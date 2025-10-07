@@ -559,8 +559,8 @@ jobs:
 
       - name: Health check
         run: |
-          sleep 10
-          curl -f https://${{ secrets.VPS_HOST }}/api/health || exit 1
+          sleep 15
+          curl -f http://${{ secrets.VPS_HOST }}/api/health || exit 1
           echo "Health check passed!"
 
       - name: Notify deployment status
