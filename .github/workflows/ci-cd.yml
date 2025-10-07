@@ -6,11 +6,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      setup_ghcr:
-        description: 'Setup GHCR access on VPS'
-        required: false
-        default: 'false'
 
 env:
   NODE_VERSION: '18'
