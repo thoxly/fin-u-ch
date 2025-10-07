@@ -57,9 +57,9 @@ COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 # Install dependencies in production (this will build native modules for this stage)
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
-# Generate Prisma Client in production stage
-WORKDIR /app/apps/api
-RUN npx prisma generate
+# Copy Prisma Client from builder (already generated there)
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Set working directory to api
 WORKDIR /app/apps/api
