@@ -41,7 +41,7 @@ COPY --from=builder /app/apps/worker/prisma ./apps/worker/prisma
 COPY --from=builder /app/apps/worker/node_modules ./apps/worker/node_modules
 
 # Install only production dependencies
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Set working directory to worker
 WORKDIR /app/apps/worker
