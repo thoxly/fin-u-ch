@@ -44,10 +44,10 @@ COPY --from=builder /app/pnpm-lock.yaml ./
 COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder /app/apps/worker/package.json ./apps/worker/
 COPY --from=builder /app/apps/worker/prisma ./apps/worker/prisma
-COPY --from=builder /app/apps/worker/node_modules ./apps/worker/node_modules
 
-# Install only production dependencies
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+# Copy all node_modules from builder (includes Prisma Client)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/worker/node_modules ./apps/worker/node_modules
 
 # Set working directory to worker
 WORKDIR /app/apps/worker

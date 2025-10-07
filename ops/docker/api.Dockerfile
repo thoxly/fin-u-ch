@@ -53,10 +53,10 @@ COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
-COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 
-# Install only production dependencies
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+# Copy all node_modules from builder (includes Prisma Client)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 
 # Set working directory to api
 WORKDIR /app/apps/api
