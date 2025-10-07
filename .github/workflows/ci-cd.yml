@@ -519,13 +519,13 @@ jobs:
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
             # Pull new images
-            docker compose pull
+            docker compose -f ops/docker/docker-compose.prod.yml pull
             
             # Apply database migrations
-            docker compose run --rm api pnpm prisma:deploy
+            docker compose -f ops/docker/docker-compose.prod.yml run --rm api pnpm prisma:deploy
             
             # Restart services with zero downtime
-            docker compose up -d --no-deps --build api web worker
+            docker compose -f ops/docker/docker-compose.prod.yml up -d --no-deps --build api web worker
             
             # Cleanup old images
             docker image prune -f
