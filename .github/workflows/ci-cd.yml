@@ -468,7 +468,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: https://${{ secrets.VPS_HOST }}
+      url: http://83.166.244.139
 
     steps:
       - name: Checkout code
