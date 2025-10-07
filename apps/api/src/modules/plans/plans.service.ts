@@ -52,14 +52,26 @@ export class PlansService {
   }
 
   async create(companyId: string, data: CreatePlanItemDTO) {
-    validateRequired({ type: data.type, startDate: data.startDate, amount: data.amount });
+    validateRequired({
+      type: data.type,
+      startDate: data.startDate,
+      amount: data.amount,
+    });
 
     const validTypes = ['income', 'expense', 'transfer'];
     if (!validTypes.includes(data.type)) {
       throw new AppError('Type must be income, expense, or transfer', 400);
     }
 
-    const validRepeat = ['none', 'daily', 'weekly', 'monthly', 'quarterly', 'semiannual', 'annual'];
+    const validRepeat = [
+      'none',
+      'daily',
+      'weekly',
+      'monthly',
+      'quarterly',
+      'semiannual',
+      'annual',
+    ];
     if (data.repeat && !validRepeat.includes(data.repeat)) {
       throw new AppError('Invalid repeat value', 400);
     }
@@ -72,7 +84,11 @@ export class PlansService {
     });
   }
 
-  async update(id: string, companyId: string, data: Partial<CreatePlanItemDTO>) {
+  async update(
+    id: string,
+    companyId: string,
+    data: Partial<CreatePlanItemDTO>
+  ) {
     await this.getById(id, companyId);
 
     return prisma.planItem.update({
@@ -92,9 +108,13 @@ export class PlansService {
   /**
    * Expand plan item into monthly amounts based on repeat setting
    */
-  expandPlan(planItem: any, periodStart: Date, periodEnd: Date): MonthlyAmount[] {
+  expandPlan(
+    planItem: any,
+    periodStart: Date,
+    periodEnd: Date
+  ): MonthlyAmount[] {
     const result: MonthlyAmount[] = [];
-    
+
     if (planItem.repeat === 'none') {
       const month = `${planItem.startDate.getFullYear()}-${String(planItem.startDate.getMonth() + 1).padStart(2, '0')}`;
       result.push({ month, amount: planItem.amount });
@@ -102,6 +122,7 @@ export class PlansService {
     }
 
     // Calculate occurrences based on repeat frequency
+    // eslint-disable-next-line prefer-const
     let currentDate = new Date(planItem.startDate);
     const endDate = planItem.endDate ? new Date(planItem.endDate) : periodEnd;
 
@@ -141,4 +162,3 @@ export class PlansService {
 }
 
 export default new PlansService();
-

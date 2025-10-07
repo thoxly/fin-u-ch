@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
 import { OperationsService, CreateOperationDTO } from './operations.service';
 import { AppError } from '../../middlewares/error';
 
@@ -46,7 +47,9 @@ describe('OperationsService', () => {
 
       expect(transferOperation.sourceAccountId).toBeDefined();
       expect(transferOperation.targetAccountId).toBeDefined();
-      expect(transferOperation.sourceAccountId).not.toBe(transferOperation.targetAccountId);
+      expect(transferOperation.sourceAccountId).not.toBe(
+        transferOperation.targetAccountId
+      );
     });
 
     it('should validate that source and target accounts are different', () => {
@@ -103,4 +106,3 @@ describe('OperationsService', () => {
     });
   });
 });
-

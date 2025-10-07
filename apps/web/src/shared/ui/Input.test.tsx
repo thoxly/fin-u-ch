@@ -39,6 +39,7 @@ describe('Input', () => {
 
   it('should forward ref correctly', () => {
     const ref = jest.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render(<Input ref={ref as any} />);
     expect(ref).toHaveBeenCalled();
   });
@@ -57,4 +58,3 @@ describe('Input', () => {
     expect(input).toHaveClass('input');
   });
 });
-

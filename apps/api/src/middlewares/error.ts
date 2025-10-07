@@ -17,10 +17,13 @@ export const errorHandler = (
   err: Error | AppError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   if (err instanceof AppError) {
-    logger.error(`AppError: ${err.message}`, { statusCode: err.statusCode, path: req.path });
+    logger.error(`AppError: ${err.message}`, {
+      statusCode: err.statusCode,
+      path: req.path,
+    });
     return res.status(err.statusCode).json({
       status: 'error',
       message: err.message,
@@ -34,4 +37,3 @@ export const errorHandler = (
     message: 'Internal server error',
   });
 };
-

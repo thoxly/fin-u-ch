@@ -11,6 +11,7 @@ const prisma = new PrismaClient({
 
 // Log queries in development
 if (process.env.NODE_ENV === 'development') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prisma.$on('query', (e: any) => {
     logger.debug(`Query: ${e.query}`);
     logger.debug(`Duration: ${e.duration}ms`);
@@ -18,4 +19,3 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 export default prisma;
-

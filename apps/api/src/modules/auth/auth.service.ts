@@ -1,7 +1,11 @@
 import prisma from '../../config/db';
 import { hashPassword, verifyPassword } from '../../utils/hash';
 import { generateAccessToken, generateRefreshToken } from '../../utils/jwt';
-import { validateEmail, validatePassword, validateRequired } from '../../utils/validation';
+import {
+  validateEmail,
+  validatePassword,
+  validateRequired,
+} from '../../utils/validation';
 import { AppError } from '../../middlewares/error';
 
 export interface RegisterDTO {
@@ -27,7 +31,11 @@ export interface TokensResponse {
 
 export class AuthService {
   async register(data: RegisterDTO): Promise<TokensResponse> {
-    validateRequired({ email: data.email, password: data.password, companyName: data.companyName });
+    validateRequired({
+      email: data.email,
+      password: data.password,
+      companyName: data.companyName,
+    });
     validateEmail(data.email);
     validatePassword(data.password);
 
@@ -43,6 +51,7 @@ export class AuthService {
     // Create company and user in a transaction
     const passwordHash = await hashPassword(data.password);
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
       const company = await tx.company.create({
         data: {
@@ -98,7 +107,10 @@ export class AuthService {
       throw new AppError('User account is inactive', 403);
     }
 
-    const isPasswordValid = await verifyPassword(data.password, user.passwordHash);
+    const isPasswordValid = await verifyPassword(
+      data.password,
+      user.passwordHash
+    );
 
     if (!isPasswordValid) {
       throw new AppError('Invalid email or password', 401);
@@ -127,7 +139,9 @@ export class AuthService {
 
   async refresh(refreshToken: string): Promise<TokensResponse> {
     try {
-      const payload = await import('../../utils/jwt').then((m) => m.verifyToken(refreshToken));
+      const payload = await import('../../utils/jwt').then((m) =>
+        m.verifyToken(refreshToken)
+      );
 
       const user = await prisma.user.findUnique({
         where: { id: payload.userId },
@@ -163,4 +177,3 @@ export class AuthService {
 }
 
 export default new AuthService();
-
