@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 
 # Generate Prisma Client
 WORKDIR /app/apps/worker
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 # Build worker
 WORKDIR /app

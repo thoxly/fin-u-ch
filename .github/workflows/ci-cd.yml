@@ -40,11 +40,11 @@ jobs:
 
       - name: Generate Prisma Client (API)
         working-directory: apps/api
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Generate Prisma Client (Worker)
         working-directory: apps/worker
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Lint
         run: pnpm lint
@@ -131,7 +131,7 @@ jobs:
 
       - name: Generate Prisma Client (API)
         working-directory: apps/api
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Build API
         run: pnpm --filter api build
@@ -141,7 +141,7 @@ jobs:
 
       - name: Generate Prisma Client (Worker)
         working-directory: apps/worker
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Build Worker
         run: pnpm --filter worker build
@@ -220,11 +220,11 @@ jobs:
 
       - name: Generate Prisma Client (API)
         working-directory: apps/api
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Run Prisma migrations
         working-directory: apps/api
-        run: npx prisma migrate deploy
+        run: pnpm exec prisma migrate deploy
 
       - name: Run unit tests (API)
         run: pnpm --filter api test:coverage
@@ -310,11 +310,11 @@ jobs:
 
       - name: Generate Prisma Client (API)
         working-directory: apps/api
-        run: npx prisma generate
+        run: pnpm exec prisma generate
 
       - name: Run Prisma migrations
         working-directory: apps/api
-        run: npx prisma migrate deploy
+        run: pnpm exec prisma migrate deploy
 
       - name: Start API server
         working-directory: apps/api
@@ -530,7 +530,7 @@ jobs:
             docker compose pull
             
             # Apply database migrations
-            docker compose run --rm api npx prisma migrate deploy
+            docker compose run --rm api pnpm exec prisma migrate deploy
             
             # Restart services with zero downtime
             docker compose up -d --no-deps --build api web worker

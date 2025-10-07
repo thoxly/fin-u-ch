@@ -22,7 +22,7 @@ RUN pnpm --filter @fin-u-ch/shared build
 
 # Generate Prisma Client
 WORKDIR /app/apps/api
-RUN npx prisma generate
+RUN pnpm exec prisma generate
 
 # Build api
 WORKDIR /app
