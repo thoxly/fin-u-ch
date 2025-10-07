@@ -512,6 +512,26 @@ jobs:
           scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
           scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
 
+      - name: Ensure VPS environment variables
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /opt/fin-u-ch
+            # Убедимся, что DOCKER_IMAGE_PREFIX установлен правильно
+            if ! grep -q "DOCKER_IMAGE_PREFIX" .env 2>/dev/null; then
+              echo "DOCKER_IMAGE_PREFIX=${{ github.repository_owner }}" >> .env
+            else
+              sed -i "s|^DOCKER_IMAGE_PREFIX=.*|DOCKER_IMAGE_PREFIX=${{ github.repository_owner }}|g" .env
+            fi
+            # Убедимся, что DOCKER_REGISTRY установлен
+            if ! grep -q "DOCKER_REGISTRY" .env 2>/dev/null; then
+              echo "DOCKER_REGISTRY=ghcr.io" >> .env
+            fi
+            # Убедимся, что IMAGE_TAG установлен
+            if ! grep -q "IMAGE_TAG" .env 2>/dev/null; then
+              echo "IMAGE_TAG=latest" >> .env
+            fi
+          EOF
+
       - name: Deploy to VPS
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'

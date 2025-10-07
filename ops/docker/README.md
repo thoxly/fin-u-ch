@@ -53,8 +53,11 @@ JWT_REFRESH_EXPIRES_IN=7d
 
 # Docker Registry
 DOCKER_REGISTRY=ghcr.io
-DOCKER_IMAGE_PREFIX=your-org/fin-u-ch
+DOCKER_IMAGE_PREFIX=your-org
 IMAGE_TAG=latest
+
+# Примечание: DOCKER_IMAGE_PREFIX - это только GitHub org/username
+# Полные имена образов будут: ghcr.io/your-org/fin-u-ch-api:latest и т.д.
 
 # Nginx
 NGINX_CONFIG=nginx.conf
