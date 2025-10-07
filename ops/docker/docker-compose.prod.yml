@@ -32,7 +32,7 @@ services:
       retries: 5
 
   api:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/api:${IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly/fin-u-ch-api}:${IMAGE_TAG:-latest}
     container_name: fin-u-ch-api
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -51,27 +51,35 @@ services:
       - fin-u-ch-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost:4000/api/health || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'wget --quiet --tries=1 --spider http://localhost:4000/api/health || exit 1',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
   web:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/web:${IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly/fin-u-ch-web}:${IMAGE_TAG:-latest}
     container_name: fin-u-ch-web
     networks:
       - fin-u-ch-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost/ || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'wget --quiet --tries=1 --spider http://localhost/ || exit 1',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
 
   worker:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/worker:${IMAGE_TAG:-latest}
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly/fin-u-ch-worker}:${IMAGE_TAG:-latest}
     container_name: fin-u-ch-worker
     environment:
       DATABASE_URL: ${DATABASE_URL}
@@ -103,7 +111,11 @@ services:
       - fin-u-ch-network
     restart: unless-stopped
     healthcheck:
-      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost/health || exit 1']
+      test:
+        [
+          'CMD-SHELL',
+          'wget --quiet --tries=1 --spider http://localhost/health || exit 1',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -128,4 +140,3 @@ volumes:
 networks:
   fin-u-ch-network:
     driver: bridge
-
