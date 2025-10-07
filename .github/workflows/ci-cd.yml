@@ -121,11 +121,19 @@ jobs:
       - name: Build shared package
         run: pnpm --filter @fin-u-ch/shared build
 
+      - name: Generate Prisma Client (API)
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Build API
         run: pnpm --filter api build
 
       - name: Build Web
         run: pnpm --filter web build
+
+      - name: Generate Prisma Client (Worker)
+        working-directory: apps/worker
+        run: npx prisma generate
 
       - name: Build Worker
         run: pnpm --filter worker build
@@ -202,15 +210,19 @@ jobs:
       - name: Build shared package
         run: pnpm --filter @fin-u-ch/shared build
 
+      - name: Generate Prisma Client (API)
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Run Prisma migrations
         working-directory: apps/api
         run: npx prisma migrate deploy
 
       - name: Run unit tests (API)
-        run: pnpm --filter api test --coverage
+        run: pnpm --filter api test:coverage
 
       - name: Run unit tests (Web)
-        run: pnpm --filter web test --coverage
+        run: pnpm --filter web test:coverage
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
@@ -288,6 +300,10 @@ jobs:
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
 
+      - name: Generate Prisma Client (API)
+        working-directory: apps/api
+        run: npx prisma generate
+
       - name: Run Prisma migrations
         working-directory: apps/api
         run: npx prisma migrate deploy
@@ -324,6 +340,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quick-checks]
     timeout-minutes: 10
+    permissions:
+      contents: read
+      security-events: write
 
     steps:
       - name: Checkout code
@@ -356,7 +375,7 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'trivy-results.sarif'

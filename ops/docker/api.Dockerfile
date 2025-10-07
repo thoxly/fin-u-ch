@@ -20,12 +20,13 @@ RUN pnpm install --frozen-lockfile
 # Build shared package
 RUN pnpm --filter @fin-u-ch/shared build
 
-# Build api
-RUN pnpm --filter api build
-
 # Generate Prisma Client
 WORKDIR /app/apps/api
 RUN npx prisma generate
+
+# Build api
+WORKDIR /app
+RUN pnpm --filter api build
 
 # Production stage
 FROM node:18-alpine

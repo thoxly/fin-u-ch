@@ -14,12 +14,13 @@ COPY apps/worker ./apps/worker
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
-# Build worker
-RUN pnpm --filter worker build
-
 # Generate Prisma Client
 WORKDIR /app/apps/worker
 RUN npx prisma generate
+
+# Build worker
+WORKDIR /app
+RUN pnpm --filter worker build
 
 # Production stage
 FROM node:18-alpine
