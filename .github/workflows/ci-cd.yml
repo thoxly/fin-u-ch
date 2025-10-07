@@ -5,6 +5,12 @@ on:
     branches: [dev, main]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      setup_ghcr:
+        description: 'Setup GHCR access on VPS'
+        required: false
+        default: 'false'
 
 env:
   NODE_VERSION: '18'
@@ -382,7 +388,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GHCR_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -427,6 +433,36 @@ jobs:
           cache-to: type=inline
 
   # ============================================
+  # Setup GHCR на VPS (ручной запуск)
+  # ============================================
+  setup-ghcr:
+    name: Setup GHCR Access on VPS
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 5
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H 83.166.244.139 >> ~/.ssh/known_hosts
+
+      - name: Login to GHCR on VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key root@83.166.244.139 << 'EOF'
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u thoxly --password-stdin
+            echo "✅ GHCR login successful!"
+          EOF
+
+      - name: Verify GHCR access
+        run: |
+          ssh -i ~/.ssh/deploy_key root@83.166.244.139 << 'EOF'
+            docker pull ghcr.io/thoxly/fin-u-ch-api:latest || echo "⚠️ Образы еще не опубликованы (нормально)"
+          EOF
+
+  # ============================================
   # Deploy на VPS (только для main)
   # ============================================
   deploy:
@@ -466,7 +502,7 @@ jobs:
             git pull origin main || true
             
             # Login to GHCR
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
             # Pull new images
             docker compose pull

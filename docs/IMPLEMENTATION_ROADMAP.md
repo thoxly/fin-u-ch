@@ -1091,62 +1091,56 @@
 ## ФАЗА 9: Настройка VPS
 
 **Длительность**: 1 день  
-**Статус**: Pending
+**Статус**: ⏳ Частично выполнено (ожидание данных от пользователя)
 
 ### 9.1 Базовая настройка сервера
 
-- [ ] Подключиться по SSH:
+- [x] Подключиться по SSH:
   ```bash
-  ssh root@<VPS_IP>
+  ssh root@83.166.244.139
   ```
-- [ ] Обновить систему:
+- [x] Обновить систему:
   ```bash
   apt update && apt upgrade -y
   ```
-- [ ] Установить Docker:
+- [x] Установить Docker:
   ```bash
   curl -fsSL https://get.docker.com -o get-docker.sh
   sh get-docker.sh
   ```
-- [ ] Установить Docker Compose:
+- [x] Установить Docker Compose:
   ```bash
   apt install docker-compose-plugin
   ```
-- [ ] Проверить:
+- [x] Проверить:
   ```bash
-  docker --version
-  docker compose version
+  docker --version  # v28.5.0
+  docker compose version  # v2.40.0
   ```
-- [ ] Создать пользователя для деплоя (опционально):
-  ```bash
-  adduser deploy
-  usermod -aG docker deploy
-  su - deploy
-  ```
+- [ ] Создать пользователя для деплоя (опционально, не требуется)
 
 ### 9.2 Firewall и безопасность
 
-- [ ] Установить UFW:
+- [x] Установить UFW:
   ```bash
-  apt install ufw
+  apt install ufw  # уже установлен v0.36.2
   ```
-- [ ] Настроить правила:
+- [x] Настроить правила:
   ```bash
   ufw allow 22/tcp    # SSH
   ufw allow 80/tcp    # HTTP
   ufw allow 443/tcp   # HTTPS
   ufw enable
-  ufw status
+  ufw status          # Firewall is active
   ```
-- [ ] Настроить SSH:
+- [x] Настроить SSH:
   - Запретить вход по паролю (только по ключу)
-  - Изменить порт SSH (опционально)
   - Отредактировать `/etc/ssh/sshd_config`:
     ```
     PasswordAuthentication no
     PermitRootLogin prohibit-password
     ```
-  - Перезапустить SSH: `systemctl restart sshd`
+  - Перезапустить SSH: `systemctl restart ssh` ✅
 
 ### 9.3 SSL сертификаты
 
@@ -1172,35 +1166,25 @@
 
 ### 9.4 Создание структуры проекта на сервере
 
-- [ ] Создать директорию:
+- [x] Создать директорию:
   ```bash
   mkdir -p /opt/fin-u-ch
   cd /opt/fin-u-ch
   ```
-- [ ] Создать `.env` файл:
-  ```bash
-  nano .env
-  ```
-  Добавить:
-  ```env
-  POSTGRES_DB=fin_u_ch
-  POSTGRES_USER=postgres
-  POSTGRES_PASSWORD=<strong-password>
-  DATABASE_URL=postgresql://postgres:<strong-password>@postgres:5432/fin_u_ch
-  REDIS_URL=redis://redis:6379
-  JWT_SECRET=<strong-jwt-secret>
-  IMAGE_TAG=latest
-  ```
-- [ ] Создать `docker-compose.yml` (симлинк на prod версию или скопировать)
-- [ ] Создать папку для nginx конфига:
+- [x] Создать `.env` файл:
+  - Пароли и секреты сгенерированы автоматически
+  - POSTGRES_PASSWORD: 32-символьный случайный пароль
+  - JWT_SECRET: 64-байтный ключ
+- [x] Скопировать `docker-compose.yml` на сервер
+- [x] Создать папку для nginx конфига:
   ```bash
   mkdir -p ops/nginx
   ```
 
 ### 9.5 Настройка Nginx
 
-- [ ] Скопировать `nginx.conf` на сервер
-- [ ] Обновить `nginx.conf` для HTTPS:
+- [x] Скопировать `nginx.conf` на сервер
+- [ ] Обновить `nginx.conf` для HTTPS (требует SSL сертификаты):
 
   ```nginx
   server {
@@ -1228,7 +1212,16 @@
   echo $GHCR_TOKEN | docker login ghcr.io -u <username> --password-stdin
   ```
 
-**Критерий готовности**: VPS готов к деплою, Docker и Docker Compose работают, firewall настроен.
+**Критерий готовности**:
+
+- ✅ VPS готов к деплою
+- ✅ Docker v28.5.0 и Docker Compose v2.40.0 работают
+- ✅ Firewall настроен (UFW active)
+- ✅ SSH безопасность (только ключи)
+- ✅ Структура проекта создана
+- ✅ Nginx конфигурация загружена
+- ⏳ SSL сертификаты (требует домен)
+- ⏳ GHCR доступ (требует token и username)
 
 ---
 
