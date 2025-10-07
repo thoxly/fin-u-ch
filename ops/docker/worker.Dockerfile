@@ -29,8 +29,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install OpenSSL for Prisma
-RUN apk add --no-cache openssl
+# Install OpenSSL and build dependencies for native modules
+RUN apk add --no-cache openssl python3 make g++
 
 # Install pnpm
 RUN npm install -g pnpm
@@ -45,9 +45,11 @@ COPY --from=builder /app/apps/worker/dist ./apps/worker/dist
 COPY --from=builder /app/apps/worker/package.json ./apps/worker/
 COPY --from=builder /app/apps/worker/prisma ./apps/worker/prisma
 
-# Copy all node_modules from builder (includes Prisma Client)
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/worker/node_modules ./apps/worker/node_modules
+# Install dependencies in production (this will build native modules for this stage)
+RUN pnpm install --frozen-lockfile --prod
+
+# Generate Prisma Client in production stage
+RUN pnpm --filter worker prisma:generate
 
 # Set working directory to worker
 WORKDIR /app/apps/worker
