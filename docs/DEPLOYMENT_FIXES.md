@@ -139,9 +139,45 @@ DOCKER_IMAGE_PREFIX=thoxly
 IMAGE_TAG=latest
 ```
 
+## 🔴 Проблема 4: Prisma Client Not Found
+
+### Симптом
+
+```
+Error: Cannot find module '.prisma/client/default'
+ELIFECYCLE Command failed with exit code 1
+```
+
+### Причина
+
+В production stage Dockerfile выполнялся `pnpm install --prod`, который перезаписывал `node_modules` и удалял сгенерированный Prisma Client.
+
+### Решение
+
+**Коммит:** `3026525`
+
+Убран `pnpm install --prod` и используются `node_modules` из builder stage:
+
+```dockerfile
+# Было:
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+
+# Стало:
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+# Без pnpm install
+```
+
+Изменённые файлы:
+
+- `ops/docker/api.Dockerfile`
+- `ops/docker/worker.Dockerfile`
+
 ## 📊 Коммиты
 
 ```
+3026525 - fix: preserve Prisma Client in Docker images
 ee8aa79 - fix: use HTTP instead of HTTPS for health check
 4d14fd5 - fix: add OpenSSL to Docker images for Prisma compatibility
 b8dd5f7 - fix: correct Docker image naming in production deployment
