@@ -505,6 +505,13 @@ jobs:
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
+      - name: Copy docker-compose to VPS
+        run: |
+          scp -i ~/.ssh/deploy_key ops/docker/docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/docker-compose.prod.yml
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
+          scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
+          scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
+
       - name: Deploy to VPS
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
@@ -512,20 +519,17 @@ jobs:
             
             cd /opt/fin-u-ch
             
-            # Pull latest docker-compose config
-            git pull origin main || true
-            
             # Login to GHCR
             echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
             # Pull new images
-            docker compose -f ops/docker/docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml pull
             
             # Apply database migrations
-            docker compose -f ops/docker/docker-compose.prod.yml run --rm api pnpm prisma:deploy
+            docker compose -f docker-compose.prod.yml run --rm api pnpm prisma:deploy
             
             # Restart services with zero downtime
-            docker compose -f ops/docker/docker-compose.prod.yml up -d --no-deps --build api web worker
+            docker compose -f docker-compose.prod.yml up -d --no-deps --build api web worker
             
             # Cleanup old images
             docker image prune -f
