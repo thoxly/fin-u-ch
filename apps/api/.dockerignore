@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development files
+*.log
+npm-debug.log*
+nodemon.json
+
+# Testing
+coverage
+*.test.ts
+*.spec.ts
+__tests__
+__mocks__
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Prisma
+prisma/migrations/**/*.md
+
+# Documentation
+README.md
+

@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id           String   @id @default(uuid())
+  name         String
+  currencyBase String   @default("RUB")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  users          User[]
+  accounts       Account[]
+  departments    Department[]
+  counterparties Counterparty[]
+  deals          Deal[]
+  articles       Article[]
+  operations     Operation[]
+  planItems      PlanItem[]
+  salaries       Salary[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  companyId    String
+  email        String   @unique
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model Account {
+  id                String   @id @default(uuid())
+  companyId         String
+  name              String
+  number            String?
+  currency          String   @default("RUB")
+  openingBalance    Float    @default(0)
+  excludeFromTotals Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  operations         Operation[] @relation("AccountOperations")
+  sourceOperations   Operation[] @relation("SourceAccountOperations")
+  targetOperations   Operation[] @relation("TargetAccountOperations")
+  planItems          PlanItem[]
+
+  @@index([companyId])
+  @@map("accounts")
+}
+
+model Department {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  operations Operation[]
+  salaries   Salary[]
+
+  @@index([companyId])
+  @@map("departments")
+}
+
+model Counterparty {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  inn         String?
+  category    String   // supplier|customer|gov|employee|other
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals        Deal[]
+  operations   Operation[]
+  salaries     Salary[]
+
+  @@index([companyId])
+  @@map("counterparties")
+}
+
+model Deal {
+  id              String   @id @default(uuid())
+  companyId       String
+  name            String
+  amount          Float?
+  departmentId    String?
+  counterpartyId  String?
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  operations   Operation[]
+  planItems    PlanItem[]
+
+  @@index([companyId])
+  @@map("deals")
+}
+
+model Article {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  parentId    String?
+  type        String   // income|expense
+  activity    String?  // operating|investing|financing
+  indicator   String?  // cash|accrual
+  isActive    Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent     Article?    @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children   Article[]   @relation("ArticleHierarchy")
+  operations Operation[]
+  planItems  PlanItem[]
+
+  @@index([companyId])
+  @@index([companyId, parentId])
+  @@map("articles")
+}
+
+model Operation {
+  id                String   @id @default(uuid())
+  companyId         String
+  type              String   // income|expense|transfer
+  operationDate     DateTime
+  amount            Float
+  currency          String   @default("RUB")
+  accountId         String?
+  sourceAccountId   String?
+  targetAccountId   String?
+  articleId         String?
+  counterpartyId    String?
+  dealId            String?
+  departmentId      String?
+  description       String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account       Account?      @relation("AccountOperations", fields: [accountId], references: [id], onDelete: SetNull)
+  sourceAccount Account?      @relation("SourceAccountOperations", fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  targetAccount Account?      @relation("TargetAccountOperations", fields: [targetAccountId], references: [id], onDelete: SetNull)
+  article       Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  counterparty  Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  deal          Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  department    Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, operationDate])
+  @@index([companyId, articleId, operationDate])
+  @@map("operations")
+}
+
+model PlanItem {
+  id          String    @id @default(uuid())
+  companyId   String
+  type        String    // income|expense|transfer
+  startDate   DateTime
+  endDate     DateTime?
+  amount      Float
+  currency    String    @default("RUB")
+  articleId   String?
+  accountId   String?
+  dealId      String?
+  repeat      String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
+  status      String    @default("active") // active|paused|archived
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, startDate, repeat])
+  @@map("plan_items")
+}
+
+model Salary {
+  id                   String    @id @default(uuid())
+  companyId            String
+  employeeCounterpartyId String
+  departmentId         String?
+  baseWage             Float
+  contributionsPct     Float     @default(30.0)
+  incomeTaxPct         Float     @default(13.0)
+  periodicity          String    @default("monthly") // monthly|weekly|biweekly
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  company            Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  employeeCounterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
+  department         Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@map("salaries")
+}
+

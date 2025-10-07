@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+build
+
+# Environment files
+.env
+.env.*
+
+# Development files
+*.log
+npm-debug.log*
+
+# Testing
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+__mocks__
+e2e
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+README.md
+
+# Vite
+vite.config.ts.timestamp-*
+

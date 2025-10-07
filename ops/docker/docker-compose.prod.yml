@@ -1,0 +1,131 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fin-u-ch-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fin_u_ch}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fin-u-ch-redis
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/api:${IMAGE_TAG:-latest}
+    container_name: fin-u-ch-api
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      NODE_ENV: production
+      PORT: 4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost:4000/api/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  web:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/web:${IMAGE_TAG:-latest}
+    container_name: fin-u-ch-web
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost/ || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  worker:
+    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-fin-u-ch}/worker:${IMAGE_TAG:-latest}
+    container_name: fin-u-ch-worker
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: fin-u-ch-nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/${NGINX_CONFIG:-nginx.conf}:/etc/nginx/conf.d/default.conf:ro
+      - ${SSL_CERT_PATH:-./nginx/ssl}:/etc/nginx/ssl:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - api
+      - web
+    networks:
+      - fin-u-ch-network
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --tries=1 --spider http://localhost/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: fin-u-ch-certbot
+    volumes:
+      - ${SSL_CERT_PATH:-./nginx/ssl}:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - fin-u-ch-network
+    profiles:
+      - ssl
+
+volumes:
+  postgres_data:
+  certbot_www:
+
+networks:
+  fin-u-ch-network:
+    driver: bridge
+

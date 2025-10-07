@@ -1,0 +1,88 @@
+/**
+ * Operation and Plan types
+ */
+
+import { OperationType, Periodicity, PlanStatus } from '../constants/enums';
+
+export interface Operation {
+  id: string;
+  companyId: string;
+  type: OperationType;
+  operationDate: Date;
+  amount: number;
+  currency: string;
+  accountId?: string | null;
+  sourceAccountId?: string | null;
+  targetAccountId?: string | null;
+  articleId: string;
+  counterpartyId?: string | null;
+  dealId?: string | null;
+  departmentId?: string | null;
+  description?: string | null;
+  recurrenceId?: string | null;
+  createdBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+}
+
+export interface PlanItem {
+  id: string;
+  companyId: string;
+  type: OperationType;
+  startDate: Date;
+  endDate?: Date | null;
+  amount: number;
+  currency: string;
+  articleId: string;
+  counterpartyId?: string | null;
+  dealId?: string | null;
+  departmentId?: string | null;
+  description?: string | null;
+  repeat: Periodicity;
+  accountId?: string | null;
+  sourceAccountId?: string | null;
+  targetAccountId?: string | null;
+  status: PlanStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+}
+
+export interface CreateOperationDTO {
+  type: OperationType;
+  operationDate: Date | string;
+  amount: number;
+  currency: string;
+  accountId?: string;
+  sourceAccountId?: string;
+  targetAccountId?: string;
+  articleId: string;
+  counterpartyId?: string;
+  dealId?: string;
+  departmentId?: string;
+  description?: string;
+}
+
+export interface CreatePlanItemDTO {
+  type: OperationType;
+  startDate: Date | string;
+  endDate?: Date | string;
+  amount: number;
+  currency: string;
+  articleId: string;
+  counterpartyId?: string;
+  dealId?: string;
+  departmentId?: string;
+  description?: string;
+  repeat: Periodicity;
+  accountId?: string;
+  sourceAccountId?: string;
+  targetAccountId?: string;
+  status?: PlanStatus;
+}
+
+export interface MonthlyAmount {
+  month: string;
+  amount: number;
+}

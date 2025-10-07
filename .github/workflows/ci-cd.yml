@@ -1,0 +1,533 @@
+name: CI/CD with AI Review
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  PNPM_VERSION: '9'
+
+jobs:
+  # ============================================
+  # Быстрые проверки (lint, format, types)
+  # ============================================
+  quick-checks:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Type check
+        run: pnpm type-check
+
+  # ============================================
+  # AI Code Review (только для PR)
+  # ============================================
+  ai-code-review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Нужна вся история для diff
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install AI Review dependencies
+        working-directory: scripts/ai-review
+        run: pnpm install --frozen-lockfile
+
+      - name: Build AI Review script
+        working-directory: scripts/ai-review
+        run: pnpm build
+
+      - name: Run AI Code Review
+        working-directory: scripts/ai-review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: pnpm start
+
+  # ============================================
+  # Сборка проекта
+  # ============================================
+  build:
+    name: Build All Packages
+    runs-on: ubuntu-latest
+    needs: [quick-checks]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @fin-u-ch/shared build
+
+      - name: Build API
+        run: pnpm --filter api build
+
+      - name: Build Web
+        run: pnpm --filter web build
+
+      - name: Build Worker
+        run: pnpm --filter worker build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            packages/shared/dist
+            apps/api/dist
+            apps/web/dist
+            apps/worker/dist
+          retention-days: 1
+
+  # ============================================
+  # Тесты
+  # ============================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: [quick-checks]
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fin_u_ch_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fin_u_ch_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @fin-u-ch/shared build
+
+      - name: Run Prisma migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Run unit tests (API)
+        run: pnpm --filter api test --coverage
+
+      - name: Run unit tests (Web)
+        run: pnpm --filter web test --coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: |
+            apps/api/coverage/lcov.info
+            apps/web/coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  # ============================================
+  # E2E тесты (Playwright)
+  # ============================================
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fin_u_ch_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fin_u_ch_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: test-jwt-secret
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Install Playwright browsers
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Prisma migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: Start API server
+        working-directory: apps/api
+        run: |
+          pnpm start &
+          sleep 5
+
+      - name: Start Web server
+        working-directory: apps/web
+        run: |
+          pnpm preview &
+          sleep 3
+
+      - name: Run E2E tests
+        working-directory: apps/web
+        run: pnpm test:e2e
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+
+  # ============================================
+  # Security Scan
+  # ============================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [quick-checks]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run pnpm audit
+        run: pnpm audit --audit-level=high || true
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # ============================================
+  # Docker Build & Push (только для main)
+  # ============================================
+  docker-build:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build, test, test-e2e, security-scan]
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ops/docker/api.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:${{ steps.meta.outputs.sha_short }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
+          cache-to: type=inline
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ops/docker/web.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-web:latest
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-web:${{ steps.meta.outputs.sha_short }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fin-u-ch-web:latest
+          cache-to: type=inline
+
+      - name: Build and push Worker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ops/docker/worker.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-worker:latest
+            ghcr.io/${{ github.repository_owner }}/fin-u-ch-worker:${{ steps.meta.outputs.sha_short }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fin-u-ch-worker:latest
+          cache-to: type=inline
+
+  # ============================================
+  # Deploy на VPS (только для main)
+  # ============================================
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [docker-build]
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://${{ secrets.VPS_HOST }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup before deployment
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+
+      - name: Deploy to VPS
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+            
+            cd /opt/fin-u-ch
+            
+            # Pull latest docker-compose config
+            git pull origin main || true
+            
+            # Login to GHCR
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            
+            # Pull new images
+            docker compose pull
+            
+            # Apply database migrations
+            docker compose run --rm api npx prisma migrate deploy
+            
+            # Restart services with zero downtime
+            docker compose up -d --no-deps --build api web worker
+            
+            # Cleanup old images
+            docker image prune -f
+            
+            echo "Deployment completed successfully!"
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl -f https://${{ secrets.VPS_HOST }}/api/health || exit 1
+          echo "Health check passed!"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful to production"
+          else
+            echo "❌ Deployment failed"
+            exit 1
+          fi
+
+  # ============================================
+  # Финальная нотификация
+  # ============================================
+  notify:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      [
+        quick-checks,
+        ai-code-review,
+        build,
+        test,
+        test-e2e,
+        security-scan,
+        docker-build,
+        deploy,
+      ]
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## CI/CD Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint & Type Check: ${{ needs.quick-checks.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- AI Code Review: ${{ needs.ai-code-review.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- E2E Tests: ${{ needs.test-e2e.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Build: ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Deploy: ${{ needs.deploy.result }}" >> $GITHUB_STEP_SUMMARY
