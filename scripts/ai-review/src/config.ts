@@ -62,4 +62,3 @@ export function validateConfig(): void {
     process.exit(1);
   }
 }
-

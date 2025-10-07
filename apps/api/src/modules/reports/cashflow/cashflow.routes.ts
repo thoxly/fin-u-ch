@@ -11,4 +11,3 @@ router.use(extractTenant);
 router.get('/', cashflowController.getCashflow);
 
 export default router;
-

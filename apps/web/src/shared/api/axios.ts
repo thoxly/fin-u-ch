@@ -39,10 +39,9 @@ apiClient.interceptors.response.use(
         }
 
         // Попытка обновить токен
-        const response = await axios.post(
-          `${config.apiUrl}/auth/refresh`,
-          { refreshToken }
-        );
+        const response = await axios.post(`${config.apiUrl}/auth/refresh`, {
+          refreshToken,
+        });
 
         const { accessToken, refreshToken: newRefreshToken } = response.data;
 
@@ -65,4 +64,3 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-

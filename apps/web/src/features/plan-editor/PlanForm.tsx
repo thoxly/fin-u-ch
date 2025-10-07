@@ -6,7 +6,10 @@ import {
   useCreatePlanMutation,
   useUpdatePlanMutation,
 } from '../../store/api/plansApi';
-import { useGetArticlesQuery, useGetAccountsQuery } from '../../store/api/catalogsApi';
+import {
+  useGetArticlesQuery,
+  useGetAccountsQuery,
+} from '../../store/api/catalogsApi';
 import { toISODate } from '../../shared/lib/date';
 import type { PlanItem } from '@shared/types/operations';
 
@@ -179,4 +182,3 @@ export const PlanForm = ({ plan, onClose }: PlanFormProps) => {
     </form>
   );
 };
-

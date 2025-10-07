@@ -27,10 +27,7 @@ export class BDDSService {
         companyId,
         status: 'active',
         startDate: { lte: params.periodTo },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: params.periodFrom } },
-        ],
+        OR: [{ endDate: null }, { endDate: { gte: params.periodFrom } }],
       },
       include: {
         article: { select: { id: true, name: true, type: true } },
@@ -43,7 +40,11 @@ export class BDDSService {
     for (const planItem of planItems) {
       if (!planItem.article) continue;
 
-      const expanded = plansService.expandPlan(planItem, params.periodFrom, params.periodTo);
+      const expanded = plansService.expandPlan(
+        planItem,
+        params.periodFrom,
+        params.periodTo
+      );
 
       const key = planItem.article.id;
       if (!articleMap.has(key)) {
@@ -65,8 +66,10 @@ export class BDDSService {
       }
     }
 
-    const result = Array.from(articleMap.values()).sort((a, b) => 
-      a.type.localeCompare(b.type) || a.articleName.localeCompare(b.articleName)
+    const result = Array.from(articleMap.values()).sort(
+      (a, b) =>
+        a.type.localeCompare(b.type) ||
+        a.articleName.localeCompare(b.articleName)
     );
 
     await cacheReport(cacheKey, result);
@@ -75,4 +78,3 @@ export class BDDSService {
 }
 
 export default new BDDSService();
-

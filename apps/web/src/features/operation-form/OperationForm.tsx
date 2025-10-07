@@ -40,7 +40,9 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
     operation?.counterpartyId || ''
   );
   const [dealId, setDealId] = useState(operation?.dealId || '');
-  const [departmentId, setDepartmentId] = useState(operation?.departmentId || '');
+  const [departmentId, setDepartmentId] = useState(
+    operation?.departmentId || ''
+  );
   const [description, setDescription] = useState(operation?.description || '');
 
   const { data: articles = [] } = useGetArticlesQuery();
@@ -64,8 +66,10 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
       currency,
       articleId: articleId || undefined,
       accountId: type !== 'transfer' ? accountId || undefined : undefined,
-      sourceAccountId: type === 'transfer' ? sourceAccountId || undefined : undefined,
-      targetAccountId: type === 'transfer' ? targetAccountId || undefined : undefined,
+      sourceAccountId:
+        type === 'transfer' ? sourceAccountId || undefined : undefined,
+      targetAccountId:
+        type === 'transfer' ? targetAccountId || undefined : undefined,
       counterpartyId: counterpartyId || undefined,
       dealId: dealId || undefined,
       departmentId: departmentId || undefined,
@@ -74,7 +78,10 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
 
     try {
       if (operation) {
-        await updateOperation({ id: operation.id, data: operationData }).unwrap();
+        await updateOperation({
+          id: operation.id,
+          data: operationData,
+        }).unwrap();
       } else {
         await createOperation(operationData).unwrap();
       }
@@ -218,4 +225,3 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
     </form>
   );
 };
-

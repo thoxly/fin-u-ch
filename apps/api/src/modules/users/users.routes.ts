@@ -51,4 +51,3 @@ router.patch('/me', usersController.updateMe);
 router.get('/', usersController.getAll);
 
 export default router;
-

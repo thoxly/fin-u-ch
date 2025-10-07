@@ -116,11 +116,11 @@ describe('DashboardService', () => {
       for (const op of operations) {
         const date = new Date(op.operationDate);
         const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        
+
         if (!monthsMap.has(month)) {
           monthsMap.set(month, { income: 0, expense: 0 });
         }
-        
+
         const data = monthsMap.get(month)!;
         if (op.type === 'income') data.income += op.amount;
         if (op.type === 'expense') data.expense += op.amount;
@@ -132,4 +132,3 @@ describe('DashboardService', () => {
     });
   });
 });
-

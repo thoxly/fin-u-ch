@@ -19,7 +19,10 @@ export const plansApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Plan', 'Dashboard', 'Report'],
     }),
-    updatePlan: builder.mutation<PlanItem, { id: string; data: Partial<PlanItem> }>({
+    updatePlan: builder.mutation<
+      PlanItem,
+      { id: string; data: Partial<PlanItem> }
+    >({
       query: ({ id, data }) => ({
         url: `/plans/${id}`,
         method: 'PATCH',
@@ -44,4 +47,3 @@ export const {
   useUpdatePlanMutation,
   useDeletePlanMutation,
 } = plansApi;
-

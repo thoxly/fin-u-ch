@@ -12,4 +12,3 @@ router.use('/bdds', bddsRoutes);
 router.use('/planfact', planfactRoutes);
 
 export default router;
-

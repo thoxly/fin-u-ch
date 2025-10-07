@@ -43,4 +43,3 @@ router.patch('/:id', operationsController.update);
 router.delete('/:id', operationsController.delete);
 
 export default router;
-

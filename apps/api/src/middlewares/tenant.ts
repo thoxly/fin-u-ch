@@ -36,4 +36,3 @@ export const extractTenant = async (
     next(error);
   }
 };
-

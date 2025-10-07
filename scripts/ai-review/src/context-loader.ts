@@ -24,4 +24,3 @@ export async function loadProjectContext(): Promise<string> {
 
   return context;
 }
-

@@ -39,4 +39,3 @@ router.use(extractTenant);
 router.get('/', dashboardController.getDashboard);
 
 export default router;
-

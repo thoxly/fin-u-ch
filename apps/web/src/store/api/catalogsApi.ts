@@ -23,7 +23,10 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Article'],
     }),
-    updateArticle: builder.mutation<Article, { id: string; data: Partial<Article> }>({
+    updateArticle: builder.mutation<
+      Article,
+      { id: string; data: Partial<Article> }
+    >({
       query: ({ id, data }) => ({
         url: `/articles/${id}`,
         method: 'PATCH',
@@ -52,7 +55,10 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Account'],
     }),
-    updateAccount: builder.mutation<Account, { id: string; data: Partial<Account> }>({
+    updateAccount: builder.mutation<
+      Account,
+      { id: string; data: Partial<Account> }
+    >({
       query: ({ id, data }) => ({
         url: `/accounts/${id}`,
         method: 'PATCH',
@@ -81,7 +87,10 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Department'],
     }),
-    updateDepartment: builder.mutation<Department, { id: string; data: Partial<Department> }>({
+    updateDepartment: builder.mutation<
+      Department,
+      { id: string; data: Partial<Department> }
+    >({
       query: ({ id, data }) => ({
         url: `/departments/${id}`,
         method: 'PATCH',
@@ -110,7 +119,10 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Counterparty'],
     }),
-    updateCounterparty: builder.mutation<Counterparty, { id: string; data: Partial<Counterparty> }>({
+    updateCounterparty: builder.mutation<
+      Counterparty,
+      { id: string; data: Partial<Counterparty> }
+    >({
       query: ({ id, data }) => ({
         url: `/counterparties/${id}`,
         method: 'PATCH',
@@ -168,7 +180,10 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Salary'],
     }),
-    updateSalary: builder.mutation<Salary, { id: string; data: Partial<Salary> }>({
+    updateSalary: builder.mutation<
+      Salary,
+      { id: string; data: Partial<Salary> }
+    >({
       query: ({ id, data }) => ({
         url: `/salaries/${id}`,
         method: 'PATCH',
@@ -212,4 +227,3 @@ export const {
   useUpdateSalaryMutation,
   useDeleteSalaryMutation,
 } = catalogsApi;
-

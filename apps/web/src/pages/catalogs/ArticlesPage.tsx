@@ -39,18 +39,32 @@ export const ArticlesPage = () => {
 
   const columns = [
     { key: 'name', header: 'Название' },
-    { key: 'type', header: 'Тип', render: (a: Article) => a.type === 'income' ? 'Доход' : 'Расход' },
+    {
+      key: 'type',
+      header: 'Тип',
+      render: (a: Article) => (a.type === 'income' ? 'Доход' : 'Расход'),
+    },
     { key: 'activity', header: 'Деятельность' },
-    { key: 'isActive', header: 'Активна', render: (a: Article) => a.isActive ? 'Да' : 'Нет' },
+    {
+      key: 'isActive',
+      header: 'Активна',
+      render: (a: Article) => (a.isActive ? 'Да' : 'Нет'),
+    },
     {
       key: 'actions',
       header: 'Действия',
       render: (a: Article) => (
         <div className="flex gap-2">
-          <button onClick={() => handleEdit(a)} className="text-primary-600 hover:text-primary-800 text-sm">
+          <button
+            onClick={() => handleEdit(a)}
+            className="text-primary-600 hover:text-primary-800 text-sm"
+          >
             Изменить
           </button>
-          <button onClick={() => handleDelete(a.id)} className="text-red-600 hover:text-red-800 text-sm">
+          <button
+            onClick={() => handleDelete(a.id)}
+            className="text-red-600 hover:text-red-800 text-sm"
+          >
             Удалить
           </button>
         </div>
@@ -67,7 +81,12 @@ export const ArticlesPage = () => {
         </div>
 
         <Card>
-          <Table columns={columns} data={articles} keyExtractor={(a) => a.id} loading={isLoading} />
+          <Table
+            columns={columns}
+            data={articles}
+            keyExtractor={(a) => a.id}
+            loading={isLoading}
+          />
         </Card>
 
         <Modal
@@ -82,7 +101,13 @@ export const ArticlesPage = () => {
   );
 };
 
-const ArticleForm = ({ article, onClose }: { article: Article | null; onClose: () => void }) => {
+const ArticleForm = ({
+  article,
+  onClose,
+}: {
+  article: Article | null;
+  onClose: () => void;
+}) => {
   const [name, setName] = useState(article?.name || '');
   const [type, setType] = useState(article?.type || 'expense');
   const [activity, setActivity] = useState(article?.activity || 'operating');
@@ -95,7 +120,10 @@ const ArticleForm = ({ article, onClose }: { article: Article | null; onClose: (
     e.preventDefault();
     try {
       if (article) {
-        await update({ id: article.id, data: { name, type, activity, isActive } }).unwrap();
+        await update({
+          id: article.id,
+          data: { name, type, activity, isActive },
+        }).unwrap();
       } else {
         await create({ name, type, activity, isActive }).unwrap();
       }
@@ -107,7 +135,12 @@ const ArticleForm = ({ article, onClose }: { article: Article | null; onClose: (
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Input label="Название" value={name} onChange={(e) => setName(e.target.value)} required />
+      <Input
+        label="Название"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        required
+      />
       <Select
         label="Тип"
         value={type}
@@ -130,7 +163,11 @@ const ArticleForm = ({ article, onClose }: { article: Article | null; onClose: (
         required
       />
       <label className="flex items-center gap-2">
-        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+        <input
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+        />
         <span className="text-sm">Активна</span>
       </label>
       <div className="flex gap-4 pt-4">
@@ -144,4 +181,3 @@ const ArticleForm = ({ article, onClose }: { article: Article | null; onClose: (
     </form>
   );
 };
-

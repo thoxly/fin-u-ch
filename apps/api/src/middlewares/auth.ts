@@ -33,4 +33,3 @@ export const authenticate = (
     next(new AppError('Invalid or expired token', 401));
   }
 };
-

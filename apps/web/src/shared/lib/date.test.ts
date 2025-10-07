@@ -1,4 +1,10 @@
-import { formatDate, formatDateTime, formatMonth, getCurrentMonth, toISODate } from './date';
+import {
+  formatDate,
+  formatDateTime,
+  formatMonth,
+  getCurrentMonth,
+  toISODate,
+} from './date';
 
 describe('Date Utils', () => {
   describe('formatDate', () => {
@@ -52,4 +58,3 @@ describe('Date Utils', () => {
     });
   });
 });
-

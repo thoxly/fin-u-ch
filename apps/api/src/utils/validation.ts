@@ -20,4 +20,3 @@ export const validateRequired = (fields: Record<string, any>): void => {
     }
   }
 };
-

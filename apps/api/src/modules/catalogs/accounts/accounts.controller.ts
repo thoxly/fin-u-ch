@@ -14,7 +14,10 @@ export class AccountsController {
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.getById(req.params.id, req.companyId!);
+      const result = await accountsService.getById(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -32,7 +35,11 @@ export class AccountsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.update(req.params.id, req.companyId!, req.body);
+      const result = await accountsService.update(
+        req.params.id,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -41,7 +48,10 @@ export class AccountsController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.delete(req.params.id, req.companyId!);
+      const result = await accountsService.delete(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -50,4 +60,3 @@ export class AccountsController {
 }
 
 export default new AccountsController();
-

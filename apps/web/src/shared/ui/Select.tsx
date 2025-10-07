@@ -16,7 +16,15 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
-    { label, error, options, placeholder, fullWidth = true, className, ...props },
+    {
+      label,
+      error,
+      options,
+      placeholder,
+      fullWidth = true,
+      className,
+      ...props
+    },
     ref
   ) => {
     return (
@@ -45,4 +53,3 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 );
 
 Select.displayName = 'Select';
-

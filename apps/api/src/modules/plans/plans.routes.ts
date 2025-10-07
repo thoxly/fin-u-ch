@@ -28,4 +28,3 @@ router.patch('/:id', plansController.update);
 router.delete('/:id', plansController.delete);
 
 export default router;
-

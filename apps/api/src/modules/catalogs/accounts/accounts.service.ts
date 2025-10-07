@@ -61,4 +61,3 @@ export class AccountsService {
 }
 
 export default new AccountsService();
-

@@ -12,12 +12,24 @@ export interface DashboardResponse {
   income: number;
   expense: number;
   netProfit: number;
-  balancesByAccount: Array<{ accountId: string; accountName: string; balance: number }>;
-  series: Array<{ month: string; income: number; expense: number; plan?: number }>;
+  balancesByAccount: Array<{
+    accountId: string;
+    accountName: string;
+    balance: number;
+  }>;
+  series: Array<{
+    month: string;
+    income: number;
+    expense: number;
+    plan?: number;
+  }>;
 }
 
 export class DashboardService {
-  async getDashboard(companyId: string, params: DashboardParams): Promise<DashboardResponse> {
+  async getDashboard(
+    companyId: string,
+    params: DashboardParams
+  ): Promise<DashboardResponse> {
     const cacheKey = generateCacheKey(companyId, 'dashboard', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -48,8 +60,14 @@ export class DashboardService {
     const incomeOps = operations.filter((op: any) => op.type === 'income');
     const expenseOps = operations.filter((op: any) => op.type === 'expense');
 
-    result.income = incomeOps.reduce((sum: number, op: any) => sum + op.amount, 0);
-    result.expense = expenseOps.reduce((sum: number, op: any) => sum + op.amount, 0);
+    result.income = incomeOps.reduce(
+      (sum: number, op: any) => sum + op.amount,
+      0
+    );
+    result.expense = expenseOps.reduce(
+      (sum: number, op: any) => sum + op.amount,
+      0
+    );
     result.netProfit = result.income - result.expense;
 
     // Calculate balances by account
@@ -59,7 +77,10 @@ export class DashboardService {
 
     for (const account of accounts) {
       const accountOps = operations.filter(
-        (op: any) => op.accountId === account.id || op.sourceAccountId === account.id || op.targetAccountId === account.id
+        (op: any) =>
+          op.accountId === account.id ||
+          op.sourceAccountId === account.id ||
+          op.targetAccountId === account.id
       );
 
       let balance = account.openingBalance;
@@ -104,4 +125,3 @@ export class DashboardService {
 }
 
 export default new DashboardService();
-

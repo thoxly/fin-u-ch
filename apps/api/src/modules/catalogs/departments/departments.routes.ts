@@ -15,4 +15,3 @@ router.patch('/:id', departmentsController.update);
 router.delete('/:id', departmentsController.delete);
 
 export default router;
-

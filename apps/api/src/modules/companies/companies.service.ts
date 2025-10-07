@@ -21,7 +21,10 @@ export class CompaniesService {
     return company;
   }
 
-  async update(companyId: string, data: { name?: string; currencyBase?: string }) {
+  async update(
+    companyId: string,
+    data: { name?: string; currencyBase?: string }
+  ) {
     return prisma.company.update({
       where: { id: companyId },
       data,
@@ -36,4 +39,3 @@ export class CompaniesService {
 }
 
 export default new CompaniesService();
-

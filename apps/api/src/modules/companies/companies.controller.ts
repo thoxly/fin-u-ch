@@ -23,4 +23,3 @@ export class CompaniesController {
 }
 
 export default new CompaniesController();
-

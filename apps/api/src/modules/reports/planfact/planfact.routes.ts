@@ -11,4 +11,3 @@ router.use(extractTenant);
 router.get('/', planfactController.getPlanFact);
 
 export default router;
-

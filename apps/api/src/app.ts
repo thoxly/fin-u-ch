@@ -60,4 +60,3 @@ app.use('/api/reports', reportsRoutes);
 app.use(errorHandler);
 
 export default app;
-

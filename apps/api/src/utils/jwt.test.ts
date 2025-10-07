@@ -1,4 +1,9 @@
-import { generateAccessToken, generateRefreshToken, verifyToken, JwtPayload } from './jwt';
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyToken,
+  JwtPayload,
+} from './jwt';
 
 describe('JWT Utils', () => {
   const mockPayload: JwtPayload = {
@@ -65,4 +70,3 @@ describe('JWT Utils', () => {
     });
   });
 });
-

@@ -38,7 +38,11 @@ export class DepartmentsService {
     });
   }
 
-  async update(id: string, companyId: string, data: Partial<CreateDepartmentDTO>) {
+  async update(
+    id: string,
+    companyId: string,
+    data: Partial<CreateDepartmentDTO>
+  ) {
     await this.getById(id, companyId);
 
     return prisma.department.update({
@@ -57,4 +61,3 @@ export class DepartmentsService {
 }
 
 export default new DepartmentsService();
-

@@ -68,4 +68,3 @@ export class DealsService {
 }
 
 export default new DealsService();
-

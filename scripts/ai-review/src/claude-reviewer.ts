@@ -197,7 +197,10 @@ Begin your review:`;
     return comments;
   }
 
-  private calculateDiffPosition(patch: string, targetLine: number): number | null {
+  private calculateDiffPosition(
+    patch: string,
+    targetLine: number
+  ): number | null {
     const lines = patch.split('\n');
     let newFileLineNumber = 0;
     let diffPosition = 0;
@@ -232,4 +235,3 @@ Begin your review:`;
     return null;
   }
 }
-

@@ -15,7 +15,9 @@ import type { Operation } from '@shared/types/operations';
 
 export const OperationsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingOperation, setEditingOperation] = useState<Operation | null>(null);
+  const [editingOperation, setEditingOperation] = useState<Operation | null>(
+    null
+  );
 
   const { data: operations = [], isLoading } = useGetOperationsQuery();
   const [deleteOperation] = useDeleteOperationMutation();
@@ -134,7 +136,9 @@ export const OperationsPage = () => {
         <Modal
           isOpen={isFormOpen}
           onClose={handleCloseForm}
-          title={editingOperation ? 'Редактировать операцию' : 'Создать операцию'}
+          title={
+            editingOperation ? 'Редактировать операцию' : 'Создать операцию'
+          }
           size="lg"
         >
           <OperationForm
@@ -146,4 +150,3 @@ export const OperationsPage = () => {
     </Layout>
   );
 };
-

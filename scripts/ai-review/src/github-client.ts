@@ -109,4 +109,3 @@ export class GitHubClient {
     return data[data.length - 1].sha;
   }
 }
-

@@ -53,10 +53,10 @@ describe('Button', () => {
   it('should handle click events', () => {
     const handleClick = jest.fn();
     render(<Button onClick={handleClick}>Click</Button>);
-    
+
     const button = screen.getByText('Click');
     fireEvent.click(button);
-    
+
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
@@ -73,4 +73,3 @@ describe('Button', () => {
     expect(button).toHaveClass('btn');
   });
 });
-

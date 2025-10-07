@@ -19,7 +19,10 @@ export interface PlanFactRow {
 }
 
 export class PlanFactService {
-  async getPlanFact(companyId: string, params: PlanFactParams): Promise<PlanFactRow[]> {
+  async getPlanFact(
+    companyId: string,
+    params: PlanFactParams
+  ): Promise<PlanFactRow[]> {
     const cacheKey = generateCacheKey(companyId, 'planfact', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -33,10 +36,7 @@ export class PlanFactService {
         companyId,
         status: 'active',
         startDate: { lte: params.periodTo },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: params.periodFrom } },
-        ],
+        OR: [{ endDate: null }, { endDate: { gte: params.periodFrom } }],
       },
       include: {
         article: { select: { id: true, name: true } },
@@ -45,7 +45,11 @@ export class PlanFactService {
     });
 
     for (const planItem of planItems) {
-      const expanded = plansService.expandPlan(planItem, params.periodFrom, params.periodTo);
+      const expanded = plansService.expandPlan(
+        planItem,
+        params.periodFrom,
+        params.periodTo
+      );
 
       for (const { month, amount } of expanded) {
         let key = '';
@@ -54,7 +58,11 @@ export class PlanFactService {
         if (params.level === 'article' && planItem.article) {
           key = planItem.article.id;
           name = planItem.article.name;
-        } else if (params.level === 'deal' && planItem.dealId && planItem.deal) {
+        } else if (
+          params.level === 'deal' &&
+          planItem.dealId &&
+          planItem.deal
+        ) {
           key = planItem.dealId;
           name = planItem.deal.name;
         } else {
@@ -63,7 +71,14 @@ export class PlanFactService {
 
         const rowKey = `${month}:${key}`;
         if (!resultMap.has(rowKey)) {
-          resultMap.set(rowKey, { month, key, name, plan: 0, fact: 0, delta: 0 });
+          resultMap.set(rowKey, {
+            month,
+            key,
+            name,
+            plan: 0,
+            fact: 0,
+            delta: 0,
+          });
         }
         resultMap.get(rowKey)!.plan += amount;
       }
@@ -97,7 +112,11 @@ export class PlanFactService {
       } else if (params.level === 'deal' && op.dealId && op.deal) {
         key = op.dealId;
         name = op.deal.name;
-      } else if (params.level === 'department' && op.departmentId && op.department) {
+      } else if (
+        params.level === 'department' &&
+        op.departmentId &&
+        op.department
+      ) {
         key = op.departmentId;
         name = op.department.name;
       } else {
@@ -117,7 +136,9 @@ export class PlanFactService {
       delta: row.fact - row.plan,
     }));
 
-    result.sort((a, b) => a.month.localeCompare(b.month) || a.name.localeCompare(b.name));
+    result.sort(
+      (a, b) => a.month.localeCompare(b.month) || a.name.localeCompare(b.name)
+    );
 
     await cacheReport(cacheKey, result);
     return result;
@@ -125,4 +146,3 @@ export class PlanFactService {
 }
 
 export default new PlanFactService();
-

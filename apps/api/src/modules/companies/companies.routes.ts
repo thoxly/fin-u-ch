@@ -37,4 +37,3 @@ router.get('/me', companiesController.get);
 router.patch('/me', companiesController.update);
 
 export default router;
-

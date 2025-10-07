@@ -80,7 +80,11 @@ export class OperationsService {
   }
 
   async create(companyId: string, data: CreateOperationDTO) {
-    validateRequired({ type: data.type, operationDate: data.operationDate, amount: data.amount });
+    validateRequired({
+      type: data.type,
+      operationDate: data.operationDate,
+      amount: data.amount,
+    });
 
     const validTypes = ['income', 'expense', 'transfer'];
     if (!validTypes.includes(data.type)) {
@@ -90,13 +94,19 @@ export class OperationsService {
     // Validate based on type
     if (data.type === 'income' || data.type === 'expense') {
       if (!data.accountId || !data.articleId) {
-        throw new AppError('accountId and articleId are required for income/expense operations', 400);
+        throw new AppError(
+          'accountId and articleId are required for income/expense operations',
+          400
+        );
       }
     }
 
     if (data.type === 'transfer') {
       if (!data.sourceAccountId || !data.targetAccountId) {
-        throw new AppError('sourceAccountId and targetAccountId are required for transfer operations', 400);
+        throw new AppError(
+          'sourceAccountId and targetAccountId are required for transfer operations',
+          400
+        );
       }
       if (data.sourceAccountId === data.targetAccountId) {
         throw new AppError('Source and target accounts must be different', 400);
@@ -111,7 +121,11 @@ export class OperationsService {
     });
   }
 
-  async update(id: string, companyId: string, data: Partial<CreateOperationDTO>) {
+  async update(
+    id: string,
+    companyId: string,
+    data: Partial<CreateOperationDTO>
+  ) {
     await this.getById(id, companyId);
 
     return prisma.operation.update({
@@ -130,4 +144,3 @@ export class OperationsService {
 }
 
 export default new OperationsService();
-

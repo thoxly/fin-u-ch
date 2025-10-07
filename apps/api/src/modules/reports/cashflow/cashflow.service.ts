@@ -18,7 +18,10 @@ export interface CashflowRow {
 }
 
 export class CashflowService {
-  async getCashflow(companyId: string, params: CashflowParams): Promise<CashflowRow[]> {
+  async getCashflow(
+    companyId: string,
+    params: CashflowParams
+  ): Promise<CashflowRow[]> {
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -33,7 +36,9 @@ export class CashflowService {
         type: { in: ['income', 'expense'] },
       },
       include: {
-        article: { select: { id: true, name: true, activity: true, type: true } },
+        article: {
+          select: { id: true, name: true, activity: true, type: true },
+        },
       },
     });
 
@@ -64,8 +69,11 @@ export class CashflowService {
       }
     }
 
-    const result = Array.from(articleMap.values()).sort((a, b) => 
-      a.activity.localeCompare(b.activity) || a.type.localeCompare(b.type) || a.articleName.localeCompare(b.articleName)
+    const result = Array.from(articleMap.values()).sort(
+      (a, b) =>
+        a.activity.localeCompare(b.activity) ||
+        a.type.localeCompare(b.type) ||
+        a.articleName.localeCompare(b.articleName)
     );
 
     await cacheReport(cacheKey, result);
@@ -74,4 +82,3 @@ export class CashflowService {
 }
 
 export default new CashflowService();
-

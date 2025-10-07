@@ -8,37 +8,38 @@ interface GenerateSalaryParams {
 
 /**
  * Генерирует зарплатные операции за указанный месяц
- * 
+ *
  * Для каждой активной записи Salary создаёт 3 операции расхода:
  * 1. ФОТ (начисление зарплаты)
  * 2. Взносы (страховые взносы)
  * 3. НДФЛ (налог на доходы физических лиц)
  */
-export async function generateSalaryOperations(params: GenerateSalaryParams): Promise<void> {
+export async function generateSalaryOperations(
+  params: GenerateSalaryParams
+): Promise<void> {
   const { month, companyId } = params;
 
-  logger.info(`Starting salary generation for month: ${month}${companyId ? ` (company: ${companyId})` : ''}`);
+  logger.info(
+    `Starting salary generation for month: ${month}${companyId ? ` (company: ${companyId})` : ''}`
+  );
 
   try {
     // Парсим месяц в Date
     const [year, monthNum] = month.split('-').map(Number);
     const targetDate = new Date(year, monthNum - 1, 1);
-    
+
     // Получаем активные записи зарплат
     const salaries = await prisma.salary.findMany({
       where: {
         ...(companyId && { companyId }),
         effectiveFrom: { lte: targetDate },
-        OR: [
-          { effectiveTo: null },
-          { effectiveTo: { gte: targetDate } }
-        ]
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: targetDate } }],
       },
       include: {
         company: true,
         employeeCounterparty: true,
-        department: true
-      }
+        department: true,
+      },
     });
 
     if (salaries.length === 0) {
@@ -64,12 +65,14 @@ export async function generateSalaryOperations(params: GenerateSalaryParams): Pr
         const account = await prisma.account.findFirst({
           where: {
             companyId: salary.companyId,
-            isActive: true
-          }
+            isActive: true,
+          },
         });
 
         if (!account) {
-          logger.warn(`No active account found for company ${salary.companyId}, skipping`);
+          logger.warn(
+            `No active account found for company ${salary.companyId}, skipping`
+          );
           continue;
         }
 
@@ -87,8 +90,8 @@ export async function generateSalaryOperations(params: GenerateSalaryParams): Pr
               articleId: articles.wage.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Зарплата за ${month} - ${salary.employeeCounterparty.name}`
-            }
+              description: `Зарплата за ${month} - ${salary.employeeCounterparty.name}`,
+            },
           });
 
           // 2. Взносы (страховые взносы)
@@ -103,8 +106,8 @@ export async function generateSalaryOperations(params: GenerateSalaryParams): Pr
               articleId: articles.contributions.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Страховые взносы за ${month} - ${salary.employeeCounterparty.name} (${salary.contributionsPct}%)`
-            }
+              description: `Страховые взносы за ${month} - ${salary.employeeCounterparty.name} (${salary.contributionsPct}%)`,
+            },
           });
 
           // 3. НДФЛ
@@ -119,25 +122,28 @@ export async function generateSalaryOperations(params: GenerateSalaryParams): Pr
               articleId: articles.incomeTax.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `НДФЛ за ${month} - ${salary.employeeCounterparty.name} (${salary.incomeTaxPct}%)`
-            }
+              description: `НДФЛ за ${month} - ${salary.employeeCounterparty.name} (${salary.incomeTaxPct}%)`,
+            },
           });
         });
 
         totalOperations += 3;
         logger.info(
           `Generated salary operations for ${salary.employeeCounterparty.name}: ` +
-          `wage=${baseWage}, contributions=${contributions.toFixed(2)}, tax=${incomeTax.toFixed(2)}`
+            `wage=${baseWage}, contributions=${contributions.toFixed(2)}, tax=${incomeTax.toFixed(2)}`
         );
-
       } catch (error) {
-        logger.error(`Error generating salary for ${salary.employeeCounterparty.name}:`, error);
+        logger.error(
+          `Error generating salary for ${salary.employeeCounterparty.name}:`,
+          error
+        );
         // Продолжаем обработку остальных записей
       }
     }
 
-    logger.info(`Salary generation completed. Total operations created: ${totalOperations}`);
-
+    logger.info(
+      `Salary generation completed. Total operations created: ${totalOperations}`
+    );
   } catch (error) {
     logger.error('Error in generateSalaryOperations:', error);
     throw error;
@@ -153,54 +159,60 @@ async function findOrCreateSalaryArticles(companyId: string) {
     where: {
       companyId,
       name: {
-        in: ['Зарплата', 'Страховые взносы', 'НДФЛ']
-      }
-    }
+        in: ['Зарплата', 'Страховые взносы', 'НДФЛ'],
+      },
+    },
   });
 
-  const articleMap = new Map(existingArticles.map(a => [a.name, a]));
+  const articleMap = new Map(existingArticles.map((a) => [a.name, a]));
 
   // Создаем недостающие статьи
-  const wageArticle = articleMap.get('Зарплата') || await prisma.article.create({
-    data: {
-      companyId,
-      name: 'Зарплата',
-      type: 'expense',
-      activity: 'operating',
-      indicator: 'cash',
-      isActive: true,
-      description: 'Фонд оплаты труда (ФОТ)'
-    }
-  });
+  const wageArticle =
+    articleMap.get('Зарплата') ||
+    (await prisma.article.create({
+      data: {
+        companyId,
+        name: 'Зарплата',
+        type: 'expense',
+        activity: 'operating',
+        indicator: 'cash',
+        isActive: true,
+        description: 'Фонд оплаты труда (ФОТ)',
+      },
+    }));
 
-  const contributionsArticle = articleMap.get('Страховые взносы') || await prisma.article.create({
-    data: {
-      companyId,
-      name: 'Страховые взносы',
-      type: 'expense',
-      activity: 'operating',
-      indicator: 'cash',
-      isActive: true,
-      description: 'Страховые взносы на зарплату'
-    }
-  });
+  const contributionsArticle =
+    articleMap.get('Страховые взносы') ||
+    (await prisma.article.create({
+      data: {
+        companyId,
+        name: 'Страховые взносы',
+        type: 'expense',
+        activity: 'operating',
+        indicator: 'cash',
+        isActive: true,
+        description: 'Страховые взносы на зарплату',
+      },
+    }));
 
-  const incomeTaxArticle = articleMap.get('НДФЛ') || await prisma.article.create({
-    data: {
-      companyId,
-      name: 'НДФЛ',
-      type: 'expense',
-      activity: 'operating',
-      indicator: 'cash',
-      isActive: true,
-      description: 'Налог на доходы физических лиц'
-    }
-  });
+  const incomeTaxArticle =
+    articleMap.get('НДФЛ') ||
+    (await prisma.article.create({
+      data: {
+        companyId,
+        name: 'НДФЛ',
+        type: 'expense',
+        activity: 'operating',
+        indicator: 'cash',
+        isActive: true,
+        description: 'Налог на доходы физических лиц',
+      },
+    }));
 
   return {
     wage: wageArticle,
     contributions: contributionsArticle,
-    incomeTax: incomeTaxArticle
+    incomeTax: incomeTaxArticle,
   };
 }
 
@@ -213,4 +225,3 @@ export function getCurrentMonth(): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
 }
-

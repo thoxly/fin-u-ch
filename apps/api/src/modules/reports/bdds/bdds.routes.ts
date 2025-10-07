@@ -11,4 +11,3 @@ router.use(extractTenant);
 router.get('/', bddsController.getBDDS);
 
 export default router;
-

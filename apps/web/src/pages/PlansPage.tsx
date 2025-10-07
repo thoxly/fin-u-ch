@@ -5,10 +5,7 @@ import { Button } from '../shared/ui/Button';
 import { Table } from '../shared/ui/Table';
 import { Modal } from '../shared/ui/Modal';
 import { PlanForm } from '../features/plan-editor/PlanForm';
-import {
-  useGetPlansQuery,
-  useDeletePlanMutation,
-} from '../store/api/plansApi';
+import { useGetPlansQuery, useDeletePlanMutation } from '../store/api/plansApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { PlanItem } from '@shared/types/operations';
@@ -83,7 +80,8 @@ export const PlansPage = () => {
     {
       key: 'endDate',
       header: 'Дата окончания',
-      render: (plan: PlanItem) => (plan.endDate ? formatDate(plan.endDate) : '-'),
+      render: (plan: PlanItem) =>
+        plan.endDate ? formatDate(plan.endDate) : '-',
       width: '120px',
     },
     {
@@ -168,4 +166,3 @@ export const PlansPage = () => {
     </Layout>
   );
 };
-

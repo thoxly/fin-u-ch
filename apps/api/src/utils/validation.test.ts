@@ -1,4 +1,8 @@
-import { validateEmail, validatePassword, validateRequired } from './validation';
+import {
+  validateEmail,
+  validatePassword,
+  validateRequired,
+} from './validation';
 import { AppError } from '../middlewares/error';
 
 describe('Validation Utils', () => {
@@ -43,7 +47,9 @@ describe('Validation Utils', () => {
         validatePassword('123');
       } catch (error) {
         expect(error).toBeInstanceOf(AppError);
-        expect((error as AppError).message).toBe('Password must be at least 6 characters long');
+        expect((error as AppError).message).toBe(
+          'Password must be at least 6 characters long'
+        );
         expect((error as AppError).statusCode).toBe(400);
       }
     });
@@ -52,7 +58,9 @@ describe('Validation Utils', () => {
   describe('validateRequired', () => {
     it('should accept object with all required fields', () => {
       expect(() => validateRequired({ name: 'John', age: 30 })).not.toThrow();
-      expect(() => validateRequired({ email: 'test@example.com' })).not.toThrow();
+      expect(() =>
+        validateRequired({ email: 'test@example.com' })
+      ).not.toThrow();
     });
 
     it('should reject object with undefined value', () => {
@@ -79,4 +87,3 @@ describe('Validation Utils', () => {
     });
   });
 });
-

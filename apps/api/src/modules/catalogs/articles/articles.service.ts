@@ -75,4 +75,3 @@ export class ArticlesService {
 }
 
 export default new ArticlesService();
-

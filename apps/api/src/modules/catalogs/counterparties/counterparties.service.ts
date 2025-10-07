@@ -32,7 +32,13 @@ export class CounterpartiesService {
   async create(companyId: string, data: CreateCounterpartyDTO) {
     validateRequired({ name: data.name, category: data.category });
 
-    const validCategories = ['supplier', 'customer', 'gov', 'employee', 'other'];
+    const validCategories = [
+      'supplier',
+      'customer',
+      'gov',
+      'employee',
+      'other',
+    ];
     if (!validCategories.includes(data.category)) {
       throw new AppError('Invalid category', 400);
     }
@@ -45,7 +51,11 @@ export class CounterpartiesService {
     });
   }
 
-  async update(id: string, companyId: string, data: Partial<CreateCounterpartyDTO>) {
+  async update(
+    id: string,
+    companyId: string,
+    data: Partial<CreateCounterpartyDTO>
+  ) {
     await this.getById(id, companyId);
 
     return prisma.counterparty.update({
@@ -64,4 +74,3 @@ export class CounterpartiesService {
 }
 
 export default new CounterpartiesService();
-

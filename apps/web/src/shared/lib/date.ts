@@ -1,7 +1,10 @@
 import { format as dateFnsFormat, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
-export const formatDate = (date: string | Date, formatStr = 'dd.MM.yyyy'): string => {
+export const formatDate = (
+  date: string | Date,
+  formatStr = 'dd.MM.yyyy'
+): string => {
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
   return dateFnsFormat(dateObj, formatStr, { locale: ru });
 };
@@ -21,4 +24,3 @@ export const getCurrentMonth = (): string => {
 export const toISODate = (date: Date): string => {
   return dateFnsFormat(date, 'yyyy-MM-dd');
 };
-

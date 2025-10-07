@@ -14,7 +14,10 @@ export class CounterpartiesController {
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await counterpartiesService.getById(req.params.id, req.companyId!);
+      const result = await counterpartiesService.getById(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -23,7 +26,10 @@ export class CounterpartiesController {
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await counterpartiesService.create(req.companyId!, req.body);
+      const result = await counterpartiesService.create(
+        req.companyId!,
+        req.body
+      );
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -32,7 +38,11 @@ export class CounterpartiesController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await counterpartiesService.update(req.params.id, req.companyId!, req.body);
+      const result = await counterpartiesService.update(
+        req.params.id,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -41,7 +51,10 @@ export class CounterpartiesController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await counterpartiesService.delete(req.params.id, req.companyId!);
+      const result = await counterpartiesService.delete(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -50,4 +63,3 @@ export class CounterpartiesController {
 }
 
 export default new CounterpartiesController();
-

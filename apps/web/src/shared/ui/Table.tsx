@@ -66,7 +66,9 @@ export function Table<T>({
                 <td key={column.key}>
                   {column.render
                     ? column.render(item)
-                    : String((item as Record<string, unknown>)[column.key] ?? '')}
+                    : String(
+                        (item as Record<string, unknown>)[column.key] ?? ''
+                      )}
                 </td>
               ))}
             </tr>
@@ -76,4 +78,3 @@ export function Table<T>({
     </div>
   );
 }
-

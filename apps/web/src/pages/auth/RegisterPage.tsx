@@ -26,7 +26,11 @@ export const RegisterPage = () => {
     }
 
     try {
-      const response = await register({ email, password, companyName }).unwrap();
+      const response = await register({
+        email,
+        password,
+        companyName,
+      }).unwrap();
       dispatch(setCredentials(response));
       navigate('/dashboard');
     } catch (err) {
@@ -96,4 +100,3 @@ export const RegisterPage = () => {
     </div>
   );
 };
-

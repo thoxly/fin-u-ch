@@ -99,4 +99,3 @@ router.patch('/:id', articlesController.update);
 router.delete('/:id', articlesController.delete);
 
 export default router;
-

@@ -15,4 +15,3 @@ router.patch('/:id', dealsController.update);
 router.delete('/:id', dealsController.delete);
 
 export default router;
-

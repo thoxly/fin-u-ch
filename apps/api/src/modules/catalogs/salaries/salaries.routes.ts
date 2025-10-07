@@ -15,4 +15,3 @@ router.patch('/:id', salariesController.update);
 router.delete('/:id', salariesController.delete);
 
 export default router;
-

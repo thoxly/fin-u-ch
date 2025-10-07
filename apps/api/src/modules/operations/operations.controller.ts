@@ -7,8 +7,12 @@ export class OperationsController {
     try {
       const filters = {
         type: req.query.type as string,
-        dateFrom: req.query.dateFrom ? new Date(req.query.dateFrom as string) : undefined,
-        dateTo: req.query.dateTo ? new Date(req.query.dateTo as string) : undefined,
+        dateFrom: req.query.dateFrom
+          ? new Date(req.query.dateFrom as string)
+          : undefined,
+        dateTo: req.query.dateTo
+          ? new Date(req.query.dateTo as string)
+          : undefined,
         articleId: req.query.articleId as string,
         dealId: req.query.dealId as string,
         departmentId: req.query.departmentId as string,
@@ -24,7 +28,10 @@ export class OperationsController {
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await operationsService.getById(req.params.id, req.companyId!);
+      const result = await operationsService.getById(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -42,7 +49,11 @@ export class OperationsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await operationsService.update(req.params.id, req.companyId!, req.body);
+      const result = await operationsService.update(
+        req.params.id,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -51,7 +62,10 @@ export class OperationsController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await operationsService.delete(req.params.id, req.companyId!);
+      const result = await operationsService.delete(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -60,4 +74,3 @@ export class OperationsController {
 }
 
 export default new OperationsController();
-

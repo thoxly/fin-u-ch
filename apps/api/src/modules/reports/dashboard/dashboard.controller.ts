@@ -6,12 +6,19 @@ export class DashboardController {
   async getDashboard(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const params = {
-        periodFrom: req.query.periodFrom ? new Date(req.query.periodFrom as string) : new Date(new Date().getFullYear(), 0, 1),
-        periodTo: req.query.periodTo ? new Date(req.query.periodTo as string) : new Date(),
+        periodFrom: req.query.periodFrom
+          ? new Date(req.query.periodFrom as string)
+          : new Date(new Date().getFullYear(), 0, 1),
+        periodTo: req.query.periodTo
+          ? new Date(req.query.periodTo as string)
+          : new Date(),
         mode: (req.query.mode as 'plan' | 'fact' | 'both') || 'fact',
       };
 
-      const result = await dashboardService.getDashboard(req.companyId!, params);
+      const result = await dashboardService.getDashboard(
+        req.companyId!,
+        params
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -20,4 +27,3 @@ export class DashboardController {
 }
 
 export default new DashboardController();
-

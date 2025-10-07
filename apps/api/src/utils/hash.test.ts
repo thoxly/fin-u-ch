@@ -13,7 +13,7 @@ describe('Hash Utils', () => {
     it('should hash password correctly', async () => {
       const password = 'testPassword123';
       const expectedHash = '$2b$10$hashedPassword';
-      
+
       mockedBcrypt.hash.mockResolvedValue(expectedHash as never);
 
       const { hashPassword } = await import('./hash');
@@ -28,7 +28,7 @@ describe('Hash Utils', () => {
     it('should verify correct password', async () => {
       const password = 'testPassword123';
       const hash = '$2b$10$hashedPassword';
-      
+
       mockedBcrypt.compare.mockResolvedValue(true as never);
 
       const { verifyPassword } = await import('./hash');
@@ -42,7 +42,7 @@ describe('Hash Utils', () => {
       const password = 'testPassword123';
       const wrongPassword = 'wrongPassword';
       const hash = '$2b$10$hashedPassword';
-      
+
       mockedBcrypt.compare.mockResolvedValue(false as never);
 
       const { verifyPassword } = await import('./hash');
@@ -54,7 +54,7 @@ describe('Hash Utils', () => {
 
     it('should reject empty password', async () => {
       const hash = '$2b$10$hashedPassword';
-      
+
       mockedBcrypt.compare.mockResolvedValue(false as never);
 
       const { verifyPassword } = await import('./hash');
@@ -65,4 +65,3 @@ describe('Hash Utils', () => {
     });
   });
 });
-

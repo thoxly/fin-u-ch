@@ -90,7 +90,9 @@ export const DashboardPage = () => {
                 </div>
                 <div
                   className={`text-2xl font-bold ${
-                    (data.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    (data.netProfit || 0) >= 0
+                      ? 'text-green-600'
+                      : 'text-red-600'
                   }`}
                 >
                   {formatMoney(data.netProfit || 0)}
@@ -111,20 +113,22 @@ export const DashboardPage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.balancesByAccount.map((balance: {
-                        accountId: string;
-                        accountName: string;
-                        balance: number;
-                        currency: string;
-                      }) => (
-                        <tr key={balance.accountId}>
-                          <td>{balance.accountName}</td>
-                          <td className="text-right">
-                            {formatMoney(balance.balance, balance.currency)}
-                          </td>
-                          <td>{balance.currency}</td>
-                        </tr>
-                      ))}
+                      {data.balancesByAccount.map(
+                        (balance: {
+                          accountId: string;
+                          accountName: string;
+                          balance: number;
+                          currency: string;
+                        }) => (
+                          <tr key={balance.accountId}>
+                            <td>{balance.accountName}</td>
+                            <td className="text-right">
+                              {formatMoney(balance.balance, balance.currency)}
+                            </td>
+                            <td>{balance.currency}</td>
+                          </tr>
+                        )
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -145,4 +149,3 @@ export const DashboardPage = () => {
     </Layout>
   );
 };
-

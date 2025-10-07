@@ -75,4 +75,3 @@ export class SalariesService {
 }
 
 export default new SalariesService();
-

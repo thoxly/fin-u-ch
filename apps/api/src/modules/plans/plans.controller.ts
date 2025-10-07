@@ -32,7 +32,11 @@ export class PlansController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.update(req.params.id, req.companyId!, req.body);
+      const result = await plansService.update(
+        req.params.id,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -50,4 +54,3 @@ export class PlansController {
 }
 
 export default new PlansController();
-
