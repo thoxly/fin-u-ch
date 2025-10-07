@@ -2,6 +2,9 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+
 # Install pnpm
 RUN npm install -g pnpm
 
@@ -31,6 +34,9 @@ RUN pnpm --filter api build
 FROM node:18-alpine
 
 WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
 
 # Install pnpm
 RUN npm install -g pnpm
