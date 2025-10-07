@@ -21,8 +21,7 @@ RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @fin-u-ch/shared build
 
 # Generate Prisma Client
-WORKDIR /app/apps/api
-RUN pnpm exec prisma generate
+RUN pnpm --filter api prisma:generate
 
 # Build api
 WORKDIR /app

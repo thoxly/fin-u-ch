@@ -86,7 +86,7 @@ docker-compose -f docker-compose.prod.yml up -d
 ### 4. Прогнать миграции
 
 ```bash
-docker-compose -f docker-compose.prod.yml exec api pnpm exec prisma migrate deploy
+docker-compose -f docker-compose.prod.yml exec api pnpm prisma:deploy
 ```
 
 ### 5. Проверить

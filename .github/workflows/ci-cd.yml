@@ -39,12 +39,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma Client (API)
-        working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm --filter api prisma:generate
 
       - name: Generate Prisma Client (Worker)
-        working-directory: apps/worker
-        run: pnpm exec prisma generate
+        run: pnpm --filter worker prisma:generate
 
       - name: Lint
         run: pnpm lint
@@ -130,8 +128,7 @@ jobs:
         run: pnpm --filter @fin-u-ch/shared build
 
       - name: Generate Prisma Client (API)
-        working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm --filter api prisma:generate
 
       - name: Build API
         run: pnpm --filter api build
@@ -140,8 +137,7 @@ jobs:
         run: pnpm --filter web build
 
       - name: Generate Prisma Client (Worker)
-        working-directory: apps/worker
-        run: pnpm exec prisma generate
+        run: pnpm --filter worker prisma:generate
 
       - name: Build Worker
         run: pnpm --filter worker build
@@ -219,12 +215,10 @@ jobs:
         run: pnpm --filter @fin-u-ch/shared build
 
       - name: Generate Prisma Client (API)
-        working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm --filter api prisma:generate
 
       - name: Run Prisma migrations
-        working-directory: apps/api
-        run: pnpm exec prisma migrate deploy
+        run: pnpm --filter api prisma:deploy
 
       - name: Run unit tests (API)
         run: pnpm --filter api test:coverage
@@ -309,12 +303,10 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Generate Prisma Client (API)
-        working-directory: apps/api
-        run: pnpm exec prisma generate
+        run: pnpm --filter api prisma:generate
 
       - name: Run Prisma migrations
-        working-directory: apps/api
-        run: pnpm exec prisma migrate deploy
+        run: pnpm --filter api prisma:deploy
 
       - name: Start API server
         working-directory: apps/api
@@ -530,7 +522,7 @@ jobs:
             docker compose pull
             
             # Apply database migrations
-            docker compose run --rm api pnpm exec prisma migrate deploy
+            docker compose run --rm api pnpm prisma:deploy
             
             # Restart services with zero downtime
             docker compose up -d --no-deps --build api web worker
