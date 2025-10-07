@@ -1,8 +1,8 @@
 import { apiSlice } from './apiSlice';
 import type {
-  DashboardData,
+  DashboardReport,
   CashflowReport,
-  BddsReport,
+  BDDSReport,
   PlanFactReport,
 } from '@shared/types/reports';
 
@@ -21,7 +21,7 @@ interface ReportParams {
 
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getDashboard: builder.query<DashboardData, DashboardParams>({
+    getDashboard: builder.query<DashboardReport, DashboardParams>({
       query: (params) => ({
         url: '/reports/dashboard',
         params,
@@ -35,7 +35,7 @@ export const reportsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Report'],
     }),
-    getBddsReport: builder.query<BddsReport, ReportParams>({
+    getBddsReport: builder.query<BDDSReport, ReportParams>({
       query: (params) => ({
         url: '/reports/bdds',
         params,
@@ -58,4 +58,3 @@ export const {
   useGetBddsReportQuery,
   useGetPlanFactReportQuery,
 } = reportsApi;
-

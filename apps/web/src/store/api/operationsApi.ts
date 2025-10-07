@@ -14,10 +14,13 @@ interface GetOperationsParams {
 export const operationsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getOperations: builder.query<Operation[], GetOperationsParams | void>({
-      query: (params) => ({
-        url: '/operations',
-        params,
-      }),
+      query: (params) =>
+        params
+          ? {
+              url: '/operations',
+              params,
+            }
+          : '/operations',
       providesTags: ['Operation'],
     }),
     getOperation: builder.query<Operation, string>({
@@ -32,7 +35,10 @@ export const operationsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
-    updateOperation: builder.mutation<Operation, { id: string; data: Partial<Operation> }>({
+    updateOperation: builder.mutation<
+      Operation,
+      { id: string; data: Partial<Operation> }
+    >({
       query: ({ id, data }) => ({
         url: `/operations/${id}`,
         method: 'PATCH',
@@ -57,4 +63,3 @@ export const {
   useUpdateOperationMutation,
   useDeleteOperationMutation,
 } = operationsApi;
-

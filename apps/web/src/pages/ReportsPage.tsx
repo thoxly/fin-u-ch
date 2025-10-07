@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Input } from '../shared/ui/Input';
-import { Button } from '../shared/ui/Button';
+// import { Button } from '../shared/ui/Button';
 import {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
@@ -138,12 +138,17 @@ const CashflowTab = ({
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((row: { key: string; article: string; amount: number }, idx: number) => (
-              <tr key={idx}>
-                <td>{row.article || 'Без статьи'}</td>
-                <td className="text-right">{formatMoney(row.amount)}</td>
-              </tr>
-            ))}
+            {data.rows.map(
+              (
+                row: { key: string; article: string; amount: number },
+                idx: number
+              ) => (
+                <tr key={idx}>
+                  <td>{row.article || 'Без статьи'}</td>
+                  <td className="text-right">{formatMoney(row.amount)}</td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>
@@ -201,12 +206,17 @@ const BddsTab = ({
             </tr>
           </thead>
           <tbody>
-            {data.rows.map((row: { key: string; article: string; amount: number }, idx: number) => (
-              <tr key={idx}>
-                <td>{row.article || 'Без статьи'}</td>
-                <td className="text-right">{formatMoney(row.amount)}</td>
-              </tr>
-            ))}
+            {data.rows.map(
+              (
+                row: { key: string; article: string; amount: number },
+                idx: number
+              ) => (
+                <tr key={idx}>
+                  <td>{row.article || 'Без статьи'}</td>
+                  <td className="text-right">{formatMoney(row.amount)}</td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>
@@ -279,7 +289,9 @@ const PlanFactTab = ({
                 idx: number
               ) => {
                 const percentage =
-                  row.plan !== 0 ? ((row.delta / row.plan) * 100).toFixed(1) : '0';
+                  row.plan !== 0
+                    ? ((row.delta / row.plan) * 100).toFixed(1)
+                    : '0';
                 return (
                   <tr key={idx}>
                     <td>{row.article || 'Без статьи'}</td>
@@ -309,4 +321,3 @@ const PlanFactTab = ({
     </Card>
   );
 };
-
