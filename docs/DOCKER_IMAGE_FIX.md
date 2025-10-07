@@ -110,6 +110,44 @@ docker compose -f docker-compose.prod.yml config | grep image:
 3. `.github/workflows/ci-cd.yml` - добавлен шаг обновления .env на VPS
 4. `ops/docker/README.md` - обновлена документация
 
+## Дополнительное исправление: OpenSSL для Prisma
+
+### Проблема 2
+
+После исправления имён образов возникла новая ошибка при миграциях:
+
+```
+Error: Could not parse schema engine response: SyntaxError: Unexpected token E in JSON at position 0
+prisma:warn Prisma failed to detect the libssl/openssl version to use
+```
+
+### Причина
+
+Alpine Linux в Docker образах не имеет OpenSSL, необходимого для работы Prisma.
+
+### Решение
+
+Добавлена установка OpenSSL в Dockerfile для API и Worker:
+
+```dockerfile
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
+```
+
+Это было добавлено в оба stage (builder и production) в:
+
+- `ops/docker/api.Dockerfile`
+- `ops/docker/worker.Dockerfile`
+
+### Дополнительно
+
+- Убран устаревший атрибут `version: '3.9'` из docker-compose файлов
+
+## Коммиты
+
+1. `b8dd5f7` - fix: correct Docker image naming in production deployment
+2. `4d14fd5` - fix: add OpenSSL to Docker images for Prisma compatibility
+
 ## Дата исправления
 
 7 октября 2025
