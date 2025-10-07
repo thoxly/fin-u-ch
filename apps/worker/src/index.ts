@@ -77,7 +77,7 @@ prisma
     );
     logger.info('👷 Worker is running and waiting for scheduled tasks...');
   })
-  .catch((error) => {
+  .catch((error: unknown) => {
     logger.error('❌ Failed to connect to database:', error);
     process.exit(1);
   });

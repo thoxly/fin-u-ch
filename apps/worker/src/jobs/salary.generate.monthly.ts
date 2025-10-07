@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import type { Prisma } from '@prisma/client';
 
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
@@ -77,7 +78,7 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           // 1. ФОТ (начисление зарплаты)
           await tx.operation.create({
             data: {
@@ -164,7 +165,9 @@ async function findOrCreateSalaryArticles(companyId: string) {
     },
   });
 
-  const articleMap = new Map(existingArticles.map((a) => [a.name, a]));
+  const articleMap = new Map(
+    existingArticles.map((a: { name: string; id: string }) => [a.name, a])
+  );
 
   // Создаем недостающие статьи
   const wageArticle =
