@@ -520,7 +520,7 @@ jobs:
             cd /opt/fin-u-ch
             
             # Login to GHCR
-            echo ${{ secrets.GHCR_TOKEN }} | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
             # Pull new images
             docker compose -f docker-compose.prod.yml pull
