@@ -46,7 +46,7 @@ COPY --from=builder /app/apps/worker/package.json ./apps/worker/
 COPY --from=builder /app/apps/worker/prisma ./apps/worker/prisma
 
 # Install dependencies in production (this will build native modules for this stage)
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Generate Prisma Client in production stage
 RUN pnpm --filter worker prisma:generate
