@@ -49,7 +49,8 @@ COPY --from=builder /app/apps/worker/prisma ./apps/worker/prisma
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 # Generate Prisma Client in production stage
-RUN pnpm --filter worker prisma:generate
+WORKDIR /app/apps/worker
+RUN npx prisma generate
 
 # Set working directory to worker
 WORKDIR /app/apps/worker
