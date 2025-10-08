@@ -419,7 +419,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
             ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:${{ steps.meta.outputs.sha_short }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
+          no-cache: true
           cache-to: type=inline
 
       - name: Build and push Web image
