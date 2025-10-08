@@ -75,14 +75,21 @@ async function main() {
     console.log(`Found ${comments.length} issues\n`);
 
     if (comments.length === 0) {
-      console.log('✅ No issues found! Approving PR...');
+      console.log('✅ No issues found!');
 
       const commitId = await githubClient.getLatestCommit(prNumber);
+
+      // GitHub Actions cannot APPROVE PRs, use COMMENT instead
+      const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
+      const event = isGitHubActions ? 'COMMENT' : 'APPROVE';
+
+      console.log(isGitHubActions ? 'Leaving comment...' : 'Approving PR...');
+
       await githubClient.createReview(
         prNumber,
         commitId,
         [],
-        'APPROVE',
+        event,
         '✅ AI Code Review: No issues found. Code looks good!'
       );
 
