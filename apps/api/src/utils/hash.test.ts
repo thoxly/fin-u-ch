@@ -1,6 +1,6 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
-jest.mock('bcrypt');
+jest.mock('bcryptjs');
 
 const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
