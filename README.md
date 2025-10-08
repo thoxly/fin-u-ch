@@ -91,6 +91,13 @@ docker-compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 - [ENV Setup](docs/ENV_SETUP.md) — управление переменными окружения
 - [CI/CD Pipeline](docs/CI_CD.md) — CI/CD процесс и AI review
 
+### 🛡️ Защита и бэкапы
+
+- **[Protection Summary](docs/PROTECTION_SUMMARY.md) — НАЧНИТЕ ОТСЮДА!** 🔥
+- [Backup Strategy](docs/BACKUP_STRATEGY.md) — полная стратегия бэкапов и восстановления
+- [GitHub Protection Checklist](docs/GITHUB_PROTECTION_CHECKLIST.md) — настройка защиты репозитория
+- [Scripts Documentation](scripts/README.md) — документация backup скриптов
+
 ### Архитектура и API
 
 - [Архитектура](docs/ARCHITECTURE.md)
@@ -184,6 +191,24 @@ pnpm env:prod
 ```
 
 Подробнее: [ENV Setup Guide](docs/ENV_SETUP.md)
+
+### Backup и восстановление
+
+```bash
+# На VPS - Настройка автоматических бэкапов (первый раз)
+sudo /opt/fin-u-ch/scripts/setup-backups.sh
+
+# Ручной бэкап БД
+/opt/fin-u-ch/scripts/backup-db.sh
+
+# Проверка здоровья бэкапов
+/opt/fin-u-ch/scripts/check-backups.sh
+
+# Восстановление из бэкапа
+/opt/fin-u-ch/scripts/restore-db.sh
+```
+
+Подробнее: [Backup Strategy](docs/BACKUP_STRATEGY.md) | [Scripts README](scripts/README.md)
 
 ## 📊 Статус разработки
 
