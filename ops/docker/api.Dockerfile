@@ -57,6 +57,9 @@ COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 # Install dependencies in production (this will build native modules for this stage)
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
+# Install Prisma CLI separately for migrations (it's a dev dep but needed for deploy)
+RUN pnpm add -w prisma --save-dev --ignore-scripts
+
 # Copy Prisma Client from builder (from .pnpm store where it actually is)
 COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
 
