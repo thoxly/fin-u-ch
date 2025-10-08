@@ -58,6 +58,9 @@ COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 # Native modules will be built for this stage, ignore scripts to skip husky
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
+# Rebuild native modules (bcrypt) that need compilation
+RUN pnpm rebuild bcrypt
+
 # Generate Prisma Client after install (since we skipped scripts)
 WORKDIR /app/apps/api
 RUN npx prisma generate
