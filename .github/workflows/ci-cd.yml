@@ -5,6 +5,10 @@ on:
     branches: [dev, main]
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+      - '.gitignore'
   workflow_dispatch:
 
 env:
@@ -18,7 +22,7 @@ jobs:
   quick-checks:
     name: Lint & Type Check
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
@@ -35,13 +39,37 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
       - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Cache Prisma Client
+        uses: actions/cache@v3
+        id: cache-prisma
+        with:
+          path: |
+            apps/api/node_modules/.prisma
+            apps/worker/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('**/schema.prisma') }}
+
       - name: Generate Prisma Client (API)
+        if: steps.cache-prisma.outputs.cache-hit != 'true'
         run: pnpm --filter api prisma:generate
 
       - name: Generate Prisma Client (Worker)
+        if: steps.cache-prisma.outputs.cache-hit != 'true'
         run: pnpm --filter worker prisma:generate
 
       - name: Lint
@@ -66,7 +94,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Нужна вся история для diff
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -98,66 +126,10 @@ jobs:
         run: pnpm start
 
   # ============================================
-  # Сборка проекта
+  # Сборка и тесты (объединены для оптимизации)
   # ============================================
-  build:
-    name: Build All Packages
-    runs-on: ubuntu-latest
-    needs: [quick-checks]
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared package
-        run: pnpm --filter @fin-u-ch/shared build
-
-      - name: Generate Prisma Client (API)
-        run: pnpm --filter api prisma:generate
-
-      - name: Build API
-        run: pnpm --filter api build
-
-      - name: Build Web
-        run: pnpm --filter web build
-
-      - name: Generate Prisma Client (Worker)
-        run: pnpm --filter worker prisma:generate
-
-      - name: Build Worker
-        run: pnpm --filter worker build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            packages/shared/dist
-            apps/api/dist
-            apps/web/dist
-            apps/worker/dist
-          retention-days: 1
-
-  # ============================================
-  # Тесты
-  # ============================================
-  test:
-    name: Run Tests
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
     needs: [quick-checks]
     timeout-minutes: 15
@@ -208,14 +180,40 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
       - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build shared package
         run: pnpm --filter @fin-u-ch/shared build
 
+      - name: Cache Prisma Client
+        uses: actions/cache@v3
+        id: cache-prisma
+        with:
+          path: |
+            apps/api/node_modules/.prisma
+            apps/worker/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('**/schema.prisma') }}
+
       - name: Generate Prisma Client (API)
+        if: steps.cache-prisma.outputs.cache-hit != 'true'
         run: pnpm --filter api prisma:generate
+
+      - name: Build API
+        run: pnpm --filter api build
 
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
@@ -223,8 +221,29 @@ jobs:
       - name: Run unit tests (API)
         run: pnpm --filter api test:coverage
 
+      - name: Build Web
+        run: pnpm --filter web build
+
       - name: Run unit tests (Web)
         run: pnpm --filter web test:coverage
+
+      - name: Generate Prisma Client (Worker)
+        if: steps.cache-prisma.outputs.cache-hit != 'true'
+        run: pnpm --filter worker prisma:generate
+
+      - name: Build Worker
+        run: pnpm --filter worker build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            packages/shared/dist
+            apps/api/dist
+            apps/web/dist
+            apps/worker/dist
+          retention-days: 1
 
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
@@ -236,12 +255,13 @@ jobs:
           name: codecov-umbrella
 
   # ============================================
-  # E2E тесты (Playwright)
+  # E2E тесты (только для PR в main)
   # ============================================
   test-e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: [build]
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: [build-and-test]
     timeout-minutes: 20
 
     services:
@@ -290,7 +310,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
       - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Download build artifacts
@@ -302,7 +335,16 @@ jobs:
         working-directory: apps/web
         run: npx playwright install --with-deps chromium
 
+      - name: Cache Prisma Client
+        uses: actions/cache@v3
+        id: cache-prisma
+        with:
+          path: |
+            apps/api/node_modules/.prisma
+          key: ${{ runner.os }}-prisma-${{ hashFiles('**/schema.prisma') }}
+
       - name: Generate Prisma Client (API)
+        if: steps.cache-prisma.outputs.cache-hit != 'true'
         run: pnpm --filter api prisma:generate
 
       - name: Run Prisma migrations
@@ -333,13 +375,14 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # Security Scan
+  # Security Scan (только для PR)
   # ============================================
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     needs: [quick-checks]
-    timeout-minutes: 10
+    timeout-minutes: 8
     permissions:
       contents: read
       security-events: write
@@ -359,7 +402,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - name: Cache node_modules
+        uses: actions/cache@v3
+        id: cache-deps
+        with:
+          path: |
+            node_modules
+            apps/*/node_modules
+            packages/*/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
       - name: Install dependencies
+        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Run pnpm audit
@@ -387,8 +443,8 @@ jobs:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [build, test, test-e2e, security-scan]
-    timeout-minutes: 30
+    needs: [build-and-test]
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -419,7 +475,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
             ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:${{ steps.meta.outputs.sha_short }}
-          no-cache: true
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/fin-u-ch-api:latest
           cache-to: type=inline
 
       - name: Build and push Web image
@@ -604,8 +660,7 @@ jobs:
       [
         quick-checks,
         ai-code-review,
-        build,
-        test,
+        build-and-test,
         test-e2e,
         security-scan,
         docker-build,
@@ -619,8 +674,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- Lint & Type Check: ${{ needs.quick-checks.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- AI Code Review: ${{ needs.ai-code-review.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Tests: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build & Test: ${{ needs.build-and-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- E2E Tests: ${{ needs.test-e2e.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Security Scan: ${{ needs.security-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Docker Build: ${{ needs.docker-build.result }}" >> $GITHUB_STEP_SUMMARY
