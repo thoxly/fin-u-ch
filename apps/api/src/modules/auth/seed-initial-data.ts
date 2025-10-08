@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import logger from '../../config/logger';
 
 /**
  * Создает начальные данные для новой компании
@@ -511,12 +512,7 @@ export async function seedInitialData(
     });
   }
 
-  console.log(
-    `✅ Начальные данные созданы для компании ${companyId}:`,
-    `\n  - ${accounts.count} счетов`,
-    `\n  - ${departments.count} подразделений`,
-    `\n  - ${counterparties.count} контрагентов`,
-    `\n  - Иерархия статей доходов и расходов`,
-    `\n  - Примеры сделок`
+  logger.info(
+    `✅ Начальные данные созданы для компании ${companyId}: ${accounts.count} счетов, ${departments.count} подразделений, ${counterparties.count} контрагентов, иерархия статей доходов/расходов, примеры сделок`
   );
 }
