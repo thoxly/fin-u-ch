@@ -425,7 +425,7 @@ export default defineConfig({
 
 ## 14) Безопасность
 
-- Пароли — только bcrypt.
+- Пароли — только **bcryptjs** (pure JavaScript реализация, без нативных зависимостей).
 - JWT (access/refresh). Храним access в памяти клиента, refresh — по политике (MVP: в httpOnly cookie или в хранилище сервера).
 - Логи без персональных данных/секретов.
 

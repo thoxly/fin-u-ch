@@ -225,13 +225,13 @@ logger.info('User registered', {
 
 ### Password Hashing
 
-- ✅ Только bcrypt для хеширования паролей
+- ✅ Только **bcryptjs** для хеширования паролей (pure JavaScript, без нативных модулей)
 - ✅ Salt rounds: минимум 10
 - ❌ Никогда не храните пароли в plain text
 
 ```typescript
 // ✅ Правильное хеширование
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
 const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
@@ -382,7 +382,7 @@ catch (error) {
 
 - [ ] Все Prisma запросы фильтруются по `companyId`
 - [ ] Нет использования `any` типа
-- [ ] Пароли хешируются через bcrypt
+- [ ] Пароли хешируются через bcryptjs
 - [ ] JWT токены имеют правильный expiration
 - [ ] Нет секретов в коде (используются env variables)
 - [ ] Input validation через Zod на фронте и бэке

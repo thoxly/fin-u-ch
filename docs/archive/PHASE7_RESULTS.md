@@ -31,7 +31,7 @@
 1. **Utils тесты** (100% coverage для utils):
    - `src/utils/validation.test.ts` - валидация email, пароля, обязательных полей
    - `src/utils/jwt.test.ts` - генерация и проверка JWT токенов
-   - `src/utils/hash.test.ts` - хеширование паролей (исключен из-за native модуля bcrypt)
+   - `src/utils/hash.test.ts` - хеширование паролей bcryptjs
 
 2. **Service тесты**:
    - `src/modules/operations/operations.service.test.ts` - валидация операций, фильтры
@@ -57,7 +57,7 @@ Time:        3-8s
 
 - Для полного тестирования сервисов с Prisma требуется либо моки всех запросов, либо интеграционные тесты с тестовой БД
 - Протестированы критичные утилиты и бизнес-логика расчетов
-- hash.test.ts исключен из-за проблем с native модулем bcrypt в Jest
+- Используется bcryptjs (pure JS) вместо bcrypt для избежания проблем с нативными модулями
 
 ### 7.2 Jest для Frontend ✅
 
@@ -202,10 +202,10 @@ pnpm test:e2e          # E2E тесты
 
 ## Проблемы и решения
 
-### 1. Bcrypt Native Module в Jest
+### 1. Bcrypt Native Module в Jest (РЕШЕНО)
 
 **Проблема**: Bcrypt не работает в Jest из-за native модуля  
-**Решение**: Исключен `hash.test.ts` из запуска, так как моки не давали полной уверенности в корректности
+**Решение**: Заменен на **bcryptjs** (pure JavaScript реализация, полностью совместима с API bcrypt). Тесты работают без проблем.
 
 ### 2. React is not defined в Jest
 

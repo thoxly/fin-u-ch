@@ -133,11 +133,11 @@
   ```bash
   cd apps/api
   pnpm add express cors helmet dotenv
-  pnpm add bcrypt jsonwebtoken
+  pnpm add bcryptjs jsonwebtoken
   pnpm add @prisma/client prisma
   pnpm add ioredis
   pnpm add -D typescript ts-node nodemon @types/node @types/express
-  pnpm add -D @types/bcrypt @types/jsonwebtoken @types/cors
+  pnpm add -D @types/bcryptjs @types/jsonwebtoken @types/cors
   ```
 - [ ] Настроить TypeScript (`tsconfig.json`)
 - [ ] Создать структуру файлов:
@@ -157,7 +157,7 @@
     │   └── tenant.ts       # companyId extraction
     ├── utils/
     │   ├── jwt.ts          # token generation
-    │   ├── hash.ts         # bcrypt helpers
+    │   ├── hash.ts         # bcryptjs helpers
     │   └── validation.ts   # input validation
     └── modules/
         └── (будут созданы далее)

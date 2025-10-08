@@ -134,7 +134,7 @@
 - **DB**: PostgreSQL (одна БД, multi-tenant через companyId в каждой таблице; индексы по companyId + дате).
 - **Cache**: Redis (кэширование отчётов и тяжёлых вычислений).
 - **Reverse Proxy**: Nginx (маршрутизация запросов между frontend/backend, SSL termination).
-- **Auth**: JWT (access+refresh). Пароли через bcrypt.
+- **Auth**: JWT (access+refresh). Пароли через bcryptjs (pure JavaScript).
 - **API Documentation**: автоматическая генерация OpenAPI через swagger-jsdoc + swagger-ui-express.
 - **Testing**: Jest (unit/integration тесты), Playwright (E2E тесты).
 - **Монорепо**: /apps/web, /apps/api, /packages/shared (типы/enum-ы).

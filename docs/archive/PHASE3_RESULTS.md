@@ -63,7 +63,7 @@
 **Утилиты**:
 
 - `utils/jwt.ts` - генерация и верификация токенов
-- `utils/hash.ts` - bcrypt для паролей
+- `utils/hash.ts` - bcryptjs для паролей
 - `utils/validation.ts` - валидация входных данных
 
 ### 3.4 Справочники (Catalogs) ✅
@@ -229,7 +229,7 @@ apps/api/
 - **Backend**: Node.js 18+, Express, TypeScript
 - **Database**: PostgreSQL 15, Prisma ORM
 - **Cache**: Redis 7, ioredis
-- **Auth**: JWT (jsonwebtoken), bcrypt
+- **Auth**: JWT (jsonwebtoken), bcryptjs
 - **Logging**: Winston
 - **Documentation**: Swagger (OpenAPI 3.0)
 - **Dev Tools**: Nodemon, ts-node

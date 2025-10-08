@@ -61,7 +61,7 @@ Multi-tenant (Компания → Пользователи с одинаков�
 | **База данных**      | PostgreSQL (multi-tenant)                    |
 | **Cache**            | Redis                                        |
 | **Reverse Proxy**    | Nginx                                        |
-| **Аутентификация**   | JWT + bcrypt                                 |
+| **Аутентификация**   | JWT + bcryptjs                               |
 | **API Docs**         | OpenAPI (swagger-jsdoc + swagger-ui-express) |
 | **Testing**          | Jest (unit/integration) + Playwright (E2E)   |
 | **Монорепо**         | pnpm workspaces                              |
