@@ -542,6 +542,11 @@ jobs:
             # Login to GHCR
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
+            # Remove old images to force pull new ones
+            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-api" -q) || true
+            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-web" -q) || true
+            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-worker" -q) || true
+            
             # Pull new images
             docker compose -f docker-compose.prod.yml pull
             
