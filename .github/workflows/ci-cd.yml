@@ -109,7 +109,7 @@ jobs:
 
       - name: Install AI Review dependencies
         working-directory: scripts/ai-review
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Build AI Review script
         working-directory: scripts/ai-review
