@@ -21,7 +21,14 @@
     "env:dev": "./scripts/switch-env.sh development",
     "env:prod": "./scripts/switch-env.sh production",
     "env:list": "./scripts/switch-env.sh --list",
-    "env:current": "./scripts/switch-env.sh --current"
+    "env:current": "./scripts/switch-env.sh --current",
+    "docker:build": "cd ops/docker && docker compose -f docker-compose.local.yml build",
+    "docker:up": "cd ops/docker && docker compose -f docker-compose.local.yml up -d",
+    "docker:down": "cd ops/docker && docker compose -f docker-compose.local.yml down",
+    "docker:logs": "cd ops/docker && docker compose -f docker-compose.local.yml logs -f",
+    "docker:ps": "cd ops/docker && docker compose -f docker-compose.local.yml ps",
+    "docker:restart": "cd ops/docker && docker compose -f docker-compose.local.yml restart",
+    "docker:clean": "cd ops/docker && docker compose -f docker-compose.local.yml down -v"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",

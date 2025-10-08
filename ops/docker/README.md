@@ -7,6 +7,7 @@
 ### Docker Compose
 
 - `docker-compose.yml` - Локальная разработка (postgres, redis, pgadmin)
+- `docker-compose.local.yml` - Полный стек локально (все сервисы как в production)
 - `docker-compose.prod.yml` - Production deployment (все сервисы)
 
 ### Dockerfiles
@@ -16,6 +17,10 @@
 - `worker.Dockerfile` - Background jobs (Node-cron)
 
 ## Локальная разработка
+
+### Вариант 1: Только инфраструктура (БД + Redis)
+
+Для обычной разработки с запуском приложений через `pnpm dev`:
 
 ```bash
 # Запустить инфраструктуру
@@ -29,6 +34,32 @@ docker-compose down
 
 # Просмотр логов
 docker-compose logs -f
+```
+
+### Вариант 2: Полный стек в Docker (как в production)
+
+Для локального тестирования всего стека в контейнерах:
+
+```bash
+# Из корня проекта
+pnpm docker:build    # Собрать все образы
+pnpm docker:up       # Запустить
+pnpm docker:ps       # Статус
+pnpm docker:logs     # Логи
+pnpm docker:down     # Остановить
+
+# Или напрямую:
+cd ops/docker
+docker compose -f docker-compose.local.yml up -d
+
+# После запуска прогнать миграции:
+docker compose -f docker-compose.local.yml exec api npx prisma migrate deploy
+
+# Приложение доступно на:
+# http://localhost - Frontend (через Nginx)
+# http://localhost/api - API (через Nginx)
+# http://localhost:4000 - API напрямую
+# http://localhost:8080 - Frontend напрямую
 ```
 
 ## Production
