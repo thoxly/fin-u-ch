@@ -31,6 +31,7 @@ function process(data: ProcessData) { ... }
 
 - ✅ Все функции должны иметь явный тип возвращаемого значения
 - ✅ Особенно важно для публичных API и сервисных методов
+- ✅ Return type может быть на отдельной строке для длинных сигнатур
 
 ```typescript
 // ❌ Плохо
@@ -41,6 +42,14 @@ function calculateTotal(items) {
 // ✅ Хорошо
 function calculateTotal(items: OrderItem[]): number {
   return items.reduce((sum, item) => sum + item.price, 0);
+}
+
+// ✅ Хорошо - многострочная сигнатура
+export async function seedInitialData(
+  tx: PrismaClient,
+  companyId: string
+): Promise<void> {
+  // ...
 }
 ```
 
@@ -203,9 +212,10 @@ const operations = await prisma.operation.findMany({
 
 - ✅ Используйте `$transaction` для атомарных операций
 - ✅ Особенно важно при создании связанных записей
+- ✅ Try-catch внутри транзакции - правильный паттерн для частичной обработки ошибок
 
 ```typescript
-// ✅ Хорошо
+// ✅ Хорошо - базовая транзакция
 await prisma.$transaction([
   prisma.operation.create({ data: operationData }),
   prisma.account.update({
@@ -213,6 +223,23 @@ await prisma.$transaction([
     data: { balance: { increment: amount } },
   }),
 ]);
+
+// ✅ Хорошо - обработка ошибок внутри транзакции
+const result = await prisma.$transaction(async (tx) => {
+  const company = await tx.company.create({ data: companyData });
+  const user = await tx.user.create({ data: userData });
+
+  // Попытка создать дополнительные данные
+  // Если упадет - вся транзакция откатится
+  try {
+    await seedInitialData(tx, company.id);
+  } catch (error) {
+    logger.error('Failed to seed data', { companyId: company.id, error });
+    throw new AppError('Failed to initialize company data', 500);
+  }
+
+  return { user, company };
+});
 ```
 
 ### Include/Select для оптимизации
@@ -379,17 +406,27 @@ function calculateTotal(
 - ✅ Ошибки с полным контекстом
 - ✅ Важные бизнес-события (создание операции, генерация отчета)
 - ❌ Никогда не логируйте пароли, токены, PII
+- ✅ Error объекты можно логировать, если в них нет sensitive данных
 
 ```typescript
-// ❌ Плохо
+// ❌ Плохо - логируем все данные пользователя
 logger.info('User logged in', user);
 
-// ✅ Хорошо
+// ✅ Хорошо - только необходимый контекст
 logger.info('User logged in', {
   userId: user.id,
   companyId: user.companyId,
   timestamp: new Date(),
 });
+
+// ✅ Хорошо - логирование ошибок с контекстом
+try {
+  await seedInitialData(tx, company.id);
+} catch (error) {
+  // Логируем error объект - это безопасно для технических ошибок
+  logger.error('Failed to seed data', { companyId: company.id, error });
+  throw new AppError('Failed to initialize company data', 500);
+}
 ```
 
 ## Тестирование
