@@ -41,8 +41,17 @@
 3. **Запустить инфраструктуру (PostgreSQL, Redis, PgAdmin)**:
 
    ```bash
+   # Вариант 1: Только БД и Redis для разработки (рекомендуется)
    docker-compose -f ops/docker/docker-compose.yml up -d
+   # Порты: PostgreSQL 5432, Redis 6379
+
+   # Вариант 2: Полный стек для тестирования как в production
+   # pnpm docker:up
+   # Порты: PostgreSQL 5433, Redis 6380 (нестандартные, чтобы не конфликтовать!)
    ```
+
+   **Примечание:** Нестандартные порты (5433, 6380) используются в `docker-compose.local.yml`
+   для возможности одновременного запуска локальных приложений и Docker инфраструктуры без конфликтов.
 
 4. **Прогнать миграции БД**:
 
@@ -51,16 +60,29 @@
    npx prisma migrate deploy
    ```
 
-5. **Запустить приложения**:
+5. **Запустить приложения локально** (с горячей перезагрузкой):
 
    ```bash
    # В разных терминалах или используйте tmux/screen
-   pnpm --filter api dev       # API: http://localhost:4000
-   pnpm --filter web dev       # Frontend: http://localhost:3000
-   pnpm --filter worker dev    # Worker (фоновые задачи)
+   cd apps/api && pnpm dev       # API: http://localhost:4000 (nodemon)
+   cd apps/web && pnpm dev       # Frontend: http://localhost:5173 (Vite HMR)
+   cd apps/worker && pnpm dev    # Worker (фоновые задачи)
+
+   # Или все вместе из корня (параллельно)
+   pnpm dev
    ```
 
-6. **Открыть в браузере**: http://localhost:3000
+6. **Открыть в браузере**: http://localhost:5173
+
+   **Архитектура запросов:**
+
+   ```
+   Браузер → http://localhost:5173/api/...
+          ↓ (Vite Proxy)
+          → http://localhost:4000/api/...
+          ↓ (Express API)
+          → PostgreSQL (5432) & Redis (6379)
+   ```
 
 ### Production (Docker)
 

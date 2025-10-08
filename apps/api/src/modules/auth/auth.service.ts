@@ -7,6 +7,8 @@ import {
   validateRequired,
 } from '../../utils/validation';
 import { AppError } from '../../middlewares/error';
+import { seedInitialData } from './seed-initial-data';
+import logger from '../../config/logger';
 
 export interface RegisterDTO {
   email: string;
@@ -66,6 +68,17 @@ export class AuthService {
           companyId: company.id,
         },
       });
+
+      // Создаем начальные данные для компании
+      try {
+        await seedInitialData(tx, company.id);
+      } catch (error) {
+        logger.error('Failed to seed initial data', {
+          companyId: company.id,
+          error,
+        });
+        throw new AppError('Failed to initialize company data', 500);
+      }
 
       return { user, company };
     });
