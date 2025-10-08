@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
+
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
@@ -46,17 +48,19 @@ export const CounterpartiesPage = () => {
               setEditing(c);
               setIsFormOpen(true);
             }}
-            className="text-primary-600 hover:text-primary-800 text-sm"
+            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
+            title="Изменить"
           >
-            Изменить
+            <Pencil size={16} />
           </button>
           <button
             onClick={() =>
               window.confirm('Удалить?') && deleteCounterparty(c.id)
             }
-            className="text-red-600 hover:text-red-800 text-sm"
+            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+            title="Удалить"
           >
-            Удалить
+            <Trash2 size={16} />
           </button>
         </div>
       ),
