@@ -39,14 +39,14 @@ WORKDIR /app
 RUN apk add --no-cache openssl python3 make g++
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
 # Copy package files
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/pnpm-lock.yaml ./
 
-# Copy shared package
+# Copy shared package (built)
 COPY --from=builder /app/packages/shared ./packages/shared
 
 # Copy api built files
@@ -54,11 +54,13 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 
-# Copy node_modules from builder (includes compiled native modules)
-COPY --from=builder /app/node_modules ./node_modules
+# Install dependencies fresh (this will compile native modules for this image)
+RUN pnpm install --frozen-lockfile --prod=false
 
-# Generate Prisma Client and set working directory
+# Set working directory
 WORKDIR /app/apps/api
+
+# Generate Prisma Client
 RUN npx prisma generate
 
 # Expose port
