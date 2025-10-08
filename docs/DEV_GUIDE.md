@@ -44,51 +44,159 @@
 
 ## 4) Окружения и переменные
 
-Минимум переменных (все есть в `.env.example`, секреты — в GitHub Secrets):
+Минимум переменных (все есть в `env.example`, секреты — в GitHub Secrets):
 
-- `DATABASE_URL` — строка подключения к Postgres.
-- `REDIS_URL` — строка подключения к Redis (для кэша отчётов).
-- `JWT_SECRET` — секрет для JWT.
-- `OPENAI_API_KEY` — для AI-ревью.
-- Деплой на VPS: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`.
+- `DATABASE_URL` — строка подключения к Postgres
+  - **Сценарий 1 (гибридный):** `postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev`
+  - **Сценарий 2 (полный Docker):** `postgresql://postgres:postgres@localhost:5433/fin_u_ch_dev`
+- `REDIS_URL` — строка подключения к Redis (для кэша отчётов)
+  - **Сценарий 1:** `redis://localhost:6379`
+  - **Сценарий 2:** `redis://localhost:6380`
+- `JWT_SECRET` — секрет для JWT
+- `VITE_API_URL` — API URL для frontend
+  - **Локальная разработка:** `/api` (через Vite proxy)
+  - **Production:** `/api` (через Nginx)
+- `ANTHROPIC_API_KEY` — для AI Code Review
+- Деплой на VPS: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 
-> Для локалки используем `.env` в корне. В CI подтягивается из Secrets.
+> **Важно:** Для локальной разработки (Сценарий 1) используйте стандартные порты (5432, 6379).  
+> Файл `.env` в корне автоматически подхватывается всеми приложениями. В CI секреты берутся из GitHub Secrets.
 
 ---
 
-## 5) Быстрый старт локально (Docker)
+## 5) Быстрый старт локально
+
+### Сценарий 1: Гибридный подход (рекомендуется ⭐)
+
+**Что:** Docker только для БД/Redis, приложения локально с горячей перезагрузкой
 
 1. Скопируй переменные:
-   ```bash
-   cp .env.example .env
-   ```
-2. Подними всё локально:
-   ```bash
-   docker-compose -f ops/docker/docker-compose.yml up -d
-   ```
-3. Прогони миграции в контейнере `api`:
-   ```bash
-   docker-compose -f ops/docker/docker-compose.yml exec api npx prisma migrate deploy
-   ```
-4. (Опционально) сиды/тестовые данные:
-   ```bash
-   docker-compose -f ops/docker/docker-compose.yml exec api node scripts/seed-dev.js
-   # или ts-версия: ts-node scripts/seed-dev.ts (если доступно)
-   ```
-5. Frontend доступен по адресу из compose, backend — `/api` (см. compose).
 
-### Локально без Docker (при необходимости)
+   ```bash
+   cp env.example .env
+   ```
 
-- Установи Postgres локально, укажи `DATABASE_URL`.
-- Установи Redis локально, укажи `REDIS_URL`.
-- В корне:
-  ```bash
-  pnpm i
-  pnpm -w build # сначала packages/shared
-  pnpm --filter api dev
-  pnpm --filter web dev
-  pnpm --filter worker dev
-  ```
+2. Подними инфраструктуру (PostgreSQL, Redis):
+
+   ```bash
+   cd ops/docker
+   docker-compose up -d
+   # Порты: PostgreSQL 5432, Redis 6379
+   ```
+
+3. Прогони миграции:
+
+   ```bash
+   cd apps/api
+   npx prisma migrate deploy
+   ```
+
+4. Запусти приложения локально:
+
+   ```bash
+   # В отдельных терминалах
+   cd apps/api && pnpm dev      # localhost:4000 (nodemon - горячая перезагрузка)
+   cd apps/web && pnpm dev      # localhost:5173 (Vite HMR)
+   cd apps/worker && pnpm dev   # фоновые задачи
+
+   # Или все вместе из корня
+   pnpm dev
+   ```
+
+5. Открой браузер: **http://localhost:5173**
+
+**Архитектура:**
+
+```
+Браузер → localhost:5173/api/...
+       ↓ (Vite Proxy из vite.config.ts)
+       → localhost:4000/api/...
+       ↓ (Express API)
+       → Docker: PostgreSQL (5432), Redis (6379)
+```
+
+**Плюсы:**
+
+- ✅ Мгновенная горячая перезагрузка (nodemon + Vite HMR)
+- ✅ Легко дебажить, видны все логи
+- ✅ Быстрая разработка
+- ✅ Изолированная инфраструктура в Docker
+
+---
+
+### Сценарий 2: Полный стек в Docker
+
+**Что:** ВСЁ в Docker (API, Web, Worker, Nginx, PostgreSQL, Redis)  
+**Когда:** Тестирование перед деплоем, проверка Nginx конфигурации
+
+1. Собери образы:
+
+   ```bash
+   pnpm docker:build
+   ```
+
+2. Запусти полный стек:
+
+   ```bash
+   pnpm docker:up
+   # Порты: PostgreSQL 5433 (!), Redis 6380 (!) - нестандартные
+   ```
+
+3. Прогони миграции в контейнере:
+
+   ```bash
+   cd ops/docker
+   docker-compose -f docker-compose.local.yml exec api npx prisma migrate deploy
+   ```
+
+4. Открой браузер: **http://localhost** (через Nginx)
+
+**Доступ:**
+
+- `http://localhost` → Frontend через Nginx (как в production)
+- `http://localhost/api` → API через Nginx (как в production)
+- `http://localhost:4000` → API напрямую
+- `http://localhost:8080` → Frontend напрямую
+
+**Плюсы:**
+
+- ✅ Полная имитация production
+- ✅ Тестирует Nginx роутинг
+- ✅ Проверяет Docker образы
+
+**Минусы:**
+
+- ❌ Нужно пересобирать при изменениях
+- ❌ Нет горячей перезагрузки
+
+**Почему нестандартные порты (5433, 6380)?**  
+Чтобы избежать конфликтов с локальными PostgreSQL/Redis или с Сценарием 1.
+Можно одновременно держать инфраструктуру на 5432/6379 и полный стек на 5433/6380.
+
+---
+
+### Переключение между сценариями
+
+**С гибридного → на полный Docker:**
+
+```bash
+# 1. Остановить локальные процессы (Ctrl+C)
+# 2. Остановить инфраструктуру
+cd ops/docker && docker-compose down
+# 3. Запустить полный стек
+pnpm docker:up
+```
+
+**С полного Docker → на гибридный:**
+
+```bash
+# 1. Остановить полный стек
+pnpm docker:down
+# 2. Запустить только инфраструктуру
+cd ops/docker && docker-compose up -d
+# 3. Запустить приложения локально
+pnpm dev
+```
 
 ---
 

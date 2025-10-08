@@ -73,6 +73,7 @@ NODE_ENV=development
 PORT=4000
 
 # База данных (локальный Docker)
+# Стандартные порты для docker-compose.yml (рекомендуется)
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev
 
 # Redis (локальный Docker)
@@ -84,8 +85,20 @@ JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
 # Frontend
-VITE_API_URL=http://localhost:4000
+# Используйте /api для работы через Vite proxy (настроен в vite.config.ts)
+VITE_API_URL=/api
 ```
+
+**Примечание о портах:**
+
+| Сценарий                      | PostgreSQL | Redis | Файл compose               |
+| ----------------------------- | ---------- | ----- | -------------------------- |
+| **Гибридный (рекомендуется)** | 5432       | 6379  | `docker-compose.yml`       |
+| **Полный Docker стек**        | 5433       | 6380  | `docker-compose.local.yml` |
+
+- **Гибридный:** Docker только для БД/Redis, приложения локально (горячая перезагрузка)
+- **Полный Docker:** Всё в Docker для тестирования production-подобного окружения
+- Нестандартные порты (5433, 6380) нужны для избежания конфликтов при одновременной работе
 
 ### 3. Запуск проекта
 
@@ -107,12 +120,25 @@ pnpm dev
 
 ### Development (Локальная разработка)
 
+**Гибридный режим (рекомендуется):**
+
 ```bash
-# .env (по умолчанию)
+# .env
 NODE_ENV=development
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev
 REDIS_URL=redis://localhost:6379
-VITE_API_URL=http://localhost:4000
+VITE_API_URL=/api  # Через Vite proxy
+JWT_SECRET=dev-secret-change-in-production
+```
+
+**Полный Docker стек (для тестирования):**
+
+```bash
+# .env
+NODE_ENV=development
+DATABASE_URL=postgresql://postgres:postgres@localhost:5433/fin_u_ch_dev
+REDIS_URL=redis://localhost:6380
+VITE_API_URL=/api
 JWT_SECRET=dev-secret-change-in-production
 ```
 

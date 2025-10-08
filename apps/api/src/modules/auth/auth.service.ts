@@ -7,6 +7,7 @@ import {
   validateRequired,
 } from '../../utils/validation';
 import { AppError } from '../../middlewares/error';
+import { seedInitialData } from './seed-initial-data';
 
 export interface RegisterDTO {
   email: string;
@@ -66,6 +67,9 @@ export class AuthService {
           companyId: company.id,
         },
       });
+
+      // Создаем начальные данные для компании
+      await seedInitialData(tx, company.id);
 
       return { user, company };
     });
