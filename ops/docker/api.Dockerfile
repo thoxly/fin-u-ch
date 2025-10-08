@@ -54,14 +54,9 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 
-# Install dependencies in production (this will build native modules for this stage)
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
-
-# Install Prisma CLI separately for migrations (it's a dev dep but needed for deploy)
-RUN pnpm add -w prisma --save-dev --ignore-scripts
-
-# Copy Prisma Client from builder (from .pnpm store where it actually is)
-COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
+# Install ALL dependencies (not just prod) to get Prisma CLI for migrations
+# Native modules will be built for this stage, ignore scripts to skip husky
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Set working directory to api
 WORKDIR /app/apps/api
