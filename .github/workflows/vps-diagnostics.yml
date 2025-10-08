@@ -1,0 +1,67 @@
+name: VPS Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    name: Diagnose VPS Issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Check current state
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /opt/fin-u-ch
+            
+            echo "===== Current Docker containers ====="
+            docker ps -a
+            
+            echo ""
+            echo "===== Docker images ====="
+            docker images | grep fin-u-ch || echo "No fin-u-ch images found"
+            
+            echo ""
+            echo "===== Try to pull images ====="
+            docker compose -f docker-compose.prod.yml config --services
+            
+            echo ""
+            echo "===== Try to pull api image manually ====="
+            docker pull ghcr.io/thoxly/fin-u-ch-api:latest || echo "Failed to pull API image"
+            
+            echo ""
+            echo "===== Try to pull web image manually ====="
+            docker pull ghcr.io/thoxly/fin-u-ch-web:latest || echo "Failed to pull web image"
+            
+            echo ""
+            echo "===== Try to pull worker image manually ====="
+            docker pull ghcr.io/thoxly/fin-u-ch-worker:latest || echo "Failed to pull worker image"
+            
+            echo ""
+            echo "===== Check .env file ====="
+            ls -la .env || echo "No .env file"
+            
+            echo ""
+            echo "===== Check docker-compose.prod.yml ====="
+            ls -la docker-compose.prod.yml || echo "No docker-compose.prod.yml file"
+            
+            echo ""
+            echo "===== Try to start services with verbose output ====="
+            docker compose -f docker-compose.prod.yml up -d 2>&1 || echo "Failed to start services"
+            
+            echo ""
+            echo "===== Final container status ====="
+            docker ps -a
+            
+            echo ""
+            echo "===== Docker compose logs ====="
+            docker compose -f docker-compose.prod.yml logs --tail=50 2>&1 || echo "No logs available"
+          EOF
