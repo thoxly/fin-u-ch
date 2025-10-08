@@ -424,9 +424,17 @@ try {
   await seedInitialData(tx, company.id);
 } catch (error) {
   // Логируем error объект - это безопасно для технических ошибок
+  // Error объекты содержат stack trace и message, не содержат PII
   logger.error('Failed to seed data', { companyId: company.id, error });
   throw new AppError('Failed to initialize company data', 500);
 }
+
+// ✅ Также допустимо - логирование статистики и счетчиков
+logger.info('Initial data seeded successfully', {
+  companyId,
+  accounts: accounts.count,
+  departments: departments.count,
+});
 ```
 
 ## Тестирование
