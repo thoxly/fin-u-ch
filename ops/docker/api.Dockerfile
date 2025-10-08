@@ -54,19 +54,12 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 
-# Install ALL dependencies (not just prod) to get Prisma CLI for migrations
-# Native modules will be built for this stage, ignore scripts to skip husky
-RUN pnpm install --frozen-lockfile --ignore-scripts
+# Copy node_modules from builder (includes compiled native modules)
+COPY --from=builder /app/node_modules ./node_modules
 
-# Rebuild native modules (bcrypt) that need compilation
-RUN pnpm rebuild bcrypt
-
-# Generate Prisma Client after install (since we skipped scripts)
+# Generate Prisma Client and set working directory
 WORKDIR /app/apps/api
 RUN npx prisma generate
-
-# Set working directory to api
-WORKDIR /app/apps/api
 
 # Expose port
 EXPOSE 4000
