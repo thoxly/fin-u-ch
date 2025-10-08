@@ -548,8 +548,8 @@ jobs:
             # Apply database migrations (using npx since Prisma CLI is in node_modules)
             docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
             
-            # Restart services with zero downtime
-            docker compose -f docker-compose.prod.yml up -d --no-deps --build api web worker
+            # Restart services with zero downtime (use pulled images, don't rebuild)
+            docker compose -f docker-compose.prod.yml up -d --no-deps api web worker
             
             # Cleanup old images
             docker image prune -f
