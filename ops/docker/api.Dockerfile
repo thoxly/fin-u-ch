@@ -36,7 +36,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Install OpenSSL for Prisma
-# Force rebuild: bcryptjs migration 2025-10-08
+# Force rebuild: seed-initial-data deploy 2025-10-08
 RUN apk add --no-cache openssl
 
 # Install pnpm
