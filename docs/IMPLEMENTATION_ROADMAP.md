@@ -1206,11 +1206,7 @@
 
 ### 9.6 SSH ключи для GitHub
 
-- [ ] Добавить публичный SSH ключ вашей машины в GitHub deploy keys репозитория (для pull образов из GHCR)
-- [ ] Или использовать Personal Access Token для docker login:
-  ```bash
-  echo $GHCR_TOKEN | docker login ghcr.io -u <username> --password-stdin
-  ```
+- [х] Добавить публичный SSH ключ вашей машины в GitHub deploy keys репозитория (для pull образов из GHCR)
 
 **Критерий готовности**:
 
