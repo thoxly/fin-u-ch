@@ -35,8 +35,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install OpenSSL and build dependencies for native modules
-RUN apk add --no-cache openssl python3 make g++
+# Install OpenSSL for Prisma
+RUN apk add --no-cache openssl
 
 # Install pnpm
 RUN npm install -g pnpm@9
