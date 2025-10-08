@@ -132,7 +132,7 @@ jobs:
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    needs: [quick-checks]
+    needs: [quick-checks, ai-code-review]
     timeout-minutes: 15
 
     services:
