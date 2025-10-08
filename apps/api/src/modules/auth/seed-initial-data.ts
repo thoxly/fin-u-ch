@@ -512,7 +512,10 @@ export async function seedInitialData(
     });
   }
 
-  logger.info(
-    `✅ Начальные данные созданы для компании ${companyId}: ${accounts.count} счетов, ${departments.count} подразделений, ${counterparties.count} контрагентов, иерархия статей доходов/расходов, примеры сделок`
-  );
+  logger.info('Initial data seeded successfully', {
+    companyId,
+    accounts: accounts.count,
+    departments: departments.count,
+    counterparties: counterparties.count,
+  });
 }

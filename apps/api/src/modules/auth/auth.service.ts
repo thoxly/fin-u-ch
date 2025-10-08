@@ -73,10 +73,10 @@ export class AuthService {
       try {
         await seedInitialData(tx, company.id);
       } catch (error) {
-        logger.error(
-          `Failed to seed initial data for company ${company.id}:`,
-          error
-        );
+        logger.error('Failed to seed initial data', {
+          companyId: company.id,
+          error,
+        });
         throw new AppError('Failed to initialize company data', 500);
       }
 
