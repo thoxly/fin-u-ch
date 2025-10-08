@@ -107,13 +107,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install AI Review dependencies
-        working-directory: scripts/ai-review
-        run: pnpm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Build AI Review script
-        working-directory: scripts/ai-review
-        run: pnpm build
+        run: pnpm --filter @fin-u-ch/ai-review build
 
       - name: Run AI Code Review
         working-directory: scripts/ai-review
