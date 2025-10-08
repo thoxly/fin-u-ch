@@ -611,7 +611,7 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
             
             # Restart services with zero downtime (use pulled images, force recreate containers)
-            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api web worker
+            docker compose -f docker-compose.prod.yml up -d --force-recreate api web worker
             
             # Cleanup old images
             docker image prune -f
