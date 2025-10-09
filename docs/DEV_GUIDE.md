@@ -180,6 +180,182 @@
 
 ---
 
+## 5.1) 🪟 Особенности для Windows
+
+### Установка зависимостей
+
+**pnpm:**
+
+```powershell
+# Установите глобально
+npm install -g pnpm@latest
+
+# Проверьте
+pnpm --version
+```
+
+**Docker Desktop:**
+
+- Скачайте с [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop)
+- Запустите и убедитесь что иконка активна в трее
+- Включите WSL 2 если требуется:
+  ```powershell
+  wsl --install
+  wsl --set-default-version 2
+  ```
+
+### Команды
+
+Все команды `pnpm env:*` теперь кросс-платформенные (используют Node.js):
+
+```powershell
+# Создать .env
+pnpm env:setup
+
+# Проверить окружение
+pnpm env:check
+
+# Текущие настройки
+pnpm env:current
+```
+
+### Типичные проблемы
+
+#### ❌ PrismaClient not found
+
+**Причина:** Prisma Client не сгенерирован.
+
+**Решение:**
+
+```powershell
+cd apps\api
+pnpm prisma:generate
+
+# Или просто переустановите (есть postinstall хук)
+pnpm install
+```
+
+#### ❌ PostgreSQL ошибка подключения
+
+**Симптомы:**
+
+```
+Error: Can't reach database server at localhost:5432
+```
+
+**Проверьте:**
+
+1. **Docker запущен:**
+
+   ```powershell
+   docker ps
+   ```
+
+   Должны быть контейнеры: `postgres` и `redis`
+
+2. **Правильный порт в .env:**
+
+   ```env
+   # Сценарий 1 (рекомендуется)
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev
+
+   # Сценарий 2 (полный Docker)
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5433/fin_u_ch_dev
+   ```
+
+3. **Перезапустите Docker:**
+
+   ```powershell
+   docker compose -f ops/docker/docker-compose.yml down
+   docker compose -f ops/docker/docker-compose.yml up -d
+
+   # Подождите 5 секунд
+   timeout /t 5
+   ```
+
+4. **Примените миграции:**
+   ```powershell
+   cd apps\api
+   npx prisma migrate deploy
+   ```
+
+#### ❌ Порт 5432 занят
+
+**Причина:** Другой PostgreSQL уже использует порт.
+
+**Решение 1** - Остановить другой PostgreSQL:
+
+```powershell
+# Найдите процесс
+netstat -ano | findstr :5432
+
+# Завершите (замените <PID> на ID процесса)
+taskkill /PID <PID> /F
+```
+
+**Решение 2** - Используйте нестандартный порт:
+
+```powershell
+# Запустите полный Docker стек
+pnpm docker:up
+
+# Обновите .env
+# DATABASE_URL=postgresql://postgres:postgres@localhost:5433/fin_u_ch_dev
+# REDIS_URL=redis://localhost:6380
+```
+
+### Проверка окружения
+
+Команда `pnpm env:check` автоматически проверит всё:
+
+```powershell
+pnpm env:check
+```
+
+**Что проверяется:**
+
+- ✓ Node.js >= 18.0.0
+- ✓ pnpm >= 9.0.0
+- ✓ .env файл и переменные
+- ✓ Docker установку
+- ✓ PostgreSQL доступность (порт 5432/5433)
+- ✓ Redis доступность (порт 6379/6380)
+- ✓ Prisma Client генерацию
+
+### Полная переустановка
+
+Если ничего не помогает:
+
+```powershell
+# 1. Остановите Docker
+docker compose -f ops/docker/docker-compose.yml down -v
+
+# 2. Удалите node_modules
+Remove-Item -Recurse -Force node_modules
+Remove-Item -Recurse -Force apps/api/node_modules
+Remove-Item -Recurse -Force apps/web/node_modules
+Remove-Item -Recurse -Force apps/worker/node_modules
+
+# 3. Переустановите
+pnpm install
+
+# 4. Запустите Docker
+docker compose -f ops/docker/docker-compose.yml up -d
+
+# 5. Подождите
+timeout /t 5
+
+# 6. Миграции
+cd apps\api
+npx prisma migrate deploy
+
+# 7. Запустите
+cd ..\..
+pnpm dev
+```
+
+---
+
 ### Переключение между сценариями
 
 **С гибридного → на полный Docker:**
