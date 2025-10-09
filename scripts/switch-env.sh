@@ -45,12 +45,10 @@ show_help() {
   echo ""
   echo "Доступные окружения:"
   echo "  development  - Локальная разработка (по умолчанию)"
-  echo "  staging      - Тестовое окружение"
   echo "  production   - Продакшен окружение"
   echo ""
   echo "Примеры:"
   echo "  ./scripts/switch-env.sh development"
-  echo "  ./scripts/switch-env.sh staging"
   echo "  ./scripts/switch-env.sh production"
   echo ""
   echo "Опции:"
@@ -72,7 +70,7 @@ list_env_files() {
     echo -e "  ${RED}✗${NC} .env (не найден)"
   fi
   
-  for env in development staging production; do
+  for env in development production; do
     if [ -f ".env.$env" ]; then
       echo -e "  ${GREEN}✓${NC} .env.$env"
     else
@@ -127,7 +125,7 @@ main() {
   
   # Валидация окружения
   case "$ENV" in
-    development|staging|production)
+    development|production)
       ;;
     *)
       error "Неизвестное окружение: $ENV"
