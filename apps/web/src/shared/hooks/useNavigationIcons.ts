@@ -23,7 +23,14 @@ const DEFAULT_ICONS: Record<string, string> = {
 
 const STORAGE_KEY = 'navigation-icons';
 
-export const useNavigationIcons = () => {
+interface UseNavigationIconsReturn {
+  getIcon: (name: string) => string;
+  updateIcon: (name: string, iconName: string) => void;
+  resetIcon: (name: string) => void;
+  resetAllIcons: () => void;
+}
+
+export const useNavigationIcons = (): UseNavigationIconsReturn => {
   const [icons, setIcons] = useState<Record<string, string>>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -31,6 +38,7 @@ export const useNavigationIcons = () => {
         return { ...DEFAULT_ICONS, ...JSON.parse(stored) };
       }
     } catch (error) {
+      // Note: Using console.error as logger is not available in frontend context
       console.error('Failed to load navigation icons:', error);
     }
     return DEFAULT_ICONS;
@@ -51,6 +59,7 @@ export const useNavigationIcons = () => {
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(customIcons));
     } catch (error) {
+      // Note: Using console.error as logger is not available in frontend context
       console.error('Failed to save navigation icons:', error);
     }
   }, [icons]);

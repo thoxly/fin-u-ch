@@ -34,7 +34,7 @@ const navigation: NavigationItem[] = [
   },
 ];
 
-export const Layout = ({ children }: LayoutProps) => {
+export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -68,8 +68,9 @@ export const Layout = ({ children }: LayoutProps) => {
 
   const renderIcon = (itemName: string) => {
     const iconName = getIcon(itemName);
-    const IconComponent = (Icons[iconName as keyof typeof Icons] ||
-      Icons.Circle) as Icons.LucideIcon;
+    const IconComponent =
+      (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon | undefined) ||
+      Icons.Circle;
     return <IconComponent size={18} />;
   };
 
@@ -118,9 +119,9 @@ export const Layout = ({ children }: LayoutProps) => {
                     {item.children.map((child) => (
                       <Link
                         key={child.href}
-                        to={child.href!}
+                        to={child.href || '/'}
                         className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                          isActive(child.href!)
+                          isActive(child.href || '/')
                             ? 'bg-primary-100 text-primary-700 font-medium'
                             : 'text-gray-700 hover:bg-gray-100'
                         }`}
@@ -140,9 +141,9 @@ export const Layout = ({ children }: LayoutProps) => {
               ) : (
                 <Link
                   key={item.href}
-                  to={item.href!}
+                  to={item.href || '/'}
                   className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    isActive(item.href!)
+                    isActive(item.href || '/')
                       ? 'bg-primary-100 text-primary-700 font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}

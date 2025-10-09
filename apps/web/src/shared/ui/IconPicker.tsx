@@ -45,7 +45,7 @@ export const IconPicker = ({
   currentIcon,
   onSelectIcon,
   onClose,
-}: IconPickerProps) => {
+}: IconPickerProps): JSX.Element => {
   const [selectedIcon, setSelectedIcon] = useState(currentIcon);
 
   const handleSelect = (iconName: string) => {
@@ -77,7 +77,8 @@ export const IconPicker = ({
 
         <div className="grid grid-cols-6 gap-2 max-h-96 overflow-y-auto">
           {AVAILABLE_ICONS.map((iconName) => {
-            const IconComponent = Icons[iconName] as Icons.LucideIcon;
+            const IconComponent =
+              (Icons[iconName] as Icons.LucideIcon | undefined) || Icons.Circle;
             const isSelected = iconName === selectedIcon;
 
             return (
