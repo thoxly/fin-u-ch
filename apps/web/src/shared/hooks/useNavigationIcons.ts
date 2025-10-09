@@ -47,15 +47,20 @@ export const useNavigationIcons = (): UseNavigationIconsReturn => {
   };
 
   const updateIcon = async (name: string, iconName: string): Promise<void> => {
-    const newNavigationIcons = {
-      ...(uiSettings?.navigationIcons || {}),
-      [name]: iconName,
-    };
+    try {
+      const newNavigationIcons = {
+        ...(uiSettings?.navigationIcons || {}),
+        [name]: iconName,
+      };
 
-    await updateUiSettings({
-      ...uiSettings,
-      navigationIcons: newNavigationIcons,
-    });
+      await updateUiSettings({
+        ...uiSettings,
+        navigationIcons: newNavigationIcons,
+      }).unwrap();
+    } catch (error) {
+      console.error('Failed to update icon:', error);
+      // Note: Consider adding toast notification for user feedback
+    }
   };
 
   return {

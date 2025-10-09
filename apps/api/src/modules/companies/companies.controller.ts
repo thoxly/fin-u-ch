@@ -21,7 +21,11 @@ export class CompaniesController {
     }
   }
 
-  async getUiSettings(req: TenantRequest, res: Response, next: NextFunction) {
+  async getUiSettings(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const result = await companiesService.getUiSettings(req.companyId!);
       res.json(result);
@@ -34,7 +38,7 @@ export class CompaniesController {
     req: TenantRequest,
     res: Response,
     next: NextFunction
-  ) {
+  ): Promise<void> {
     try {
       const result = await companiesService.updateUiSettings(
         req.companyId!,

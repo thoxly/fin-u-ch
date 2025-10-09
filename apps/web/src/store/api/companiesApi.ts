@@ -1,8 +1,14 @@
 import { apiSlice } from './apiSlice';
 
+export interface NavigationIcons {
+  [navigationItemName: string]: string;
+}
+
 export interface UiSettings {
-  navigationIcons?: Record<string, string>;
-  [key: string]: unknown;
+  navigationIcons?: NavigationIcons;
+  // Future UI settings can be added here
+  // theme?: 'light' | 'dark';
+  // sidebarCollapsed?: boolean;
 }
 
 export const companiesApi = apiSlice.injectEndpoints({

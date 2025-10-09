@@ -38,7 +38,7 @@ export class CompaniesService {
     });
   }
 
-  async getUiSettings(companyId: string) {
+  async getUiSettings(companyId: string): Promise<Record<string, unknown>> {
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { uiSettings: true },
@@ -48,17 +48,20 @@ export class CompaniesService {
       throw new AppError('Company not found', 404);
     }
 
-    return company.uiSettings || {};
+    return (company.uiSettings as Record<string, unknown>) || {};
   }
 
-  async updateUiSettings(companyId: string, settings: Record<string, unknown>) {
+  async updateUiSettings(
+    companyId: string,
+    settings: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     const company = await prisma.company.update({
       where: { id: companyId },
       data: { uiSettings: settings },
       select: { uiSettings: true, updatedAt: true },
     });
 
-    return company.uiSettings;
+    return (company.uiSettings as Record<string, unknown>) || {};
   }
 }
 
