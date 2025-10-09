@@ -4,7 +4,7 @@ import { useEffect } from 'react';
  * Hook для автоматического определения и применения темной темы
  * на основе системных настроек пользователя
  */
-export function useDarkMode() {
+export function useDarkMode(): void {
   useEffect(() => {
     // Проверяем системные настройки темы
     const isDarkMode = window.matchMedia(
@@ -20,7 +20,7 @@ export function useDarkMode() {
 
     // Слушаем изменения системных настроек
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
+    const handleChange = (e: MediaQueryListEvent): void => {
       if (e.matches) {
         document.documentElement.classList.add('dark');
       } else {
@@ -28,21 +28,12 @@ export function useDarkMode() {
       }
     };
 
-    // Добавляем слушатель (поддержка старых браузеров)
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleChange);
-    } else {
-      // Fallback для старых браузеров
-      mediaQuery.addListener(handleChange);
-    }
+    // Добавляем слушатель
+    mediaQuery.addEventListener('change', handleChange);
 
     // Очистка при размонтировании
-    return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener('change', handleChange);
-      } else {
-        mediaQuery.removeListener(handleChange);
-      }
+    return (): void => {
+      mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
 }
