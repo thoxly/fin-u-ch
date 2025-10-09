@@ -3,7 +3,7 @@
 ## 🚀 Быстрый старт
 
 ```bash
-# 1. Создать .env из примера
+# 1. Создать .env из примера (работает на Windows/macOS/Linux)
 pnpm env:setup
 
 # 2. Показать текущие настройки
@@ -12,6 +12,8 @@ pnpm env:current
 # 3. Список доступных env файлов
 pnpm env:list
 ```
+
+> **💡 Совет для Windows пользователей:** Все команды `pnpm env:*` кросс-платформенные!
 
 ## 🔄 Переключение окружений
 
@@ -74,6 +76,22 @@ docker-compose config
 
 ## 🛠️ Полезные команды
 
+### Кросс-платформенные (работают везде)
+
+```bash
+# Создать .env
+pnpm env:setup
+
+# Проверить текущее окружение
+pnpm env:current
+
+# Переключить окружение
+pnpm env:dev    # development
+pnpm env:prod   # production
+```
+
+### macOS / Linux
+
 ```bash
 # Создать env файл для production
 cp env.example .env.production
@@ -90,6 +108,27 @@ diff .env .env.production
 
 # Найти использование переменной в коде
 grep -r "REDIS_URL" apps/
+```
+
+### Windows (PowerShell)
+
+```powershell
+# Создать env файл для production
+Copy-Item env.example .env.production
+notepad .env.production
+
+# Backup текущего .env
+$date = Get-Date -Format "yyyyMMdd_HHmmss"
+Copy-Item .env ".env.backup.$date"
+
+# Проверить все env файлы
+Get-ChildItem -Filter .env*
+
+# Сравнить env файлы
+Compare-Object (Get-Content .env) (Get-Content .env.production)
+
+# Найти использование переменной в коде
+Get-ChildItem -Path apps -Recurse -Filter *.ts | Select-String "REDIS_URL"
 ```
 
 ## 📋 Checklist перед деплоем
