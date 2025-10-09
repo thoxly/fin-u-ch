@@ -45,10 +45,9 @@ Developer commits → Push to feature branch
     ├───────────────────────────┤
     │ 1. Quick Checks           │ ← Lint, Type Check, Format
     │ 2. AI Code Review         │ ← Claude анализирует код
-    │ 3. Build                  │ ← Сборка всех пакетов
-    │ 4. Tests                  │ ← Unit + Integration тесты
-    │ 5. E2E Tests              │ ← Playwright
-    │ 6. Security Scan          │ ← Trivy + pnpm audit
+    │ 3. Build & Test           │ ← Сборка + Unit тесты
+    │ 4. E2E Tests              │ ← Playwright (только PR в main)
+    │ 5. Security Scan          │ ← Trivy + pnpm audit
     └───────────────────────────┘
             ↓
     All checks passed? → Merge to main
@@ -56,9 +55,9 @@ Developer commits → Push to feature branch
     ┌───────────────────────────┐
     │    Production Deploy      │
     ├───────────────────────────┤
-    │ 7. Docker Build & Push    │ ← Build images → GHCR
-    │ 8. Deploy to VPS          │ ← SSH deploy + migrations
-    │ 9. Health Check           │ ← Verify deployment
+    │ 6. Docker Build & Push    │ ← Build images → GHCR
+    │ 7. Deploy to VPS          │ ← SSH deploy + migrations
+    │ 8. Health Check           │ ← Verify deployment
     └───────────────────────────┘
 ```
 
@@ -140,48 +139,31 @@ ai-code-review:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 3. Build (5-10 минут)
+### 3. Build & Test (5-15 минут)
 
 **Триггер**: Все PR и push
 
 **Что делает**:
 
 - Устанавливает зависимости (pnpm install --frozen-lockfile)
+- Запускает PostgreSQL и Redis в Docker
 - Собирает пакеты в правильном порядке:
   1. `packages/shared` (типы и константы)
   2. `apps/api` (backend)
   3. `apps/web` (frontend)
   4. `apps/worker` (background jobs)
+- Применяет Prisma миграции к test database
+- Запускает unit тесты (Jest) для API и Web
+- Генерирует coverage report
+- Загружает coverage в Codecov
 - Загружает артефакты сборки для следующих джобов
 
 **Критерии успеха**:
 
 - ✅ Все пакеты собираются без ошибок
 - ✅ Нет missing dependencies
-
-```yaml
-build:
-  needs: [quick-checks]
-  steps:
-    - Install dependencies
-    - Build shared: pnpm --filter @fin-u-ch/shared build
-    - Build API: pnpm --filter api build
-    - Build Web: pnpm --filter web build
-    - Build Worker: pnpm --filter worker build
-    - Upload build artifacts
-```
-
-### 4. Tests (5-10 минут)
-
-**Триггер**: Все PR и push
-
-**Что делает**:
-
-- Запускает PostgreSQL и Redis в Docker
-- Применяет Prisma миграции к test database
-- Запускает unit тесты (Jest) для API и Web
-- Генерирует coverage report
-- Загружает coverage в Codecov
+- ✅ Все тесты проходят
+- ✅ Coverage >= 60%
 
 **Требования к coverage**:
 
@@ -189,21 +171,27 @@ build:
 - 100% желательно для критичных модулей (auth, reports, salary-engine)
 
 ```yaml
-test:
+build-and-test:
+  needs: [quick-checks]
   services:
     postgres: postgres:15-alpine
     redis: redis:7-alpine
   steps:
-    - Setup test database
+    - Install dependencies
+    - Build shared: pnpm --filter @fin-u-ch/shared build
+    - Build API: pnpm --filter api build
     - Run Prisma migrations
-    - Run: pnpm --filter api test --coverage
-    - Run: pnpm --filter web test --coverage
+    - Run API tests: pnpm --filter api test:coverage
+    - Build Web: pnpm --filter web build
+    - Run Web tests: pnpm --filter web test:coverage
+    - Build Worker: pnpm --filter worker build
+    - Upload build artifacts
     - Upload coverage to Codecov
 ```
 
-### 5. E2E Tests (10-20 минут)
+### 4. E2E Tests (10-20 минут)
 
-**Триггер**: Все PR и push
+**Триггер**: Только PR в main
 
 **Что делает**:
 
@@ -223,7 +211,8 @@ test:
 
 ```yaml
 test-e2e:
-  needs: [build]
+  if: github.event_name == 'pull_request' && github.base_ref == 'main'
+  needs: [build-and-test]
   steps:
     - Download build artifacts
     - Start API and Web servers
@@ -232,9 +221,9 @@ test-e2e:
     - Upload test results
 ```
 
-### 6. Security Scan (2-3 минуты)
+### 5. Security Scan (2-3 минуты)
 
-**Триггер**: Все PR и push
+**Триггер**: Только Pull Requests
 
 **Что делает**:
 
@@ -249,13 +238,15 @@ test-e2e:
 
 ```yaml
 security-scan:
+  if: github.event_name == 'pull_request'
+  needs: [quick-checks]
   steps:
     - Run: pnpm audit --audit-level=high
     - Run Trivy vulnerability scanner
     - Upload results to GitHub Security
 ```
 
-### 7. Docker Build & Push (5-10 минут)
+### 6. Docker Build & Push (5-10 минут)
 
 **Триггер**: Только push в main
 
@@ -275,7 +266,7 @@ security-scan:
 
 ```yaml
 docker-build:
-  needs: [build, test, test-e2e, security-scan]
+  needs: [build-and-test]
   if: github.ref == 'refs/heads/main'
   steps:
     - Login to GHCR
@@ -284,7 +275,7 @@ docker-build:
     - Build and push: ghcr.io/<org>/fin-u-ch-worker:latest
 ```
 
-### 8. Deploy to VPS (2-5 минут)
+### 7. Deploy to VPS (2-5 минут)
 
 **Триггер**: Только push в main после успешной сборки Docker images
 
@@ -332,7 +323,7 @@ deploy:
     - Health check
 ```
 
-### 9. Notify Results
+### 8. Notify Results
 
 **Триггер**: Всегда, после завершения всех джобов
 
@@ -345,13 +336,14 @@ deploy:
 
 Все секреты хранятся в Settings → Secrets and variables → Actions:
 
-| Секрет              | Описание                             | Где используется   |
-| ------------------- | ------------------------------------ | ------------------ |
-| `ANTHROPIC_API_KEY` | API ключ Claude для AI review        | ai-code-review job |
-| `VPS_HOST`          | Хост VPS сервера                     | deploy job         |
-| `VPS_USER`          | SSH пользователь                     | deploy job         |
-| `VPS_SSH_KEY`       | Приватный SSH ключ                   | deploy job         |
-| `GITHUB_TOKEN`      | Автоматически предоставляется GitHub | все jobs           |
+| Секрет              | Описание                             | Где используется          |
+| ------------------- | ------------------------------------ | ------------------------- |
+| `ANTHROPIC_API_KEY` | API ключ Claude для AI review        | ai-code-review job        |
+| `GHCR_TOKEN`        | GitHub Container Registry token      | docker-build, deploy jobs |
+| `VPS_HOST`          | Хост VPS сервера                     | deploy job                |
+| `VPS_USER`          | SSH пользователь                     | deploy job                |
+| `VPS_SSH_KEY`       | Приватный SSH ключ                   | deploy job                |
+| `GITHUB_TOKEN`      | Автоматически предоставляется GitHub | все jobs                  |
 
 **Инструкция по настройке**: См. [SETUP_EXTERNAL.md](./SETUP_EXTERNAL.md)
 
@@ -362,12 +354,11 @@ deploy:
 - ✅ Require pull request before merging
   - Минимум 1 approval
 - ✅ Require status checks:
-  - Lint & Type Check
-  - AI Code Review
-  - Build All Packages
-  - Run Tests
-  - E2E Tests
-  - Security Scan
+  - quick-checks (Lint & Type Check)
+  - ai-code-review (AI Code Review)
+  - build-and-test (Build & Test)
+  - test-e2e (E2E Tests)
+  - security-scan (Security Scan)
 - ✅ Require conversation resolution
 - ❌ Allow force pushes
 - ❌ Allow deletions
@@ -376,10 +367,9 @@ deploy:
 
 - ✅ Require pull request before merging (0 approvals)
 - ✅ Require status checks:
-  - Lint & Type Check
-  - AI Code Review
-  - Build All Packages
-  - Run Tests
+  - quick-checks (Lint & Type Check)
+  - ai-code-review (AI Code Review)
+  - build-and-test (Build & Test)
 - ❌ Allow force pushes
 
 ## 🔄 Git Flow

@@ -4,8 +4,7 @@
     "contexts": [
       "quick-checks",
       "ai-code-review",
-      "build",
-      "test",
+      "build-and-test",
       "test-e2e",
       "security-scan"
     ]
