@@ -70,11 +70,16 @@
 
 **Что:** Docker только для БД/Redis, приложения локально с горячей перезагрузкой
 
-1. Скопируй переменные:
+1. Скопируй переменные (кросс-платформенно):
 
    ```bash
-   cp env.example .env
+   pnpm env:setup
    ```
+
+   Или вручную:
+   - macOS/Linux: `cp env.example .env`
+   - Windows PowerShell: `Copy-Item env.example .env`
+   - Windows CMD: `copy env.example .env`
 
 2. Подними инфраструктуру (PostgreSQL, Redis):
 

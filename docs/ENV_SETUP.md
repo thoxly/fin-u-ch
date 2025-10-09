@@ -96,13 +96,61 @@
 
 ### 1. Создание .env файла для разработки
 
+#### Автоматический способ (рекомендуется, работает на всех ОС)
+
 ```bash
-# Шаг 1: Скопируйте ШАБЛОН (env.example) в ваш личный .env
+# Используйте готовый кросс-платформенный скрипт
+pnpm env:setup
+```
+
+Этот скрипт автоматически:
+
+- Проверит наличие `.env` файла
+- Скопирует `env.example` → `.env` если нужно
+- Выведет подсказки для следующих шагов
+
+**Важно:** Скрипт работает на Windows, macOS и Linux!
+
+#### Ручной способ
+
+<details>
+<summary>macOS / Linux</summary>
+
+```bash
+# Скопируйте шаблон
 cp env.example .env
 
-# Шаг 2: Отредактируйте значения (для локальной разработки можно оставить как есть)
+# Отредактируйте значения
 nano .env
 ```
+
+</details>
+
+<details>
+<summary>Windows (PowerShell)</summary>
+
+```powershell
+# Скопируйте шаблон
+Copy-Item env.example .env
+
+# Отредактируйте значения
+notepad .env
+```
+
+</details>
+
+<details>
+<summary>Windows (CMD)</summary>
+
+```cmd
+# Скопируйте шаблон
+copy env.example .env
+
+# Отредактируйте значения
+notepad .env
+```
+
+</details>
 
 **Объяснение:**
 
@@ -408,6 +456,30 @@ export const env = cleanEnv(process.env, {
 
 ## Troubleshooting
 
+### Проблема: "test" не является командой (Windows)
+
+**Симптомы:**
+
+```
+"test" не является внутренней или внешней командой
+"cp" не является внутренней или внешней командой
+```
+
+**Решение:**
+
+```bash
+# Используйте кросс-платформенный скрипт
+pnpm env:setup
+
+# Или вручную (PowerShell)
+Copy-Item env.example .env
+
+# Или вручную (CMD)
+copy env.example .env
+```
+
+**Объяснение:** Unix команды (`test`, `cp`) не работают в Windows CMD/PowerShell. Используйте `pnpm env:setup` для всех платформ.
+
 ### Проблема: Переменные не читаются
 
 ```bash
@@ -442,32 +514,67 @@ docker-compose -f ops/docker/docker-compose.yml --env-file .env up
 ## Полезные команды
 
 ```bash
+# Создать .env из примера (кросс-платформенно)
+pnpm env:setup
+
+# Показать текущее окружение
+pnpm env:current
+
+# Проверить переменные в Docker
+docker-compose config
+```
+
+<details>
+<summary>Unix-специфичные команды (macOS/Linux)</summary>
+
+```bash
 # Показать текущие ENV переменные
 printenv | grep FIN_U_CH
 
 # Проверить существование .env файла
 test -f .env && echo "✅ .env exists" || echo "❌ .env not found"
 
-# Создать .env из примера
-[ ! -f .env ] && cp env.example .env || echo ".env already exists"
-
 # Сравнить .env с .env.example
 diff .env env.example
-
-# Проверить переменные в Docker
-docker-compose config
 ```
+
+</details>
+
+<details>
+<summary>Windows-специфичные команды (PowerShell)</summary>
+
+```powershell
+# Показать текущие ENV переменные
+Get-ChildItem Env: | Where-Object { $_.Name -like "*FIN_U_CH*" }
+
+# Проверить существование .env файла
+Test-Path .env
+
+# Сравнить .env с .env.example
+Compare-Object (Get-Content .env) (Get-Content env.example)
+```
+
+</details>
 
 ## Рекомендуемый workflow для команды
 
 1. **Новый разработчик:**
 
    ```bash
+   # Клонируйте проект
    git clone <repo>
-   cp env.example .env
-   # Настройте локальные значения
+   cd fin-u-ch
+
+   # Установите зависимости
    pnpm install
-   docker-compose up -d
+
+   # Создайте .env (работает на всех ОС!)
+   pnpm env:setup
+
+   # Запустите инфраструктуру
+   docker-compose -f ops/docker/docker-compose.yml up -d
+
+   # Запустите проект
    pnpm dev
    ```
 
@@ -550,12 +657,14 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev
 ## ✅ Checklist для новых разработчиков
 
 - [ ] Склонировал проект: `git clone ...`
-- [ ] Проверил что есть `env.example` в проекте
-- [ ] Скопировал: `cp env.example .env`
-- [ ] Проверил что `.env` в `.gitignore`
-- [ ] Запустил: `pnpm env:current`
+- [ ] Установил зависимости: `pnpm install`
+- [ ] Создал .env: `pnpm env:setup` (работает на Windows/macOS/Linux!)
+- [ ] Проверил что `.env` в `.gitignore` (уже настроено)
+- [ ] Проверил окружение: `pnpm env:current`
 - [ ] Для локальной разработки - оставил значения как есть
 - [ ] Для production - получил credentials от команды
+- [ ] Запустил инфраструктуру: `docker-compose -f ops/docker/docker-compose.yml up -d`
+- [ ] Запустил проект: `pnpm dev`
 - [ ] Готово! ✨
 
 ## Дополнительные ресурсы
