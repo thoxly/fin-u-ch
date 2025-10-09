@@ -110,11 +110,13 @@ async function main() {
     console.log('\n');
 
     // Determine review action
+    // Note: Cannot REQUEST_CHANGES on your own PR, so always use COMMENT
+    const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
     let reviewEvent: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT';
     let reviewBody: string;
 
     if (criticalIssues.length > 0) {
-      reviewEvent = 'REQUEST_CHANGES';
+      reviewEvent = isGitHubActions ? 'REQUEST_CHANGES' : 'COMMENT';
       reviewBody = `🔴 **AI Code Review: Critical issues found**
 
 Found ${criticalIssues.length} critical issue(s) that must be fixed before merging.
@@ -127,7 +129,7 @@ Found ${criticalIssues.length} critical issue(s) that must be fixed before mergi
 
 Please address the critical issues and request a new review.`;
     } else if (highIssues.length > 0) {
-      reviewEvent = 'REQUEST_CHANGES';
+      reviewEvent = isGitHubActions ? 'REQUEST_CHANGES' : 'COMMENT';
       reviewBody = `🟠 **AI Code Review: Important issues found**
 
 Found ${highIssues.length} high-severity issue(s) that should be fixed.
