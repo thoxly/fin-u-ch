@@ -11,6 +11,7 @@ model Company {
   id           String   @id @default(uuid())
   name         String
   currencyBase String   @default("RUB")
+  uiSettings   Json?    // UI preferences: navigation icons, theme, etc.
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import * as Icons from 'lucide-react';
-import { IconPicker } from './IconPicker';
+import { IconPickerPopover } from './IconPickerPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 
 interface LayoutProps {
@@ -43,14 +43,15 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const [iconPickerState, setIconPickerState] = useState<{
     isOpen: boolean;
     itemName: string;
-  }>({ isOpen: false, itemName: '' });
+    position: { top: number; left: number };
+  }>({ isOpen: false, itemName: '', position: { top: 0, left: 0 } });
 
-  const handleLogout = () => {
+  const handleLogout = (): void => {
     dispatch(logout());
     navigate('/login');
   };
 
-  const isActive = (href: string) => location.pathname === href;
+  const isActive = (href: string): boolean => location.pathname === href;
 
   const handleIconClick = (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -58,7 +59,16 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   ): void => {
     e.preventDefault();
     e.stopPropagation();
-    setIconPickerState({ isOpen: true, itemName });
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setIconPickerState({
+      isOpen: true,
+      itemName,
+      position: {
+        top: rect.bottom + 5,
+        left: rect.left,
+      },
+    });
   };
 
   const handleIconSelect = (iconName: string): void => {
@@ -66,7 +76,11 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   };
 
   const handleCloseIconPicker = (): void => {
-    setIconPickerState({ isOpen: false, itemName: '' });
+    setIconPickerState({
+      isOpen: false,
+      itemName: '',
+      position: { top: 0, left: 0 },
+    });
   };
 
   const renderIcon = (itemName: string): JSX.Element => {
@@ -169,12 +183,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         <main className="flex-1">{children}</main>
       </div>
 
-      {/* Icon Picker Modal */}
+      {/* Icon Picker Popover */}
       {iconPickerState.isOpen && (
-        <IconPicker
+        <IconPickerPopover
           currentIcon={getIcon(iconPickerState.itemName)}
           onSelectIcon={handleIconSelect}
           onClose={handleCloseIconPicker}
+          anchorPosition={iconPickerState.position}
         />
       )}
     </div>

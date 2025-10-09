@@ -9,6 +9,7 @@ export class CompaniesService {
         id: true,
         name: true,
         currencyBase: true,
+        uiSettings: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -35,6 +36,32 @@ export class CompaniesService {
         updatedAt: true,
       },
     });
+  }
+
+  async getUiSettings(companyId: string): Promise<Record<string, unknown>> {
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { uiSettings: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404);
+    }
+
+    return (company.uiSettings as Record<string, unknown>) || {};
+  }
+
+  async updateUiSettings(
+    companyId: string,
+    settings: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
+    const company = await prisma.company.update({
+      where: { id: companyId },
+      data: { uiSettings: settings },
+      select: { uiSettings: true, updatedAt: true },
+    });
+
+    return (company.uiSettings as Record<string, unknown>) || {};
   }
 }
 
