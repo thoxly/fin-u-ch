@@ -12,8 +12,12 @@ import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
 import { PrivateRoute } from './components/PrivateRoute';
+import { useDarkMode } from './shared/hooks/useDarkMode';
 
 function App() {
+  // Автоматическое определение системной темы
+  useDarkMode();
+
   return (
     <Routes>
       {/* Public routes */}
