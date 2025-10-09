@@ -20,6 +20,31 @@ export class CompaniesController {
       next(error);
     }
   }
+
+  async getUiSettings(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await companiesService.getUiSettings(req.companyId!);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateUiSettings(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const result = await companiesService.updateUiSettings(
+        req.companyId!,
+        req.body
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new CompaniesController();

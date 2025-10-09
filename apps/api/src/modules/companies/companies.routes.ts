@@ -36,4 +36,38 @@ router.get('/me', companiesController.get);
  */
 router.patch('/me', companiesController.update);
 
+/**
+ * @swagger
+ * /api/companies/ui-settings:
+ *   get:
+ *     summary: Get UI settings for current company
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: UI settings
+ */
+router.get('/ui-settings', companiesController.getUiSettings);
+
+/**
+ * @swagger
+ * /api/companies/ui-settings:
+ *   put:
+ *     summary: Update UI settings for current company
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: UI settings updated
+ */
+router.put('/ui-settings', companiesController.updateUiSettings);
+
 export default router;
