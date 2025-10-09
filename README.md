@@ -113,9 +113,9 @@ docker-compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 - [ENV Setup](docs/ENV_SETUP.md) — управление переменными окружения
 - [CI/CD Pipeline](docs/CI_CD.md) — CI/CD процесс и AI review
 
-### 🛡️ Защита и бэкапы
+### 🛡️ Защита и бэкапы (Для DevOps)
 
-- **[Protection Summary](docs/PROTECTION_SUMMARY.md) — НАЧНИТЕ ОТСЮДА!** 🔥
+- \*\*[Protection Summary](docs/PROTECTION_SUMMARY.md)
 - [Backup Strategy](docs/BACKUP_STRATEGY.md) — полная стратегия бэкапов и восстановления
 - [GitHub Protection Checklist](docs/GITHUB_PROTECTION_CHECKLIST.md) — настройка защиты репозитория
 - [Scripts Documentation](scripts/README.md) — документация backup скриптов
@@ -125,17 +125,6 @@ docker-compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 - [Архитектура](docs/ARCHITECTURE.md)
 - [API документация](docs/API.md)
 - [Доменная модель](docs/DOMAIN_MODEL.md)
-
-### Результаты разработки
-
-- [План разработки](docs/IMPLEMENTATION_ROADMAP.md)
-- [Результаты Фаз](docs/)
-  - [Фаза 1: Подготовка](docs/PHASE1_RESULTS.md)
-  - [Фаза 2: Общие компоненты](docs/PHASE2_RESULTS.md)
-  - [Фаза 3: Backend API](docs/PHASE3_RESULTS.md)
-  - [Фаза 4: Worker](docs/PHASE4_RESULTS.md)
-  - [Фаза 5: Frontend](docs/PHASE5_RESULTS.md)
-  - [Фаза 6: Docker инфраструктура](docs/PHASE6_RESULTS.md)
 
 ## 🏗️ Структура проекта
 
@@ -213,6 +202,19 @@ pnpm env:prod
 ```
 
 Подробнее: [ENV Setup Guide](docs/ENV_SETUP.md)
+
+### 🔧 Troubleshooting
+
+#### 502 Bad Gateway после режима сна / смены сети
+
+```bash
+# Быстрое решение
+pkill -f "nodemon" && pkill -f "vite"
+cd ops/docker && docker compose restart && cd ../..
+pnpm dev
+```
+
+Подробнее: [DEV_GUIDE.md - Перезапуск после режима сна](docs/DEV_GUIDE.md#-перезапуск-после-режима-сна-или-смены-сети)
 
 ### Backup и восстановление
 

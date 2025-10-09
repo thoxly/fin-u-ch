@@ -1,5 +1,6 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
+import { Prisma } from '@prisma/client';
 
 export class CompaniesService {
   async get(companyId: string) {
@@ -57,7 +58,7 @@ export class CompaniesService {
   ): Promise<Record<string, unknown>> {
     const company = await prisma.company.update({
       where: { id: companyId },
-      data: { uiSettings: settings },
+      data: { uiSettings: settings as Prisma.InputJsonValue },
       select: { uiSettings: true, updatedAt: true },
     });
 
