@@ -77,6 +77,9 @@ async function main() {
     if (comments.length === 0) {
       console.log('✅ No issues found!');
 
+      // Dismiss previous REQUEST_CHANGES reviews from this bot
+      await githubClient.dismissPreviousReviews(prNumber);
+
       const commitId = await githubClient.getLatestCommit(prNumber);
 
       // GitHub Actions cannot APPROVE PRs, use COMMENT instead
@@ -163,6 +166,9 @@ Found ${comments.length} minor suggestion(s) for improvement.
 
 These are optional improvements.`;
     }
+
+    // Dismiss previous REQUEST_CHANGES reviews from this bot
+    await githubClient.dismissPreviousReviews(prNumber);
 
     // Create review
     const commitId = await githubClient.getLatestCommit(prNumber);
