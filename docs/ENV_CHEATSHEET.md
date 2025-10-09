@@ -19,9 +19,6 @@ pnpm env:list
 # Development (локальная разработка)
 pnpm env:dev
 
-# Staging (тестовая среда)
-pnpm env:staging
-
 # Production (продакшен)
 pnpm env:prod
 ```
@@ -36,16 +33,6 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fin_u_ch_dev
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=dev-secret-change-in-production
 VITE_API_URL=http://localhost:4000
-```
-
-### Staging (.env.staging)
-
-```env
-NODE_ENV=staging
-DATABASE_URL=postgresql://user:password@staging-db:5432/fin_u_ch_staging
-REDIS_URL=redis://:password@staging-redis:6379
-JWT_SECRET=staging-secret-32-chars-minimum
-VITE_API_URL=https://staging-api.example.com
 ```
 
 ### Production (.env.production)
@@ -88,9 +75,9 @@ docker-compose config
 ## 🛠️ Полезные команды
 
 ```bash
-# Создать env файл для конкретного окружения
-cp env.example .env.staging
-nano .env.staging
+# Создать env файл для production
+cp env.example .env.production
+nano .env.production
 
 # Backup текущего .env
 cp .env ".env.backup.$(date +%Y%m%d_%H%M%S)"
@@ -99,7 +86,7 @@ cp .env ".env.backup.$(date +%Y%m%d_%H%M%S)"
 ls -la | grep .env
 
 # Сравнить env файлы
-diff .env .env.staging
+diff .env .env.production
 
 # Найти использование переменной в коде
 grep -r "REDIS_URL" apps/

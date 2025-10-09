@@ -106,25 +106,37 @@ docker-compose -f docker-compose.prod.yml exec api npx prisma migrate deploy
 
 ## 📚 Документация
 
-### Для разработчиков
+### 🚀 Быстрый старт
 
+- [Dev Guide](docs/DEV_GUIDE.md) — полное руководство для разработчиков
 - [Git Guide](docs/GIT_GUIDE.md) — работа с Git, коммиты, PR процесс
-- [Dev Guide](docs/DEV_GUIDE.md) — гид для разработчиков
+
+### 📖 Обзор проекта
+
+- [Project Overview](docs/PROJECT_OVERVIEW.md) — цели, возможности, технологии и UI flow
+
+### 🏗️ Архитектура и дизайн
+
+- [Architecture](docs/ARCHITECTURE.md) — структура проекта и технические решения
+- [Domain Model](docs/DOMAIN_MODEL.md) — модель данных и бизнес-сущности
+- [API Documentation](docs/API.md) — REST API эндпоинты и Swagger
+
+### ⚙️ Настройка и конфигурация
+
 - [ENV Setup](docs/ENV_SETUP.md) — управление переменными окружения
-- [CI/CD Pipeline](docs/CI_CD.md) — CI/CD процесс и AI review
+- [ENV Cheatsheet](docs/ENV_CHEATSHEET.md) — быстрая шпаргалка по ENV
+- [ENV Hot Reload](docs/ENV_HOT_RELOAD.md) — горячая перезагрузка переменных
 
-### 🛡️ Защита и бэкапы (Для DevOps)
+### 🔄 CI/CD и процессы
 
-- \*\*[Protection Summary](docs/PROTECTION_SUMMARY.md)
-- [Backup Strategy](docs/BACKUP_STRATEGY.md) — полная стратегия бэкапов и восстановления
+- [CI/CD Pipeline](docs/CI_CD.md) — полное описание CI/CD с AI Code Review
+
+### 🛡️ Безопасность и защита
+
+- [Protection Summary](docs/PROTECTION_SUMMARY.md) — обзор систем защиты проекта
 - [GitHub Protection Checklist](docs/GITHUB_PROTECTION_CHECKLIST.md) — настройка защиты репозитория
+- [Backup Strategy](docs/BACKUP_STRATEGY.md) — стратегия бэкапов и восстановления
 - [Scripts Documentation](scripts/README.md) — документация backup скриптов
-
-### Архитектура и API
-
-- [Архитектура](docs/ARCHITECTURE.md)
-- [API документация](docs/API.md)
-- [Доменная модель](docs/DOMAIN_MODEL.md)
 
 ## 🏗️ Структура проекта
 

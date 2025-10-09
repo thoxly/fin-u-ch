@@ -95,11 +95,11 @@ echo "JWT_SECRET=$NEW_SECRET" >> .env
 ### Сценарий 3: Переключение окружений
 
 ```bash
-# 1. Переключитесь на staging
-pnpm env:staging
+# 1. Переключитесь на production
+pnpm env:prod
 
 # 2. API и Worker автоматически перезапустятся
-# 3. Подключатся к staging БД и Redis
+# 3. Подключатся к production БД и Redis
 
 # 4. Перезапустите Web вручную
 # Ctrl+C в терминале с Vite
@@ -248,7 +248,6 @@ docker-compose -f ops/docker/docker-compose.yml up -d
 
 - [ENV Setup Guide](ENV_SETUP.md) - Полное руководство
 - [ENV Cheatsheet](ENV_CHEATSHEET.md) - Быстрая шпаргалка
-- [ENV Migration Summary](ENV_MIGRATION_SUMMARY.md) - Итоговая сводка
 
 ## ✨ Итог
 
