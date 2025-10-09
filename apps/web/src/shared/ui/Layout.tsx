@@ -52,21 +52,24 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
 
   const isActive = (href: string) => location.pathname === href;
 
-  const handleIconClick = (e: React.MouseEvent, itemName: string) => {
+  const handleIconClick = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    itemName: string
+  ): void => {
     e.preventDefault();
     e.stopPropagation();
     setIconPickerState({ isOpen: true, itemName });
   };
 
-  const handleIconSelect = (iconName: string) => {
+  const handleIconSelect = (iconName: string): void => {
     updateIcon(iconPickerState.itemName, iconName);
   };
 
-  const handleCloseIconPicker = () => {
+  const handleCloseIconPicker = (): void => {
     setIconPickerState({ isOpen: false, itemName: '' });
   };
 
-  const renderIcon = (itemName: string) => {
+  const renderIcon = (itemName: string): JSX.Element => {
     const iconName = getIcon(itemName);
     const IconComponent =
       (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon | undefined) ||
