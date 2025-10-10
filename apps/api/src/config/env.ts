@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Load .env from monorepo root
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+// Load .env from monorepo root (current working directory)
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
