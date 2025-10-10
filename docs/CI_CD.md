@@ -632,6 +632,33 @@ test('should create operation and see it in list', async ({ page }) => {
 3. Проверьте логи PostgreSQL: `docker compose logs postgres`
 4. Откатите к предыдущей версии если нужно
 
+#### Проблема: E2E тесты падают с "Timed out waiting for webServer"
+
+**Решение**:
+
+1. Проверьте `playwright.config.ts` - в CI режиме `webServer` должен быть `undefined`
+2. Убедитесь что ENV переменные передаются в workflow
+3. Проверьте что API запускается на порту 4000, Web на 3000
+4. Добавьте health checks перед запуском тестов:
+
+```yaml
+- name: Wait for API to be ready
+  run: |
+    for i in {1..30}; do
+      if curl -f http://localhost:4000/api/health; then
+        echo "✅ API is ready!"
+        exit 0
+      fi
+      sleep 2
+    done
+```
+
+5. Локальное тестирование в CI режиме:
+
+```bash
+./scripts/test-e2e-ci.sh
+```
+
 ### Local Development Issues
 
 #### Проблема: Husky hooks не работают
@@ -662,6 +689,7 @@ rm -rf packages/*/dist
 
 - [GIT_GUIDE.md](./GIT_GUIDE.md) - Работа с Git (коммиты, PR, workflow)
 - [SETUP_EXTERNAL.md](./SETUP_EXTERNAL.md) - Настройка GitHub Secrets и VPS
+- [ENV_CI_CD.md](./ENV_CI_CD.md) - ENV переменные в CI/CD
 - [DEV_GUIDE.md](./DEV_GUIDE.md) - Гид для разработчиков
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Архитектура проекта
 - [docs/ai-context/](../docs/ai-context/) - Контекст для AI review

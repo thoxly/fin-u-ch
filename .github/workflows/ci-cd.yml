@@ -352,21 +352,62 @@ jobs:
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
 
-      - name: Start API server
+      - name: Start API server in background
         working-directory: apps/api
         run: |
-          pnpm start &
-          sleep 5
+          node dist/server.js &
+          echo $! > api.pid
+          sleep 10
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          NODE_ENV: ${{ env.NODE_ENV }}
+          PORT: 4000
 
-      - name: Start Web server
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:4000/api/health 2>/dev/null; then
+              echo "✅ API is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30: API not ready yet, waiting..."
+            sleep 2
+          done
+          echo "❌ API failed to start"
+          exit 1
+
+      - name: Start Web server in background
         working-directory: apps/web
         run: |
-          pnpm preview &
-          sleep 3
+          npx vite preview --port 3000 --host &
+          echo $! > web.pid
+          sleep 5
+
+      - name: Wait for Web to be ready
+        run: |
+          echo "Waiting for Web server to be ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:3000 2>/dev/null; then
+              echo "✅ Web server is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30: Web not ready yet, waiting..."
+            sleep 2
+          done
+          echo "❌ Web server failed to start"
+          exit 1
 
       - name: Run E2E tests
         working-directory: apps/web
         run: pnpm test:e2e
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          REDIS_URL: ${{ env.REDIS_URL }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          NODE_ENV: ${{ env.NODE_ENV }}
 
       - name: Upload test results
         if: always()
