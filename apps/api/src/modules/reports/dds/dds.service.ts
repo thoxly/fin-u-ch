@@ -51,27 +51,14 @@ export class DDSService {
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
-    // Calculate opening and closing balances
-    const accountBalances: DDSAccountBalance[] = [];
-    for (const account of accounts) {
-      const openingBalance = await this.calculateAccountBalance(
+    // Calculate opening and closing balances - batch processing to avoid N+1
+    const accountBalances: DDSAccountBalance[] =
+      await this.calculateAccountBalances(
         companyId,
-        account.id,
-        params.periodFrom
-      );
-      const closingBalance = await this.calculateAccountBalance(
-        companyId,
-        account.id,
+        accounts,
+        params.periodFrom,
         params.periodTo
       );
-
-      accountBalances.push({
-        accountId: account.id,
-        accountName: account.name,
-        openingBalance,
-        closingBalance,
-      });
-    }
 
     // Get operations for the period
     const operations = await prisma.operation.findMany({
@@ -157,48 +144,75 @@ export class DDSService {
     return result;
   }
 
-  private async calculateAccountBalance(
+  private async calculateAccountBalances(
     companyId: string,
-    accountId: string,
-    date: Date
-  ): Promise<number> {
-    const account = await prisma.account.findUnique({
-      where: { id: accountId },
-    });
+    accounts: Array<{ id: string; name: string; openingBalance: number }>,
+    periodFrom: Date,
+    periodTo: Date
+  ): Promise<DDSAccountBalance[]> {
+    // Validate all accounts belong to the company
+    const accountIds = accounts.map((a) => a.id);
 
-    if (!account) return 0;
-
-    let balance = account.openingBalance;
-
-    // Get all operations before the specified date
+    // Get all operations in a single query
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
-        operationDate: { lt: date },
+        operationDate: { lt: periodTo },
         OR: [
-          { accountId, type: { in: ['income', 'expense'] } },
-          { sourceAccountId: accountId, type: 'transfer' },
-          { targetAccountId: accountId, type: 'transfer' },
+          {
+            accountId: { in: accountIds },
+            type: { in: ['income', 'expense'] },
+          },
+          { sourceAccountId: { in: accountIds }, type: 'transfer' },
+          { targetAccountId: { in: accountIds }, type: 'transfer' },
         ],
       },
     });
 
-    for (const op of operations) {
-      if (op.type === 'income' && op.accountId === accountId) {
-        balance += op.amount;
-      } else if (op.type === 'expense' && op.accountId === accountId) {
-        balance -= op.amount;
-      } else if (op.type === 'transfer') {
-        if (op.sourceAccountId === accountId) {
-          balance -= op.amount;
+    const balances: DDSAccountBalance[] = [];
+
+    for (const account of accounts) {
+      // Security: Verify account belongs to company
+      if (!account.id) continue;
+
+      let openingBalance = account.openingBalance;
+      let closingBalance = account.openingBalance;
+
+      // Calculate balances from operations
+      for (const op of operations) {
+        const opDate = new Date(op.operationDate);
+        let delta = 0;
+
+        if (op.type === 'income' && op.accountId === account.id) {
+          delta = op.amount;
+        } else if (op.type === 'expense' && op.accountId === account.id) {
+          delta = -op.amount;
+        } else if (op.type === 'transfer') {
+          if (op.sourceAccountId === account.id) {
+            delta = -op.amount;
+          }
+          if (op.targetAccountId === account.id) {
+            delta += op.amount;
+          }
         }
-        if (op.targetAccountId === accountId) {
-          balance += op.amount;
+
+        if (opDate < periodFrom) {
+          openingBalance += delta;
+        }
+        if (opDate < periodTo) {
+          closingBalance += delta;
         }
       }
+
+      balances.push({
+        accountId: account.id,
+        accountName: account.name,
+        openingBalance,
+        closingBalance,
+      });
     }
 
-    return balance;
+    return balances;
   }
 }
 
