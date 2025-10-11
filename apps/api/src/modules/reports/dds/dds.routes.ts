@@ -34,6 +34,18 @@ router.use(extractTenant);
  *         schema:
  *           type: string
  *         description: Filter by specific account (optional)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10000
+ *         description: Maximum number of operations to retrieve (pagination)
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *         description: Number of operations to skip (pagination)
  *     responses:
  *       200:
  *         description: Detailed cash flow statement

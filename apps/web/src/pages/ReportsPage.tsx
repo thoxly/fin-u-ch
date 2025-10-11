@@ -349,9 +349,29 @@ const DDSTab = ({
   }
 
   if (error) {
+    // Enhanced error handling with logging
+    console.error('DDS Report Error:', error);
+
+    const errorMessage =
+      'status' in error && error.status === 400
+        ? 'Некорректные параметры запроса. Проверьте выбранные даты.'
+        : 'status' in error && error.status === 403
+          ? 'Недостаточно прав для просмотра отчета.'
+          : 'status' in error && error.status === 500
+            ? 'Ошибка сервера. Попробуйте позже.'
+            : 'Ошибка загрузки отчета. Попробуйте обновить страницу.';
+
     return (
       <Card>
-        <div className="text-red-600">Ошибка загрузки отчета</div>
+        <div className="space-y-4">
+          <div className="text-red-600 font-semibold">Ошибка</div>
+          <div className="text-gray-700">{errorMessage}</div>
+          {'data' in error && error.data && (
+            <div className="text-sm text-gray-500">
+              Детали: {JSON.stringify(error.data)}
+            </div>
+          )}
+        </div>
       </Card>
     );
   }

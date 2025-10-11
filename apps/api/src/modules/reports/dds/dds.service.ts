@@ -6,6 +6,8 @@ export interface DDSParams {
   periodFrom: Date;
   periodTo: Date;
   accountId?: string;
+  limit?: number;
+  offset?: number;
 }
 
 export interface DDSAccountBalance {
@@ -40,7 +42,7 @@ export class DDSService {
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
 
-    // Get accounts
+    // Get accounts with explicit companyId validation
     const accounts = await prisma.account.findMany({
       where: {
         companyId,
@@ -48,6 +50,18 @@ export class DDSService {
         ...(params.accountId && { id: params.accountId }),
       },
     });
+
+    // CRITICAL SECURITY: Verify all accounts belong to this company
+    if (accounts.length > 0) {
+      const invalidAccounts = accounts.filter(
+        (acc) => acc.companyId !== companyId
+      );
+      if (invalidAccounts.length > 0) {
+        throw new Error(
+          'Security violation: Account does not belong to company'
+        );
+      }
+    }
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
@@ -60,7 +74,10 @@ export class DDSService {
         params.periodTo
       );
 
-    // Get operations for the period
+    // Get operations for the period with pagination support
+    const limit = params.limit || 10000; // Default limit for large datasets
+    const offset = params.offset || 0;
+
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -76,6 +93,11 @@ export class DDSService {
           select: { id: true, name: true, type: true },
         },
       },
+      orderBy: {
+        operationDate: 'desc',
+      },
+      take: limit,
+      skip: offset,
     });
 
     // Group by articles
@@ -153,7 +175,27 @@ export class DDSService {
     // Validate all accounts belong to the company
     const accountIds = accounts.map((a) => a.id);
 
-    // Get all operations in a single query
+    // SECURITY: Explicit validation that all accounts belong to the company
+    const accountsToValidate = await prisma.account.findMany({
+      where: {
+        id: { in: accountIds },
+      },
+      select: {
+        id: true,
+        companyId: true,
+      },
+    });
+
+    // Verify each account belongs to the company
+    for (const acc of accountsToValidate) {
+      if (acc.companyId !== companyId) {
+        throw new Error(
+          `Security violation: Account ${acc.id} does not belong to company ${companyId}`
+        );
+      }
+    }
+
+    // Get all operations in a single query with date range limit
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -167,12 +209,14 @@ export class DDSService {
           { targetAccountId: { in: accountIds }, type: 'transfer' },
         ],
       },
+      orderBy: {
+        operationDate: 'asc',
+      },
     });
 
     const balances: DDSAccountBalance[] = [];
 
     for (const account of accounts) {
-      // Security: Verify account belongs to company
       if (!account.id) continue;
 
       let openingBalance = account.openingBalance;
