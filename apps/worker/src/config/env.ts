@@ -1,8 +1,26 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
-// Load .env from monorepo root (current working directory)
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Try to find .env file in current dir, parent, or grandparent (monorepo root)
+function findEnvFile(): string {
+  const possiblePaths = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../.env'),
+    path.resolve(process.cwd(), '../../.env'),
+    path.resolve(__dirname, '../../../.env'),
+  ];
+
+  for (const envPath of possiblePaths) {
+    if (fs.existsSync(envPath)) {
+      return envPath;
+    }
+  }
+
+  return path.resolve(process.cwd(), '.env');
+}
+
+dotenv.config({ path: findEnvFile() });
 
 interface EnvConfig {
   NODE_ENV: string;

@@ -53,3 +53,5 @@ Thumbs.db
 *.db
 *.db-journal
 
+apps/api/.env
+apps/worker/.env
