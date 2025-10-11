@@ -653,15 +653,10 @@ test('should create operation and see it in list', async ({ page }) => {
     done
 ```
 
-5. Локальное тестирование E2E:
+5. Локальное тестирование в CI режиме:
 
 ```bash
-# Запустить все приложения
-pnpm dev
-
-# В отдельном терминале запустить E2E тесты
-cd apps/web
-pnpm test:e2e
+./scripts/test-e2e-ci.sh
 ```
 
 ### Local Development Issues
