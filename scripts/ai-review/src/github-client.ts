@@ -108,4 +108,45 @@ export class GitHubClient {
 
     return data[data.length - 1].sha;
   }
+
+  async dismissPreviousReviews(prNumber: number): Promise<void> {
+    console.log(`Checking for previous reviews to dismiss...`);
+
+    try {
+      const { data: reviews } = await this.octokit.pulls.listReviews({
+        owner: CONFIG.github.owner,
+        repo: CONFIG.github.repo,
+        pull_number: prNumber,
+      });
+
+      // Find reviews from github-actions bot with REQUEST_CHANGES
+      const botReviews = reviews.filter(
+        (review) =>
+          review.user?.login === 'github-actions[bot]' &&
+          review.state === 'CHANGES_REQUESTED'
+      );
+
+      if (botReviews.length === 0) {
+        console.log('  No previous REQUEST_CHANGES reviews to dismiss\n');
+        return;
+      }
+
+      console.log(`  Found ${botReviews.length} previous review(s) to dismiss`);
+
+      for (const review of botReviews) {
+        await this.octokit.pulls.dismissReview({
+          owner: CONFIG.github.owner,
+          repo: CONFIG.github.repo,
+          pull_number: prNumber,
+          review_id: review.id,
+          message: 'Issues have been addressed in latest commits',
+        });
+        console.log(`  ✅ Dismissed review #${review.id}`);
+      }
+
+      console.log('');
+    } catch (error) {
+      console.warn('  ⚠️  Failed to dismiss previous reviews:', error);
+    }
+  }
 }

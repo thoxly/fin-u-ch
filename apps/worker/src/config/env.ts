@@ -1,6 +1,8 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config();
+// Load .env from monorepo root (current working directory)
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 interface EnvConfig {
   NODE_ENV: string;

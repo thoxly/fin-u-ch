@@ -92,22 +92,22 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link
                 to="/dashboard"
-                className="text-xl font-bold text-primary-600"
+                className="text-xl font-bold text-primary-600 dark:text-primary-400"
               >
                 Fin-U-CH
               </Link>
             </div>
             <button
               onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-gray-600 hover:text-gray-900 transition-colors dark:text-gray-300 dark:hover:text-gray-100"
             >
               Выйти
             </button>
@@ -122,10 +122,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             {navigation.map((item) =>
               item.children ? (
                 <div key={item.name}>
-                  <div className="group relative flex items-center gap-2 text-sm font-medium text-gray-500 px-3 py-2">
+                  <div className="group relative flex items-center gap-2 text-sm font-medium text-gray-500 px-3 py-2 dark:text-gray-400">
                     <button
                       onClick={(e) => handleIconClick(e, item.name)}
-                      className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all"
+                      className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-700"
                       title="Изменить иконку"
                     >
                       {renderIcon(item.name)}
@@ -139,13 +139,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                         to={child.href || '/'}
                         className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                           isActive(child.href || '/')
-                            ? 'bg-primary-100 text-primary-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400'
+                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                         }`}
                       >
                         <button
                           onClick={(e) => handleIconClick(e, child.name)}
-                          className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all"
+                          className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-600"
                           title="Изменить иконку"
                         >
                           {renderIcon(child.name)}
@@ -161,13 +161,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                   to={item.href || '/'}
                   className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive(item.href || '/')
-                      ? 'bg-primary-100 text-primary-700 font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                      ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                   }`}
                 >
                   <button
                     onClick={(e) => handleIconClick(e, item.name)}
-                    className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all"
+                    className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-600"
                     title="Изменить иконку"
                   >
                     {renderIcon(item.name)}

@@ -18,10 +18,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  // В CI серверы запускаются отдельно в workflow, локально Playwright запустит сам
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: 'pnpm dev',
+        url: 'http://localhost:3000',
+        reuseExistingServer: true,
+        timeout: 120000,
+      },
 });
