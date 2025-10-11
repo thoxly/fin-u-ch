@@ -42,7 +42,7 @@ export class DDSService {
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
 
-    // Get accounts with explicit companyId validation
+    // Get accounts - Prisma ensures companyId filtering at database level
     const accounts = await prisma.account.findMany({
       where: {
         companyId,
@@ -50,18 +50,6 @@ export class DDSService {
         ...(params.accountId && { id: params.accountId }),
       },
     });
-
-    // CRITICAL SECURITY: Verify all accounts belong to this company
-    if (accounts.length > 0) {
-      const invalidAccounts = accounts.filter(
-        (acc) => acc.companyId !== companyId
-      );
-      if (invalidAccounts.length > 0) {
-        throw new Error(
-          'Security violation: Account does not belong to company'
-        );
-      }
-    }
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
@@ -172,34 +160,17 @@ export class DDSService {
     periodFrom: Date,
     periodTo: Date
   ): Promise<DDSAccountBalance[]> {
-    // Validate all accounts belong to the company
     const accountIds = accounts.map((a) => a.id);
 
-    // SECURITY: Explicit validation that all accounts belong to the company
-    const accountsToValidate = await prisma.account.findMany({
-      where: {
-        id: { in: accountIds },
-      },
-      select: {
-        id: true,
-        companyId: true,
-      },
-    });
-
-    // Verify each account belongs to the company
-    for (const acc of accountsToValidate) {
-      if (acc.companyId !== companyId) {
-        throw new Error(
-          `Security violation: Account ${acc.id} does not belong to company ${companyId}`
-        );
-      }
-    }
-
-    // Get all operations in a single query with date range limit
+    // Get operations with proper date filtering to prevent memory issues
+    // Prisma ensures companyId filtering at database level for security
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
-        operationDate: { lt: periodTo },
+        operationDate: {
+          gte: new Date(periodFrom.getFullYear() - 10, 0, 1), // Max 10 years history
+          lt: periodTo,
+        },
         OR: [
           {
             accountId: { in: accountIds },
