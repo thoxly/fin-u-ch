@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import dotenv from 'dotenv';
+import path from 'path';
 import logger from './logger';
+
+// Load .env before initializing Prisma
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const prisma = new PrismaClient({
   log: [

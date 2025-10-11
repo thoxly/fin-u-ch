@@ -1,37 +1,37 @@
-# Common Pitfalls - Частые ошибки в проекте
+# Common Pitfalls
 
-Известные проблемы и подводные камни в проекте Fin-U-CH.
+Known issues and pitfalls in the Fin-U-CH project.
 
-## 1. Забытые фильтры по companyId
+## 1. Missing companyId Filters
 
-### Проблема
+### Problem
 
-Самая частая и опасная ошибка - запросы к БД без фильтрации по `companyId`, что приводит к утечке данных между компаниями.
+The most common and dangerous mistake is database queries without companyId filtering, leading to data leakage between companies.
 
-### Как избежать
+### How to Avoid
 
-- ✅ Всегда используйте `tenantMiddleware` перед роутами
-- ✅ Всегда включайте `companyId` в WHERE условие
-- ✅ Создайте helper функции с автоматической фильтрацией
+- Always use tenantMiddleware before routes
+- Always include companyId in WHERE conditions
+- Create helper functions with automatic filtering
 
 ```typescript
-// ❌ ОПАСНО - утечка данных!
+// BAD - data leakage!
 const operations = await prisma.operation.findMany({
   where: { operationDate: { gte: startDate } },
 });
 
-// ✅ Правильно
+// GOOD
 const operations = await prisma.operation.findMany({
   where: {
-    companyId, // ОБЯЗАТЕЛЬНО!
+    companyId, // REQUIRED!
     operationDate: { gte: startDate },
   },
 });
 ```
 
-### Проверка в тестах
+### Testing
 
-Всегда пишите тесты на изоляцию данных:
+Always write tests for data isolation:
 
 ```typescript
 it('should not return data from other companies', async () => {
@@ -46,15 +46,15 @@ it('should not return data from other companies', async () => {
 
 ## 2. Missing Indexes
 
-### Проблема
+### Problem
 
-Медленные запросы из-за отсутствия индексов на часто запрашиваемых полях.
+Slow queries due to missing indexes on frequently queried fields.
 
-### Обязательные индексы
+### Required Indexes
 
 ```prisma
 model Operation {
-  // ... поля
+  // ... fields
 
   @@index([companyId, operationDate])
   @@index([companyId, articleId, operationDate])
@@ -63,40 +63,40 @@ model Operation {
 }
 
 model PlanItem {
-  // ... поля
+  // ... fields
 
   @@index([companyId, startDate, repeat])
   @@index([companyId, articleId])
 }
 
 model Article {
-  // ... поля
+  // ... fields
 
   @@index([companyId, parentId])
   @@index([companyId, type, activity])
 }
 ```
 
-### Как проверить
+### How to Check
 
-- Используйте `EXPLAIN ANALYZE` для slow queries
-- Мониторьте время выполнения запросов в production
-- Создавайте индексы до деплоя, не после
+- Use EXPLAIN ANALYZE for slow queries
+- Monitor query execution time in production
+- Create indexes before deployment, not after
 
 ## 3. N+1 Query Problem
 
-### Проблема
+### Problem
 
-Множественные запросы к БД в циклах вместо одного запроса с join.
+Multiple database queries in loops instead of a single query with join.
 
 ```typescript
-// ❌ ПЛОХО - N+1 queries
+// BAD - N+1 queries
 const operations = await prisma.operation.findMany({ where: { companyId } });
 for (const op of operations) {
   op.article = await prisma.article.findUnique({ where: { id: op.articleId } });
 }
 
-// ✅ ХОРОШО - один запрос с include
+// GOOD - single query with include
 const operations = await prisma.operation.findMany({
   where: { companyId },
   include: {
@@ -107,12 +107,12 @@ const operations = await prisma.operation.findMany({
 });
 ```
 
-### Оптимизация для больших выборок
+### Optimization for Large Datasets
 
-Используйте `select` вместо `include` если нужны только определённые поля:
+Use select instead of include if only specific fields are needed:
 
 ```typescript
-// ✅ ОТЛИЧНО - только нужные поля
+// EXCELLENT - only needed fields
 const operations = await prisma.operation.findMany({
   where: { companyId },
   select: {
@@ -126,66 +126,63 @@ const operations = await prisma.operation.findMany({
 });
 ```
 
-## 4. Отчеты без кэширования
+## 4. Reports Without Caching
 
-### Проблема
+### Problem
 
-Тяжёлые отчеты вычисляются каждый раз при запросе, нагружая БД.
+Heavy reports are calculated on every request, overloading the database.
 
-### Решение
+### Solution
 
-Используйте Redis для кэширования:
+Use Redis for caching:
 
 ```typescript
-// ✅ С кэшированием
+// With caching
 async function getDashboardReport(
   companyId: string,
   params: ReportParams
 ): Promise<DashboardData> {
   const cacheKey = `report:${companyId}:dashboard:${hashParams(params)}`;
 
-  // Проверяем кэш
   const cached = await redis.get(cacheKey);
   if (cached) {
     return JSON.parse(cached);
   }
 
-  // Вычисляем отчет
   const data = await calculateDashboard(companyId, params);
 
-  // Сохраняем в кэш на 10 минут
   await redis.setex(cacheKey, 600, JSON.stringify(data));
 
   return data;
 }
 ```
 
-### Инвалидация кэша
+### Cache Invalidation
 
-При изменении данных сбрасывайте кэш:
+Clear cache when data changes:
 
 ```typescript
-// После создания/обновления операции
-await redis.del(`report:${companyId}:*`); // Удалить все отчеты компании
+// After creating/updating operation
+await redis.del(`report:${companyId}:*`);
 ```
 
-## 5. Отсутствие пагинации
+## 5. Missing Pagination
 
-### Проблема
+### Problem
 
-Загрузка всех записей в память приводит к out-of-memory ошибкам при больших объёмах.
+Loading all records into memory leads to out-of-memory errors with large volumes.
 
-### Решение
+### Solution
 
-Всегда используйте пагинацию:
+Always use pagination:
 
 ```typescript
-// ❌ ПЛОХО - загружаем всё
+// BAD - loading everything
 const operations = await prisma.operation.findMany({
   where: { companyId },
 });
 
-// ✅ ХОРОШО - с пагинацией
+// GOOD - with pagination
 const PAGE_SIZE = 50;
 
 const operations = await prisma.operation.findMany({
@@ -200,41 +197,41 @@ const total = await prisma.operation.count({
 });
 ```
 
-## 6. Зависимости сборки
+## 6. Build Dependencies
 
-### Проблема
+### Problem
 
-`packages/shared` должен собираться первым, иначе apps не находят типы.
+packages/shared must be built first, otherwise apps cannot find types.
 
-### Решение
+### Solution
 
-В скриптах сборки:
+In build scripts:
 
 ```bash
-# ✅ Правильный порядок
+# Correct order
 pnpm --filter @fin-u-ch/shared build
 pnpm --filter api build
 pnpm --filter web build
 pnpm --filter worker build
 
-# Или в корне package.json
+# Or in root package.json
 "build": "pnpm --filter @fin-u-ch/shared build && pnpm -r --filter './apps/*' build"
 ```
 
-В Docker multi-stage builds тоже соблюдайте порядок.
+Maintain order in Docker multi-stage builds as well.
 
-## 7. Frontend Proxy в Vite
+## 7. Frontend Proxy in Vite
 
-### Проблема
+### Problem
 
-Прямые запросы к API с фронта блокируются CORS в dev режиме.
+Direct API requests from frontend are blocked by CORS in dev mode.
 
-### Решение
+### Solution
 
-Используйте proxy в `vite.config.ts`:
+Use proxy in vite.config.ts:
 
 ```typescript
-// ✅ vite.config.ts
+// vite.config.ts
 export default defineConfig({
   server: {
     proxy: {
@@ -247,17 +244,17 @@ export default defineConfig({
 });
 ```
 
-В production Nginx делает proxy, в dev - Vite.
+In production Nginx handles proxy, in dev - Vite.
 
-## 8. Worker зависит от Prisma migrations
+## 8. Worker Depends on Prisma Migrations
 
-### Проблема
+### Problem
 
-Worker падает если миграции не применены.
+Worker crashes if migrations are not applied.
 
-### Решение
+### Solution
 
-В CI/CD и docker-compose:
+In CI/CD and docker-compose:
 
 ```yaml
 # docker-compose.yml
@@ -272,103 +269,103 @@ services:
 
   worker:
     depends_on:
-      - api # Ждём пока API применит миграции
+      - api # Wait for API to apply migrations
     command: npm start
 ```
 
-## 9. Breaking changes в JWT payload
+## 9. Breaking Changes in JWT Payload
 
-### Проблема
+### Problem
 
-Изменение структуры JWT требует logout всех пользователей.
+Changing JWT structure requires logout of all users.
 
-### Решение
+### Solution
 
-- Используйте версионирование JWT payload
-- При breaking changes увеличивайте версию
-- Старые токены отклоняйте gracefully
+- Use JWT payload versioning
+- Increment version on breaking changes
+- Reject old tokens gracefully
 
 ```typescript
 interface JWTPayload {
   userId: string;
   companyId: string;
-  version: number; // ✅ Версионирование
+  version: number; // Versioning
 }
 
-// При проверке токена
+// When verifying token
 if (payload.version !== CURRENT_JWT_VERSION) {
   throw new Error('Token version mismatch, please login again');
 }
 ```
 
-## 10. Миграции с удалением колонок
+## 10. Migrations with Column Removal
 
-### Проблема
+### Problem
 
-Удаление колонок в одну миграцию ломает работающий код при rolling deployment.
+Removing columns in a single migration breaks running code during rolling deployment.
 
-### Решение
+### Solution
 
-Двухэтапный деплой:
+Two-phase deployment:
 
-**Этап 1:** Перестать использовать колонку
+**Phase 1:** Stop using the column
 
 ```typescript
-// Деплой 1: убираем использование поля
+// Deploy 1: remove field usage
 const user = await prisma.user.findUnique({
   select: {
     id: true,
     email: true,
-    // oldField: true, // <-- убрали
+    // oldField: true, // removed
   },
 });
 ```
 
-**Этап 2:** Удалить колонку
+**Phase 2:** Remove the column
 
 ```prisma
-// Деплой 2: миграция удаляет колонку
+// Deploy 2: migration removes column
 model User {
   id    String
   email String
-  // oldField String  // <-- удалили
+  // oldField String  // removed
 }
 ```
 
-## 11. Enum изменения требуют обновления данных
+## 11. Enum Changes Require Data Updates
 
-### Проблема
+### Problem
 
-Добавление/удаление enum значений может сломать существующие записи.
+Adding/removing enum values can break existing records.
 
-### Решение
+### Solution
 
-При изменении enum:
+When changing enums:
 
-1. Добавление нового значения - безопасно
-2. Удаление значения - требует миграцию данных:
+1. Adding new value - safe
+2. Removing value - requires data migration:
 
 ```sql
--- Миграция: меняем старое значение на новое
+-- Migration: change old value to new
 UPDATE operations
 SET type = 'expense'
 WHERE type = 'old_expense_type';
 
--- Затем можно удалить из enum
+-- Then remove from enum
 ```
 
-## 12. Redis connection handling
+## 12. Redis Connection Handling
 
-### Проблема
+### Problem
 
-Неправильное управление Redis подключениями приводит к утечкам.
+Improper Redis connection management leads to leaks.
 
-### Решение
+### Solution
 
-Используйте singleton pattern:
+Use singleton pattern:
 
 ```typescript
-// ✅ config/redis.ts
+// config/redis.ts
 import Redis from 'ioredis';
 
 let redisClient: Redis | null = null;
@@ -393,27 +390,27 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-## 13. Date handling с timezone
+## 13. Date Handling with Timezone
 
-### Проблема
+### Problem
 
-Несоответствие timezone между клиентом, сервером и БД приводит к неправильным датам.
+Timezone mismatch between client, server, and database leads to incorrect dates.
 
-### Решение
+### Solution
 
-- Храните все даты в UTC в БД
-- Конвертируйте в локальный timezone только при отображении
-- Используйте ISO 8601 формат для передачи дат
+- Store all dates in UTC in database
+- Convert to local timezone only for display
+- Use ISO 8601 format for transmitting dates
 
 ```typescript
-// ✅ Правильная работа с датами
+// Correct date handling
 import { format, parseISO } from 'date-fns';
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 
-// От клиента всегда получаем ISO строку
+// Always receive ISO string from client
 const operationDate = parseISO(req.body.operationDate); // '2024-01-15T10:00:00Z'
 
-// Сохраняем в БД как Date (PostgreSQL хранит в UTC)
+// Save to database as Date (PostgreSQL stores in UTC)
 await prisma.operation.create({
   data: {
     operationDate,
@@ -421,24 +418,24 @@ await prisma.operation.create({
   },
 });
 
-// Отдаём клиенту в ISO формате
+// Return to client in ISO format
 res.json({
   operationDate: operation.operationDate.toISOString(),
 });
 ```
 
-## 14. Memory leaks в React
+## 14. Memory Leaks in React
 
-### Проблема
+### Problem
 
-Асинхронные операции после unmount компонента.
+Asynchronous operations after component unmount.
 
-### Решение
+### Solution
 
-Используйте cleanup в useEffect:
+Use cleanup in useEffect:
 
 ```typescript
-// ✅ С cleanup
+// With cleanup
 useEffect(() => {
   let cancelled = false;
 
@@ -457,7 +454,7 @@ useEffect(() => {
 }, []);
 ```
 
-Или используйте AbortController:
+Or use AbortController:
 
 ```typescript
 useEffect(() => {
@@ -475,18 +472,18 @@ useEffect(() => {
 }, []);
 ```
 
-## 15. Testing с реальной БД
+## 15. Testing with Real Database
 
-### Проблема
+### Problem
 
-Тесты влияют друг на друга из-за общей БД.
+Tests affect each other due to shared database.
 
-### Решение
+### Solution
 
-Используйте test database и transactions:
+Use test database and transactions:
 
 ```typescript
-// ✅ jest.config.js
+// jest.config.js
 module.exports = {
   globalSetup: './tests/setup.ts',
   globalTeardown: './tests/teardown.ts',
@@ -495,11 +492,11 @@ module.exports = {
 // tests/setup.ts
 export default async function setup() {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
-  // Применить миграции
+  // Apply migrations
   execSync('npx prisma migrate deploy');
 }
 
-// В тестах используйте transactions
+// In tests use transactions
 beforeEach(async () => {
   await prisma.$executeRaw`BEGIN`;
 });
@@ -509,20 +506,20 @@ afterEach(async () => {
 });
 ```
 
-## Checklist перед PR
+## Checklist Before PR
 
-Проверьте эти пункты перед созданием PR:
+Check these points before creating a PR:
 
-- [ ] Все Prisma запросы имеют фильтр по `companyId`
-- [ ] Индексы созданы для новых полей в WHERE/ORDER BY
-- [ ] Нет N+1 query проблем (используется include/select)
-- [ ] Тяжёлые отчёты кэшируются в Redis
-- [ ] Большие списки имеют пагинацию
-- [ ] packages/shared пересобран после изменений типов
-- [ ] Обновлены миграции Prisma
-- [ ] Нет breaking changes в JWT payload (или версия увеличена)
-- [ ] Enum изменения учтены в существующих данных
-- [ ] Правильный порядок сборки в CI/CD
-- [ ] Тесты проходят и не влияют друг на друга
-- [ ] Нет memory leaks в React (cleanup в useEffect)
-- [ ] Даты в UTC и используется ISO формат
+- [ ] All Prisma queries have companyId filter
+- [ ] Indexes created for new fields in WHERE/ORDER BY
+- [ ] No N+1 query problems (using include/select)
+- [ ] Heavy reports are cached in Redis
+- [ ] Large lists have pagination
+- [ ] packages/shared rebuilt after type changes
+- [ ] Prisma migrations updated
+- [ ] No breaking changes in JWT payload (or version incremented)
+- [ ] Enum changes accounted for in existing data
+- [ ] Correct build order in CI/CD
+- [ ] Tests pass and do not affect each other
+- [ ] No memory leaks in React (cleanup in useEffect)
+- [ ] Dates in UTC and using ISO format

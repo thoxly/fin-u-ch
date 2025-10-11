@@ -611,24 +611,27 @@ jobs:
             # Login to GHCR
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             
-            # Remove old images to force pull new ones
-            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-api" -q) || true
-            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-web" -q) || true
-            docker rmi $(docker images "ghcr.io/${{ github.repository_owner }}/fin-u-ch-worker" -q) || true
-            
-            # Pull new images
-            docker compose -f docker-compose.prod.yml pull
+            # Pull new images first
+            docker compose -f docker-compose.prod.yml pull api web worker
             
             # Apply database migrations (using npx since Prisma CLI is in node_modules)
             docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
             
-            # Restart services with zero downtime (use pulled images, force recreate containers)
-            docker compose -f docker-compose.prod.yml up -d --force-recreate api web worker
+            # Stop and remove old containers to ensure they restart with new images
+            docker compose -f docker-compose.prod.yml stop api web worker
+            docker compose -f docker-compose.prod.yml rm -f api web worker
             
-            # Cleanup old images
-            docker image prune -f
+            # Start with new images
+            docker compose -f docker-compose.prod.yml up -d api web worker
             
-            echo "Deployment completed successfully!"
+            # Cleanup unused resources
+            echo "🧹 Cleaning up unused Docker resources..."
+            docker container prune -f
+            docker image prune -af --filter "until=168h"  # Remove images older than 7 days
+            docker volume prune -f
+            docker network prune -f
+            
+            echo "✅ Deployment completed successfully!"
           EOF
 
       - name: Health check

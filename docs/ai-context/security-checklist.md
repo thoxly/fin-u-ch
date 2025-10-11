@@ -1,17 +1,17 @@
-# Security Checklist для AI Code Review
+# Security Checklist for AI Code Review
 
-Чеклист безопасности адаптированный под проект Fin-U-CH. Основан на OWASP Top 10.
+Security checklist adapted for the Fin-U-CH project. Based on OWASP Top 10.
 
 ## 1. SQL Injection Prevention
 
 ### Prisma Parameterized Queries
 
-- ✅ Prisma автоматически использует параметризованные запросы
-- ❌ Никогда не используйте raw SQL без параметров
-- ⚠️ Если необходим raw SQL - используйте `$queryRaw` с плейсхолдерами
+- Prisma automatically uses parameterized queries
+- Never use raw SQL without parameters
+- If raw SQL is necessary, use $queryRaw with placeholders
 
 ```typescript
-// ✅ Безопасно - Prisma автоматически экранирует
+// SAFE - Prisma automatically escapes
 const operations = await prisma.operation.findMany({
   where: {
     companyId,
@@ -19,12 +19,12 @@ const operations = await prisma.operation.findMany({
   },
 });
 
-// ❌ ОПАСНО - SQL injection!
+// DANGEROUS - SQL injection!
 await prisma.$executeRawUnsafe(
   `SELECT * FROM operations WHERE description = '${userInput}'`
 );
 
-// ✅ Безопасно - параметризованный raw query
+// SAFE - parameterized raw query
 await prisma.$queryRaw`
   SELECT * FROM operations 
   WHERE companyId = ${companyId} 
@@ -36,22 +36,22 @@ await prisma.$queryRaw`
 
 ### React Automatic Escaping
 
-- ✅ React автоматически экранирует содержимое
-- ⚠️ DOMPurify для HTML из внешних источников
-- ❌ Запрет `dangerouslySetInnerHTML` без sanitization
+- React automatically escapes content
+- Use DOMPurify for HTML from external sources
+- Prohibit dangerouslySetInnerHTML without sanitization
 
 ```typescript
-// ✅ Безопасно - React автоматически экранирует
+// SAFE - React automatically escapes
 function OperationDescription({ description }: Props) {
   return <div>{description}</div>;
 }
 
-// ❌ ОПАСНО - XSS атака!
+// DANGEROUS - XSS attack!
 function OperationDescription({ description }: Props) {
   return <div dangerouslySetInnerHTML={{ __html: description }} />;
 }
 
-// ✅ Безопасно - с санитизацией
+// SAFE - with sanitization
 import DOMPurify from 'dompurify';
 
 function OperationDescription({ description }: Props) {
@@ -62,37 +62,37 @@ function OperationDescription({ description }: Props) {
 
 ### Input Validation
 
-- ✅ Валидируйте все пользовательские данные
-- ✅ Используйте whitelist, не blacklist
-- ✅ Ограничивайте длину строк
+- Validate all user data
+- Use whitelist, not blacklist
+- Limit string lengths
 
 ## 3. CSRF (Cross-Site Request Forgery) Protection
 
 ### SameSite Cookies
 
-- ✅ SameSite cookies для refresh token
-- ✅ CORS настройки в API
+- SameSite cookies for refresh token
+- CORS settings in API
 
 ```typescript
-// ✅ Безопасная настройка cookie
+// SAFE cookie configuration
 res.cookie('refreshToken', token, {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'strict',
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 });
 ```
 
 ### CORS Configuration
 
-- ✅ Ограничьте список разрешенных origin
-- ❌ Никогда не используйте `origin: '*'` в production
+- Limit allowed origins list
+- Never use origin: '\*' in production
 
 ```typescript
-// ❌ ОПАСНО в production
+// DANGEROUS in production
 app.use(cors({ origin: '*' }));
 
-// ✅ Безопасно
+// SAFE
 app.use(
   cors({
     origin: process.env.FRONTEND_URL,
@@ -107,12 +107,12 @@ app.use(
 
 ### Token Expiration
 
-- ✅ Access token: 15 минут
-- ✅ Refresh token: 7 дней
-- ✅ Rotation on use для refresh token
+- Access token: 15 minutes
+- Refresh token: 7 days
+- Rotation on use for refresh token
 
 ```typescript
-// ✅ Правильная конфигурация
+// Correct configuration
 const accessToken = jwt.sign({ userId, companyId }, JWT_SECRET, {
   expiresIn: '15m',
 });
@@ -126,32 +126,32 @@ const refreshToken = jwt.sign(
 
 ### Token Storage
 
-- ✅ Access token в памяти (React state/Redux)
-- ✅ Refresh token в httpOnly cookie или secure storage
-- ❌ Никогда не храните токены в localStorage для чувствительных данных
+- Access token in memory (React state/Redux)
+- Refresh token in httpOnly cookie or secure storage
+- Never store tokens in localStorage for sensitive data
 
 ### Sensitive Data in JWT
 
-- ❌ Никогда не храните в JWT:
-  - Пароли
-  - Секретные ключи
-  - Полные данные пользователя
+- Never store in JWT:
+  - Passwords
+  - Secret keys
+  - Full user data
   - PII (personally identifiable information)
-- ✅ Храните только:
+- Store only:
   - userId
   - companyId
-  - role (если есть)
+  - role (if applicable)
 
 ## 5. Input Validation
 
 ### Zod Schemas
 
-- ✅ Zod schemas на всех входных данных
-- ✅ Валидация на фронтенде И бэкенде
-- ✅ Отклонение невалидных данных с понятным сообщением
+- Zod schemas on all input data
+- Validation on frontend AND backend
+- Reject invalid data with clear message
 
 ```typescript
-// ✅ Хорошо - валидация через Zod
+// Good - validation via Zod
 import { z } from 'zod';
 
 const CreateOperationSchema = z.object({
@@ -164,10 +164,10 @@ const CreateOperationSchema = z.object({
   description: z.string().max(500).optional(),
 });
 
-// В контроллере
+// In controller
 try {
   const validatedData = CreateOperationSchema.parse(req.body);
-  // ... обработка
+  // ... processing
 } catch (error) {
   return res.status(400).json({
     error: 'Validation failed',
@@ -178,21 +178,21 @@ try {
 
 ### File Upload Validation
 
-- ✅ Проверяйте MIME type
-- ✅ Ограничивайте размер файла
-- ✅ Проверяйте расширение файла
-- ✅ Сканируйте на вирусы (если импорт файлов реализован)
+- Check MIME type
+- Limit file size
+- Check file extension
+- Scan for viruses (if file import implemented)
 
 ## 6. Sensitive Data Protection
 
 ### Environment Variables
 
-- ✅ Все секреты в переменных окружения
-- ❌ Никогда не коммитьте `.env` файлы
-- ✅ Используйте `.env.example` с placeholder значениями
+- All secrets in environment variables
+- Never commit .env files
+- Use .env.example with placeholder values
 
 ```bash
-# ✅ .env.example
+# .env.example
 DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 JWT_SECRET=your-secret-key-here
 REDIS_URL=redis://localhost:6379
@@ -200,24 +200,24 @@ REDIS_URL=redis://localhost:6379
 
 ### Logging Sensitive Data
 
-- ❌ Не логируйте:
-  - Пароли
-  - JWT токены
-  - API ключи
-  - Полные номера карт/счетов
-  - PII (email, телефоны без маскировки)
+- Do not log:
+  - Passwords
+  - JWT tokens
+  - API keys
+  - Full card/account numbers
+  - PII (email, phones without masking)
 
 ```typescript
-// ❌ ОПАСНО
+// DANGEROUS
 logger.info('User login', { email, password });
 
-// ✅ Безопасно
+// SAFE
 logger.info('User login', {
   userId: user.id,
   companyId: user.companyId,
 });
 
-// ✅ Безопасно - маскировка email
+// SAFE - email masking
 logger.info('User registered', {
   email: maskEmail(email), // u***@example.com
 });
@@ -225,18 +225,18 @@ logger.info('User registered', {
 
 ### Password Hashing
 
-- ✅ Только **bcryptjs** для хеширования паролей (pure JavaScript, без нативных модулей)
-- ✅ Salt rounds: минимум 10
-- ❌ Никогда не храните пароли в plain text
+- Only bcryptjs for password hashing (pure JavaScript, no native modules)
+- Salt rounds: minimum 10
+- Never store passwords in plain text
 
 ```typescript
-// ✅ Правильное хеширование
+// Correct hashing
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
 const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
-// Проверка
+// Verification
 const isValid = await bcrypt.compare(inputPassword, user.passwordHash);
 ```
 
@@ -244,12 +244,12 @@ const isValid = await bcrypt.compare(inputPassword, user.passwordHash);
 
 ### CompanyId Filtering
 
-- ✅ **ВСЕГДА** проверяйте `companyId` в middleware
-- ✅ Изолируйте данные на уровне БД (WHERE companyId = ?)
-- ❌ Никогда не доверяйте companyId из клиентского запроса
+- ALWAYS check companyId in middleware
+- Isolate data at database level (WHERE companyId = ?)
+- Never trust companyId from client request
 
 ```typescript
-// ✅ Middleware для извлечения companyId
+// Middleware for extracting companyId
 export async function tenantMiddleware(
   req: Request,
   res: Response,
@@ -270,26 +270,26 @@ export async function tenantMiddleware(
     return res.status(401).json({ error: 'User not found' });
   }
 
-  // Устанавливаем companyId из БД, не из запроса!
+  // Set companyId from database, not from request!
   req.companyId = user.companyId;
   next();
 }
 
-// ✅ В сервисе всегда фильтруем
+// In service always filter
 async function getOperations(companyId: string) {
   return await prisma.operation.findMany({
-    where: { companyId }, // Обязательно!
+    where: { companyId }, // Required!
   });
 }
 ```
 
 ### Data Leakage Tests
 
-- ✅ Тесты на data leakage между тенантами
-- ✅ Проверка изоляции в E2E тестах
+- Tests for data leakage between tenants
+- Check isolation in E2E tests
 
 ```typescript
-// ✅ Тест на изоляцию данных
+// Test for data isolation
 describe('Multi-tenant isolation', () => {
   it('should not return operations from other company', async () => {
     const company1Operations = await createOperations(company1Id);
@@ -307,22 +307,22 @@ describe('Multi-tenant isolation', () => {
 
 ### Express Rate Limit
 
-- ✅ Ограничьте количество запросов с одного IP
-- ✅ Разные лимиты для auth endpoints (строже)
+- Limit number of requests from single IP
+- Different limits for auth endpoints (stricter)
 
 ```typescript
-// ✅ Rate limiting
+// Rate limiting
 import rateLimit from 'express-rate-limit';
 
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: 100, // 100 запросов
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests
   message: 'Too many requests from this IP',
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5, // 5 попыток входа
+  max: 5, // 5 login attempts
   message: 'Too many login attempts',
 });
 
@@ -334,39 +334,39 @@ app.use('/api/auth', authLimiter);
 
 ### Regular Updates
 
-- ✅ Регулярно обновляйте зависимости
-- ✅ Используйте `pnpm audit` для проверки уязвимостей
-- ✅ Автоматизируйте проверку через Dependabot
+- Regularly update dependencies
+- Use pnpm audit to check vulnerabilities
+- Automate checks via Dependabot
 
 ```bash
-# Проверка уязвимостей
+# Check vulnerabilities
 pnpm audit
 
-# Автоматическое исправление
+# Automatic fix
 pnpm audit fix
 ```
 
 ### Lock Files
 
-- ✅ Коммитьте `pnpm-lock.yaml`
-- ✅ Используйте `--frozen-lockfile` в CI/CD
+- Commit pnpm-lock.yaml
+- Use --frozen-lockfile in CI/CD
 
 ## 10. Error Messages
 
-### Не раскрывайте внутреннюю структуру
+### Do Not Expose Internal Structure
 
-- ❌ Не возвращайте stack traces в production
-- ❌ Не раскрывайте структуру БД в сообщениях об ошибках
-- ✅ Возвращайте общие сообщения пользователю
-- ✅ Детальные ошибки только в логах
+- Do not return stack traces in production
+- Do not reveal database structure in error messages
+- Return general messages to user
+- Detailed errors only in logs
 
 ```typescript
-// ❌ ОПАСНО - раскрывает структуру БД
+// DANGEROUS - reveals database structure
 catch (error) {
   res.status(500).json({ error: error.message });
 }
 
-// ✅ Безопасно
+// SAFE
 catch (error) {
   logger.error('Operation failed', { error, userId, companyId });
   res.status(500).json({
@@ -376,19 +376,19 @@ catch (error) {
 }
 ```
 
-## Checklist для PR Review
+## Checklist for PR Review
 
-При ревью кода проверяйте:
+When reviewing code check:
 
-- [ ] Все Prisma запросы фильтруются по `companyId`
-- [ ] Нет использования `any` типа
-- [ ] Пароли хешируются через bcryptjs
-- [ ] JWT токены имеют правильный expiration
-- [ ] Нет секретов в коде (используются env variables)
-- [ ] Input validation через Zod на фронте и бэке
-- [ ] Нет `dangerouslySetInnerHTML` без sanitization
-- [ ] CORS настроен правильно (не `*` в production)
-- [ ] Логи не содержат sensitive data
-- [ ] Error messages не раскрывают внутреннюю структуру
-- [ ] Rate limiting настроен для auth endpoints
-- [ ] Нет SQL injection уязвимостей (raw queries параметризованы)
+- [ ] All Prisma queries filtered by companyId
+- [ ] No use of any type
+- [ ] Passwords hashed via bcryptjs
+- [ ] JWT tokens have correct expiration
+- [ ] No secrets in code (using env variables)
+- [ ] Input validation via Zod on front and back
+- [ ] No dangerouslySetInnerHTML without sanitization
+- [ ] CORS configured correctly (not \* in production)
+- [ ] Logs do not contain sensitive data
+- [ ] Error messages do not reveal internal structure
+- [ ] Rate limiting configured for auth endpoints
+- [ ] No SQL injection vulnerabilities (raw queries parameterized)
