@@ -1,3 +1,8 @@
+// Load environment variables FIRST, before any other imports
+import dotenv from 'dotenv';
+import path from 'path';
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+
 import app from './app';
 import { env } from './config/env';
 import logger from './config/logger';

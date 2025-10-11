@@ -1,25 +1,25 @@
-# Style Guide для AI Code Review
+# Style Guide for AI Code Review
 
-Правила и паттерны кода для проекта Fin-U-CH. Используется AI агентом для автоматической проверки кода в PR.
+Code rules and patterns for the Fin-U-CH project. Used by AI agent for automatic code review in PRs.
 
 ## TypeScript Strict Requirements
 
-### Запрет `any`
+### No any
 
-- ❌ Никогда не используйте `any`
-- ✅ Используйте `unknown` для неизвестных типов
-- ✅ Создавайте конкретные типы/интерфейсы
+- Never use any
+- Use unknown for unknown types
+- Create specific types/interfaces
 
 ```typescript
-// ❌ Плохо
+// BAD
 function process(data: any) { ... }
 
-// ✅ Хорошо
+// GOOD
 function process(data: unknown) {
   if (isValidData(data)) { ... }
 }
 
-// ✅ Отлично
+// EXCELLENT
 interface ProcessData {
   id: string;
   amount: number;
@@ -29,22 +29,22 @@ function process(data: ProcessData) { ... }
 
 ### Explicit Return Types
 
-- ✅ Все функции должны иметь явный тип возвращаемого значения
-- ✅ Особенно важно для публичных API и сервисных методов
-- ✅ Return type может быть на отдельной строке для длинных сигнатур
+- All functions must have explicit return type
+- Especially important for public APIs and service methods
+- Return type can be on separate line for long signatures
 
 ```typescript
-// ❌ Плохо
+// BAD
 function calculateTotal(items) {
   return items.reduce((sum, item) => sum + item.price, 0);
 }
 
-// ✅ Хорошо
+// GOOD
 function calculateTotal(items: OrderItem[]): number {
   return items.reduce((sum, item) => sum + item.price, 0);
 }
 
-// ✅ Хорошо - многострочная сигнатура
+// GOOD - multiline signature
 export async function seedInitialData(
   tx: PrismaClient,
   companyId: string
@@ -55,17 +55,17 @@ export async function seedInitialData(
 
 ### Strict Null Checks
 
-- ✅ Используйте `strictNullChecks: true` в tsconfig.json
-- ✅ Явно обрабатывайте `null` и `undefined`
-- ✅ Используйте optional chaining `?.` и nullish coalescing `??`
+- Use strictNullChecks: true in tsconfig.json
+- Explicitly handle null and undefined
+- Use optional chaining ?. and nullish coalescing ??
 
 ```typescript
-// ❌ Плохо
+// BAD
 function getUserName(user) {
   return user.name;
 }
 
-// ✅ Хорошо
+// GOOD
 function getUserName(user: User | null): string {
   return user?.name ?? 'Anonymous';
 }
@@ -73,84 +73,84 @@ function getUserName(user: User | null): string {
 
 ## HTTP Requests
 
-### Единый API Client
+### Unified API Client
 
-- ✅ Все HTTP запросы только через `shared/api/axios.ts`
-- ❌ Никогда не используйте прямые `fetch()` или сторонние axios инстансы
-- ✅ JWT токены добавляются автоматически через interceptor
+- All HTTP requests only through shared/api/axios.ts
+- Never use direct fetch() or external axios instances
+- JWT tokens added automatically via interceptor
 
 ```typescript
-// ❌ Плохо
+// BAD
 const response = await fetch('/api/operations');
 
-// ❌ Плохо
+// BAD
 import axios from 'axios';
 const response = await axios.get('/api/operations');
 
-// ✅ Хорошо
+// GOOD
 import { apiClient } from '@/shared/api/axios';
 const response = await apiClient.get('/api/operations');
 ```
 
-## Обработка ошибок
+## Error Handling
 
-### Try-Catch для Async операций
+### Try-Catch for Async Operations
 
-- ✅ Обязательно оборачивайте все async/await в try-catch
-- ✅ Логируйте ошибки с контекстом
-- ✅ Возвращайте понятные сообщения об ошибках пользователю
+- Must wrap all async/await in try-catch
+- Log errors with context
+- Return clear error messages to user
 
 ```typescript
-// ❌ Плохо
+// BAD
 async function fetchOperations() {
   const data = await apiClient.get('/api/operations');
   return data;
 }
 
-// ✅ Хорошо
+// GOOD
 async function fetchOperations(): Promise<Operation[]> {
   try {
     const { data } = await apiClient.get<Operation[]>('/api/operations');
     return data;
   } catch (error) {
     logger.error('Failed to fetch operations', { error });
-    throw new Error('Не удалось загрузить операции');
+    throw new Error('Failed to load operations');
   }
 }
 ```
 
-### Error Boundaries в React
+### Error Boundaries in React
 
-- ✅ Используйте Error Boundary компоненты для критичных блоков UI
-- ✅ Показывайте пользователю fallback UI при ошибках
+- Use Error Boundary components for critical UI blocks
+- Show user fallback UI on errors
 
-### Централизованный Error Middleware в API
+### Centralized Error Middleware in API
 
-- ✅ Все ошибки обрабатываются через `middlewares/error.ts`
-- ✅ Возвращайте правильные HTTP статусы:
-  - 400 - валидация
-  - 401 - не авторизован
-  - 403 - нет доступа
-  - 404 - не найдено
-  - 409 - конфликт
-  - 500 - внутренняя ошибка
+- All errors handled through middlewares/error.ts
+- Return correct HTTP statuses:
+  - 400 - validation
+  - 401 - unauthorized
+  - 403 - forbidden
+  - 404 - not found
+  - 409 - conflict
+  - 500 - internal error
 
-## React Паттерны
+## React Patterns
 
 ### Hooks Rules
 
-- ✅ Hooks только на верхнем уровне компонента
-- ❌ Никогда не вызывайте hooks внутри условий, циклов, вложенных функций
+- Hooks only at top level of component
+- Never call hooks inside conditions, loops, nested functions
 
 ```typescript
-// ❌ Плохо
+// BAD
 function Component({ isVisible }) {
   if (isVisible) {
-    const [count, setCount] = useState(0); // Ошибка!
+    const [count, setCount] = useState(0); // Error!
   }
 }
 
-// ✅ Хорошо
+// GOOD
 function Component({ isVisible }) {
   const [count, setCount] = useState(0);
 
@@ -161,21 +161,21 @@ function Component({ isVisible }) {
 
 ### Functional Components Only
 
-- ✅ Используйте только функциональные компоненты
-- ❌ Никаких class-based компонентов
+- Use only functional components
+- No class-based components
 
 ### Props Destructuring
 
-- ✅ Деструктурируйте props в сигнатуре функции
-- ✅ Типизируйте props через интерфейс
+- Destructure props in function signature
+- Type props via interface
 
 ```typescript
-// ❌ Плохо
+// BAD
 function Button(props) {
   return <button onClick={props.onClick}>{props.label}</button>;
 }
 
-// ✅ Хорошо
+// GOOD
 interface ButtonProps {
   label: string;
   onClick: () => void;
@@ -188,34 +188,34 @@ function Button({ label, onClick }: ButtonProps) {
 
 ### Custom Hooks Naming
 
-- ✅ Имена custom hooks начинаются с `use`
-- ✅ Имя должно отражать назначение: `useAuth`, `useOperations`, `useDashboard`
+- Custom hook names start with use
+- Name should reflect purpose: useAuth, useOperations, useDashboard
 
 ## Prisma Best Practices
 
-### Фильтрация по companyId
+### CompanyId Filtering
 
-- ✅ **ВСЕГДА** фильтруйте запросы по `companyId`
-- ❌ Никогда не делайте запросы без фильтра по tenant
+- ALWAYS filter queries by companyId
+- Never make queries without tenant filter
 
 ```typescript
-// ❌ Плохо - утечка данных между компаниями!
+// BAD - data leakage between companies!
 const operations = await prisma.operation.findMany();
 
-// ✅ Хорошо
+// GOOD
 const operations = await prisma.operation.findMany({
   where: { companyId },
 });
 ```
 
-### Transactions для связанных операций
+### Transactions for Related Operations
 
-- ✅ Используйте `$transaction` для атомарных операций
-- ✅ Особенно важно при создании связанных записей
-- ✅ Try-catch внутри транзакции - правильный паттерн для частичной обработки ошибок
+- Use $transaction for atomic operations
+- Especially important when creating related records
+- Try-catch inside transaction is correct pattern for partial error handling
 
 ```typescript
-// ✅ Хорошо - базовая транзакция
+// GOOD - basic transaction
 await prisma.$transaction([
   prisma.operation.create({ data: operationData }),
   prisma.account.update({
@@ -224,13 +224,13 @@ await prisma.$transaction([
   }),
 ]);
 
-// ✅ Хорошо - обработка ошибок внутри транзакции
+// GOOD - error handling inside transaction
 const result = await prisma.$transaction(async (tx) => {
   const company = await tx.company.create({ data: companyData });
   const user = await tx.user.create({ data: userData });
 
-  // Попытка создать дополнительные данные
-  // Если упадет - вся транзакция откатится
+  // Attempt to create additional data
+  // If fails - entire transaction rolls back
   try {
     await seedInitialData(tx, company.id);
   } catch (error) {
@@ -242,19 +242,19 @@ const result = await prisma.$transaction(async (tx) => {
 });
 ```
 
-### Include/Select для оптимизации
+### Include/Select for Optimization
 
-- ✅ Используйте `select` чтобы получить только нужные поля
-- ✅ Используйте `include` для связанных данных
-- ❌ Избегайте получения всех полей, если они не нужны
+- Use select to get only needed fields
+- Use include for related data
+- Avoid fetching all fields if not needed
 
 ```typescript
-// ❌ Плохо - загружаем всё
+// BAD - loading everything
 const operation = await prisma.operation.findUnique({
   where: { id },
 });
 
-// ✅ Хорошо - только нужные поля и связи
+// GOOD - only needed fields and relations
 const operation = await prisma.operation.findUnique({
   where: { id },
   select: {
@@ -268,24 +268,24 @@ const operation = await prisma.operation.findUnique({
 });
 ```
 
-## Принцип простоты кода
+## Code Simplicity Principle
 
-### Основные правила
+### Basic Rules
 
-- Код проще читать, чем писать
-- Линейная логика предпочтительнее вложенной
-- Избегайте "умных" решений ради экономии строк
-- Комментарии объясняют "почему", а не "что"
+- Code is easier to read than to write
+- Linear logic is preferable to nested
+- Avoid clever solutions for saving lines
+- Comments explain why, not what
 
-### Метрики сложности
+### Complexity Metrics
 
-- Когнитивная сложность функции: ≤ 10
-- Длина функции: ≤ 40 строк
-- Вложенность условий: ≤ 3 уровня
-- Именование: самоочевидное
+- Cognitive complexity of function: ≤ 10
+- Function length: ≤ 40 lines
+- Nesting of conditions: ≤ 3 levels
+- Naming: self-evident
 
 ```typescript
-// ❌ Плохо - вложенность и неясная логика
+// BAD - nesting and unclear logic
 function processOrder(order) {
   if (order) {
     if (order.items) {
@@ -302,7 +302,7 @@ function processOrder(order) {
   return 0;
 }
 
-// ✅ Хорошо - ранние выходы, линейная логика
+// GOOD - early returns, linear logic
 function calculateOrderTotal(order: Order | null): number {
   if (!order?.items?.length) return 0;
 
@@ -312,36 +312,36 @@ function calculateOrderTotal(order: Order | null): number {
 }
 ```
 
-## Именование
+## Naming
 
-### Переменные и функции
+### Variables and Functions
 
-- ✅ camelCase: `getUserName`, `totalAmount`
-- ✅ Глаголы для функций: `fetchData`, `calculateTotal`, `validateInput`
-- ✅ Существительные для переменных: `userName`, `orderTotal`
+- camelCase: getUserName, totalAmount
+- Verbs for functions: fetchData, calculateTotal, validateInput
+- Nouns for variables: userName, orderTotal
 
-### Компоненты и Типы
+### Components and Types
 
-- ✅ PascalCase: `DashboardPage`, `OperationForm`, `User`, `OrderDTO`
-- ✅ Интерфейсы props: `ComponentNameProps`
-- ✅ DTOs: `CreateOperationDTO`, `UpdateArticleDTO`
+- PascalCase: DashboardPage, OperationForm, User, OrderDTO
+- Interface props: ComponentNameProps
+- DTOs: CreateOperationDTO, UpdateArticleDTO
 
-### Константы
+### Constants
 
-- ✅ UPPER_SNAKE_CASE для глобальных констант: `API_BASE_URL`, `MAX_RETRY_COUNT`
-- ✅ camelCase для локальных констант: `defaultCurrency`
+- UPPER_SNAKE_CASE for global constants: API_BASE_URL, MAX_RETRY_COUNT
+- camelCase for local constants: defaultCurrency
 
 ## Imports
 
-### Порядок импортов
+### Import Order
 
-1. Внешние библиотеки (React, Express, etc.)
-2. Внутренние модули проекта
-3. Типы и интерфейсы
-4. Стили
+1. External libraries (React, Express, etc.)
+2. Internal project modules
+3. Types and interfaces
+4. Styles
 
 ```typescript
-// ✅ Хорошо
+// GOOD
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 
@@ -353,25 +353,25 @@ import { Operation } from '@fin-u-ch/shared';
 import './styles.css';
 ```
 
-### Абсолютные пути
+### Absolute Paths
 
-- ✅ Используйте алиасы из tsconfig: `@/`, `@shared/`
-- ❌ Избегайте относительных путей `../../../`
+- Use aliases from tsconfig: @/, @shared/
+- Avoid relative paths ../../../
 
-## Комментарии
+## Comments
 
-### JSDoc для публичных API
+### JSDoc for Public APIs
 
-- ✅ Все публичные функции, классы, интерфейсы
-- ✅ Описание параметров и возвращаемых значений
+- All public functions, classes, interfaces
+- Description of parameters and return values
 
 ```typescript
 /**
- * Рассчитывает общую сумму операций за период
- * @param operations - Массив операций
- * @param startDate - Начало периода
- * @param endDate - Конец периода
- * @returns Общая сумма
+ * Calculates total sum of operations for period
+ * @param operations - Array of operations
+ * @param startDate - Period start
+ * @param endDate - Period end
+ * @returns Total sum
  */
 function calculateTotal(
   operations: Operation[],
@@ -382,54 +382,54 @@ function calculateTotal(
 }
 ```
 
-### TODO комментарии
+### TODO Comments
 
-- ✅ Формат: `// TODO: описание задачи`
-- ✅ Добавляйте контекст и причину
+- Format: // TODO: task description
+- Add context and reason
 
 ```typescript
-// TODO: Добавить кэширование результата в Redis (после оптимизации запроса)
-// TODO: Рефакторинг после миграции на новый API формат (v2.0)
+// TODO: Add result caching in Redis (after query optimization)
+// TODO: Refactor after migration to new API format (v2.0)
 ```
 
-## Логирование
+## Logging
 
-### Уровни логов
+### Log Levels
 
-- `error` - критические ошибки
-- `warn` - предупреждения
-- `info` - информационные сообщения
-- `debug` - отладочная информация
+- error - critical errors
+- warn - warnings
+- info - informational messages
+- debug - debug information
 
-### Что логировать
+### What to Log
 
-- ✅ Ошибки с полным контекстом
-- ✅ Важные бизнес-события (создание операции, генерация отчета)
-- ❌ Никогда не логируйте пароли, токены, PII
-- ✅ Error объекты можно логировать, если в них нет sensitive данных
+- Errors with full context
+- Important business events (operation creation, report generation)
+- Never log passwords, tokens, PII
+- Error objects can be logged if they do not contain sensitive data
 
 ```typescript
-// ❌ Плохо - логируем все данные пользователя
+// BAD - logging all user data
 logger.info('User logged in', user);
 
-// ✅ Хорошо - только необходимый контекст
+// GOOD - only necessary context
 logger.info('User logged in', {
   userId: user.id,
   companyId: user.companyId,
   timestamp: new Date(),
 });
 
-// ✅ Хорошо - логирование ошибок с контекстом
+// GOOD - error logging with context
 try {
   await seedInitialData(tx, company.id);
 } catch (error) {
-  // Логируем error объект - это безопасно для технических ошибок
-  // Error объекты содержат stack trace и message, не содержат PII
+  // Log error object - safe for technical errors
+  // Error objects contain stack trace and message, no PII
   logger.error('Failed to seed data', { companyId: company.id, error });
   throw new AppError('Failed to initialize company data', 500);
 }
 
-// ✅ Также допустимо - логирование статистики и счетчиков
+// GOOD - logging statistics and counters
 logger.info('Initial data seeded successfully', {
   companyId,
   accounts: accounts.count,
@@ -437,20 +437,20 @@ logger.info('Initial data seeded successfully', {
 });
 ```
 
-## Тестирование
+## Testing
 
-### Unit тесты
+### Unit Tests
 
-- ✅ Один тест на один сценарий
-- ✅ Arrange-Act-Assert паттерн
-- ✅ Понятные имена тестов: `should return total when operations are valid`
+- One test per scenario
+- Arrange-Act-Assert pattern
+- Clear test names: should return total when operations are valid
 
-### Мокирование
+### Mocking
 
-- ✅ Мокируйте внешние зависимости (БД, API)
-- ✅ Используйте Jest mocks, не реальные сервисы в unit тестах
+- Mock external dependencies (DB, API)
+- Use Jest mocks, not real services in unit tests
 
 ### Coverage
 
-- ✅ Минимум 60% для бизнес-логики
-- ✅ 100% для критичных модулей (auth, reports, salary-engine)
+- Minimum 60% for business logic
+- 100% for critical modules (auth, reports, salary-engine)
