@@ -18,10 +18,12 @@ env:
 jobs:
   # ============================================
   # Быстрые проверки (lint, format, types)
+  # Запускается: всегда для PR, пропускается для push в main (уже проверено)
   # ============================================
   quick-checks:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
     timeout-minutes: 5
 
     steps:
@@ -82,12 +84,13 @@ jobs:
         run: pnpm type-check
 
   # ============================================
-  # AI Code Review (только для PR)
+  # AI Code Review (только для PR, не блокирует другие проверки)
+  # Экономия: пропускаем для PR из dev в main (код уже проверен)
   # ============================================
   ai-code-review:
     name: AI Code Review
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.base_ref != 'main'
     timeout-minutes: 10
     permissions:
       contents: read
@@ -128,13 +131,16 @@ jobs:
 
   # ============================================
   # Сборка и тесты (объединены для оптимизации)
+  # Всегда выполняется: для PR проверяет код, для push в main создает build для Docker
   # ============================================
   build-and-test:
     name: Build & Test
     runs-on: ubuntu-latest
-    needs: [quick-checks, ai-code-review]
+    needs: [quick-checks]
+    if: |
+      always() && 
+      (needs.quick-checks.result == 'success' || needs.quick-checks.result == 'skipped')
     timeout-minutes: 15
-
     services:
       postgres:
         image: postgres:15-alpine
@@ -417,13 +423,15 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # Security Scan (только для PR)
+  # Security Scan (только для PR, параллельно с build)
   # ============================================
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     needs: [quick-checks]
+    if: |
+      always() && github.event_name == 'pull_request' &&
+      (needs.quick-checks.result == 'success' || needs.quick-checks.result == 'skipped')
     timeout-minutes: 8
     permissions:
       contents: read
@@ -479,12 +487,12 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   # ============================================
-  # Docker Build & Push (только для main)
+  # Docker Build & Push (только для main после успешного build)
   # ============================================
   docker-build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [build-and-test]
     timeout-minutes: 25
 
@@ -545,12 +553,12 @@ jobs:
           cache-to: type=inline
 
   # ============================================
-  # Deploy на VPS (только для main)
+  # Deploy на VPS (только для push в main после успешной сборки Docker)
   # ============================================
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: [docker-build]
     timeout-minutes: 10
     environment:
