@@ -184,9 +184,9 @@ These are optional improvements.`;
     console.log(`Event: ${reviewEvent}`);
     console.log(`Total comments: ${comments.length}`);
 
-    // Exit with error code if critical issues found
-    if (criticalIssues.length > 0) {
-      console.log('\n❌ Critical issues found - failing check');
+    // Exit with error code if critical or high issues found
+    if (criticalIssues.length > 0 || highIssues.length > 0) {
+      console.log('\n❌ Critical/High issues found - failing check');
       process.exit(1);
     }
   } catch (error) {
