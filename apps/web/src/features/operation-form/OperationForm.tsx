@@ -15,6 +15,8 @@ import {
 } from '../../store/api/catalogsApi';
 import { toISODate } from '../../shared/lib/date';
 import type { Operation } from '@shared/types/operations';
+import { useNotification } from '../../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -56,6 +58,8 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
   const [updateOperation, { isLoading: isUpdating }] =
     useUpdateOperationMutation();
 
+  const { showSuccess, showError } = useNotification();
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -82,12 +86,19 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
           id: operation.id,
           data: operationData,
         }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
       } else {
         await createOperation(operationData).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
       }
       onClose();
     } catch (error) {
       console.error('Failed to save operation:', error);
+      showError(
+        operation
+          ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
+          : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR
+      );
     }
   };
 

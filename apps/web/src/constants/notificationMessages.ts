@@ -1,0 +1,75 @@
+/**
+ * Предопределенные сообщения для уведомлений
+ */
+export const NOTIFICATION_MESSAGES = {
+  OPERATION: {
+    CREATE_SUCCESS: 'Операция успешно создана',
+    CREATE_ERROR: 'Ошибка создания операции',
+    UPDATE_SUCCESS: 'Операция обновлена',
+    UPDATE_ERROR: 'Ошибка обновления операции',
+    DELETE_SUCCESS: 'Операция удалена',
+    DELETE_ERROR: 'Ошибка удаления операции',
+  },
+  ACCOUNT: {
+    CREATE_SUCCESS: 'Счет создан',
+    CREATE_ERROR: 'Ошибка создания счета',
+    UPDATE_SUCCESS: 'Счет обновлен',
+    UPDATE_ERROR: 'Ошибка обновления счета',
+    DELETE_SUCCESS: 'Счет удален',
+    DELETE_ERROR: 'Ошибка удаления счета',
+  },
+  ARTICLE: {
+    CREATE_SUCCESS: 'Статья создана',
+    CREATE_ERROR: 'Ошибка создания статьи',
+    UPDATE_SUCCESS: 'Статья обновлена',
+    UPDATE_ERROR: 'Ошибка обновления статьи',
+    DELETE_SUCCESS: 'Статья удалена',
+    DELETE_ERROR: 'Ошибка удаления статьи',
+  },
+  COUNTERPARTY: {
+    CREATE_SUCCESS: 'Контрагент создан',
+    CREATE_ERROR: 'Ошибка создания контрагента',
+    UPDATE_SUCCESS: 'Контрагент обновлен',
+    UPDATE_ERROR: 'Ошибка обновления контрагента',
+    DELETE_SUCCESS: 'Контрагент удален',
+    DELETE_ERROR: 'Ошибка удаления контрагента',
+  },
+  DEAL: {
+    CREATE_SUCCESS: 'Сделка создана',
+    CREATE_ERROR: 'Ошибка создания сделки',
+    UPDATE_SUCCESS: 'Сделка обновлена',
+    UPDATE_ERROR: 'Ошибка обновления сделки',
+    DELETE_SUCCESS: 'Сделка удалена',
+    DELETE_ERROR: 'Ошибка удаления сделки',
+  },
+  DEPARTMENT: {
+    CREATE_SUCCESS: 'Отдел создан',
+    CREATE_ERROR: 'Ошибка создания отдела',
+    UPDATE_SUCCESS: 'Отдел обновлен',
+    UPDATE_ERROR: 'Ошибка обновления отдела',
+    DELETE_SUCCESS: 'Отдел удален',
+    DELETE_ERROR: 'Ошибка удаления отдела',
+  },
+  PLAN: {
+    CREATE_SUCCESS: 'План создан',
+    CREATE_ERROR: 'Ошибка создания плана',
+    UPDATE_SUCCESS: 'План обновлен',
+    UPDATE_ERROR: 'Ошибка обновления плана',
+    DELETE_SUCCESS: 'План удален',
+    DELETE_ERROR: 'Ошибка удаления плана',
+  },
+  AUTH: {
+    LOGIN_SUCCESS: 'Вы успешно вошли в систему',
+    LOGIN_ERROR: 'Ошибка входа в систему',
+    LOGOUT_SUCCESS: 'Вы вышли из системы',
+    REGISTER_SUCCESS: 'Регистрация прошла успешно',
+    REGISTER_ERROR: 'Ошибка регистрации',
+  },
+  GENERAL: {
+    SAVE_SUCCESS: 'Изменения сохранены',
+    SAVE_ERROR: 'Ошибка сохранения',
+    LOAD_ERROR: 'Ошибка загрузки данных',
+    NETWORK_ERROR: 'Ошибка сети. Проверьте подключение к интернету',
+    UNKNOWN_ERROR: 'Произошла неизвестная ошибка',
+  },
+} as const;
