@@ -932,10 +932,27 @@ docker compose up -d --force-recreate
 **State Management (Redux Toolkit)**
 
 - Глобальное состояние управляется через Redux Toolkit.
-- **Slices**: auth, catalogs (articles/accounts/etc), operations, plans, reports.
+- **Slices**: auth, catalogs (articles/accounts/etc), operations, plans, reports, notifications.
 - **RTK Query**: для кэширования API-запросов и автоматической инвалидации.
 - **Структура**: `apps/web/src/store/` содержит `store.ts`, `slices/`, `api/`.
 - Локальное состояние форм — через React useState/useReducer (не всё в Redux).
+
+**Система уведомлений**
+
+- Всплывающие уведомления для обратной связи пользователю (success/error/warning/info).
+- **Использование**: Импортируй `useNotification()` хук и вызывай `showSuccess()`, `showError()` и т.д.
+- **Пример**:
+  ```typescript
+  const { showSuccess, showError } = useNotification();
+  try {
+    await createOperation(data);
+    showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
+  } catch (error) {
+    showError(NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR);
+  }
+  ```
+- **Интеграция**: Уже добавлено в операции, авторизацию. Для новых форм просто используй хук.
+- **Документация**: См. [features/notification-system.md](./features/notification-system.md)
 
 ---
 
@@ -1184,8 +1201,16 @@ export default defineConfig({
 
 - **Где**: `apps/web/src/store/`
 - **Зачем**: Централизованное управление состоянием приложения
-- **Что**: Slices для auth, catalogs, operations, plans, reports
+- **Что**: Slices для auth, catalogs, operations, plans, reports, notifications
 - **RTK Query**: Автоматическое кэширование и инвалидация API запросов
+
+### Система уведомлений (Notifications)
+
+- **Где**: `apps/web/src/components/Notification/`, `apps/web/src/store/slices/notificationSlice.ts`
+- **Зачем**: Мгновенная обратная связь пользователям о результатах действий
+- **Использование**: Хук `useNotification()` с методами `showSuccess()`, `showError()`, `showWarning()`, `showInfo()`
+- **Константы**: `NOTIFICATION_MESSAGES` в `apps/web/src/constants/notificationMessages.ts`
+- **Docs**: [features/notification-system.md](./features/notification-system.md)
 
 ### Redis (Cache)
 
@@ -1257,6 +1282,7 @@ export default defineConfig({
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — архитектура проекта
 - [API.md](./API.md) — API документация
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) — доменная модель
+- [features/notification-system.md](./features/notification-system.md) — система уведомлений
 
 ## 18) Контакты/поддержка
 

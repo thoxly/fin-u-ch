@@ -1,0 +1,238 @@
+/* Контейнер для уведомлений */
+.notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 400px;
+  pointer-events: none;
+}
+
+/* Базовые стили уведомления */
+.notification {
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease-in-out;
+  opacity: 0;
+  transform: translateX(100%);
+  border-left: 4px solid;
+  background-color: white;
+  pointer-events: auto;
+  min-width: 300px;
+}
+
+/* Анимация появления */
+.notification.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Анимация исчезновения */
+.notification.hidden {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+/* Типы уведомлений - Success */
+.notification-success {
+  background-color: #f6ffed;
+  border-color: #52c41a;
+  color: #135200;
+}
+
+.notification-success .notification-title {
+  color: #135200;
+}
+
+.notification-success .notification-message {
+  color: #389e0d;
+}
+
+/* Типы уведомлений - Error */
+.notification-error {
+  background-color: #fff2f0;
+  border-color: #ff4d4f;
+  color: #a8071a;
+}
+
+.notification-error .notification-title {
+  color: #a8071a;
+}
+
+.notification-error .notification-message {
+  color: #cf1322;
+}
+
+/* Типы уведомлений - Warning */
+.notification-warning {
+  background-color: #fffbe6;
+  border-color: #faad14;
+  color: #5c3b00;
+}
+
+.notification-warning .notification-title {
+  color: #5c3b00;
+}
+
+.notification-warning .notification-message {
+  color: #ad6800;
+}
+
+/* Типы уведомлений - Info */
+.notification-info {
+  background-color: #e6f7ff;
+  border-color: #1890ff;
+  color: #0050b3;
+}
+
+.notification-info .notification-title {
+  color: #0050b3;
+}
+
+.notification-info .notification-message {
+  color: #096dd9;
+}
+
+/* Содержимое уведомления */
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Иконка */
+.notification-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* Тело уведомления */
+.notification-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Заголовок */
+.notification-title {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+/* Сообщение */
+.notification-message {
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Кнопка закрытия */
+.notification-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.notification-close:hover {
+  opacity: 1;
+}
+
+.notification-close:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 480px) {
+  .notification-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  .notification {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* Темная тема (опционально) */
+@media (prefers-color-scheme: dark) {
+  .notification {
+    background-color: #1f1f1f;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .notification-success {
+    background-color: #162312;
+    color: #95de64;
+  }
+
+  .notification-success .notification-title {
+    color: #95de64;
+  }
+
+  .notification-success .notification-message {
+    color: #73d13d;
+  }
+
+  .notification-error {
+    background-color: #2a1215;
+    color: #ff7875;
+  }
+
+  .notification-error .notification-title {
+    color: #ff7875;
+  }
+
+  .notification-error .notification-message {
+    color: #ff4d4f;
+  }
+
+  .notification-warning {
+    background-color: #2b2111;
+    color: #ffc53d;
+  }
+
+  .notification-warning .notification-title {
+    color: #ffc53d;
+  }
+
+  .notification-warning .notification-message {
+    color: #faad14;
+  }
+
+  .notification-info {
+    background-color: #111d2c;
+    color: #69c0ff;
+  }
+
+  .notification-info .notification-title {
+    color: #69c0ff;
+  }
+
+  .notification-info .notification-message {
+    color: #40a9ff;
+  }
+}
+
