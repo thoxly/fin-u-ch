@@ -492,7 +492,11 @@ jobs:
   docker-build:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' && 
+      github.event_name == 'push' &&
+      needs.build-and-test.result == 'success'
     needs: [build-and-test]
     timeout-minutes: 25
 
@@ -558,7 +562,11 @@ jobs:
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' && 
+      github.event_name == 'push' &&
+      needs.docker-build.result == 'success'
     needs: [docker-build]
     timeout-minutes: 10
     environment:
