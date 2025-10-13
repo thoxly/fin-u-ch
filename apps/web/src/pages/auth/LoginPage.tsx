@@ -5,8 +5,6 @@ import { useLoginMutation } from '../../store/api/authApi';
 import { setCredentials } from '../../store/slices/authSlice';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
-import { useNotification } from '../../shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -16,7 +14,6 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [login, { isLoading }] = useLoginMutation();
-  const { showSuccess, showError } = useNotification();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,12 +22,9 @@ export const LoginPage = () => {
     try {
       const response = await login({ email, password }).unwrap();
       dispatch(setCredentials(response));
-      showSuccess(NOTIFICATION_MESSAGES.AUTH.LOGIN_SUCCESS);
       navigate('/dashboard');
     } catch (err) {
-      const errorMessage = 'Неверный email или пароль';
-      setError(errorMessage);
-      showError(NOTIFICATION_MESSAGES.AUTH.LOGIN_ERROR);
+      setError('Неверный email или пароль');
     }
   };
 
