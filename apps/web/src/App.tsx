@@ -14,103 +14,107 @@ import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { useDarkMode } from './shared/hooks/useDarkMode';
+import { NotificationContainer } from './components/Notification';
 
 function App() {
   // Автоматическое определение системной темы
   useDarkMode();
 
   return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+    <>
+      <NotificationContainer />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      {/* Private routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <DashboardPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/operations"
-        element={
-          <PrivateRoute>
-            <OperationsPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/plans"
-        element={
-          <PrivateRoute>
-            <PlansPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <PrivateRoute>
-            <ReportsPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/articles"
-        element={
-          <PrivateRoute>
-            <ArticlesPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/accounts"
-        element={
-          <PrivateRoute>
-            <AccountsPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/departments"
-        element={
-          <PrivateRoute>
-            <DepartmentsPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/counterparties"
-        element={
-          <PrivateRoute>
-            <CounterpartiesPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/deals"
-        element={
-          <PrivateRoute>
-            <DealsPage />
-          </PrivateRoute>
-        }
-      />
-      <Route
-        path="/catalogs/salaries"
-        element={
-          <PrivateRoute>
-            <SalariesPage />
-          </PrivateRoute>
-        }
-      />
+        {/* Private routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <PrivateRoute>
+              <DashboardPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/operations"
+          element={
+            <PrivateRoute>
+              <OperationsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/plans"
+          element={
+            <PrivateRoute>
+              <PlansPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <PrivateRoute>
+              <ReportsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/articles"
+          element={
+            <PrivateRoute>
+              <ArticlesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/accounts"
+          element={
+            <PrivateRoute>
+              <AccountsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/departments"
+          element={
+            <PrivateRoute>
+              <DepartmentsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/counterparties"
+          element={
+            <PrivateRoute>
+              <CounterpartiesPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/deals"
+          element={
+            <PrivateRoute>
+              <DealsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/catalogs/salaries"
+          element={
+            <PrivateRoute>
+              <SalariesPage />
+            </PrivateRoute>
+          }
+        />
 
-      {/* Redirect */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
 

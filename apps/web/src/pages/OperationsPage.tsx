@@ -14,6 +14,8 @@ import {
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
+import { useNotification } from '../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 
 export const OperationsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -23,6 +25,7 @@ export const OperationsPage = () => {
 
   const { data: operations = [], isLoading } = useGetOperationsQuery();
   const [deleteOperation] = useDeleteOperationMutation();
+  const { showSuccess, showError } = useNotification();
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -36,7 +39,13 @@ export const OperationsPage = () => {
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Вы уверены, что хотите удалить эту операцию?')) {
-      await deleteOperation(id);
+      try {
+        await deleteOperation(id).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
+      } catch (error) {
+        console.error('Failed to delete operation:', error);
+        showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+      }
     }
   };
 
