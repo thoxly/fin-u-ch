@@ -1,13 +1,15 @@
 /* Контейнер для уведомлений */
 .notification-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 1000;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 400px;
+  max-width: 500px;
+  width: 90%;
   pointer-events: none;
 }
 
@@ -18,7 +20,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease-in-out;
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(100%);
   border-left: 4px solid;
   background-color: white;
   pointer-events: auto;
@@ -28,13 +30,13 @@
 /* Анимация появления */
 .notification.visible {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
 }
 
 /* Анимация исчезновения */
 .notification.hidden {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(100%);
 }
 
 /* Типы уведомлений - Success */
@@ -164,10 +166,11 @@
 /* Адаптивность для мобильных устройств */
 @media (max-width: 480px) {
   .notification-container {
-    top: 10px;
-    right: 10px;
+    bottom: 10px;
     left: 10px;
-    max-width: none;
+    right: 10px;
+    transform: none;
+    width: auto;
   }
 
   .notification {

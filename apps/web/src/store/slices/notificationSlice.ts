@@ -10,6 +10,26 @@ const initialState: NotificationState = {
 };
 
 /**
+ * Генерирует UUID с fallback для старых браузеров
+ */
+const generateId = (): string => {
+  // Пробуем использовать crypto.randomUUID() если доступен
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID();
+  }
+
+  // Fallback: генерируем UUID v4 вручную
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+/**
  * Redux slice для управления системой уведомлений
  */
 export const notificationSlice = createSlice({
@@ -26,7 +46,7 @@ export const notificationSlice = createSlice({
       const { type, title, message, duration = 5000 } = action.payload;
 
       // Генерируем UUID для уведомления
-      const id = crypto.randomUUID();
+      const id = generateId();
 
       const notification: Notification = {
         id,
