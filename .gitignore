@@ -1,3 +1,8 @@
+# Experimental/custom development
+agent_custom/
+agent_custom_backup/
+DO_NOT_USE/
+
 # Dependencies
 node_modules/
 .pnp

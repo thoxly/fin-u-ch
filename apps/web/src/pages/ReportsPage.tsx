@@ -7,12 +7,13 @@ import {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
   useGetPlanFactReportQuery,
+  useGetDdsReportQuery,
 } from '../store/api/reportsApi';
 import { formatMoney } from '../shared/lib/money';
 import { toISODate } from '../shared/lib/date';
 import { subMonths, startOfMonth } from 'date-fns';
 
-type TabType = 'cashflow' | 'bdds' | 'planfact';
+type TabType = 'cashflow' | 'bdds' | 'planfact' | 'dds';
 
 export const ReportsPage = () => {
   const today = new Date();
@@ -26,6 +27,7 @@ export const ReportsPage = () => {
     { id: 'cashflow' as TabType, label: 'ОДДС (факт)' },
     { id: 'bdds' as TabType, label: 'БДДС (план)' },
     { id: 'planfact' as TabType, label: 'План vs Факт' },
+    { id: 'dds' as TabType, label: 'ДДС (детально)' },
   ];
 
   return (
@@ -82,6 +84,9 @@ export const ReportsPage = () => {
         )}
         {activeTab === 'planfact' && (
           <PlanFactTab periodFrom={periodFrom} periodTo={periodTo} />
+        )}
+        {activeTab === 'dds' && (
+          <DDSTab periodFrom={periodFrom} periodTo={periodTo} />
         )}
       </div>
     </Layout>
@@ -319,5 +324,204 @@ const PlanFactTab = ({
         </table>
       </div>
     </Card>
+  );
+};
+
+// ДДС (детально)
+const DDSTab = ({
+  periodFrom,
+  periodTo,
+}: {
+  periodFrom: string;
+  periodTo: string;
+}) => {
+  const { data, isLoading, error } = useGetDdsReportQuery({
+    periodFrom,
+    periodTo,
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <div className="text-center py-8 text-gray-500">Загрузка...</div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    // Enhanced error handling with logging
+    console.error('DDS Report Error:', error);
+
+    const errorMessage =
+      'status' in error && error.status === 400
+        ? 'Некорректные параметры запроса. Проверьте выбранные даты.'
+        : 'status' in error && error.status === 403
+          ? 'Недостаточно прав для просмотра отчета.'
+          : 'status' in error && error.status === 500
+            ? 'Ошибка сервера. Попробуйте позже.'
+            : 'Ошибка загрузки отчета. Попробуйте обновить страницу.';
+
+    return (
+      <Card>
+        <div className="space-y-4">
+          <div className="text-red-600 font-semibold">Ошибка</div>
+          <div className="text-gray-700">{errorMessage}</div>
+          {'data' in error && error.data && (
+            <div className="text-sm text-gray-500">
+              Детали: {JSON.stringify(error.data)}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Card>
+        <div className="text-center py-8 text-gray-500">
+          Нет данных за выбранный период
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Остатки на счетах */}
+      <Card>
+        <h3 className="text-lg font-semibold mb-4">Остатки на счетах</h3>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Счет</th>
+                <th className="text-right">Остаток на начало</th>
+                <th className="text-right">Остаток на конец</th>
+                <th className="text-right">Изменение</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.accounts.map((account) => {
+                const change = account.closingBalance - account.openingBalance;
+                return (
+                  <tr key={account.accountId}>
+                    <td>{account.accountName}</td>
+                    <td className="text-right">
+                      {formatMoney(account.openingBalance)}
+                    </td>
+                    <td className="text-right">
+                      {formatMoney(account.closingBalance)}
+                    </td>
+                    <td
+                      className={`text-right ${
+                        change >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {formatMoney(change)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Поступления */}
+      <Card>
+        <h3 className="text-lg font-semibold mb-4 text-green-600">
+          Поступления
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Статья</th>
+                <th className="text-right">Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.inflows.map((flow) => (
+                <tr key={flow.articleId}>
+                  <td>{flow.articleName}</td>
+                  <td className="text-right">{formatMoney(flow.total)}</td>
+                </tr>
+              ))}
+              <tr className="font-bold border-t-2">
+                <td>Итого поступлений</td>
+                <td className="text-right text-green-600">
+                  {formatMoney(data.summary.totalInflow)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Выбытия */}
+      <Card>
+        <h3 className="text-lg font-semibold mb-4 text-red-600">Выбытия</h3>
+        <div className="overflow-x-auto">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Статья</th>
+                <th className="text-right">Сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.outflows.map((flow) => (
+                <tr key={flow.articleId}>
+                  <td>{flow.articleName}</td>
+                  <td className="text-right">{formatMoney(flow.total)}</td>
+                </tr>
+              ))}
+              <tr className="font-bold border-t-2">
+                <td>Итого выбытий</td>
+                <td className="text-right text-red-600">
+                  {formatMoney(data.summary.totalOutflow)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Итого */}
+      <Card>
+        <h3 className="text-lg font-semibold mb-4">Итого</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-green-50 p-4 rounded-lg">
+            <div className="text-sm text-gray-600">Поступления</div>
+            <div className="text-2xl font-bold text-green-600">
+              {formatMoney(data.summary.totalInflow)}
+            </div>
+          </div>
+          <div className="bg-red-50 p-4 rounded-lg">
+            <div className="text-sm text-gray-600">Выбытия</div>
+            <div className="text-2xl font-bold text-red-600">
+              {formatMoney(data.summary.totalOutflow)}
+            </div>
+          </div>
+          <div
+            className={`p-4 rounded-lg ${
+              data.summary.netCashflow >= 0 ? 'bg-blue-50' : 'bg-orange-50'
+            }`}
+          >
+            <div className="text-sm text-gray-600">Чистое изменение</div>
+            <div
+              className={`text-2xl font-bold ${
+                data.summary.netCashflow >= 0
+                  ? 'text-blue-600'
+                  : 'text-orange-600'
+              }`}
+            >
+              {formatMoney(data.summary.netCashflow)}
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 };
