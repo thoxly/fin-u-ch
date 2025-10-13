@@ -176,6 +176,7 @@ model Operation {
 
   @@index([companyId, operationDate])
   @@index([companyId, articleId, operationDate])
+  @@index([companyId, accountId, operationDate])
   @@map("operations")
 }
 
