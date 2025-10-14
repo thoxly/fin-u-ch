@@ -13,7 +13,7 @@ import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { useDarkMode } from './shared/hooks/useDarkMode';
-
+import { NotificationContainer } from './components/Notification';
 function App() {
   // Автоматическое определение системной темы
   useDarkMode();
