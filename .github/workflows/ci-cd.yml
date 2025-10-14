@@ -618,36 +618,66 @@ jobs:
 
       - name: Deploy to VPS
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            set -e
-            
-            cd /opt/fin-u-ch
-            
-            # Login to GHCR
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
-            
-            # Pull new images first
-            docker compose -f docker-compose.prod.yml pull api web worker
-            
-            # Apply database migrations (using npx since Prisma CLI is in node_modules)
-            docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
-            
-            # Stop and remove old containers to ensure they restart with new images
-            docker compose -f docker-compose.prod.yml stop api web worker
-            docker compose -f docker-compose.prod.yml rm -f api web worker
-            
-            # Start with new images (force recreate)
-            docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker
-            
-            # Cleanup unused resources
-            echo "🧹 Cleaning up unused Docker resources..."
-            docker container prune -f
-            docker image prune -af --filter "until=168h"  # Remove images older than 7 days
-            docker volume prune -f
-            docker network prune -f
-            
-            echo "✅ Deployment completed successfully!"
-          EOF
+          # Create deploy script on VPS
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /opt/fin-u-ch/deploy.sh" << 'DEPLOY_SCRIPT'
+          #!/bin/bash
+          set -e
+
+          echo "=== Starting deployment at $(date) ==="
+          cd /opt/fin-u-ch
+
+          # Login to GHCR
+          echo "📦 Logging into GHCR..."
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_OWNER" --password-stdin
+
+          # Check current state
+          echo "=== Current containers (before update) ==="
+          docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+
+          # Pull new images
+          echo "=== Pulling new images ==="
+          docker compose -f docker-compose.prod.yml pull api web worker
+
+          # Check available images
+          echo "=== Available images ==="
+          docker images --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" | grep fin-u-ch | head -n 10
+
+          # Apply database migrations
+          echo "=== Applying database migrations ==="
+          docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
+
+          # Stop and remove old containers
+          echo "=== Stopping and removing old containers ==="
+          docker compose -f docker-compose.prod.yml stop api web worker
+          docker compose -f docker-compose.prod.yml rm -f api web worker
+
+          # Start with new images
+          echo "=== Starting containers with new images ==="
+          docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker
+
+          # Wait for health checks
+          echo "=== Waiting for services to be healthy (30 seconds) ==="
+          sleep 30
+
+          # Check final state
+          echo "=== New containers (after update) ==="
+          docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+
+          # Cleanup
+          echo "=== Cleaning up unused Docker resources ==="
+          docker container prune -f
+          docker image prune -af --filter "until=168h"
+
+          echo "✅ Deployment completed successfully at $(date)!"
+          DEPLOY_SCRIPT
+
+          # Make script executable
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /opt/fin-u-ch/deploy.sh"
+
+          # Execute deploy script with environment variables
+          echo "🚀 Executing deployment script..."
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' GITHUB_OWNER='${{ github.repository_owner }}' /opt/fin-u-ch/deploy.sh"
 
       - name: Health check
         run: |
