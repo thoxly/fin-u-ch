@@ -77,7 +77,7 @@ export async function generateSalaryOperations(
           continue;
         }
 
-        // Создаем операции в транзакции
+        // Создаем операции в транзакции // проблема при коммите
         // await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         //   // 1. ФОТ (начисление зарплаты)
         //   await tx.operation.create({

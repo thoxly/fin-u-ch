@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
@@ -8,13 +8,13 @@ import { Table } from '../../shared/ui/Table';
 import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import {
   useGetArticlesQuery,
   useCreateArticleMutation,
   useUpdateArticleMutation,
   useDeleteArticleMutation,
 } from '../../store/api/catalogsApi';
-import { OffCanvas } from '@/shared/ui/OffCanvas';
 import type { Article } from '@shared/types/catalogs';
 
 export const ArticlesPage = () => {
@@ -116,6 +116,13 @@ const ArticleForm = ({
   const [type, setType] = useState(article?.type || 'expense');
   const [activity, setActivity] = useState(article?.activity || 'operating');
   const [isActive, setIsActive] = useState(article?.isActive ?? true);
+
+  useEffect(() => {
+    setName(article?.name || '');
+    setType(article?.type || 'expense');
+    setActivity(article?.activity || 'operating');
+    setIsActive(article?.isActive ?? true);
+  }, [article]); // Зависимость: article
 
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
