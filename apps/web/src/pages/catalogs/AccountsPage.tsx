@@ -16,6 +16,7 @@ import {
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
 import type { Account } from '@shared/types/catalogs';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 
 export const AccountsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -87,13 +88,13 @@ export const AccountsPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
+        <OffCanvas
           isOpen={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           title={editing ? 'Редактировать счет' : 'Создать счет'}
         >
           <AccountForm account={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
+        </OffCanvas>
       </div>
     </Layout>
   );

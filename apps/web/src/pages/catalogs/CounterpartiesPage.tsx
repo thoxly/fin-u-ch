@@ -15,6 +15,7 @@ import {
   useDeleteCounterpartyMutation,
 } from '../../store/api/catalogsApi';
 import type { Counterparty } from '@shared/types/catalogs';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 
 export const CounterpartiesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -89,7 +90,7 @@ export const CounterpartiesPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
+        <OffCanvas
           isOpen={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           title={editing ? 'Редактировать' : 'Создать'}
@@ -98,7 +99,7 @@ export const CounterpartiesPage = () => {
             counterparty={editing}
             onClose={() => setIsFormOpen(false)}
           />
-        </Modal>
+        </OffCanvas>
       </div>
     </Layout>
   );

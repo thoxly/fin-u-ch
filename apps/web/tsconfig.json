@@ -16,6 +16,7 @@
 
     /* Linting */
     "strict": false,
+    "types": ["vitest/globals"],
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,

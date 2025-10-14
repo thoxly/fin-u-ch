@@ -4,9 +4,8 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgres://postgres:postgres@127.0.0.1:5432/fin_u_ch_dev"
 }
-
 model Company {
   id           String   @id @default(uuid())
   name         String

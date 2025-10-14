@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
@@ -8,6 +8,7 @@ import { Table } from '../../shared/ui/Table';
 import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import {
   useGetArticlesQuery,
   useCreateArticleMutation,
@@ -92,15 +93,14 @@ export const ArticlesPage = () => {
             loading={isLoading}
           />
         </Card>
-
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать статью' : 'Создать статью'}
-        >
-          <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать статью' : 'Создать статью'}
+      >
+        <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };
@@ -116,6 +116,13 @@ const ArticleForm = ({
   const [type, setType] = useState(article?.type || 'expense');
   const [activity, setActivity] = useState(article?.activity || 'operating');
   const [isActive, setIsActive] = useState(article?.isActive ?? true);
+
+  useEffect(() => {
+    setName(article?.name || '');
+    setType(article?.type || 'expense');
+    setActivity(article?.activity || 'operating');
+    setIsActive(article?.isActive ?? true);
+  }, [article]); // Зависимость: article
 
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
