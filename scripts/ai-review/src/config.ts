@@ -13,7 +13,7 @@ export const CONFIG = {
   anthropic: {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     model: 'claude-sonnet-4-20250514',
-    maxTokens: 8000,
+    maxTokens: 16000, // Increased for Level 2 architectural review
   },
   github: {
     token: process.env.GITHUB_TOKEN || '',
