@@ -14,6 +14,7 @@ import {
   useUpdateArticleMutation,
   useDeleteArticleMutation,
 } from '../../store/api/catalogsApi';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import type { Article } from '@shared/types/catalogs';
 
 export const ArticlesPage = () => {
@@ -92,15 +93,14 @@ export const ArticlesPage = () => {
             loading={isLoading}
           />
         </Card>
-
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать статью' : 'Создать статью'}
-        >
-          <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать статью' : 'Создать статью'}
+      >
+        <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };

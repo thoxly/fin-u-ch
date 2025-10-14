@@ -15,6 +15,7 @@ import {
   useDeleteAccountMutation,
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import type { Account } from '@shared/types/catalogs';
 
 export const AccountsPage = () => {
@@ -87,14 +88,14 @@ export const AccountsPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать счет' : 'Создать счет'}
-        >
-          <AccountForm account={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать счет' : 'Создать счет'}
+      >
+        <AccountForm account={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };

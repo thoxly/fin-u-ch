@@ -18,6 +18,7 @@ import {
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
 import { formatDate } from '../../shared/lib/date';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import type { Salary } from '@shared/types/catalogs';
 
 export const SalariesPage = () => {
@@ -98,15 +99,15 @@ export const SalariesPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать' : 'Создать'}
-          size="lg"
-        >
-          <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать' : 'Создать'}
+        size="lg"
+      >
+        <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };

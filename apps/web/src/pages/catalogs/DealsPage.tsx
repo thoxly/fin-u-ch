@@ -17,6 +17,7 @@ import {
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 import type { Deal } from '@shared/types/catalogs';
 
 export const DealsPage = () => {
@@ -83,14 +84,14 @@ export const DealsPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать' : 'Создать'}
-        >
-          <DealForm deal={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать' : 'Создать'}
+      >
+        <DealForm deal={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };
