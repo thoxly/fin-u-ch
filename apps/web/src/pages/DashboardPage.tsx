@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Input } from '../shared/ui/Input';
+import CardSkeleton from '../shared/ui/CardSkeleton';
 import { useGetDashboardQuery } from '../store/api/reportsApi';
 import { formatMoney } from '../shared/lib/money';
 import { toISODate } from '../shared/lib/date';
@@ -47,9 +48,15 @@ export const DashboardPage = () => {
 
         {/* Loading state */}
         {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500">Загрузка данных...</div>
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <CardSkeleton size="md" lines={2} />
+              <CardSkeleton size="md" lines={2} />
+              <CardSkeleton size="md" lines={2} />
+            </div>
+            <CardSkeleton size="lg" lines={4} />
+            <CardSkeleton size="lg" lines={6} />
+          </>
         )}
 
         {/* Error state */}
