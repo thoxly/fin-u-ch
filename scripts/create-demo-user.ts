@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 async function createDemoUser() {
   try {
-    console.log('🚀 Creating demo user with sample data for 2025...');
+    // Creating demo user with sample data for 2025
 
     // 1. Создаем компанию
     const company = await prisma.company.create({
@@ -16,11 +16,11 @@ async function createDemoUser() {
       },
     });
 
-    console.log('✅ Company created:', company.id);
+    // Company created
 
     // 2. Создаем демо-пользователя
     const hashedPassword = await bcrypt.hash('demo123', 10);
-    const user = await prisma.user.create({
+    await prisma.user.create({
       data: {
         companyId: company.id,
         email: 'demo@example.com',
@@ -29,23 +29,24 @@ async function createDemoUser() {
       },
     });
 
-    console.log('✅ Demo user created:', user.email);
+    // Demo user created
 
     // 3. Создаем начальные справочники
     await seedInitialData(prisma, company.id);
-    console.log('✅ Initial data seeded');
+    // Initial data seeded
 
     // 4. Создаем дополнительные данные за 2025 год
     await createSampleOperations(prisma, company.id);
     await createSamplePlans(prisma, company.id);
     await createSampleSalaries(prisma, company.id);
 
-    console.log('🎉 Demo user created successfully!');
-    console.log('📧 Email: demo@example.com');
-    console.log('🔑 Password: demo123');
-    console.log('📊 Sample data for 2025 added');
+    // Demo user created successfully!
+    // Email: demo@example.com
+    // Password: demo123
+    // Sample data for 2025 added
   } catch (error) {
-    console.error('❌ Error creating demo user:', error);
+    // Error creating demo user
+    console.error('Demo user creation failed:', error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -53,7 +54,7 @@ async function createDemoUser() {
 }
 
 async function createSampleOperations(prisma: PrismaClient, companyId: string) {
-  console.log('📝 Creating sample operations for 2025...');
+  // Creating sample operations for 2025
 
   // Получаем нужные ID
   const accounts = await prisma.account.findMany({ where: { companyId } });
@@ -520,11 +521,11 @@ async function createSampleOperations(prisma: PrismaClient, companyId: string) {
     });
   }
 
-  console.log(`✅ Created ${operations.length} sample operations`);
+  // Created sample operations
 }
 
 async function createSamplePlans(prisma: PrismaClient, companyId: string) {
-  console.log('📋 Creating sample plans for 2025...');
+  // Creating sample plans for 2025
 
   const articles = await prisma.article.findMany({ where: { companyId } });
   const accounts = await prisma.account.findMany({ where: { companyId } });
@@ -678,11 +679,11 @@ async function createSamplePlans(prisma: PrismaClient, companyId: string) {
     });
   }
 
-  console.log(`✅ Created ${plans.length} sample plans`);
+  // Created sample plans
 }
 
 async function createSampleSalaries(prisma: PrismaClient, companyId: string) {
-  console.log('💰 Creating sample salary rules...');
+  // Creating sample salary rules
 
   const counterparties = await prisma.counterparty.findMany({
     where: { companyId },
@@ -710,18 +711,18 @@ async function createSampleSalaries(prisma: PrismaClient, companyId: string) {
     },
   });
 
-  console.log('✅ Created sample salary rule');
+  // Created sample salary rule
 }
 
 // Запуск скрипта
 if (require.main === module) {
   createDemoUser()
     .then(() => {
-      console.log('🎉 Demo user setup completed!');
+      // Demo user setup completed
       process.exit(0);
     })
-    .catch((error) => {
-      console.error('❌ Demo user setup failed:', error);
+    .catch((_error) => {
+      // Demo user setup failed
       process.exit(1);
     });
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatMoney } from '../../shared/lib/money';
-import { CashflowReport, BDDSReport } from '@shared/types/reports';
+import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 
 interface CashflowTableProps {
   data: CashflowReport;

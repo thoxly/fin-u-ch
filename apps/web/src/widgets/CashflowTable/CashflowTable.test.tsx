@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CashflowTable } from './CashflowTable';
-import { CashflowReport, BDDSReport } from '@shared/types/reports';
+import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 
 // Mock data for testing
 const mockCashflowData: CashflowReport = {
