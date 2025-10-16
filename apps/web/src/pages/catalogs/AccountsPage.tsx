@@ -99,7 +99,7 @@ export const AccountsPage = () => {
   );
 };
 
-const AccountForm = ({
+export const AccountForm = ({
   account,
   onClose,
 }: {

@@ -95,7 +95,7 @@ export const DealsPage = () => {
   );
 };
 
-const DealForm = ({
+export const DealForm = ({
   deal,
   onClose,
 }: {

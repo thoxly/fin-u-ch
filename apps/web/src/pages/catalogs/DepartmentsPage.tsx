@@ -88,7 +88,7 @@ export const DepartmentsPage = () => {
   );
 };
 
-const DepartmentForm = ({
+export const DepartmentForm = ({
   department,
   onClose,
 }: {

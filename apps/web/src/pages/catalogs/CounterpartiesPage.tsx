@@ -104,7 +104,7 @@ export const CounterpartiesPage = () => {
   );
 };
 
-const CounterpartyForm = ({
+export const CounterpartyForm = ({
   counterparty,
   onClose,
 }: {

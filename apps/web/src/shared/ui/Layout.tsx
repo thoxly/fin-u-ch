@@ -7,6 +7,7 @@ import { IconPickerPopover } from './IconPickerPopover';
 import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
+import { CatalogFormRenderer } from './CatalogFormRenderer';
 
 interface LayoutProps {
   children: ReactNode;
@@ -300,11 +301,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           onClose={handleCloseOffCanvas}
           title={offCanvasState.title}
         >
-          <div className="p-4">
-            <p className="text-gray-600 dark:text-gray-400">
-              Форма для создания записи будет здесь
-            </p>
-          </div>
+          <CatalogFormRenderer
+            catalogType={offCanvasState.catalogType}
+            onClose={handleCloseOffCanvas}
+          />
         </OffCanvas>
       )}
     </div>

@@ -111,7 +111,7 @@ export const SalariesPage = () => {
   );
 };
 
-const SalaryForm = ({
+export const SalaryForm = ({
   salary,
   onClose,
 }: {

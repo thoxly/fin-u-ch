@@ -104,7 +104,7 @@ export const ArticlesPage = () => {
   );
 };
 
-const ArticleForm = ({
+export const ArticleForm = ({
   article,
   onClose,
 }: {
