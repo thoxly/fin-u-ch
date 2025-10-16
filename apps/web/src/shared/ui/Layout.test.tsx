@@ -4,7 +4,22 @@ import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { Layout } from './Layout';
-import * as useNavigationIconsHook from '../hooks/useNavigationIcons';
+
+// Mock CatalogFormRenderer
+jest.mock('./CatalogFormRenderer', () => ({
+  CatalogFormRenderer: ({
+    catalogType,
+    onClose,
+  }: {
+    catalogType: string;
+    onClose: () => void;
+  }) => (
+    <div data-testid="catalog-form-renderer">
+      <div>Form for: {catalogType}</div>
+      <button onClick={onClose}>Close Form</button>
+    </div>
+  ),
+}));
 
 // Mock navigation icons hook
 const mockGetIcon = jest.fn((name: string) => {

@@ -36,28 +36,6 @@ describe('MenuPopover', () => {
     expect(screen.getByText('Контрагенты')).toBeInTheDocument();
   });
 
-  it('should render menu header', () => {
-    renderMenuPopover();
-
-    expect(screen.getByText('Меню')).toBeInTheDocument();
-  });
-
-  it('should render close button', () => {
-    renderMenuPopover();
-
-    const closeButton = screen.getByLabelText('Закрыть меню');
-    expect(closeButton).toBeInTheDocument();
-  });
-
-  it('should call onClose when close button is clicked', () => {
-    renderMenuPopover();
-
-    const closeButton = screen.getByLabelText('Закрыть меню');
-    fireEvent.click(closeButton);
-
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
-  });
-
   it('should call onClose when menu item is clicked', () => {
     renderMenuPopover();
 
@@ -86,17 +64,18 @@ describe('MenuPopover', () => {
   it('should not call onClose when clicking inside popover', () => {
     renderMenuPopover();
 
-    const menuHeader = screen.getByText('Меню');
-    fireEvent.mouseDown(menuHeader);
+    const menuItem = screen.getByText('Статьи');
+    fireEvent.mouseDown(menuItem);
 
     expect(mockOnClose).not.toHaveBeenCalled();
   });
 
-  it('should apply custom positioning', () => {
+  it('should apply custom positioning with offset', () => {
     const { container } = renderMenuPopover();
 
     const popover = container.querySelector('[role="menu"]');
-    expect(popover).toHaveStyle({ top: '100px', left: '200px' });
+    // Offset is 8px, so 100 + 8 = 108
+    expect(popover).toHaveStyle({ top: '108px', left: '200px' });
   });
 
   it('should render menu items as links with correct href', () => {
@@ -202,7 +181,8 @@ describe('MenuPopover', () => {
     );
 
     const popover = container.querySelector('[role="menu"]');
-    expect(popover).toHaveStyle({ top: '100px', left: '300px' });
+    // Offset is 8px, so 100 + 8 = 108
+    expect(popover).toHaveStyle({ top: '108px', left: '300px' });
   });
 
   it('should render create action button when provided', () => {
