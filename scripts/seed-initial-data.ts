@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import logger from '../../config/logger';
+import logger from '../apps/api/src/config/logger';
 
 /**
  * Создает начальные данные для новой компании

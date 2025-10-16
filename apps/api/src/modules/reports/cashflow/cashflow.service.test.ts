@@ -8,6 +8,12 @@ const mockPrisma = {
   },
 } as any;
 
+// Mock the prisma import
+jest.mock('../../../config/db', () => ({
+  __esModule: true,
+  default: mockPrisma,
+}));
+
 describe('CashflowService', () => {
   let service: CashflowService;
 
