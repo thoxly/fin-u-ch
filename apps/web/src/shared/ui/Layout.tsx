@@ -92,7 +92,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -180,7 +180,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 min-w-0">{children}</main>
       </div>
 
       {/* Icon Picker Popover */}
