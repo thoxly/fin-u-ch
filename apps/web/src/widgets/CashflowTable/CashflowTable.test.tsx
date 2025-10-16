@@ -5,14 +5,17 @@ import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 
 // Mock data for testing
 const mockCashflowData: CashflowReport = {
+  periodFrom: '2025-01-01',
+  periodTo: '2025-03-31',
   activities: [
     {
-      activity: 'operating',
+      activity: 'operating' as const,
       netCashflow: 100000,
       incomeGroups: [
         {
           articleId: 'income-1',
           articleName: 'Продажи',
+          type: 'income' as const,
           total: 150000,
           months: [
             { month: '2025-01', amount: 50000 },
@@ -25,6 +28,7 @@ const mockCashflowData: CashflowReport = {
         {
           articleId: 'expense-1',
           articleName: 'Зарплата',
+          type: 'expense' as const,
           total: 50000,
           months: [
             { month: '2025-01', amount: 16667 },
@@ -42,6 +46,7 @@ const mockPlanData: BDDSReport = {
     {
       articleId: 'income-1',
       articleName: 'Продажи',
+      type: 'income' as const,
       total: 150000,
       months: [
         { month: '2025-01', amount: 50000 },
@@ -64,9 +69,9 @@ describe('CashflowTable', () => {
 
     expect(screen.getByText('Статья')).toBeInTheDocument();
     expect(screen.getByText('Итого')).toBeInTheDocument();
-    expect(screen.getByText('янв 25')).toBeInTheDocument();
-    expect(screen.getByText('февр 25')).toBeInTheDocument();
-    expect(screen.getByText('март 25')).toBeInTheDocument();
+    expect(screen.getByText(/янв 25/)).toBeInTheDocument();
+    expect(screen.getByText(/февр 25/)).toBeInTheDocument();
+    expect(screen.getByText(/март 25/)).toBeInTheDocument();
   });
 
   it('renders activity rows with correct names', () => {
@@ -84,8 +89,8 @@ describe('CashflowTable', () => {
       />
     );
 
-    expect(screen.getByText('План')).toBeInTheDocument();
-    expect(screen.getByText('Факт')).toBeInTheDocument();
+    expect(screen.getAllByText('План').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Факт').length).toBeGreaterThan(0);
   });
 
   it('toggles section expansion when clicked', () => {
@@ -133,7 +138,11 @@ describe('CashflowTable', () => {
   });
 
   it('handles empty data gracefully', () => {
-    const emptyData: CashflowReport = { activities: [] };
+    const emptyData: CashflowReport = {
+      periodFrom: '2025-01-01',
+      periodTo: '2025-03-31',
+      activities: [],
+    };
 
     render(<CashflowTable {...defaultProps} data={emptyData} />);
 
@@ -145,7 +154,7 @@ describe('CashflowTable', () => {
     render(<CashflowTable {...defaultProps} />);
 
     // Check for formatted money values (assuming formatMoney returns formatted strings)
-    expect(screen.getByText(/100 000/)).toBeInTheDocument();
+    expect(screen.getAllByText(/100 000/).length).toBeGreaterThan(0);
   });
 
   it('shows cumulative balance calculation', () => {

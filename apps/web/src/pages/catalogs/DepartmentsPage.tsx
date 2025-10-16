@@ -5,7 +5,6 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import {
   useGetDepartmentsQuery,
