@@ -66,58 +66,51 @@ export const MenuPopover = ({
 
   const defaultRenderIcon = (iconName?: string): JSX.Element => {
     if (!iconName) {
-      return <Icons.Circle size={16} />;
+      return <></>;
     }
-    const IconComponent =
-      (Icons[iconName as keyof typeof Icons] as Icons.LucideIcon | undefined) ||
-      Icons.Circle;
+    const IconComponent = Icons[iconName as keyof typeof Icons] as
+      | Icons.LucideIcon
+      | undefined;
+    if (!IconComponent) {
+      return <></>;
+    }
     return <IconComponent size={16} />;
   };
 
   const iconRenderer = renderIcon || defaultRenderIcon;
 
+  const offset = 8; // Offset to make popover feel "attached" to trigger element
   const positionStyle =
     position === 'right' && anchorPosition.right !== undefined
       ? {
-          top: `${anchorPosition.top}px`,
+          top: `${anchorPosition.top + offset}px`,
           left: `${anchorPosition.right}px`,
         }
       : {
-          top: `${anchorPosition.top}px`,
+          top: `${anchorPosition.top + offset}px`,
           left: `${anchorPosition.left}px`,
         };
 
   return (
     <div
       ref={popoverRef}
-      className={`fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-[200px] dark:bg-gray-800 dark:border-gray-700 ${className}`}
+      className={`fixed bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-50 min-w-[200px] dark:bg-[#1E1E2A] dark:border-gray-700 ${className}`}
       style={positionStyle}
       role="menu"
       aria-orientation="vertical"
     >
-      <div className="flex justify-between items-center px-4 pb-2 border-b border-gray-100 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Меню
-        </h3>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors dark:hover:text-gray-300"
-          aria-label="Закрыть меню"
-        >
-          <Icons.X size={16} />
-        </button>
-      </div>
-
       <div className="py-1">
         {items.map((item) => (
-          <div key={item.href}>
+          <div key={item.href} className="relative group">
             <Link
               to={item.href}
               onClick={onClose}
-              className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+              className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700/50 pr-10"
               role="menuitem"
             >
-              <span className="flex-shrink-0">{iconRenderer(item.icon)}</span>
+              {item.icon && (
+                <span className="flex-shrink-0">{iconRenderer(item.icon)}</span>
+              )}
               <span>{item.name}</span>
             </Link>
             {item.createAction && (
@@ -126,13 +119,12 @@ export const MenuPopover = ({
                   item.createAction!.onClick();
                   onClose();
                 }}
-                className="w-full flex items-center gap-3 px-3 py-1.5 text-xs text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30 ml-4"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30"
                 role="menuitem"
+                title={item.createAction.label}
+                aria-label={item.createAction.label}
               >
-                <span className="flex-shrink-0">
-                  <Icons.Plus size={14} />
-                </span>
-                <span className="font-medium">{item.createAction.label}</span>
+                <Icons.Plus size={16} />
               </button>
             )}
           </div>

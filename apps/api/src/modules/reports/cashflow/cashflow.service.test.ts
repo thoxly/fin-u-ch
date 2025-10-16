@@ -236,5 +236,22 @@ describe('CashflowService', () => {
       expect(salesGroup.months[1].amount).toBe(200);
       expect(salesGroup.total).toBe(300);
     });
+
+    it('should verify companyId filter is applied for security', async () => {
+      mockOperationFindMany.mockResolvedValue([]);
+
+      await service.getCashflow('test-company-456', {
+        periodFrom: new Date('2025-01-01'),
+        periodTo: new Date('2025-01-31'),
+      });
+
+      expect(mockOperationFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            companyId: 'test-company-456',
+          }),
+        })
+      );
+    });
   });
 });
