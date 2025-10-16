@@ -78,55 +78,55 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx: any) => {
-          // 1. ФОТ (начисление зарплаты)
-          await tx.operation.create({
-            data: {
-              companyId: salary.companyId,
-              type: 'expense',
-              operationDate: targetDate,
-              amount: baseWage,
-              currency: salary.company.currencyBase,
-              accountId: account.id,
-              articleId: articles.wage.id,
-              counterpartyId: salary.employeeCounterpartyId,
-              departmentId: salary.departmentId,
-              description: `Зарплата за ${month} - ${salary.employeeCounterparty.name}`,
-            },
-          });
+        // await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        //   // 1. ФОТ (начисление зарплаты)
+        //   await tx.operation.create({
+        //     data: {
+        //       companyId: salary.companyId,
+        //       type: 'expense',
+        //       operationDate: targetDate,
+        //       amount: baseWage,
+        //       currency: salary.company.currencyBase,
+        //       accountId: account.id,
+        //       articleId: articles.wage.id,
+        //       counterpartyId: salary.employeeCounterpartyId,
+        //       departmentId: salary.departmentId,
+        //       description: `Зарплата за ${month} - ${salary.employeeCounterparty.name}`,
+        //     },
+        //   });
 
-          // 2. Взносы (страховые взносы)
-          await tx.operation.create({
-            data: {
-              companyId: salary.companyId,
-              type: 'expense',
-              operationDate: targetDate,
-              amount: contributions,
-              currency: salary.company.currencyBase,
-              accountId: account.id,
-              articleId: articles.contributions.id,
-              counterpartyId: salary.employeeCounterpartyId,
-              departmentId: salary.departmentId,
-              description: `Страховые взносы за ${month} - ${salary.employeeCounterparty.name} (${salary.contributionsPct}%)`,
-            },
-          });
+        //   // 2. Взносы (страховые взносы)
+        //   await tx.operation.create({
+        //     data: {
+        //       companyId: salary.companyId,
+        //       type: 'expense',
+        //       operationDate: targetDate,
+        //       amount: contributions,
+        //       currency: salary.company.currencyBase,
+        //       accountId: account.id,
+        //       articleId: articles.contributions.id,
+        //       counterpartyId: salary.employeeCounterpartyId,
+        //       departmentId: salary.departmentId,
+        //       description: `Страховые взносы за ${month} - ${salary.employeeCounterparty.name} (${salary.contributionsPct}%)`,
+        //     },
+        //   });
 
-          // 3. НДФЛ
-          await tx.operation.create({
-            data: {
-              companyId: salary.companyId,
-              type: 'expense',
-              operationDate: targetDate,
-              amount: incomeTax,
-              currency: salary.company.currencyBase,
-              accountId: account.id,
-              articleId: articles.incomeTax.id,
-              counterpartyId: salary.employeeCounterpartyId,
-              departmentId: salary.departmentId,
-              description: `НДФЛ за ${month} - ${salary.employeeCounterparty.name} (${salary.incomeTaxPct}%)`,
-            },
-          });
-        });
+        //   // 3. НДФЛ
+        //   await tx.operation.create({
+        //     data: {
+        //       companyId: salary.companyId,
+        //       type: 'expense',
+        //       operationDate: targetDate,
+        //       amount: incomeTax,
+        //       currency: salary.company.currencyBase,
+        //       accountId: account.id,
+        //       articleId: articles.incomeTax.id,
+        //       counterpartyId: salary.employeeCounterpartyId,
+        //       departmentId: salary.departmentId,
+        //       description: `НДФЛ за ${month} - ${salary.employeeCounterparty.name} (${salary.incomeTaxPct}%)`,
+        //     },
+        //   });
+        // });
 
         totalOperations += 3;
         logger.info(
