@@ -13,6 +13,9 @@ export class CashflowController {
           ? new Date(req.query.periodTo as string)
           : new Date(),
         activity: req.query.activity as string | undefined,
+        rounding: req.query.rounding
+          ? parseInt(req.query.rounding as string, 10)
+          : undefined,
       };
 
       const result = await cashflowService.getCashflow(req.companyId!, params);

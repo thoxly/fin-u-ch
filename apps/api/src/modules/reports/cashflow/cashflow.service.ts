@@ -6,9 +6,11 @@ export interface CashflowParams {
   periodFrom: Date;
   periodTo: Date;
   activity?: string;
+  rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
 }
 
-export interface CashflowRow {
+// Internal aggregation row
+interface CashflowRow {
   articleId: string;
   articleName: string;
   activity: string;
@@ -17,11 +19,40 @@ export interface CashflowRow {
   total: number;
 }
 
+// API response shape
+interface MonthlyData {
+  month: string;
+  amount: number;
+}
+
+interface ArticleGroup {
+  articleId: string;
+  articleName: string;
+  type: 'income' | 'expense';
+  months: MonthlyData[];
+  total: number;
+}
+
+interface ActivityGroup {
+  activity: 'operating' | 'investing' | 'financing' | 'unknown';
+  incomeGroups: ArticleGroup[];
+  expenseGroups: ArticleGroup[];
+  totalIncome: number;
+  totalExpense: number;
+  netCashflow: number;
+}
+
+interface CashflowReport {
+  periodFrom: string;
+  periodTo: string;
+  activities: ActivityGroup[];
+}
+
 export class CashflowService {
   async getCashflow(
     companyId: string,
     params: CashflowParams
-  ): Promise<CashflowRow[]> {
+  ): Promise<CashflowReport> {
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -69,15 +100,75 @@ export class CashflowService {
       }
     }
 
-    const result = Array.from(articleMap.values()).sort(
+    // Helper for rounding if provided
+    const applyRounding = (value: number): number => {
+      const unit = params.rounding || 0;
+      if (!unit || unit <= 1) return Math.round(value * 100) / 100; // round to 2 decimals
+      return Math.round(value / unit) * unit;
+    };
+
+    // Transform to activities with income/expense groups
+    const byActivity: Map<string, ActivityGroup> = new Map();
+
+    const sortedRows = Array.from(articleMap.values()).sort(
       (a, b) =>
         a.activity.localeCompare(b.activity) ||
         a.type.localeCompare(b.type) ||
         a.articleName.localeCompare(b.articleName)
     );
 
-    await cacheReport(cacheKey, result);
-    return result;
+    for (const row of sortedRows) {
+      const activity = (row.activity || 'unknown') as ActivityGroup['activity'];
+      if (!byActivity.has(activity)) {
+        byActivity.set(activity, {
+          activity,
+          incomeGroups: [],
+          expenseGroups: [],
+          totalIncome: 0,
+          totalExpense: 0,
+          netCashflow: 0,
+        });
+      }
+
+      const group = byActivity.get(activity)!;
+      const monthsArray: MonthlyData[] = months.map((m) => ({
+        month: m,
+        amount: applyRounding(row.months[m] || 0),
+      }));
+
+      const articleGroup: ArticleGroup = {
+        articleId: row.articleId,
+        articleName: row.articleName,
+        type: row.type as 'income' | 'expense',
+        months: monthsArray,
+        total: applyRounding(row.total),
+      };
+
+      if (row.type === 'income') {
+        group.incomeGroups.push(articleGroup);
+        group.totalIncome += articleGroup.total;
+      } else if (row.type === 'expense') {
+        group.expenseGroups.push(articleGroup);
+        group.totalExpense += articleGroup.total;
+      }
+    }
+
+    // Finalize net values and optional rounding for totals
+    const activities = Array.from(byActivity.values()).map((g) => ({
+      ...g,
+      totalIncome: applyRounding(g.totalIncome),
+      totalExpense: applyRounding(g.totalExpense),
+      netCashflow: applyRounding(g.totalIncome - g.totalExpense),
+    }));
+
+    const response: CashflowReport = {
+      periodFrom: params.periodFrom.toISOString().slice(0, 10),
+      periodTo: params.periodTo.toISOString().slice(0, 10),
+      activities,
+    };
+
+    await cacheReport(cacheKey, response);
+    return response;
   }
 }
 

@@ -122,7 +122,7 @@ const CashflowTab = ({
     );
   }
 
-  if (!data || !data.rows || data.rows.length === 0) {
+  if (!data || !data.activities || data.activities.length === 0) {
     return (
       <Card>
         <div className="text-center py-8 text-gray-500">
@@ -134,28 +134,71 @@ const CashflowTab = ({
 
   return (
     <Card>
-      <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Статья</th>
-              <th className="text-right">Сумма</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map(
-              (
-                row: { key: string; article: string; amount: number },
-                idx: number
-              ) => (
-                <tr key={idx}>
-                  <td>{row.article || 'Без статьи'}</td>
-                  <td className="text-right">{formatMoney(row.amount)}</td>
-                </tr>
-              )
+      <div className="space-y-8">
+        {data.activities.map((group) => (
+          <div key={group.activity}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold capitalize">
+                {group.activity}
+              </h3>
+              <div className="text-sm text-gray-600">
+                Итого: {formatMoney(group.netCashflow)}
+              </div>
+            </div>
+            {/* Поступления */}
+            {group.incomeGroups.length > 0 && (
+              <div className="overflow-x-auto mb-4">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th colSpan={2} className="text-left text-green-700">
+                        Поступления (Итого: {formatMoney(group.totalIncome)})
+                      </th>
+                    </tr>
+                    <tr>
+                      <th>Статья</th>
+                      <th className="text-right">Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.incomeGroups.map((row) => (
+                      <tr key={row.articleId}>
+                        <td>{row.articleName}</td>
+                        <td className="text-right">{formatMoney(row.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </tbody>
-        </table>
+            {/* Выбытия */}
+            {group.expenseGroups.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th colSpan={2} className="text-left text-red-700">
+                        Выбытия (Итого: {formatMoney(group.totalExpense)})
+                      </th>
+                    </tr>
+                    <tr>
+                      <th>Статья</th>
+                      <th className="text-right">Сумма</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.expenseGroups.map((row) => (
+                      <tr key={row.articleId}>
+                        <td>{row.articleName}</td>
+                        <td className="text-right">{formatMoney(row.total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </Card>
   );
@@ -211,17 +254,12 @@ const BddsTab = ({
             </tr>
           </thead>
           <tbody>
-            {data.rows.map(
-              (
-                row: { key: string; article: string; amount: number },
-                idx: number
-              ) => (
-                <tr key={idx}>
-                  <td>{row.article || 'Без статьи'}</td>
-                  <td className="text-right">{formatMoney(row.amount)}</td>
-                </tr>
-              )
-            )}
+            {data.rows.map((row) => (
+              <tr key={row.articleId}>
+                <td>{row.articleName || 'Без статьи'}</td>
+                <td className="text-right">{formatMoney(row.total)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

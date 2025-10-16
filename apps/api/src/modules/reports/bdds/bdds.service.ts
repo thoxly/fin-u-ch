@@ -8,11 +8,16 @@ export interface BDDSParams {
   periodTo: Date;
 }
 
+export interface BDDSMonthlyData {
+  month: string;
+  amount: number;
+}
+
 export interface BDDSRow {
   articleId: string;
   articleName: string;
   type: string;
-  months: Record<string, number>;
+  months: BDDSMonthlyData[];
   total: number;
 }
 
@@ -35,6 +40,7 @@ export class BDDSService {
     });
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
+    const monthsIndex = new Map(months.map((m, idx) => [m, idx]));
     const articleMap = new Map<string, BDDSRow>();
 
     for (const planItem of planItems) {
@@ -52,15 +58,16 @@ export class BDDSService {
           articleId: planItem.article.id,
           articleName: planItem.article.name,
           type: planItem.article.type,
-          months: Object.fromEntries(months.map((m) => [m, 0])),
+          months: months.map((m) => ({ month: m, amount: 0 })),
           total: 0,
         });
       }
 
       const row = articleMap.get(key)!;
       for (const { month, amount } of expanded) {
-        if (row.months[month] !== undefined) {
-          row.months[month] += amount;
+        const idx = monthsIndex.get(month);
+        if (idx !== undefined) {
+          row.months[idx].amount += amount;
           row.total += amount;
         }
       }
