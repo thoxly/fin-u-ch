@@ -636,7 +636,7 @@ jobs:
 
           # Pull new images
           echo "=== Pulling new images ==="
-          docker compose -f docker-compose.prod.yml pull api web worker
+          docker compose -f docker-compose.prod.yml pull api web worker nginx
 
           # Check available images
           echo "=== Available images ==="
@@ -648,12 +648,12 @@ jobs:
 
           # Stop and remove old containers
           echo "=== Stopping and removing old containers ==="
-          docker compose -f docker-compose.prod.yml stop api web worker
-          docker compose -f docker-compose.prod.yml rm -f api web worker
+          docker compose -f docker-compose.prod.yml stop api web worker nginx
+          docker compose -f docker-compose.prod.yml rm -f api web worker nginx
 
           # Start with new images
           echo "=== Starting containers with new images ==="
-          docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker
+          docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker nginx
 
           # Wait for health checks
           echo "=== Waiting for services to be healthy (30 seconds) ==="

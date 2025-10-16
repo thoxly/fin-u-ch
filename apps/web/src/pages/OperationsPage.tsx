@@ -5,6 +5,9 @@ import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
 import { Table } from '../shared/ui/Table';
+import TableSkeleton from '../shared/ui/TableSkeleton';
+import { EmptyState } from '../shared/ui/EmptyState';
+import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import {
@@ -85,11 +88,13 @@ export const OperationsPage = () => {
     {
       key: 'articleName',
       header: 'Статья',
+      // @ts-expect-error backend includes articleName in API response, not in shared type
       render: (op: Operation) => op.articleName || '-',
     },
     {
       key: 'accountName',
       header: 'Счет',
+      // @ts-expect-error backend includes accountName in API response, not in shared type
       render: (op: Operation) => op.accountName || '-',
     },
     {
@@ -137,13 +142,21 @@ export const OperationsPage = () => {
         </div>
 
         <Card>
-          <Table
-            columns={columns}
-            data={operations}
-            keyExtractor={(op) => op.id}
-            loading={isLoading}
-            emptyMessage="Нет операций"
-          />
+          {isLoading ? (
+            <TableSkeleton rows={5} columns={6} />
+          ) : operations.length === 0 ? (
+            <EmptyState
+              icon={FolderOpen}
+              title="Нет операций"
+              description="Создайте первую операцию, чтобы начать."
+            />
+          ) : (
+            <Table
+              columns={columns}
+              data={operations}
+              keyExtractor={(op) => op.id}
+            />
+          )}
         </Card>
 
         <Modal
