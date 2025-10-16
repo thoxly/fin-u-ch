@@ -20,6 +20,13 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
   },
-  ignorePatterns: ['dist', 'build', 'node_modules', '*.config.js'],
+  ignorePatterns: [
+    'dist', 
+    'build', 
+    'node_modules', 
+    '*.config.js',
+    'agent_custom/**',
+    'agent_custom_backup_*/**'
+  ],
 };
 
