@@ -19,6 +19,7 @@ import {
 import { formatMoney } from '../../shared/lib/money';
 import { formatDate } from '../../shared/lib/date';
 import type { Salary } from '@shared/types/catalogs';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 
 export const SalariesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -98,15 +99,15 @@ export const SalariesPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать' : 'Создать'}
-          size="lg"
-        >
-          <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать' : 'Создать'}
+        size="lg"
+      >
+        <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
+      </OffCanvas>
     </Layout>
   );
 };

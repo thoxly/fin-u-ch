@@ -14,6 +14,7 @@ import {
   useDeleteDepartmentMutation,
 } from '../../store/api/catalogsApi';
 import type { Department } from '@shared/types/catalogs';
+import { OffCanvas } from '@/shared/ui/OffCanvas';
 
 export const DepartmentsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -73,17 +74,17 @@ export const DepartmentsPage = () => {
             loading={isLoading}
           />
         </Card>
-        <Modal
-          isOpen={isFormOpen}
-          onClose={() => setIsFormOpen(false)}
-          title={editing ? 'Редактировать' : 'Создать'}
-        >
-          <DepartmentForm
-            department={editing}
-            onClose={() => setIsFormOpen(false)}
-          />
-        </Modal>
       </div>
+      <OffCanvas
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        title={editing ? 'Редактировать' : 'Создать'}
+      >
+        <DepartmentForm
+          department={editing}
+          onClose={() => setIsFormOpen(false)}
+        />
+      </OffCanvas>
     </Layout>
   );
 };
