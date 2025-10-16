@@ -12,6 +12,7 @@ import {
 import { formatMoney } from '../shared/lib/money';
 import { toISODate } from '../shared/lib/date';
 import { subMonths, startOfMonth } from 'date-fns';
+import { CashflowTable } from '../widgets/CashflowTable';
 
 type TabType = 'cashflow' | 'bdds' | 'planfact' | 'dds';
 
@@ -22,6 +23,7 @@ export const ReportsPage = () => {
     toISODate(startOfMonth(subMonths(today, 2)))
   );
   const [periodTo, setPeriodTo] = useState(toISODate(today));
+  const [showPlan, setShowPlan] = useState(false);
 
   const tabs = [
     { id: 'cashflow' as TabType, label: 'ОДДС (факт)' },
@@ -37,7 +39,7 @@ export const ReportsPage = () => {
 
         {/* Фильтры */}
         <Card>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <Input
               label="Период с"
               type="date"
@@ -50,6 +52,19 @@ export const ReportsPage = () => {
               value={periodTo}
               onChange={(e) => setPeriodTo(e.target.value)}
             />
+            {activeTab === 'cashflow' && (
+              <label className="flex items-center space-x-2 cursor-pointer pb-1">
+                <input
+                  type="checkbox"
+                  checked={showPlan}
+                  onChange={(e) => setShowPlan(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
+                />
+                <span className="text-sm font-medium text-gray-700">
+                  Показать план
+                </span>
+              </label>
+            )}
           </div>
         </Card>
 
@@ -77,7 +92,11 @@ export const ReportsPage = () => {
 
         {/* Контент вкладок */}
         {activeTab === 'cashflow' && (
-          <CashflowTab periodFrom={periodFrom} periodTo={periodTo} />
+          <CashflowTab
+            periodFrom={periodFrom}
+            periodTo={periodTo}
+            showPlan={showPlan}
+          />
         )}
         {activeTab === 'bdds' && (
           <BddsTab periodFrom={periodFrom} periodTo={periodTo} />
@@ -97,16 +116,27 @@ export const ReportsPage = () => {
 const CashflowTab = ({
   periodFrom,
   periodTo,
+  showPlan,
 }: {
   periodFrom: string;
   periodTo: string;
+  showPlan: boolean;
 }) => {
   const { data, isLoading, error } = useGetCashflowReportQuery({
     periodFrom,
     periodTo,
   });
 
-  if (isLoading) {
+  const {
+    data: planData,
+    isLoading: planLoading,
+    error: planError,
+  } = useGetBddsReportQuery({
+    periodFrom,
+    periodTo,
+  });
+
+  if (isLoading || planLoading) {
     return (
       <Card>
         <div className="text-center py-8 text-gray-500">Загрузка...</div>
@@ -114,7 +144,7 @@ const CashflowTab = ({
     );
   }
 
-  if (error) {
+  if (error || planError) {
     return (
       <Card>
         <div className="text-red-600">Ошибка загрузки отчета</div>
@@ -122,7 +152,7 @@ const CashflowTab = ({
     );
   }
 
-  if (!data || !data.rows || data.rows.length === 0) {
+  if (!data || !data.activities || data.activities.length === 0) {
     return (
       <Card>
         <div className="text-center py-8 text-gray-500">
@@ -133,31 +163,13 @@ const CashflowTab = ({
   }
 
   return (
-    <Card>
-      <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Статья</th>
-              <th className="text-right">Сумма</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map(
-              (
-                row: { key: string; article: string; amount: number },
-                idx: number
-              ) => (
-                <tr key={idx}>
-                  <td>{row.article || 'Без статьи'}</td>
-                  <td className="text-right">{formatMoney(row.amount)}</td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+    <CashflowTable
+      data={data}
+      planData={planData}
+      showPlan={showPlan}
+      periodFrom={periodFrom}
+      periodTo={periodTo}
+    />
   );
 };
 
@@ -211,17 +223,12 @@ const BddsTab = ({
             </tr>
           </thead>
           <tbody>
-            {data.rows.map(
-              (
-                row: { key: string; article: string; amount: number },
-                idx: number
-              ) => (
-                <tr key={idx}>
-                  <td>{row.article || 'Без статьи'}</td>
-                  <td className="text-right">{formatMoney(row.amount)}</td>
-                </tr>
-              )
-            )}
+            {data.rows.map((row) => (
+              <tr key={row.articleId}>
+                <td>{row.articleName || 'Без статьи'}</td>
+                <td className="text-right">{formatMoney(row.total)}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
