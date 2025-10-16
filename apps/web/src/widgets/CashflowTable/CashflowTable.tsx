@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatMoney } from '../../shared/lib/money';
 import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 
@@ -33,14 +33,15 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   };
 
   // Получаем все месяцы из данных
-  const allMonths =
-    data.activities.length > 0
+  const allMonths = useMemo(() => {
+    return data.activities.length > 0
       ? data.activities[0].incomeGroups.length > 0
         ? data.activities[0].incomeGroups[0].months.map((m) => m.month)
         : data.activities[0].expenseGroups.length > 0
           ? data.activities[0].expenseGroups[0].months.map((m) => m.month)
           : []
       : [];
+  }, [data.activities]);
 
   // Функция для получения плановых данных по статье и месяцу
   const getPlanAmount = (articleId: string, month: string) => {
@@ -58,7 +59,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   );
 
   // Вычисляем остаток на конец периода (кумулятивно)
-  const calculateCumulativeBalance = () => {
+  const cumulativeBalances = useMemo(() => {
     let balance = 0;
     return allMonths.map((month) => {
       const monthTotal = data.activities.reduce((sum, activity) => {
@@ -78,9 +79,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       balance += monthTotal;
       return { month, balance };
     });
-  };
-
-  const cumulativeBalances = calculateCumulativeBalance();
+  }, [allMonths, data.activities]);
 
   const getActivityDisplayName = (activity: string) => {
     const names: Record<string, string> = {

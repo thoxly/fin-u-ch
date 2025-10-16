@@ -12,18 +12,17 @@ describe('CashflowService', () => {
   let service: CashflowService;
 
   beforeEach(() => {
-    service = new CashflowService(mockPrisma);
+    service = new CashflowService();
   });
 
   describe('getCashflow', () => {
     it('should return empty activities when no operations found', async () => {
       mockPrisma.operation.findMany.mockResolvedValue([]);
 
-      const result = await service.getCashflow(
-        'company-id',
-        new Date('2025-01-01'),
-        new Date('2025-01-31')
-      );
+      const result = await service.getCashflow('company-id', {
+        periodFrom: new Date('2025-01-01'),
+        periodTo: new Date('2025-01-31'),
+      });
 
       expect(result.activities).toEqual([]);
     });
@@ -48,11 +47,10 @@ describe('CashflowService', () => {
 
       mockPrisma.operation.findMany.mockResolvedValue(mockOperations as never);
 
-      const result = await service.getCashflow(
-        'company-id',
-        new Date('2025-01-01'),
-        new Date('2025-01-31')
-      );
+      const result = await service.getCashflow('company-id', {
+        periodFrom: new Date('2025-01-01'),
+        periodTo: new Date('2025-01-31'),
+      });
 
       expect(result.activities).toHaveLength(1);
       expect(result.activities[0].activity).toBe('operating');

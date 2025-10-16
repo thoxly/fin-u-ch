@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { seedInitialData } from '../apps/api/src/modules/auth/seed-initial-data';
+import { seedInitialData } from './seed-initial-data';
 
 const prisma = new PrismaClient();
 

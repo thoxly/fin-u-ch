@@ -12,18 +12,17 @@ describe('BDDSService', () => {
   let service: BDDSService;
 
   beforeEach(() => {
-    service = new BDDSService(mockPrisma);
+    service = new BDDSService();
   });
 
-  describe('getBdds', () => {
+  describe('getBDDS', () => {
     it('should return empty rows when no plans found', async () => {
       mockPrisma.plan.findMany.mockResolvedValue([]);
 
-      const result = await service.getBdds(
-        'company-id',
-        new Date('2025-01-01'),
-        new Date('2025-01-31')
-      );
+      const result = await service.getBDDS('company-id', {
+        periodFrom: new Date('2025-01-01'),
+        periodTo: new Date('2025-01-31'),
+      });
 
       expect(result.rows).toEqual([]);
     });
