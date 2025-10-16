@@ -6,6 +6,7 @@ interface OffCanvasProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export const OffCanvas = ({

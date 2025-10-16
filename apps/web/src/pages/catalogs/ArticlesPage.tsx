@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
@@ -119,7 +119,20 @@ const ArticleForm = ({
 
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
-
+  useEffect(() => {
+    if (article) {
+      setName(article.name || '');
+      setType(article.type || 'expense');
+      setActivity(article.activity || 'operating');
+      setIsActive(article.isActive ?? true);
+    } else {
+      // Сброс при создании новой статьи
+      setName('');
+      setType('expense');
+      setActivity('operating');
+      setIsActive(true);
+    }
+  }, [article]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
