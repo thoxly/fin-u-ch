@@ -1,0 +1,57 @@
+/* General site-style fallback styles for TableSkeleton */
+
+:root {
+  --skeleton-bg: #e5e7eb; /* gray-200 */
+  --skeleton-accent: #d1d5db; /* gray-300 */
+  --skeleton-header: #f9fafb; /* gray-50 */
+  --skeleton-border: #e5e7eb; /* gray-200 */
+  --skeleton-radius: 0.375rem; /* rounded */
+}
+
+/* Dark theme via prefers-color-scheme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --skeleton-bg: #374151; /* gray-700 */
+    --skeleton-accent: #4b5563; /* gray-600 */
+    --skeleton-header: #111827; /* gray-900 */
+    --skeleton-border: #374151; /* gray-700 */
+  }
+}
+
+/* Dark theme via .dark class on html/body wrapper */
+.dark :root, .dark {
+  --skeleton-bg: #374151; /* gray-700 */
+  --skeleton-accent: #4b5563; /* gray-600 */
+  --skeleton-header: #111827; /* gray-900 */
+  --skeleton-border: #374151; /* gray-700 */
+}
+
+@keyframes pulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+/* Utility fallbacks to match existing class names used in the component */
+.w-full { width: 100%; }
+.border-collapse { border-collapse: collapse; }
+.bg-gray-50 { background-color: var(--skeleton-header); }
+.bg-gray-200 { background-color: var(--skeleton-bg); }
+.bg-gray-300 { background-color: var(--skeleton-accent); }
+.rounded { border-radius: var(--skeleton-radius); }
+.h-4 { height: 1rem; }
+.h-5 { height: 1.25rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.border-b { border-bottom: 1px solid var(--skeleton-border); }
+.border-gray-200 { border-color: var(--skeleton-border); }
+.text-left { text-align: left; }
+.overflow-hidden { overflow: hidden; }
+.animate-pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+/* Table specific tweaks */
+table.w-full.border-collapse { width: 100%; border-collapse: collapse; }
+thead.bg-gray-50 th { font-weight: 500; }
+tbody tr:hover { background-color: transparent; }
+
+
