@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
@@ -117,6 +117,24 @@ const AccountForm = ({
 
   const [create, { isLoading: isCreating }] = useCreateAccountMutation();
   const [update, { isLoading: isUpdating }] = useUpdateAccountMutation();
+
+  // 🔁 Синхронизация состояния с account при изменении
+  useEffect(() => {
+    if (account) {
+      setName(account.name || '');
+      setNumber(account.number || '');
+      setCurrency(account.currency || 'RUB');
+      setOpeningBalance(account.openingBalance?.toString() || '0');
+      setIsActive(account.isActive ?? true);
+    } else {
+      // Сброс при создании нового счета
+      setName('');
+      setNumber('');
+      setCurrency('RUB');
+      setOpeningBalance('0');
+      setIsActive(true);
+    }
+  }, [account]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

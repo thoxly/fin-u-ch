@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import {
   useGetDepartmentsQuery,
@@ -98,18 +97,32 @@ const DepartmentForm = ({
 }) => {
   const [name, setName] = useState(department?.name || '');
   const [description, setDescription] = useState(department?.description || '');
+
   const [create, { isLoading: isCreating }] = useCreateDepartmentMutation();
   const [update, { isLoading: isUpdating }] = useUpdateDepartmentMutation();
+
+  useEffect(() => {
+    if (department) {
+      setName(department.name || '');
+      setDescription(department.description || '');
+    } else {
+      setName('');
+      setDescription('');
+    }
+  }, [department]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (department)
+      if (department) {
         await update({
           id: department.id,
-          data: { name, description },
+          name,
+          description,
         }).unwrap();
-      else await create({ name, description }).unwrap();
+      } else {
+        await create({ name, description }).unwrap();
+      }
       onClose();
     } catch (error) {
       console.error('Failed to save department:', error);

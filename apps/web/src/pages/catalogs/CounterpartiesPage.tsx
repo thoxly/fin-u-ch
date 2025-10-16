@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // ← добавлен useEffect
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import {
@@ -115,18 +114,35 @@ const CounterpartyForm = ({
   const [name, setName] = useState(counterparty?.name || '');
   const [inn, setInn] = useState(counterparty?.inn || '');
   const [category, setCategory] = useState(counterparty?.category || 'other');
+
   const [create, { isLoading: isCreating }] = useCreateCounterpartyMutation();
   const [update, { isLoading: isUpdating }] = useUpdateCounterpartyMutation();
+
+  // 🔁 Синхронизация состояния с counterparty при изменении
+  useEffect(() => {
+    if (counterparty) {
+      setName(counterparty.name || '');
+      setInn(counterparty.inn || '');
+      setCategory(counterparty.category || 'other');
+    } else {
+      // Сброс при создании нового контрагента
+      setName('');
+      setInn('');
+      setCategory('other');
+    }
+  }, [counterparty]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (counterparty)
+      if (counterparty) {
         await update({
           id: counterparty.id,
           data: { name, inn, category },
         }).unwrap();
-      else await create({ name, inn, category }).unwrap();
+      } else {
+        await create({ name, inn, category }).unwrap();
+      }
       onClose();
     } catch (error) {
       console.error('Failed to save counterparty:', error);

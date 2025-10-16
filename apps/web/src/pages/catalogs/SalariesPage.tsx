@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // ← добавлен useEffect
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import {
@@ -24,7 +23,7 @@ import { OffCanvas } from '@/shared/ui/OffCanvas';
 export const SalariesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Salary | null>(null);
-  const { data: salaries = [], isLoading } = useGetSalariesQuery();
+  const { salaries = [], isLoading } = useGetSalariesQuery();
   const [deleteSalary] = useDeleteSalaryMutation();
 
   const columns = [
@@ -119,33 +118,49 @@ const SalaryForm = ({
   salary: Salary | null;
   onClose: () => void;
 }) => {
-  const [employeeCounterpartyId, setEmployeeCounterpartyId] = useState(
-    salary?.employeeCounterpartyId || ''
-  );
-  const [departmentId, setDepartmentId] = useState(salary?.departmentId || '');
-  const [baseWage, setBaseWage] = useState(salary?.baseWage.toString() || '');
-  const [contributionsPct, setContributionsPct] = useState(
-    salary?.contributionsPct.toString() || '30'
-  );
-  const [incomeTaxPct, setIncomeTaxPct] = useState(
-    salary?.incomeTaxPct.toString() || '13'
-  );
-  const [periodicity, setPeriodicity] = useState(
-    salary?.periodicity || 'monthly'
-  );
-  const [effectiveFrom, setEffectiveFrom] = useState(
-    salary?.effectiveFrom.split('T')[0] || ''
-  );
-  const [effectiveTo, setEffectiveTo] = useState(
-    salary?.effectiveTo ? salary.effectiveTo.split('T')[0] : ''
-  );
+  const [employeeCounterpartyId, setEmployeeCounterpartyId] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [baseWage, setBaseWage] = useState('');
+  const [contributionsPct, setContributionsPct] = useState('30');
+  const [incomeTaxPct, setIncomeTaxPct] = useState('13');
+  const [periodicity, setPeriodicity] = useState<
+    'monthly' | 'weekly' | 'biweekly'
+  >('monthly');
+  const [effectiveFrom, setEffectiveFrom] = useState('');
+  const [effectiveTo, setEffectiveTo] = useState('');
 
-  const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  const { data: departments = [] } = useGetDepartmentsQuery();
+  const { counterparties = [] } = useGetCounterpartiesQuery();
+  const { departments = [] } = useGetDepartmentsQuery();
   const [create, { isLoading: isCreating }] = useCreateSalaryMutation();
   const [update, { isLoading: isUpdating }] = useUpdateSalaryMutation();
 
   const employees = counterparties.filter((c) => c.category === 'employee');
+
+  // 🔁 Синхронизация состояния с salary при изменении
+  useEffect(() => {
+    if (salary) {
+      setEmployeeCounterpartyId(salary.employeeCounterpartyId || '');
+      setDepartmentId(salary.departmentId || '');
+      setBaseWage(salary.baseWage?.toString() || '');
+      setContributionsPct(salary.contributionsPct?.toString() || '30');
+      setIncomeTaxPct(salary.incomeTaxPct?.toString() || '13');
+      setPeriodicity(salary.periodicity || 'monthly');
+      setEffectiveFrom(salary.effectiveFrom.split('T')[0] || '');
+      setEffectiveTo(
+        salary.effectiveTo ? salary.effectiveTo.split('T')[0] : ''
+      );
+    } else {
+      // Сброс при создании новой записи
+      setEmployeeCounterpartyId('');
+      setDepartmentId('');
+      setBaseWage('');
+      setContributionsPct('30');
+      setIncomeTaxPct('13');
+      setPeriodicity('monthly');
+      setEffectiveFrom('');
+      setEffectiveTo('');
+    }
+  }, [salary]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,8 +177,11 @@ const SalaryForm = ({
         : undefined,
     };
     try {
-      if (salary) await update({ id: salary.id, data }).unwrap();
-      else await create(data).unwrap();
+      if (salary) {
+        await update({ id: salary.id, data }).unwrap();
+      } else {
+        await create(data).unwrap();
+      }
       onClose();
     } catch (error) {
       console.error('Failed to save salary:', error);
@@ -199,7 +217,9 @@ const SalaryForm = ({
         <Select
           label="Периодичность"
           value={periodicity}
-          onChange={(e) => setPeriodicity(e.target.value)}
+          onChange={(e) =>
+            setPeriodicity(e.target.value as 'monthly' | 'weekly' | 'biweekly')
+          }
           options={[
             { value: 'monthly', label: 'Ежемесячно' },
             { value: 'weekly', label: 'Еженедельно' },

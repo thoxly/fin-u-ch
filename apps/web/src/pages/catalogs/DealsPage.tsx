@@ -1,11 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // ← добавлен useEffect
 import { Pencil, Trash2 } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import {
@@ -109,10 +108,28 @@ const DealForm = ({
     deal?.counterpartyId || ''
   );
   const [departmentId, setDepartmentId] = useState(deal?.departmentId || '');
+
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
+
   const [create, { isLoading: isCreating }] = useCreateDealMutation();
   const [update, { isLoading: isUpdating }] = useUpdateDealMutation();
+
+  // 🔁 Синхронизация состояния с deal при изменении
+  useEffect(() => {
+    if (deal) {
+      setName(deal.name || '');
+      setAmount(deal.amount?.toString() || '');
+      setCounterpartyId(deal.counterpartyId || '');
+      setDepartmentId(deal.departmentId || '');
+    } else {
+      // Сброс при создании новой сделки
+      setName('');
+      setAmount('');
+      setCounterpartyId('');
+      setDepartmentId('');
+    }
+  }, [deal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,8 +140,11 @@ const DealForm = ({
       departmentId: departmentId || undefined,
     };
     try {
-      if (deal) await update({ id: deal.id, data }).unwrap();
-      else await create(data).unwrap();
+      if (deal) {
+        await update({ id: deal.id, data }).unwrap();
+      } else {
+        await create(data).unwrap();
+      }
       onClose();
     } catch (error) {
       console.error('Failed to save deal:', error);
