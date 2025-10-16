@@ -168,11 +168,11 @@ describe('Layout - MenuPopover Integration', () => {
       expect(screen.getByText('Статьи')).toBeInTheDocument();
     });
 
-    const closeButton = screen.getByLabelText('Закрыть меню');
-    fireEvent.click(closeButton);
+    // Click outside to close the popover
+    fireEvent.mouseDown(document.body);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText('Закрыть меню')).not.toBeInTheDocument();
+      expect(screen.queryByText('Статьи')).not.toBeInTheDocument();
     });
   });
 
@@ -194,7 +194,7 @@ describe('Layout - MenuPopover Integration', () => {
     fireEvent.click(articleLink);
 
     await waitFor(() => {
-      expect(screen.queryByLabelText('Закрыть меню')).not.toBeInTheDocument();
+      expect(screen.queryByText('Статьи')).not.toBeInTheDocument();
     });
   });
 
