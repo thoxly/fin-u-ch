@@ -4,7 +4,9 @@ import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import * as Icons from 'lucide-react';
 import { IconPickerPopover } from './IconPickerPopover';
+import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
+import { OffCanvas } from './OffCanvas';
 
 interface LayoutProps {
   children: ReactNode;
@@ -46,6 +48,19 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     position: { top: number; left: number };
   }>({ isOpen: false, itemName: '', position: { top: 0, left: 0 } });
 
+  const [menuPopoverState, setMenuPopoverState] = useState<{
+    isOpen: boolean;
+    items: MenuPopoverItem[];
+    position: { top: number; left: number; right?: number };
+    createAction?: MenuPopoverAction;
+  }>({ isOpen: false, items: [], position: { top: 0, left: 0 } });
+
+  const [offCanvasState, setOffCanvasState] = useState<{
+    isOpen: boolean;
+    title: string;
+    catalogType: string;
+  }>({ isOpen: false, title: '', catalogType: '' });
+
   const handleLogout = (): void => {
     dispatch(logout());
     navigate('/login');
@@ -80,6 +95,80 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       isOpen: false,
       itemName: '',
       position: { top: 0, left: 0 },
+    });
+  };
+
+  const getCatalogCreateLabel = (catalogName: string): string => {
+    const labels: Record<string, string> = {
+      Статьи: 'Создать статью',
+      Счета: 'Создать счет',
+      Подразделения: 'Создать подразделение',
+      Контрагенты: 'Создать контрагента',
+      Сделки: 'Создать сделку',
+      Зарплаты: 'Добавить зарплату',
+    };
+    return labels[catalogName] || 'Создать';
+  };
+
+  const handleCreateCatalog = (catalogName: string): void => {
+    setOffCanvasState({
+      isOpen: true,
+      title: getCatalogCreateLabel(catalogName),
+      catalogType: catalogName,
+    });
+  };
+
+  const handleMenuClick = (
+    e: React.MouseEvent<HTMLDivElement>,
+    children: NavigationItem[],
+    parentName: string
+  ): void => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    // Determine if this is a catalog menu (Справочники)
+    const isCatalogMenu = parentName === 'Справочники';
+
+    const menuItems: MenuPopoverItem[] = children.map((child) => ({
+      name: child.name,
+      href: child.href || '/',
+      icon: getIcon(child.name),
+      createAction: isCatalogMenu
+        ? {
+            label: getCatalogCreateLabel(child.name),
+            onClick: () => handleCreateCatalog(child.name),
+          }
+        : undefined,
+    }));
+
+    setMenuPopoverState({
+      isOpen: true,
+      items: menuItems,
+      position: {
+        top: rect.top,
+        left: rect.left,
+        right: rect.right + 5,
+      },
+      createAction: undefined,
+    });
+  };
+
+  const handleCloseMenuPopover = (): void => {
+    setMenuPopoverState({
+      isOpen: false,
+      items: [],
+      position: { top: 0, left: 0 },
+      createAction: undefined,
+    });
+  };
+
+  const handleCloseOffCanvas = (): void => {
+    setOffCanvasState({
+      isOpen: false,
+      title: '',
+      catalogType: '',
     });
   };
 
@@ -122,7 +211,24 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             {navigation.map((item) =>
               item.children ? (
                 <div key={item.name}>
-                  <div className="group relative flex items-center gap-2 text-sm font-medium text-gray-500 px-3 py-2 dark:text-gray-400">
+                  <div
+                    onClick={(e) =>
+                      handleMenuClick(e, item.children || [], item.name)
+                    }
+                    className="group relative flex items-center gap-2 text-sm font-medium text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleMenuClick(
+                          e as unknown as React.MouseEvent<HTMLDivElement>,
+                          item.children || [],
+                          item.name
+                        );
+                      }
+                    }}
+                  >
                     <button
                       onClick={(e) => handleIconClick(e, item.name)}
                       className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-700"
@@ -131,28 +237,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       {renderIcon(item.name)}
                     </button>
                     <span>{item.name}</span>
-                  </div>
-                  <div className="ml-4 space-y-1">
-                    {item.children.map((child) => (
-                      <Link
-                        key={child.href}
-                        to={child.href || '/'}
-                        className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                          isActive(child.href || '/')
-                            ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400'
-                            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <button
-                          onClick={(e) => handleIconClick(e, child.name)}
-                          className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-600"
-                          title="Изменить иконку"
-                        >
-                          {renderIcon(child.name)}
-                        </button>
-                        <span>{child.name}</span>
-                      </Link>
-                    ))}
+                    <Icons.ChevronRight
+                      size={16}
+                      className="ml-auto opacity-50"
+                    />
                   </div>
                 </div>
               ) : (
@@ -191,6 +279,33 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           onClose={handleCloseIconPicker}
           anchorPosition={iconPickerState.position}
         />
+      )}
+
+      {/* Menu Popover */}
+      {menuPopoverState.isOpen && (
+        <MenuPopover
+          items={menuPopoverState.items}
+          onClose={handleCloseMenuPopover}
+          anchorPosition={menuPopoverState.position}
+          renderIcon={(iconName) => renderIcon(iconName || '')}
+          createAction={menuPopoverState.createAction}
+          position="right"
+        />
+      )}
+
+      {/* OffCanvas for Creating */}
+      {offCanvasState.isOpen && (
+        <OffCanvas
+          isOpen={offCanvasState.isOpen}
+          onClose={handleCloseOffCanvas}
+          title={offCanvasState.title}
+        >
+          <div className="p-4">
+            <p className="text-gray-600 dark:text-gray-400">
+              Форма для создания записи будет здесь
+            </p>
+          </div>
+        </OffCanvas>
       )}
     </div>
   );

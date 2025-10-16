@@ -6,4 +6,6 @@ export { Select } from './Select';
 export { Table } from './Table';
 export { Input } from './Input';
 export { IconPickerPopover } from './IconPickerPopover';
+export { MenuPopover } from './MenuPopover';
+export type { MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 export { EmptyState } from './EmptyState';
