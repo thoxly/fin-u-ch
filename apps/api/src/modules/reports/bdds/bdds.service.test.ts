@@ -1,22 +1,18 @@
-import { BddsService } from './bdds.service';
+import { BDDSService } from './bdds.service';
 import { PrismaClient } from '@prisma/client';
 
 // Mock Prisma
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    plan: {
-      findMany: jest.fn(),
-    },
-  })),
-}));
+const mockPrisma = {
+  plan: {
+    findMany: jest.fn(),
+  },
+} as any;
 
-describe('BddsService', () => {
-  let service: BddsService;
-  let mockPrisma: jest.Mocked<PrismaClient>;
+describe('BDDSService', () => {
+  let service: BDDSService;
 
   beforeEach(() => {
-    mockPrisma = new PrismaClient() as jest.Mocked<PrismaClient>;
-    service = new BddsService(mockPrisma);
+    service = new BDDSService(mockPrisma);
   });
 
   describe('getBdds', () => {
@@ -25,8 +21,8 @@ describe('BddsService', () => {
 
       const result = await service.getBdds(
         'company-id',
-        '2025-01-01',
-        '2025-01-31'
+        new Date('2025-01-01'),
+        new Date('2025-01-31')
       );
 
       expect(result.rows).toEqual([]);
@@ -52,8 +48,8 @@ describe('BddsService', () => {
 
       const result = await service.getBdds(
         'company-id',
-        '2025-01-01',
-        '2025-02-28'
+        new Date('2025-01-01'),
+        new Date('2025-02-28')
       );
 
       expect(result.rows).toHaveLength(1);

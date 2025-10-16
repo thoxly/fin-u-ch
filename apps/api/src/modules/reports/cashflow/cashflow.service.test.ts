@@ -2,20 +2,16 @@ import { CashflowService } from './cashflow.service';
 import { PrismaClient } from '@prisma/client';
 
 // Mock Prisma
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => ({
-    operation: {
-      findMany: jest.fn(),
-    },
-  })),
-}));
+const mockPrisma = {
+  operation: {
+    findMany: jest.fn(),
+  },
+} as any;
 
 describe('CashflowService', () => {
   let service: CashflowService;
-  let mockPrisma: jest.Mocked<PrismaClient>;
 
   beforeEach(() => {
-    mockPrisma = new PrismaClient() as jest.Mocked<PrismaClient>;
     service = new CashflowService(mockPrisma);
   });
 
@@ -25,8 +21,8 @@ describe('CashflowService', () => {
 
       const result = await service.getCashflow(
         'company-id',
-        '2025-01-01',
-        '2025-01-31'
+        new Date('2025-01-01'),
+        new Date('2025-01-31')
       );
 
       expect(result.activities).toEqual([]);
@@ -54,8 +50,8 @@ describe('CashflowService', () => {
 
       const result = await service.getCashflow(
         'company-id',
-        '2025-01-01',
-        '2025-01-31'
+        new Date('2025-01-01'),
+        new Date('2025-01-31')
       );
 
       expect(result.activities).toHaveLength(1);
