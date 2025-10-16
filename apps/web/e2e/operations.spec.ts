@@ -8,14 +8,30 @@ test.describe('Operations Page', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('should display operations page when authenticated', async ({
-    page,
-  }) => {
-    // Note: This test would need proper authentication setup
-    test.skip(true, 'Requires authentication setup');
-
+  test('should display login form elements', async ({ page }) => {
     await page.goto('/operations');
 
-    await expect(page.locator('h1')).toContainText('Operations');
+    // Should be redirected to login
+    await expect(page).toHaveURL(/\/login/);
+
+    // Check login form elements are present
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
+    await expect(page.locator('button[type="submit"]')).toBeVisible();
+  });
+
+  test('should show validation errors for empty login form', async ({
+    page,
+  }) => {
+    await page.goto('/login');
+
+    // Try to submit empty form
+    const submitButton = page.locator('button[type="submit"]').first();
+    if (await submitButton.isVisible()) {
+      await submitButton.click();
+    }
+
+    // Form should still be visible (not navigated away)
+    await expect(page.locator('input[type="email"]')).toBeVisible();
   });
 });

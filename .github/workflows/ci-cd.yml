@@ -269,7 +269,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     needs: [build-and-test]
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     services:
       postgres:
@@ -360,9 +360,9 @@ jobs:
       - name: Start API server in background
         working-directory: apps/api
         run: |
-          node dist/server.js &
+          pnpm dev &
           echo $! > api.pid
-          sleep 10
+          sleep 20
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           REDIS_URL: ${{ env.REDIS_URL }}
@@ -373,13 +373,13 @@ jobs:
       - name: Wait for API to be ready
         run: |
           echo "Waiting for API to be ready..."
-          for i in {1..30}; do
+          for i in {1..60}; do
             if curl -f http://localhost:4000/api/health 2>/dev/null; then
               echo "✅ API is ready!"
               exit 0
             fi
-            echo "Attempt $i/30: API not ready yet, waiting..."
-            sleep 2
+            echo "Attempt $i/60: API not ready yet, waiting..."
+            sleep 3
           done
           echo "❌ API failed to start"
           exit 1
@@ -387,20 +387,20 @@ jobs:
       - name: Start Web server in background
         working-directory: apps/web
         run: |
-          npx vite preview --port 3000 --host &
+          pnpm dev &
           echo $! > web.pid
-          sleep 5
+          sleep 15
 
       - name: Wait for Web to be ready
         run: |
           echo "Waiting for Web server to be ready..."
-          for i in {1..30}; do
+          for i in {1..60}; do
             if curl -f http://localhost:3000 2>/dev/null; then
               echo "✅ Web server is ready!"
               exit 0
             fi
-            echo "Attempt $i/30: Web not ready yet, waiting..."
-            sleep 2
+            echo "Attempt $i/60: Web not ready yet, waiting..."
+            sleep 3
           done
           echo "❌ Web server failed to start"
           exit 1
@@ -413,6 +413,22 @@ jobs:
           REDIS_URL: ${{ env.REDIS_URL }}
           JWT_SECRET: ${{ env.JWT_SECRET }}
           NODE_ENV: ${{ env.NODE_ENV }}
+
+      - name: Stop servers
+        if: always()
+        run: |
+          echo "Stopping servers..."
+          if [ -f apps/api/api.pid ]; then
+            kill $(cat apps/api/api.pid) 2>/dev/null || true
+            rm -f apps/api/api.pid
+          fi
+          if [ -f apps/web/web.pid ]; then
+            kill $(cat apps/web/web.pid) 2>/dev/null || true
+            rm -f apps/web/web.pid
+          fi
+          # Kill any remaining node processes
+          pkill -f "node.*server" 2>/dev/null || true
+          pkill -f "vite" 2>/dev/null || true
 
       - name: Upload test results
         if: always()

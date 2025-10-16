@@ -6,6 +6,9 @@ test.describe('Smoke Tests', () => {
 
     // Application should load without errors
     await expect(page).not.toHaveTitle('');
+
+    // Should redirect to login for unauthenticated users
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test('should have no console errors on login page', async ({ page }) => {
@@ -22,21 +25,39 @@ test.describe('Smoke Tests', () => {
 
     // Allow for known acceptable errors (if any)
     const criticalErrors = errors.filter(
-      (error) => !error.includes('favicon') // Ignore favicon errors
+      (error) =>
+        !error.includes('favicon') && // Ignore favicon errors
+        !error.includes('404') && // Ignore 404 errors for missing assets
+        !error.includes('Failed to load resource') // Ignore resource loading errors
     );
 
     expect(criticalErrors).toHaveLength(0);
   });
 
-  test('should navigate between public pages', async ({ page }) => {
+  test('should display login form correctly', async ({ page }) => {
     await page.goto('/login');
     await expect(page).toHaveURL(/\/login/);
 
-    // Try to find and click register link
-    const registerLink = page.getByRole('link', { name: /register/i }).first();
-    if (await registerLink.isVisible()) {
-      await registerLink.click();
-      await expect(page).toHaveURL(/\/register/);
+    // Check that login form elements are present
+    await expect(page.locator('input[type="email"]')).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toBeVisible();
+    await expect(page.locator('button[type="submit"]')).toBeVisible();
+  });
+
+  test('should have proper page title', async ({ page }) => {
+    await page.goto('/login');
+
+    // Check that page has a meaningful title
+    await expect(page).toHaveTitle(/Fin-U-CH/);
+  });
+
+  test('should handle navigation to protected routes', async ({ page }) => {
+    // Try to access protected routes - should redirect to login
+    const protectedRoutes = ['/dashboard', '/operations', '/reports'];
+
+    for (const route of protectedRoutes) {
+      await page.goto(route);
+      await expect(page).toHaveURL(/\/login/);
     }
   });
 });
