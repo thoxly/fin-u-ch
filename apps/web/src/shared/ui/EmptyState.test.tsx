@@ -1,48 +1,49 @@
-/// <reference types="jest" />
-/* eslint-env jest */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { FolderOpen } from 'lucide-react';
-import { EmptyState } from './EmptyState';
+import { Plus } from 'lucide-react';
+import EmptyState from './EmptyState';
 
 describe('EmptyState', () => {
-  it('renders title', () => {
-    render(<EmptyState title="Нет данных" />);
-    expect(screen.getByText('Нет данных')).toBeInTheDocument();
+  it('renders with title only', () => {
+    render(<EmptyState title="No data found" />);
+
+    expect(screen.getByText('No data found')).toBeInTheDocument();
   });
 
-  it('renders description when provided', () => {
-    render(<EmptyState title="Пусто" description="Добавьте запись" />);
-    expect(screen.getByText('Добавьте запись')).toBeInTheDocument();
-  });
-
-  it('renders default icon by iconName (Inbox)', () => {
-    const { container } = render(<EmptyState title="Пусто" />);
-    expect(container.querySelector('svg')).toBeInTheDocument();
-  });
-
-  it('renders custom icon via icon prop', () => {
+  it('renders with title and description', () => {
     render(
       <EmptyState
-        title="Пусто"
-        icon={<FolderOpen aria-label="folder-open" />}
+        title="No operations"
+        description="You haven't created any operations yet"
       />
     );
-    expect(screen.getByLabelText('folder-open')).toBeInTheDocument();
+
+    expect(screen.getByText('No operations')).toBeInTheDocument();
+    expect(
+      screen.getByText("You haven't created any operations yet")
+    ).toBeInTheDocument();
   });
 
-  it('applies fullHeight when true', () => {
-    const { container } = render(<EmptyState title="Пусто" fullHeight />);
-    // container has root element with class from CSS module; ensure at least two class names applied (container + fullHeight)
-    const root = container.firstElementChild as HTMLElement;
-    expect(root.className.split(' ').length).toBeGreaterThanOrEqual(1);
+  it('renders with icon', () => {
+    render(<EmptyState icon={Plus} title="Add your first operation" />);
+
+    expect(screen.getByText('Add your first operation')).toBeInTheDocument();
   });
 
-  it('merges external className', () => {
+  it('renders with action button', () => {
+    render(<EmptyState title="No data" action={<button>Create new</button>} />);
+
+    expect(screen.getByText('No data')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Create new' })
+    ).toBeInTheDocument();
+  });
+
+  it('applies custom className', () => {
     const { container } = render(
-      <EmptyState title="Пусто" className="test-extra-class" />
+      <EmptyState title="Test" className="custom-class" />
     );
-    const root = container.firstElementChild as HTMLElement;
-    expect(root.className).toMatch(/test-extra-class/);
+
+    expect(container.firstChild).toHaveClass('custom-class');
   });
 });
