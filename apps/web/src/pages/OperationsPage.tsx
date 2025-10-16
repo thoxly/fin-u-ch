@@ -7,6 +7,7 @@ import { Button } from '../shared/ui/Button';
 import { Table } from '../shared/ui/Table';
 import TableSkeleton from '../shared/ui/TableSkeleton';
 import { EmptyState } from '../shared/ui/EmptyState';
+import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import {
@@ -145,10 +146,9 @@ export const OperationsPage = () => {
             <TableSkeleton rows={5} columns={6} />
           ) : operations.length === 0 ? (
             <EmptyState
-              fullHeight
+              icon={FolderOpen}
               title="Нет операций"
               description="Создайте первую операцию, чтобы начать."
-              iconName="FolderOpen"
             />
           ) : (
             <Table
