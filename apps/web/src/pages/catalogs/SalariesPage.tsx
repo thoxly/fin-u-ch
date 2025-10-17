@@ -80,7 +80,9 @@ export const SalariesPage = () => {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Зарплаты</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Зарплаты
+          </h1>
           <Button
             onClick={() => {
               setEditing(null);
@@ -103,7 +105,6 @@ export const SalariesPage = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         title={editing ? 'Редактировать' : 'Создать'}
-        size="lg"
       >
         <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
