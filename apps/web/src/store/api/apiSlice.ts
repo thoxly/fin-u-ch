@@ -30,9 +30,12 @@ const baseQueryWithReauth: BaseQueryFn<
   let result = await baseQuery(args, api, extraOptions);
 
   // Если получили 401, пытаемся рефрешить токен
-  // Тест: можно временно изменить JWT_ACCESS_EXPIRES_IN на 1m и проверить авто-рефреш
   if (result.error && result.error.status === 401) {
-    const refreshToken = localStorage.getItem('refreshToken');
+    // Безопасное получение refreshToken с проверкой на SSR
+    const refreshToken =
+      typeof window !== 'undefined'
+        ? localStorage.getItem('refreshToken')
+        : null;
 
     if (refreshToken) {
       try {
@@ -46,7 +49,11 @@ const baseQueryWithReauth: BaseQueryFn<
         });
 
         if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json();
+          const refreshData = (await refreshResponse.json()) as {
+            user: { id: string; email: string; companyId: string };
+            accessToken: string;
+            refreshToken: string;
+          };
 
           // Обновляем токены в store и localStorage
           api.dispatch(
@@ -61,18 +68,31 @@ const baseQueryWithReauth: BaseQueryFn<
           result = await baseQuery(args, api, extraOptions);
         } else {
           // Рефреш не удался - разлогиниваем
+          console.warn(
+            'Token refresh failed:',
+            refreshResponse.status,
+            refreshResponse.statusText
+          );
           api.dispatch(logout());
-          window.location.href = '/login';
+          // Используем более безопасный способ редиректа
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
         }
       } catch (error) {
         // Ошибка при рефреше - разлогиниваем
+        console.error('Token refresh error:', error);
         api.dispatch(logout());
-        window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
       }
     } else {
       // Нет refresh токена - разлогиниваем
       api.dispatch(logout());
-      window.location.href = '/login';
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
   }
 
