@@ -664,6 +664,10 @@ jobs:
           echo "=== Applying database migrations ==="
           docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
 
+          # Create demo user for production
+          echo "=== Creating demo user for production ==="
+          docker compose -f docker-compose.prod.yml run --rm api npx tsx scripts/setup-production-demo.ts
+
           # Stop and remove old containers
           echo "=== Stopping and removing old containers ==="
           docker compose -f docker-compose.prod.yml stop api web worker nginx

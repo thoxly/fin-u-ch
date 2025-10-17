@@ -52,8 +52,8 @@ info "Running database migrations..."
 pnpm --filter api prisma migrate deploy
 
 # 4. Создаем демо-пользователя
-info "Creating demo user for E2E tests..."
-pnpm --filter api tsx scripts/setup-demo-user.ts
+info "Creating demo user for development..."
+pnpm --filter api tsx scripts/setup-production-demo.ts
 
 success "Development environment setup completed!"
 echo ""
