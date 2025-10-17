@@ -3,8 +3,14 @@ import { defineConfig, devices } from '@playwright/test';
 // @ts-expect-error - process is available in Node.js environment
 declare const process: NodeJS.Process;
 
+/**
+ * Smoke tests configuration
+ * Runs critical path tests only - faster for PR validation
+ * Includes: auth, smoke, dashboard tests
+ */
 export default defineConfig({
   testDir: './e2e',
+  testMatch: /(auth|smoke|dashboard)\.spec\.ts$/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
