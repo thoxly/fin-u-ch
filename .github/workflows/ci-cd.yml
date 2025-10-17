@@ -666,7 +666,7 @@ jobs:
 
           # Create demo user for production
           echo "=== Creating demo user for production ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx tsx scripts/setup-production-demo.ts
+          docker compose -f docker-compose.prod.yml run --rm api npx tsx src/scripts/init-demo-user.ts || echo "Demo user creation failed, continuing deployment..."
 
           # Stop and remove old containers
           echo "=== Stopping and removing old containers ==="
