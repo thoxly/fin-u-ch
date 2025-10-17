@@ -46,7 +46,8 @@ export class DemoDataGeneratorService {
           counterpartyId: client.id,
           dealId: deal?.id,
           amount: Math.floor(Math.random() * 500000) + 100000,
-          date,
+          operationDate: date,
+          type: 'income',
           description: `Продажа товаров/услуг ${i + 1}`,
         });
       }
@@ -67,7 +68,8 @@ export class DemoDataGeneratorService {
           articleId: expenseArticle.id,
           counterpartyId: supplier.id,
           amount: Math.floor(Math.random() * 200000) + 50000,
-          date,
+          operationDate: date,
+          type: 'expense',
           description: `Закупка материалов ${i + 1}`,
         });
       }
@@ -85,7 +87,8 @@ export class DemoDataGeneratorService {
           companyId,
           accountId: bankAccount.id,
           amount: Math.floor(Math.random() * 100000) + 20000,
-          date,
+          operationDate: date,
+          type: 'transfer',
           description: `Перевод в кассу ${i + 1}`,
         });
       }
@@ -167,7 +170,16 @@ export class DemoDataGeneratorService {
     }
 
     for (const plan of plans) {
-      await prisma.plan.create({ data: plan });
+      await prisma.plan.create({
+        data: {
+          companyId: plan.companyId,
+          name: plan.name,
+          description: plan.description,
+          startDate: plan.startDate,
+          endDate: plan.endDate,
+          items: plan.items,
+        },
+      });
     }
 
     logger.info('Demo plans created', { count: plans.length, companyId });

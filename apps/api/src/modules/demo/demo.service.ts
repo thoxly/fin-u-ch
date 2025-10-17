@@ -1,6 +1,6 @@
 import prisma from '../../config/db';
 import logger from '../../config/logger';
-import bcrypt from 'bcrypt';
+import * as bcrypt from 'bcrypt';
 import demoCatalogsService from './demo-catalogs.service';
 import demoDataGeneratorService from './demo-data-generator.service';
 
@@ -71,19 +71,13 @@ export class DemoUserService {
       return null;
     }
 
-    const [
-      operationsCount,
-      plansCount,
-      accountsCount,
-      articlesCount,
-      counterpartiesCount,
-    ] = await Promise.all([
-      prisma.operation.count({ where: { companyId: user.companyId } }),
-      prisma.plan.count({ where: { companyId: user.companyId } }),
-      prisma.account.count({ where: { companyId: user.companyId } }),
-      prisma.article.count({ where: { companyId: user.companyId } }),
-      prisma.counterparty.count({ where: { companyId: user.companyId } }),
-    ]);
+    const [operationsCount, accountsCount, articlesCount, counterpartiesCount] =
+      await Promise.all([
+        prisma.operation.count({ where: { companyId: user.companyId } }),
+        prisma.account.count({ where: { companyId: user.companyId } }),
+        prisma.article.count({ where: { companyId: user.companyId } }),
+        prisma.counterparty.count({ where: { companyId: user.companyId } }),
+      ]);
 
     return {
       user: {
@@ -96,7 +90,6 @@ export class DemoUserService {
         name: user.company.name,
       },
       operationsCount,
-      plansCount,
       accountsCount,
       articlesCount,
       counterpartiesCount,
@@ -171,7 +164,6 @@ export class DemoUserService {
     await prisma.$transaction(async (tx) => {
       // Удаляем все связанные данные
       await tx.operation.deleteMany({ where: { companyId: user.companyId } });
-      await tx.plan.deleteMany({ where: { companyId: user.companyId } });
       await tx.salary.deleteMany({ where: { companyId: user.companyId } });
       await tx.account.deleteMany({ where: { companyId: user.companyId } });
       await tx.article.deleteMany({ where: { companyId: user.companyId } });
