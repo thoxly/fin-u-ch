@@ -225,6 +225,9 @@ jobs:
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
 
+      - name: Create demo user for E2E tests
+        run: pnpm --filter api tsx scripts/setup-demo-user.ts
+
       - name: Run unit tests (API)
         run: pnpm --filter api test:coverage
 
@@ -356,6 +359,9 @@ jobs:
 
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
+
+      - name: Create demo user for E2E tests
+        run: pnpm --filter api tsx scripts/setup-demo-user.ts
 
       - name: Start API server in background
         working-directory: apps/api
