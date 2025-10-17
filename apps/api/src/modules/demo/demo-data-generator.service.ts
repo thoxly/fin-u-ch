@@ -30,9 +30,9 @@ export class DemoDataGeneratorService {
     // Генерируем доходы
     for (let i = 0; i < 20; i++) {
       const date = new Date(2025, 0, 1 + i * 15);
-      const revenueArticle = articles.find((a) => a.type === 'revenue');
-      const revenueAccount = accounts.find((a) => a.type === 'revenue');
-      const client = counterparties.find((c) => c.type === 'client');
+      const revenueArticle = articles.find((a) => a.name.includes('Доходы'));
+      const revenueAccount = accounts.find((a) => a.name.includes('Доходы'));
+      const client = counterparties.find((c) => c.category === 'customer');
       const deal = deals[Math.floor(Math.random() * deals.length)];
 
       if (revenueArticle && revenueAccount && client && deal) {
@@ -54,9 +54,9 @@ export class DemoDataGeneratorService {
     // Генерируем расходы
     for (let i = 0; i < 15; i++) {
       const date = new Date(2025, 0, 5 + i * 20);
-      const expenseArticle = articles.find((a) => a.type === 'expense');
-      const expenseAccount = accounts.find((a) => a.type === 'expense');
-      const supplier = counterparties.find((c) => c.type === 'supplier');
+      const expenseArticle = articles.find((a) => a.name.includes('Расходы'));
+      const expenseAccount = accounts.find((a) => a.name.includes('Расходы'));
+      const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
         operations.push({
@@ -86,8 +86,7 @@ export class DemoDataGeneratorService {
           operationDate: date,
           amount: Math.floor(Math.random() * 100000) + 20000,
           currency: 'RUB',
-          sourceAccountId: bankAccount.id,
-          targetAccountId: cashAccount.id,
+          accountId: bankAccount.id,
           description: `Перевод с расчетного счета в кассу ${i + 1}`,
         });
       }
@@ -116,16 +115,13 @@ export class DemoDataGeneratorService {
 
     // Планы доходов
     for (let i = 0; i < 5; i++) {
-      const revenueArticle = articles.find((a) => a.type === 'revenue');
-      const revenueAccount = accounts.find((a) => a.type === 'revenue');
-      const client = counterparties.find((c) => c.type === 'client');
+      const revenueArticle = articles.find((a) => a.name.includes('Доходы'));
+      const revenueAccount = accounts.find((a) => a.name.includes('Доходы'));
+      const client = counterparties.find((c) => c.category === 'customer');
 
       if (revenueArticle && revenueAccount && client) {
         plans.push({
           companyId,
-          name: `План доходов ${i + 1}`,
-          description: `Планируемые доходы на ${i + 1} квартал`,
-          type: 'income',
           amount: Math.floor(Math.random() * 200000) + 100000,
           currency: 'RUB',
           accountId: revenueAccount.id,
@@ -133,25 +129,20 @@ export class DemoDataGeneratorService {
           counterpartyId: client.id,
           startDate: new Date(2025, i * 3, 1),
           endDate: new Date(2025, (i + 1) * 3, 0),
-          periodicity: 'monthly',
-          effectiveFrom: new Date(2025, i * 3, 1),
-          effectiveTo: new Date(2025, (i + 1) * 3, 0),
+          repeat: 'monthly',
         });
       }
     }
 
     // Планы расходов
     for (let i = 0; i < 8; i++) {
-      const expenseArticle = articles.find((a) => a.type === 'expense');
-      const expenseAccount = accounts.find((a) => a.type === 'expense');
-      const supplier = counterparties.find((c) => c.type === 'supplier');
+      const expenseArticle = articles.find((a) => a.name.includes('Расходы'));
+      const expenseAccount = accounts.find((a) => a.name.includes('Расходы'));
+      const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
         plans.push({
           companyId,
-          name: `План расходов ${i + 1}`,
-          description: `Планируемые расходы на ${i + 1} месяц`,
-          type: 'expense',
           amount: Math.floor(Math.random() * 100000) + 20000,
           currency: 'RUB',
           accountId: expenseAccount.id,
@@ -159,9 +150,7 @@ export class DemoDataGeneratorService {
           counterpartyId: supplier.id,
           startDate: new Date(2025, i, 1),
           endDate: new Date(2025, i + 1, 0),
-          periodicity: 'monthly',
-          effectiveFrom: new Date(2025, i, 1),
-          effectiveTo: new Date(2025, i + 1, 0),
+          repeat: 'monthly',
         });
       }
     }
@@ -188,14 +177,12 @@ export class DemoDataGeneratorService {
 
       salaries.push({
         companyId,
-        employeeName: `Сотрудник ${i + 1}`,
-        position: `Должность ${i + 1}`,
+        employeeCounterpartyId: `demo-employee-${i + 1}`,
         departmentId: department?.id,
-        baseSalary: Math.floor(Math.random() * 100000) + 50000,
+        baseWage: Math.floor(Math.random() * 100000) + 50000,
         currency: 'RUB',
-        startDate: new Date(2025, 0, 1),
-        endDate: new Date(2025, 11, 31),
-        isActive: true,
+        effectiveFrom: new Date(2025, 0, 1),
+        effectiveTo: new Date(2025, 11, 31),
       });
     }
 

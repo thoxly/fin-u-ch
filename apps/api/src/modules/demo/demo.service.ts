@@ -120,7 +120,6 @@ export class DemoUserService {
       data: {
         name: DemoUserService.DEMO_COMPANY_NAME,
         currencyBase: 'RUB',
-        isActive: true,
       },
     });
 
