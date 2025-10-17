@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticateToken } from '../../middlewares/auth';
+import { authenticate } from '../../middlewares/auth';
 import demoController from './demo.controller';
 
 const router: Router = Router();
@@ -8,9 +8,9 @@ const router: Router = Router();
 router.get('/credentials', demoController.getCredentials);
 
 // Защищенные маршруты
-router.get('/info', authenticateToken, demoController.getInfo);
-router.get('/exists', authenticateToken, demoController.checkExists);
-router.post('/create', authenticateToken, demoController.create);
-router.delete('/delete', authenticateToken, demoController.delete);
+router.get('/info', authenticate, demoController.getInfo);
+router.get('/exists', authenticate, demoController.checkExists);
+router.post('/create', authenticate, demoController.create);
+router.delete('/delete', authenticate, demoController.delete);
 
 export default router;

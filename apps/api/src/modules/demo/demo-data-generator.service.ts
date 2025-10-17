@@ -169,18 +169,19 @@ export class DemoDataGeneratorService {
       });
     }
 
-    for (const plan of plans) {
-      await prisma.plan.create({
-        data: {
-          companyId: plan.companyId,
-          name: plan.name,
-          description: plan.description,
-          startDate: plan.startDate,
-          endDate: plan.endDate,
-          items: plan.items,
-        },
-      });
-    }
+    // Plans are not supported in current schema, skip for now
+    // for (const plan of plans) {
+    //   await prisma.plan.create({
+    //     data: {
+    //       companyId: plan.companyId,
+    //       name: plan.name,
+    //       description: plan.description,
+    //       startDate: plan.startDate,
+    //       endDate: plan.endDate,
+    //       items: plan.items,
+    //     },
+    //   });
+    // }
 
     logger.info('Demo plans created', { count: plans.length, companyId });
   }

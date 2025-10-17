@@ -1,6 +1,6 @@
 import prisma from '../../config/db';
 import logger from '../../config/logger';
-import * as bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import demoCatalogsService from './demo-catalogs.service';
 import demoDataGeneratorService from './demo-data-generator.service';
 
@@ -21,7 +21,6 @@ export interface DemoUserData {
     name: string;
   };
   operationsCount: number;
-  plansCount: number;
   accountsCount: number;
   articlesCount: number;
   counterpartiesCount: number;
