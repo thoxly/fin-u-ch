@@ -21,17 +21,17 @@ describe('DemoUserController', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockPrisma = {} as jest.Mocked<PrismaClient>;
+    mockPrisma = {} as unknown as jest.Mocked<PrismaClient>;
     mockDemoUserService = {
       getCredentials: jest.fn(),
       exists: jest.fn(),
       getInfo: jest.fn(),
       create: jest.fn(),
       delete: jest.fn(),
-    } as jest.Mocked<DemoUserService>;
+    } as unknown as jest.Mocked<DemoUserService>;
 
     // Mock DemoUserService constructor
-    (DemoUserService as jest.Mock).mockImplementation(
+    (DemoUserService as unknown as jest.Mock).mockImplementation(
       () => mockDemoUserService
     );
 

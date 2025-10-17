@@ -80,7 +80,7 @@ describe('DemoUserService', () => {
         deleteMany: jest.fn(),
       },
       $transaction: jest.fn(),
-    } as jest.Mocked<PrismaClient>;
+    } as unknown as jest.Mocked<PrismaClient>;
 
     mockBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
     mockBcrypt.hash.mockResolvedValue('hashed-password');
