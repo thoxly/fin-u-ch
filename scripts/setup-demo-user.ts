@@ -83,20 +83,22 @@ async function createInitialCatalogs(companyId: string) {
   ];
 
   for (const article of articles) {
-    await prisma.article.upsert({
+    const existing = await prisma.article.findFirst({
       where: {
-        companyId_name: {
-          companyId,
-          name: article.name,
-        },
-      },
-      update: {},
-      create: {
         companyId,
         name: article.name,
-        type: article.type,
       },
     });
+
+    if (!existing) {
+      await prisma.article.create({
+        data: {
+          companyId,
+          name: article.name,
+          type: article.type,
+        },
+      });
+    }
   }
 
   // Счета
@@ -107,20 +109,22 @@ async function createInitialCatalogs(companyId: string) {
   ];
 
   for (const account of accounts) {
-    await prisma.account.upsert({
+    const existing = await prisma.account.findFirst({
       where: {
-        companyId_name: {
-          companyId,
-          name: account.name,
-        },
-      },
-      update: {},
-      create: {
         companyId,
         name: account.name,
-        type: account.type,
       },
     });
+
+    if (!existing) {
+      await prisma.account.create({
+        data: {
+          companyId,
+          name: account.name,
+          type: account.type,
+        },
+      });
+    }
   }
 
   // Подразделения
@@ -132,19 +136,21 @@ async function createInitialCatalogs(companyId: string) {
   ];
 
   for (const deptName of departments) {
-    await prisma.department.upsert({
+    const existing = await prisma.department.findFirst({
       where: {
-        companyId_name: {
-          companyId,
-          name: deptName,
-        },
-      },
-      update: {},
-      create: {
         companyId,
         name: deptName,
       },
     });
+
+    if (!existing) {
+      await prisma.department.create({
+        data: {
+          companyId,
+          name: deptName,
+        },
+      });
+    }
   }
 
   // Контрагенты
@@ -156,19 +162,21 @@ async function createInitialCatalogs(companyId: string) {
   ];
 
   for (const cpName of counterparties) {
-    await prisma.counterparty.upsert({
+    const existing = await prisma.counterparty.findFirst({
       where: {
-        companyId_name: {
-          companyId,
-          name: cpName,
-        },
-      },
-      update: {},
-      create: {
         companyId,
         name: cpName,
       },
     });
+
+    if (!existing) {
+      await prisma.counterparty.create({
+        data: {
+          companyId,
+          name: cpName,
+        },
+      });
+    }
   }
 
   console.log('✅ Initial catalogs created');
