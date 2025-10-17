@@ -12,9 +12,8 @@ import { setCredentials, logout } from '../slices/authSlice';
 const baseQueryWithoutReauth = fetchBaseQuery({
   baseUrl: config.apiUrl,
   prepareHeaders: (headers, { getState }) => {
-    const token =
-      (getState() as RootState).auth.accessToken ||
-      localStorage.getItem('accessToken');
+    const state = getState() as RootState;
+    const token = state.auth.accessToken;
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
@@ -31,11 +30,9 @@ const baseQueryWithReauth: BaseQueryFn<
 
   // Если получили 401, пытаемся рефрешить токен
   if (result.error && result.error.status === 401) {
-    // Безопасное получение refreshToken с проверкой на SSR
-    const refreshToken =
-      typeof window !== 'undefined'
-        ? localStorage.getItem('refreshToken')
-        : null;
+    // Получаем refreshToken из Redux store
+    const state = api.getState() as RootState;
+    const refreshToken = state.auth.refreshToken;
 
     if (refreshToken) {
       // Используем baseQueryWithoutReauth для рефреша (избегаем рекурсии)
@@ -70,16 +67,23 @@ const baseQueryWithReauth: BaseQueryFn<
       } else {
         // Рефреш не удался - разлогиниваем
         api.dispatch(logout());
-        // Используем более безопасный способ редиректа
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+        // Безопасный редирект только в браузере
+        if (
+          typeof window !== 'undefined' &&
+          typeof window.location !== 'undefined'
+        ) {
+          window.location.assign('/login');
         }
       }
     } else {
       // Нет refresh токена - разлогиниваем
       api.dispatch(logout());
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+      // Безопасный редирект только в браузере
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.location !== 'undefined'
+      ) {
+        window.location.assign('/login');
       }
     }
   }
