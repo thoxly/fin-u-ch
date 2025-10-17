@@ -269,7 +269,7 @@ jobs:
   # Запускаем только smoke тесты для быстрой проверки
   # ============================================
   test-e2e:
-    name: E2E Tests (Smoke)
+    name: E2E Tests
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     needs: [build-and-test]
@@ -420,7 +420,7 @@ jobs:
           cat apps/web/web.pid || true
           exit 1
 
-      - name: Run E2E tests (Smoke)
+      - name: Run E2E tests
         working-directory: apps/web
         run: pnpm test:e2e:smoke
         env:
@@ -428,6 +428,7 @@ jobs:
           REDIS_URL: ${{ env.REDIS_URL }}
           JWT_SECRET: ${{ env.JWT_SECRET }}
           NODE_ENV: ${{ env.NODE_ENV }}
+          CI: true
 
       - name: Upload test results
         if: always()
