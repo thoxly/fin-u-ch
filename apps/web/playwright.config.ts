@@ -1,5 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// @ts-expect-error - process is available in Node.js environment
+declare const process: NodeJS.Process;
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.CI ? 'http://localhost:3000' : 'http://localhost:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -23,7 +26,7 @@ export default defineConfig({
     ? undefined
     : {
         command: 'pnpm dev',
-        url: 'http://localhost:3000',
+        url: 'http://localhost:5173',
         reuseExistingServer: true,
         timeout: 120000,
       },
