@@ -69,7 +69,9 @@ export const AccountsPage = () => {
     <Layout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Счета</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Счета
+          </h1>
           <Button
             onClick={() => {
               setEditing(null);
@@ -169,11 +171,12 @@ export const AccountForm = ({
         value={openingBalance}
         onChange={(e) => setOpeningBalance(e.target.value)}
       />
-      <label className="flex items-center gap-2">
+      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
         <input
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
+          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
         />
         <span className="text-sm">Активен</span>
       </label>
