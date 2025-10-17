@@ -77,11 +77,7 @@ export class DemoUserController {
    *       404:
    *         description: Demo user not found
    */
-  async getCredentials(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getCredentials(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const credentials = demoUserService.getCredentials();
       res.json({
@@ -119,11 +115,7 @@ export class DemoUserController {
    *       404:
    *         description: Demo user not found
    */
-  async getInfo(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async getInfo(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const info = await demoUserService.getInfo();
       if (!info) {
@@ -170,11 +162,7 @@ export class DemoUserController {
    *                       type: boolean
    *                       example: true
    */
-  async checkExists(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async checkExists(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const exists = await demoUserService.exists();
       res.json({
@@ -215,11 +203,7 @@ export class DemoUserController {
    *       500:
    *         description: Failed to create demo user
    */
-  async create(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const exists = await demoUserService.exists();
       if (exists) {
@@ -268,11 +252,7 @@ export class DemoUserController {
    *       500:
    *         description: Failed to delete demo user
    */
-  async delete(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
+  async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const exists = await demoUserService.exists();
       if (!exists) {
