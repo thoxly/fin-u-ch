@@ -34,52 +34,52 @@ describe('DemoUserService', () => {
     // Setup Prisma mocks
     mockPrisma = {
       user: {
-        findUnique: jest.fn(),
-        create: jest.fn(),
-        deleteMany: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       company: {
-        create: jest.fn(),
-        delete: jest.fn(),
+        create: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
       },
       operation: {
-        count: jest.fn(),
-        create: jest.fn(),
-        deleteMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       planItem: {
-        count: jest.fn(),
-        create: jest.fn(),
-        deleteMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       account: {
-        count: jest.fn(),
-        findMany: jest.fn(),
-        deleteMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       article: {
-        count: jest.fn(),
-        findMany: jest.fn(),
-        deleteMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       counterparty: {
-        count: jest.fn(),
-        findMany: jest.fn(),
-        deleteMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       department: {
-        findFirst: jest.fn(),
-        deleteMany: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue(null),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       salary: {
-        create: jest.fn(),
-        deleteMany: jest.fn(),
+        create: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
       deal: {
-        findMany: jest.fn(),
-        deleteMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn().mockResolvedValue({}),
       },
-      $transaction: jest.fn(),
+      $transaction: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<PrismaClient>;
 
     mockBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
