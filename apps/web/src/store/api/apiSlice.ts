@@ -38,51 +38,39 @@ const baseQueryWithReauth: BaseQueryFn<
         : null;
 
     if (refreshToken) {
-      try {
-        // Делаем запрос на рефреш напрямую (минуя RTK Query, чтобы избежать рекурсии)
-        const refreshResponse = await fetch(`${config.apiUrl}/auth/refresh`, {
+      // Используем тот же baseQuery для рефреша (более консистентно)
+      const refreshResult = await baseQuery(
+        {
+          url: '/auth/refresh',
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ refreshToken }),
-        });
+          body: { refreshToken },
+        },
+        api,
+        extraOptions
+      );
 
-        if (refreshResponse.ok) {
-          const refreshData = (await refreshResponse.json()) as {
-            user: { id: string; email: string; companyId: string };
-            accessToken: string;
-            refreshToken: string;
-          };
+      if (refreshResult.data) {
+        const refreshData = refreshResult.data as {
+          user: { id: string; email: string; companyId: string };
+          accessToken: string;
+          refreshToken: string;
+        };
 
-          // Обновляем токены в store и localStorage
-          api.dispatch(
-            setCredentials({
-              user: refreshData.user,
-              accessToken: refreshData.accessToken,
-              refreshToken: refreshData.refreshToken,
-            })
-          );
+        // Обновляем токены в store и localStorage
+        api.dispatch(
+          setCredentials({
+            user: refreshData.user,
+            accessToken: refreshData.accessToken,
+            refreshToken: refreshData.refreshToken,
+          })
+        );
 
-          // Повторяем оригинальный запрос с новым токеном
-          result = await baseQuery(args, api, extraOptions);
-        } else {
-          // Рефреш не удался - разлогиниваем
-          console.warn(
-            'Token refresh failed:',
-            refreshResponse.status,
-            refreshResponse.statusText
-          );
-          api.dispatch(logout());
-          // Используем более безопасный способ редиректа
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-        }
-      } catch (error) {
-        // Ошибка при рефреше - разлогиниваем
-        console.error('Token refresh error:', error);
+        // Повторяем оригинальный запрос с новым токеном
+        result = await baseQuery(args, api, extraOptions);
+      } else {
+        // Рефреш не удался - разлогиниваем
         api.dispatch(logout());
+        // Используем более безопасный способ редиректа
         if (typeof window !== 'undefined') {
           window.location.href = '/login';
         }
