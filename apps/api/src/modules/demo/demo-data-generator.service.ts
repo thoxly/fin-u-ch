@@ -122,6 +122,7 @@ export class DemoDataGeneratorService {
       if (revenueArticle && revenueAccount && client) {
         plans.push({
           companyId,
+          type: 'income',
           amount: Math.floor(Math.random() * 200000) + 100000,
           currency: 'RUB',
           accountId: revenueAccount.id,
@@ -143,6 +144,7 @@ export class DemoDataGeneratorService {
       if (expenseArticle && expenseAccount && supplier) {
         plans.push({
           companyId,
+          type: 'expense',
           amount: Math.floor(Math.random() * 100000) + 20000,
           currency: 'RUB',
           accountId: expenseAccount.id,
