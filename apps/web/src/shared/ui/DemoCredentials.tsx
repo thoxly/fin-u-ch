@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
-import { Button } from '@/shared/ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from './Card';
+import { Button } from './Button';
 import { Copy, Eye, EyeOff } from 'lucide-react';
+import { apiClient } from '../api/axios';
 
 interface DemoCredentials {
   email: string;
@@ -25,14 +26,10 @@ export const DemoCredentials: React.FC<DemoCredentialsProps> = ({
     fetchCredentials();
   }, []);
 
-  const fetchCredentials = async () => {
+  const fetchCredentials = async (): Promise<void> => {
     try {
-      const response = await fetch('/api/demo/credentials');
-      const data = await response.json();
-
-      if (data.success) {
-        setCredentials(data.data);
-      }
+      const response = await apiClient.get('/demo/credentials');
+      setCredentials(response.data);
     } catch (error) {
       console.error('Failed to fetch demo credentials:', error);
     } finally {
@@ -40,7 +37,7 @@ export const DemoCredentials: React.FC<DemoCredentialsProps> = ({
     }
   };
 
-  const copyToClipboard = async (text: string, type: string) => {
+  const copyToClipboard = async (text: string, type: string): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(type);
@@ -50,7 +47,7 @@ export const DemoCredentials: React.FC<DemoCredentialsProps> = ({
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = (): void => {
     if (credentials) {
       // Redirect to login page with pre-filled credentials
       const loginUrl = `/login?email=${encodeURIComponent(credentials.email)}&password=${encodeURIComponent(credentials.password)}`;

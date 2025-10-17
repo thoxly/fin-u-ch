@@ -19,7 +19,7 @@ import salariesRoutes from './modules/catalogs/salaries/salaries.routes';
 import operationsRoutes from './modules/operations/operations.routes';
 import plansRoutes from './modules/plans/plans.routes';
 import reportsRoutes from './modules/reports/reports.routes';
-import demoUserRoutes from './routes/demo-user.routes';
+import demoUserRoutes from './modules/demo/demo.routes';
 
 const app: Application = express();
 

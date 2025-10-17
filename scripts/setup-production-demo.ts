@@ -4,7 +4,7 @@
 // @ts-nocheck - Script runs with tsx, types resolved at runtime
 
 import { PrismaClient } from '@prisma/client';
-import { DemoUserService } from '../apps/api/src/services/demo-user.service';
+import { DemoUserService } from '../apps/api/src/modules/demo/demo.service';
 
 const prisma = new PrismaClient();
 
@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
  * Создает демо-пользователя для продакшена с полными моковыми данными
  * Этот скрипт должен запускаться автоматически при деплое
  */
-async function setupProductionDemo() {
+async function setupProductionDemo(): Promise<void> {
   try {
     console.log('🚀 Setting up production demo user...');
 
@@ -74,7 +74,8 @@ async function setupProductionDemo() {
 }
 
 // Запуск скрипта
-if (require.main === module) {
+// ES modules pattern for script execution
+if (import.meta.url === new URL(process.argv[1], 'file:').href) {
   setupProductionDemo()
     .then(() => {
       console.log('✅ Production demo setup completed successfully');

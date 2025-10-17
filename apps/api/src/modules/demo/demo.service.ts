@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-// import { seedInitialData } from '../../../scripts/seed-initial-data';
-import logger from '../config/logger';
+// import { seedInitialData } from '../../../../scripts/seed-initial-data';
+import logger from '../../config/logger';
 
 export interface DemoUserCredentials {
   email: string;

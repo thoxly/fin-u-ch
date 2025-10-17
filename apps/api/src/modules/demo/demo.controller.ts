@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { DemoUserService } from '../services/demo-user.service';
-import logger from '../config/logger';
+import { DemoUserService } from './demo.service';
+import logger from '../../config/logger';
 
 /**
  * @swagger

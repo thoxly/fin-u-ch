@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { DemoUserController } from '../controllers/demo-user.controller';
-import prisma from '../config/db';
+import { DemoUserController } from './demo.controller';
+import prisma from '../../config/db';
+import { authenticateToken } from '../../middlewares/auth';
 
 const router: Router = Router();
 const demoUserController = new DemoUserController(prisma);
@@ -43,6 +44,7 @@ const demoUserController = new DemoUserController(prisma);
  *                       type: string
  *                       example: Демо Компания ООО
  */
+// Публичный endpoint для получения кредов (без аутентификации)
 router.get('/credentials', demoUserController.getCredentials);
 
 /**
@@ -97,7 +99,8 @@ router.get('/credentials', demoUserController.getCredentials);
  *       404:
  *         description: Demo user not found
  */
-router.get('/info', demoUserController.getInfo);
+// Защищенные endpoints (требуют аутентификации)
+router.get('/info', authenticateToken, demoUserController.getInfo);
 
 /**
  * @swagger
@@ -121,7 +124,7 @@ router.get('/info', demoUserController.getInfo);
  *                   type: boolean
  *                   example: true
  */
-router.get('/exists', demoUserController.checkExists);
+router.get('/exists', authenticateToken, demoUserController.checkExists);
 
 /**
  * @swagger
@@ -178,7 +181,7 @@ router.get('/exists', demoUserController.checkExists);
  *       500:
  *         description: Failed to create demo user
  */
-router.post('/create', demoUserController.create);
+router.post('/create', authenticateToken, demoUserController.create);
 
 /**
  * @swagger
@@ -204,6 +207,6 @@ router.post('/create', demoUserController.create);
  *       500:
  *         description: Failed to delete demo user
  */
-router.delete('/delete', demoUserController.delete);
+router.delete('/delete', authenticateToken, demoUserController.delete);
 
 export default router;
