@@ -103,9 +103,9 @@ async function createInitialCatalogs(companyId: string) {
 
   // Счета
   const accounts = [
-    { name: 'Касса', type: 'CASH' as const },
-    { name: 'Расчетный счет', type: 'BANK' as const },
-    { name: 'Валютный счет', type: 'BANK' as const },
+    { name: 'Касса' },
+    { name: 'Расчетный счет' },
+    { name: 'Валютный счет' },
   ];
 
   for (const account of accounts) {
@@ -121,7 +121,6 @@ async function createInitialCatalogs(companyId: string) {
         data: {
           companyId,
           name: account.name,
-          type: account.type,
         },
       });
     }
