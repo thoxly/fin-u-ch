@@ -14,7 +14,12 @@ export class BDDSController {
           : new Date(),
       };
 
-      const result = await bddsService.getBDDS(req.companyId!, params);
+      const rows = await bddsService.getBDDS(req.companyId!, params);
+      const result = {
+        periodFrom: params.periodFrom.toISOString().split('T')[0],
+        periodTo: params.periodTo.toISOString().split('T')[0],
+        rows,
+      };
       res.json(result);
     } catch (error) {
       next(error);
