@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { DemoUserController } from '../controllers/demo-user.controller';
-import { prisma } from '../config/db';
+import prisma from '../config/db';
 
 const router: Router = Router();
 const demoUserController = new DemoUserController(prisma);
