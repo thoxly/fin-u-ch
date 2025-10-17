@@ -8,31 +8,13 @@ import { env } from './config/env';
 import logger from './config/logger';
 import prisma from './config/db';
 import redis from './config/redis';
-import demoUserService from './modules/demo/demo.service';
 
 const PORT = env.PORT;
 
-const server = app.listen(PORT, async () => {
+const server = app.listen(PORT, () => {
   logger.info(`API server running on port ${PORT}`);
   logger.info(`Environment: ${env.NODE_ENV}`);
   logger.info(`Health check: http://localhost:${PORT}/api/health`);
-
-  // Автоматически создаем демо-пользователя при первом запуске
-  try {
-    const exists = await demoUserService.exists();
-    if (!exists) {
-      logger.info('Demo user not found, creating...');
-      const demoUser = await demoUserService.create();
-      logger.info(`Demo user created: ${demoUser.user.email}`);
-      logger.info(
-        `Demo data: ${demoUser.operationsCount} operations, ${demoUser.accountsCount} accounts`
-      );
-    } else {
-      logger.info('Demo user already exists');
-    }
-  } catch (error) {
-    logger.error('Failed to setup demo user:', error);
-  }
 });
 
 // Graceful shutdown

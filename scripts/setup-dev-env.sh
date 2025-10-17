@@ -53,7 +53,7 @@ pnpm --filter api prisma migrate deploy
 
 # 4. Создаем демо-пользователя
 info "Creating demo user for development..."
-pnpm --filter api tsx scripts/setup-production-demo.ts
+pnpm --filter api tsx src/scripts/init-demo-user.ts
 
 success "Development environment setup completed!"
 echo ""
