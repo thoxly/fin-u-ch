@@ -127,10 +127,11 @@ export class DemoUserController {
     try {
       const info = await demoUserService.getInfo();
       if (!info) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: 'Demo user not found',
         });
+        return;
       }
 
       res.json({
@@ -223,10 +224,11 @@ export class DemoUserController {
     try {
       const exists = await demoUserService.exists();
       if (exists) {
-        return res.status(409).json({
+        res.status(409).json({
           success: false,
           error: 'Demo user already exists',
         });
+        return;
       }
 
       await demoUserService.create();
@@ -276,10 +278,11 @@ export class DemoUserController {
     try {
       const exists = await demoUserService.exists();
       if (!exists) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: 'Demo user not found',
         });
+        return;
       }
 
       await demoUserService.delete();

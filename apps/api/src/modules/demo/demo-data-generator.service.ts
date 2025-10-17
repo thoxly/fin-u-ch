@@ -31,8 +31,8 @@ export class DemoDataGeneratorService {
     for (let i = 0; i < 20; i++) {
       const date = new Date(2025, 0, 1);
       date.setDate(date.getDate() + i * 15);
-      const revenueArticle = articles.find((a) => a.type === 'income');
-      const revenueAccount = accounts.find((a) => a.type === 'income');
+      const revenueArticle = articles.find((a) => a.name === 'Выручка');
+      const revenueAccount = accounts.find((a) => a.name === 'Выручка');
       const client = counterparties.find((c) => c.category === 'customer');
       const deal = deals[Math.floor(Math.random() * deals.length)];
 
@@ -56,8 +56,8 @@ export class DemoDataGeneratorService {
     for (let i = 0; i < 15; i++) {
       const date = new Date(2025, 0, 5);
       date.setDate(date.getDate() + i * 20);
-      const expenseArticle = articles.find((a) => a.type === 'expense');
-      const expenseAccount = accounts.find((a) => a.type === 'expense');
+      const expenseArticle = articles.find((a) => a.name === 'Расходы');
+      const expenseAccount = accounts.find((a) => a.name === 'Расходы');
       const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
@@ -118,8 +118,8 @@ export class DemoDataGeneratorService {
 
     // Планы доходов
     for (let i = 0; i < 5; i++) {
-      const revenueArticle = articles.find((a) => a.type === 'income');
-      const revenueAccount = accounts.find((a) => a.type === 'income');
+      const revenueArticle = articles.find((a) => a.name === 'Выручка');
+      const revenueAccount = accounts.find((a) => a.name === 'Выручка');
       const client = counterparties.find((c) => c.category === 'customer');
 
       if (revenueArticle && revenueAccount && client) {
@@ -140,8 +140,8 @@ export class DemoDataGeneratorService {
 
     // Планы расходов
     for (let i = 0; i < 8; i++) {
-      const expenseArticle = articles.find((a) => a.type === 'expense');
-      const expenseAccount = accounts.find((a) => a.type === 'expense');
+      const expenseArticle = articles.find((a) => a.name === 'Расходы');
+      const expenseAccount = accounts.find((a) => a.name === 'Расходы');
       const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
