@@ -62,7 +62,7 @@ async function setupProductionDemo(): Promise<void> {
     console.error('❌ Failed to setup production demo user:', error);
     throw error;
   } finally {
-    await prisma.$disconnect();
+    // No need to disconnect as we're using the singleton instance
   }
 }
 

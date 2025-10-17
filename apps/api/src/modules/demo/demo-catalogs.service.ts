@@ -136,7 +136,7 @@ export class DemoCatalogsService {
    */
   private async createArticles(companyId: string): Promise<void> {
     // Создаем родительские статьи
-    const parentArticles = await prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,

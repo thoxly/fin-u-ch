@@ -115,35 +115,41 @@ export class DemoUserService {
       throw new Error('Demo user already exists');
     }
 
-    // Создаем компанию
-    const company = await prisma.company.create({
-      data: {
-        name: DemoUserService.DEMO_COMPANY_NAME,
-        currencyBase: 'RUB',
-      },
+    // Создаем все в одной транзакции
+    const result = await prisma.$transaction(async (tx) => {
+      // Создаем компанию
+      const company = await tx.company.create({
+        data: {
+          name: DemoUserService.DEMO_COMPANY_NAME,
+          currencyBase: 'RUB',
+        },
+      });
+
+      // Создаем пользователя
+      const passwordHash = await bcrypt.hash(DemoUserService.DEMO_PASSWORD, 10);
+      const user = await tx.user.create({
+        data: {
+          email: DemoUserService.DEMO_EMAIL,
+          passwordHash,
+          companyId: company.id,
+          isActive: true,
+        },
+      });
+
+      return { company, user };
     });
 
-    logger.info('Demo company created', { companyId: company.id });
-
-    // Создаем пользователя
-    const passwordHash = await bcrypt.hash(DemoUserService.DEMO_PASSWORD, 10);
-    const user = await prisma.user.create({
-      data: {
-        email: DemoUserService.DEMO_EMAIL,
-        passwordHash,
-        companyId: company.id,
-        isActive: true,
-      },
+    logger.info('Demo company and user created', {
+      companyId: result.company.id,
+      userId: result.user.id,
     });
-
-    logger.info('Demo user created', { userId: user.id });
 
     // Создаем начальные справочники
-    await demoCatalogsService.createInitialCatalogs(company.id);
+    await demoCatalogsService.createInitialCatalogs(result.company.id);
     logger.info('Initial catalogs created');
 
     // Создаем моковые данные
-    await demoDataGeneratorService.createSampleData(company.id);
+    await demoDataGeneratorService.createSampleData(result.company.id);
     logger.info('Sample data created');
 
     const info = await this.getInfo();
