@@ -9,7 +9,7 @@ import { config } from '../../shared/config/env';
 import type { RootState } from '../store';
 import { setCredentials, logout } from '../slices/authSlice';
 
-const baseQuery = fetchBaseQuery({
+const baseQueryWithoutReauth = fetchBaseQuery({
   baseUrl: config.apiUrl,
   prepareHeaders: (headers, { getState }) => {
     const token =
@@ -27,7 +27,7 @@ const baseQueryWithReauth: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  let result = await baseQuery(args, api, extraOptions);
+  let result = await baseQueryWithoutReauth(args, api, extraOptions);
 
   // Если получили 401, пытаемся рефрешить токен
   if (result.error && result.error.status === 401) {
@@ -38,8 +38,8 @@ const baseQueryWithReauth: BaseQueryFn<
         : null;
 
     if (refreshToken) {
-      // Используем тот же baseQuery для рефреша (более консистентно)
-      const refreshResult = await baseQuery(
+      // Используем baseQueryWithoutReauth для рефреша (избегаем рекурсии)
+      const refreshResult = await baseQueryWithoutReauth(
         {
           url: '/auth/refresh',
           method: 'POST',
@@ -66,7 +66,7 @@ const baseQueryWithReauth: BaseQueryFn<
         );
 
         // Повторяем оригинальный запрос с новым токеном
-        result = await baseQuery(args, api, extraOptions);
+        result = await baseQueryWithoutReauth(args, api, extraOptions);
       } else {
         // Рефреш не удался - разлогиниваем
         api.dispatch(logout());
