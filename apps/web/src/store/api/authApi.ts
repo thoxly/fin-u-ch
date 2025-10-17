@@ -21,6 +21,10 @@ interface AuthResponse {
   refreshToken: string;
 }
 
+interface RefreshRequest {
+  refreshToken: string;
+}
+
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
@@ -41,7 +45,19 @@ export const authApi = apiSlice.injectEndpoints({
       query: () => '/users/me',
       providesTags: ['User'],
     }),
+    refresh: builder.mutation<AuthResponse, RefreshRequest>({
+      query: (data) => ({
+        url: '/auth/refresh',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
-export const { useLoginMutation, useRegisterMutation, useGetMeQuery } = authApi;
+export const {
+  useLoginMutation,
+  useRegisterMutation,
+  useGetMeQuery,
+  useRefreshMutation,
+} = authApi;
