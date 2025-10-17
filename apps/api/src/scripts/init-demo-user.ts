@@ -15,7 +15,7 @@ import { env } from '../config/env';
 import logger from '../config/logger';
 import demoUserService from '../modules/demo/demo.service';
 
-async function initDemoUser() {
+async function initDemoUser(): Promise<void> {
   logger.info('🚀 Initializing demo user...');
 
   try {
@@ -34,7 +34,9 @@ async function initDemoUser() {
     logger.info('🎉 Demo user initialization completed');
     process.exit(0);
   } catch (error) {
-    logger.error('❌ Failed to setup demo user:', error);
+    logger.error('❌ Failed to setup demo user:', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     process.exit(1);
   }
 }
