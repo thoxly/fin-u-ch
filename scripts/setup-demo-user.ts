@@ -154,17 +154,17 @@ async function createInitialCatalogs(companyId: string) {
 
   // Контрагенты
   const counterparties = [
-    'ООО "Поставщик"',
-    'ИП Иванов И.И.',
-    'ОАО "Клиент"',
-    'ЗАО "Партнер"',
+    { name: 'ООО "Поставщик"', category: 'supplier' },
+    { name: 'ИП Иванов И.И.', category: 'supplier' },
+    { name: 'ОАО "Клиент"', category: 'customer' },
+    { name: 'ЗАО "Партнер"', category: 'customer' },
   ];
 
-  for (const cpName of counterparties) {
+  for (const cp of counterparties) {
     const existing = await prisma.counterparty.findFirst({
       where: {
         companyId,
-        name: cpName,
+        name: cp.name,
       },
     });
 
@@ -172,7 +172,8 @@ async function createInitialCatalogs(companyId: string) {
       await prisma.counterparty.create({
         data: {
           companyId,
-          name: cpName,
+          name: cp.name,
+          category: cp.category,
         },
       });
     }
