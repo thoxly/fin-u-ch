@@ -275,9 +275,9 @@ describe('Layout - MenuPopover Integration', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByText('Создать статью')).toBeInTheDocument();
-      expect(screen.getByText('Создать счет')).toBeInTheDocument();
-      expect(screen.getByText('Создать контрагента')).toBeInTheDocument();
+      expect(screen.getByLabelText('Создать статью')).toBeInTheDocument();
+      expect(screen.getByLabelText('Создать счет')).toBeInTheDocument();
+      expect(screen.getByLabelText('Создать контрагента')).toBeInTheDocument();
     });
   });
 
@@ -292,14 +292,14 @@ describe('Layout - MenuPopover Integration', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByText('Создать статью')).toBeInTheDocument();
+      expect(screen.getByLabelText('Создать статью')).toBeInTheDocument();
     });
 
-    const createButton = screen.getByText('Создать статью');
+    const createButton = screen.getByLabelText('Создать статью');
     fireEvent.click(createButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Создать статью')).toBeInTheDocument();
+      expect(screen.getByTestId('catalog-form-renderer')).toBeInTheDocument();
     });
   });
 
