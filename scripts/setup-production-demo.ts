@@ -1,12 +1,7 @@
 #!/usr/bin/env tsx
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 /* eslint-disable no-console */
-// @ts-nocheck - Script runs with tsx, types resolved at runtime
 
-import { PrismaClient } from '@prisma/client';
-import { DemoUserService } from '../apps/api/src/modules/demo/demo.service';
-
-const prisma = new PrismaClient();
+import demoUserService from '../apps/api/src/modules/demo/demo.service';
 
 /**
  * Создает демо-пользователя для продакшена с полными моковыми данными
@@ -15,8 +10,6 @@ const prisma = new PrismaClient();
 async function setupProductionDemo(): Promise<void> {
   try {
     console.log('🚀 Setting up production demo user...');
-
-    const demoUserService = new DemoUserService();
 
     // Проверяем, существует ли уже демо-пользователь
     const exists = await demoUserService.exists();

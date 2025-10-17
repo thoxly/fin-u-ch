@@ -29,9 +29,10 @@ export class DemoDataGeneratorService {
 
     // Генерируем доходы
     for (let i = 0; i < 20; i++) {
-      const date = new Date(2025, 0, 1 + i * 15);
-      const revenueArticle = articles.find((a) => a.name.includes('Доходы'));
-      const revenueAccount = accounts.find((a) => a.name.includes('Доходы'));
+      const date = new Date(2025, 0, 1);
+      date.setDate(date.getDate() + i * 15);
+      const revenueArticle = articles.find((a) => a.name === 'Выручка');
+      const revenueAccount = accounts.find((a) => a.name === 'Выручка');
       const client = counterparties.find((c) => c.category === 'customer');
       const deal = deals[Math.floor(Math.random() * deals.length)];
 
@@ -53,9 +54,10 @@ export class DemoDataGeneratorService {
 
     // Генерируем расходы
     for (let i = 0; i < 15; i++) {
-      const date = new Date(2025, 0, 5 + i * 20);
-      const expenseArticle = articles.find((a) => a.name.includes('Расходы'));
-      const expenseAccount = accounts.find((a) => a.name.includes('Расходы'));
+      const date = new Date(2025, 0, 5);
+      date.setDate(date.getDate() + i * 20);
+      const expenseArticle = articles.find((a) => a.name === 'Расходы');
+      const expenseAccount = accounts.find((a) => a.name === 'Расходы');
       const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
@@ -75,7 +77,8 @@ export class DemoDataGeneratorService {
 
     // Генерируем переводы
     for (let i = 0; i < 5; i++) {
-      const date = new Date(2025, 0, 10 + i * 30);
+      const date = new Date(2025, 0, 10);
+      date.setDate(date.getDate() + i * 30);
       const cashAccount = accounts.find((a) => a.name === 'Касса');
       const bankAccount = accounts.find((a) => a.name === 'Расчетный счет');
 
@@ -115,8 +118,8 @@ export class DemoDataGeneratorService {
 
     // Планы доходов
     for (let i = 0; i < 5; i++) {
-      const revenueArticle = articles.find((a) => a.name.includes('Доходы'));
-      const revenueAccount = accounts.find((a) => a.name.includes('Доходы'));
+      const revenueArticle = articles.find((a) => a.name === 'Выручка');
+      const revenueAccount = accounts.find((a) => a.name === 'Выручка');
       const client = counterparties.find((c) => c.category === 'customer');
 
       if (revenueArticle && revenueAccount && client) {
@@ -137,8 +140,8 @@ export class DemoDataGeneratorService {
 
     // Планы расходов
     for (let i = 0; i < 8; i++) {
-      const expenseArticle = articles.find((a) => a.name.includes('Расходы'));
-      const expenseAccount = accounts.find((a) => a.name.includes('Расходы'));
+      const expenseArticle = articles.find((a) => a.name === 'Расходы');
+      const expenseAccount = accounts.find((a) => a.name === 'Расходы');
       const supplier = counterparties.find((c) => c.category === 'supplier');
 
       if (expenseArticle && expenseAccount && supplier) {
@@ -177,9 +180,18 @@ export class DemoDataGeneratorService {
       const department =
         departments[Math.floor(Math.random() * departments.length)];
 
+      // Создаем сотрудника как контрагента
+      const employee = await prisma.counterparty.create({
+        data: {
+          companyId,
+          name: `Сотрудник ${i + 1}`,
+          category: 'employee',
+        },
+      });
+
       salaries.push({
         companyId,
-        employeeCounterpartyId: `demo-employee-${i + 1}`,
+        employeeCounterpartyId: employee.id,
         departmentId: department?.id,
         baseWage: Math.floor(Math.random() * 100000) + 50000,
         currency: 'RUB',

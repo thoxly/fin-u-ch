@@ -23,7 +23,15 @@ export const DemoCredentials: React.FC<DemoCredentialsProps> = ({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCredentials();
+    const loadCredentials = async (): Promise<void> => {
+      try {
+        await fetchCredentials();
+      } catch (error) {
+        console.error('Failed to load demo credentials:', error);
+      }
+    };
+
+    loadCredentials();
   }, []);
 
   const fetchCredentials = async (): Promise<void> => {

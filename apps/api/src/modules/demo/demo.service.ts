@@ -146,7 +146,11 @@ export class DemoUserService {
     await demoDataGeneratorService.createSampleData(company.id);
     logger.info('Sample data created');
 
-    return this.getInfo() as Promise<DemoUserData>;
+    const info = await this.getInfo();
+    if (!info) {
+      throw new Error('Failed to create demo user');
+    }
+    return info;
   }
 
   /**
