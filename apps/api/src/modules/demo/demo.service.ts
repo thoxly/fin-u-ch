@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../config/db';
 import bcrypt from 'bcryptjs';
 // import { seedInitialData } from '../../../../scripts/seed-initial-data';
 import logger from '../../config/logger';
@@ -36,8 +36,6 @@ export class DemoUserService {
   private static readonly DEMO_PASSWORD = 'demo123';
   private static readonly DEMO_COMPANY_NAME = 'Демо Компания ООО';
 
-  constructor(private prisma: PrismaClient) {}
-
   /**
    * Получает учетные данные демо-пользователя
    */
@@ -53,7 +51,7 @@ export class DemoUserService {
    * Проверяет, существует ли демо-пользователь
    */
   async exists(): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: DemoUserService.DEMO_EMAIL },
       include: { company: true },
     });
@@ -64,7 +62,7 @@ export class DemoUserService {
    * Получает информацию о демо-пользователе
    */
   async getInfo(): Promise<DemoUserData | null> {
-    const user = await this.prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: DemoUserService.DEMO_EMAIL },
       include: { company: true },
     });
@@ -80,11 +78,11 @@ export class DemoUserService {
       articlesCount,
       counterpartiesCount,
     ] = await Promise.all([
-      this.prisma.operation.count({ where: { companyId: user.companyId } }),
-      this.prisma.planItem.count({ where: { companyId: user.companyId } }),
-      this.prisma.account.count({ where: { companyId: user.companyId } }),
-      this.prisma.article.count({ where: { companyId: user.companyId } }),
-      this.prisma.counterparty.count({ where: { companyId: user.companyId } }),
+      prisma.operation.count({ where: { companyId: user.companyId } }),
+      prisma.planItem.count({ where: { companyId: user.companyId } }),
+      prisma.account.count({ where: { companyId: user.companyId } }),
+      prisma.article.count({ where: { companyId: user.companyId } }),
+      prisma.counterparty.count({ where: { companyId: user.companyId } }),
     ]);
 
     return {
@@ -113,7 +111,7 @@ export class DemoUserService {
     logger.info('Creating demo user...');
 
     // Проверяем, не существует ли уже демо-пользователь
-    const existingUser = await this.prisma.user.findUnique({
+    const existingUser = await prisma.user.findUnique({
       where: { email: DemoUserService.DEMO_EMAIL },
       include: { company: true },
     });
@@ -124,7 +122,7 @@ export class DemoUserService {
     }
 
     // Создаем компанию
-    const company = await this.prisma.company.create({
+    const company = await prisma.company.create({
       data: {
         name: DemoUserService.DEMO_COMPANY_NAME,
         currencyBase: 'RUB',
@@ -135,7 +133,7 @@ export class DemoUserService {
 
     // Создаем пользователя
     const hashedPassword = await bcrypt.hash(DemoUserService.DEMO_PASSWORD, 10);
-    const user = await this.prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         companyId: company.id,
         email: DemoUserService.DEMO_EMAIL,
@@ -163,7 +161,7 @@ export class DemoUserService {
   async delete(): Promise<void> {
     logger.info('Deleting demo user...');
 
-    const user = await this.prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email: DemoUserService.DEMO_EMAIL },
       include: { company: true },
     });
@@ -174,23 +172,23 @@ export class DemoUserService {
     }
 
     // Удаляем все данные компании
-    await this.prisma.$transaction([
-      this.prisma.operation.deleteMany({
+    await prisma.$transaction([
+      prisma.operation.deleteMany({
         where: { companyId: user.companyId },
       }),
-      this.prisma.planItem.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.salary.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.deal.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.counterparty.deleteMany({
+      prisma.planItem.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.salary.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.deal.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.counterparty.deleteMany({
         where: { companyId: user.companyId },
       }),
-      this.prisma.department.deleteMany({
+      prisma.department.deleteMany({
         where: { companyId: user.companyId },
       }),
-      this.prisma.article.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.account.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.user.deleteMany({ where: { companyId: user.companyId } }),
-      this.prisma.company.delete({ where: { id: user.companyId } }),
+      prisma.article.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.account.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.user.deleteMany({ where: { companyId: user.companyId } }),
+      prisma.company.delete({ where: { id: user.companyId } }),
     ]);
 
     logger.info('Demo user and all related data deleted');
@@ -201,7 +199,7 @@ export class DemoUserService {
    */
   private async createInitialCatalogs(companyId: string): Promise<void> {
     // Создаем счета
-    await this.prisma.account.createMany({
+    await prisma.account.createMany({
       data: [
         {
           companyId,
@@ -239,7 +237,7 @@ export class DemoUserService {
     });
 
     // Создаем подразделения
-    await this.prisma.department.createMany({
+    await prisma.department.createMany({
       data: [
         {
           companyId,
@@ -270,7 +268,7 @@ export class DemoUserService {
     });
 
     // Создаем контрагентов
-    await this.prisma.counterparty.createMany({
+    await prisma.counterparty.createMany({
       data: [
         {
           companyId,
@@ -346,7 +344,7 @@ export class DemoUserService {
     });
 
     // Создаем статьи доходов и расходов
-    const incomeOperating = await this.prisma.article.create({
+    const incomeOperating = await prisma.article.create({
       data: {
         companyId,
         name: 'Операционная деятельность (доходы)',
@@ -356,7 +354,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -380,7 +378,7 @@ export class DemoUserService {
     });
 
     // Создаем статьи расходов
-    const expenseOperating = await this.prisma.article.create({
+    const expenseOperating = await prisma.article.create({
       data: {
         companyId,
         name: 'Операционная деятельность (расходы)',
@@ -390,7 +388,7 @@ export class DemoUserService {
       },
     });
 
-    const fot = await this.prisma.article.create({
+    const fot = await prisma.article.create({
       data: {
         companyId,
         name: 'ФОТ',
@@ -402,7 +400,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -435,7 +433,7 @@ export class DemoUserService {
     });
 
     // Операционные расходы
-    const opex = await this.prisma.article.create({
+    const opex = await prisma.article.create({
       data: {
         companyId,
         name: 'Операционные расходы',
@@ -447,7 +445,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -498,7 +496,7 @@ export class DemoUserService {
     });
 
     // Себестоимость
-    const cogs = await this.prisma.article.create({
+    const cogs = await prisma.article.create({
       data: {
         companyId,
         name: 'Себестоимость',
@@ -510,7 +508,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -534,7 +532,7 @@ export class DemoUserService {
     });
 
     // Налоги
-    const taxes = await this.prisma.article.create({
+    const taxes = await prisma.article.create({
       data: {
         companyId,
         name: 'Налоги',
@@ -546,7 +544,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -579,7 +577,7 @@ export class DemoUserService {
     });
 
     // Инвестиционная деятельность
-    const investing = await this.prisma.article.create({
+    const investing = await prisma.article.create({
       data: {
         companyId,
         name: 'Инвестиционная деятельность',
@@ -589,7 +587,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -622,7 +620,7 @@ export class DemoUserService {
     });
 
     // Финансовая деятельность
-    const financing = await this.prisma.article.create({
+    const financing = await prisma.article.create({
       data: {
         companyId,
         name: 'Финансовая деятельность',
@@ -632,7 +630,7 @@ export class DemoUserService {
       },
     });
 
-    await this.prisma.article.createMany({
+    await prisma.article.createMany({
       data: [
         {
           companyId,
@@ -665,16 +663,16 @@ export class DemoUserService {
     });
 
     // Создаем сделки
-    const customer1 = await this.prisma.counterparty.findFirst({
+    const customer1 = await prisma.counterparty.findFirst({
       where: { companyId, name: 'ООО "Клиент-1"' },
     });
 
-    const salesDept = await this.prisma.department.findFirst({
+    const salesDept = await prisma.department.findFirst({
       where: { companyId, name: 'Отдел продаж' },
     });
 
     if (customer1 && salesDept) {
-      await this.prisma.deal.createMany({
+      await prisma.deal.createMany({
         data: [
           {
             companyId,
@@ -703,10 +701,10 @@ export class DemoUserService {
   private async createSampleData(companyId: string): Promise<void> {
     // Получаем нужные ID
     const [accounts, articles, counterparties, deals] = await Promise.all([
-      this.prisma.account.findMany({ where: { companyId } }),
-      this.prisma.article.findMany({ where: { companyId } }),
-      this.prisma.counterparty.findMany({ where: { companyId } }),
-      this.prisma.deal.findMany({ where: { companyId } }),
+      prisma.account.findMany({ where: { companyId } }),
+      prisma.article.findMany({ where: { companyId } }),
+      prisma.counterparty.findMany({ where: { companyId } }),
+      prisma.deal.findMany({ where: { companyId } }),
     ]);
 
     const mainAccount = accounts.find(
@@ -790,7 +788,7 @@ export class DemoUserService {
 
     // Создаем операции в базе
     if (operations.length > 0) {
-      await this.prisma.operation.createMany({
+      await prisma.operation.createMany({
         data: operations.map((op) => ({
           companyId,
           type: op.type,
@@ -1089,7 +1087,7 @@ export class DemoUserService {
         continue;
       }
 
-      await this.prisma.planItem.create({
+      await prisma.planItem.create({
         data: {
           companyId,
           type: plan.type,
@@ -1120,12 +1118,12 @@ export class DemoUserService {
     const employee = counterparties.find(
       (c) => c.name === 'Иванов Иван Иванович'
     );
-    const salesDept = await this.prisma.department.findFirst({
+    const salesDept = await prisma.department.findFirst({
       where: { companyId, name: 'Отдел продаж' },
     });
 
     if (employee && salesDept) {
-      await this.prisma.salary.create({
+      await prisma.salary.create({
         data: {
           companyId,
           employeeCounterpartyId: employee.id,
@@ -1141,3 +1139,5 @@ export class DemoUserService {
     }
   }
 }
+
+export default new DemoUserService();

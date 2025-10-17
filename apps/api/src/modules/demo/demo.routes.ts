@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { DemoUserController } from './demo.controller';
-import prisma from '../../config/db';
-import { authenticateToken } from '../../middlewares/auth';
+import { authenticate } from '../../middlewares/auth';
+import { extractTenant } from '../../middlewares/tenant';
+import demoUserController from './demo.controller';
 
 const router: Router = Router();
-const demoUserController = new DemoUserController(prisma);
 
 /**
  * @swagger
@@ -13,39 +12,12 @@ const demoUserController = new DemoUserController(prisma);
  *   description: Demo user management endpoints
  */
 
-/**
- * @swagger
- * /api/demo/credentials:
- *   get:
- *     summary: Get demo user credentials
- *     description: Returns the credentials for the demo user account
- *     tags: [Demo]
- *     responses:
- *       200:
- *         description: Demo user credentials
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     email:
- *                       type: string
- *                       example: demo@example.com
- *                     password:
- *                       type: string
- *                       example: demo123
- *                     companyName:
- *                       type: string
- *                       example: Демо Компания ООО
- */
 // Публичный endpoint для получения кредов (без аутентификации)
 router.get('/credentials', demoUserController.getCredentials);
+
+// Защищенные endpoints (требуют аутентификации)
+router.use(authenticate);
+router.use(extractTenant);
 
 /**
  * @swagger
@@ -54,6 +26,8 @@ router.get('/credentials', demoUserController.getCredentials);
  *     summary: Get demo user information
  *     description: Returns detailed information about the demo user and their data
  *     tags: [Demo]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Demo user information
@@ -66,49 +40,21 @@ router.get('/credentials', demoUserController.getCredentials);
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         isActive:
- *                           type: boolean
- *                     company:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         name:
- *                           type: string
- *                         currencyBase:
- *                           type: string
- *                     operationsCount:
- *                       type: number
- *                     plansCount:
- *                       type: number
- *                     accountsCount:
- *                       type: number
- *                     articlesCount:
- *                       type: number
- *                     counterpartiesCount:
- *                       type: number
+ *                   $ref: '#/components/schemas/DemoUserData'
  *       404:
  *         description: Demo user not found
  */
-// Защищенные endpoints (требуют аутентификации)
-router.get('/info', authenticateToken, demoUserController.getInfo);
+router.get('/info', demoUserController.getInfo);
 
 /**
  * @swagger
  * /api/demo/exists:
  *   get:
  *     summary: Check if demo user exists
- *     description: Checks whether the demo user account exists in the system
+ *     description: Returns whether the demo user exists in the system
  *     tags: [Demo]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Demo user existence status
@@ -120,19 +66,24 @@ router.get('/info', authenticateToken, demoUserController.getInfo);
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 exists:
- *                   type: boolean
- *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     exists:
+ *                       type: boolean
+ *                       example: true
  */
-router.get('/exists', authenticateToken, demoUserController.checkExists);
+router.get('/exists', demoUserController.checkExists);
 
 /**
  * @swagger
  * /api/demo/create:
  *   post:
- *     summary: Create demo user with sample data
- *     description: Creates a demo user account with sample financial data for demonstration purposes
+ *     summary: Create demo user
+ *     description: Creates a new demo user with sample data for testing
  *     tags: [Demo]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       201:
  *         description: Demo user created successfully
@@ -144,52 +95,25 @@ router.get('/exists', authenticateToken, demoUserController.checkExists);
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     user:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         email:
- *                           type: string
- *                         isActive:
- *                           type: boolean
- *                     company:
- *                       type: object
- *                       properties:
- *                         id:
- *                           type: string
- *                         name:
- *                           type: string
- *                         currencyBase:
- *                           type: string
- *                     operationsCount:
- *                       type: number
- *                     plansCount:
- *                       type: number
- *                     accountsCount:
- *                       type: number
- *                     articlesCount:
- *                       type: number
- *                     counterpartiesCount:
- *                       type: number
  *                 message:
  *                   type: string
  *                   example: Demo user created successfully
+ *       409:
+ *         description: Demo user already exists
  *       500:
  *         description: Failed to create demo user
  */
-router.post('/create', authenticateToken, demoUserController.create);
+router.post('/create', demoUserController.create);
 
 /**
  * @swagger
  * /api/demo/delete:
  *   delete:
- *     summary: Delete demo user and all related data
- *     description: Permanently deletes the demo user account and all associated data
+ *     summary: Delete demo user
+ *     description: Deletes the demo user and all associated data
  *     tags: [Demo]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Demo user deleted successfully
@@ -204,9 +128,11 @@ router.post('/create', authenticateToken, demoUserController.create);
  *                 message:
  *                   type: string
  *                   example: Demo user deleted successfully
+ *       404:
+ *         description: Demo user not found
  *       500:
  *         description: Failed to delete demo user
  */
-router.delete('/delete', authenticateToken, demoUserController.delete);
+router.delete('/delete', demoUserController.delete);
 
 export default router;

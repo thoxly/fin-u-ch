@@ -16,7 +16,7 @@ async function setupProductionDemo(): Promise<void> {
   try {
     console.log('🚀 Setting up production demo user...');
 
-    const demoUserService = new DemoUserService(prisma);
+    const demoUserService = new DemoUserService();
 
     // Проверяем, существует ли уже демо-пользователь
     const exists = await demoUserService.exists();

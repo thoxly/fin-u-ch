@@ -1,6 +1,6 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { DemoUserService } from './demo.service';
+import { Response, NextFunction } from 'express';
+import { TenantRequest } from '../../middlewares/tenant';
+import demoUserService from './demo.service';
 import logger from '../../config/logger';
 
 /**
@@ -29,8 +29,8 @@ import logger from '../../config/logger';
  *               type: string
  *             email:
  *               type: string
- *             isActive:
- *               type: boolean
+ *             companyId:
+ *               type: string
  *         company:
  *           type: object
  *           properties:
@@ -38,31 +38,28 @@ import logger from '../../config/logger';
  *               type: string
  *             name:
  *               type: string
- *             currencyBase:
- *               type: string
- *         operationsCount:
- *           type: number
- *         plansCount:
- *           type: number
- *         accountsCount:
- *           type: number
- *         articlesCount:
- *           type: number
- *         counterpartiesCount:
- *           type: number
+ *         statistics:
+ *           type: object
+ *           properties:
+ *             operationsCount:
+ *               type: number
+ *             plansCount:
+ *               type: number
+ *             accountsCount:
+ *               type: number
+ *             articlesCount:
+ *               type: number
+ *             counterpartiesCount:
+ *               type: number
  */
+
 export class DemoUserController {
-  private demoUserService: DemoUserService;
-
-  constructor(private prisma: PrismaClient) {
-    this.demoUserService = new DemoUserService(prisma);
-  }
-
   /**
    * @swagger
    * /api/demo/credentials:
    *   get:
    *     summary: Get demo user credentials
+   *     description: Returns demo user login credentials for testing
    *     tags: [Demo]
    *     responses:
    *       200:
@@ -70,31 +67,42 @@ export class DemoUserController {
    *         content:
    *           application/json:
    *             schema:
-   *               $ref: '#/components/schemas/DemoUserCredentials'
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   $ref: '#/components/schemas/DemoUserCredentials'
+   *       404:
+   *         description: Demo user not found
    */
-  getCredentials = async (req: Request, res: Response): Promise<void> => {
+  async getCredentials(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const credentials = this.demoUserService.getCredentials();
-
+      const credentials = demoUserService.getCredentials();
       res.json({
         success: true,
         data: credentials,
       });
     } catch (error) {
-      logger.error('Failed to get demo credentials:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get demo credentials',
-      });
+      logger.error('Failed to get demo credentials', { error });
+      next(error);
     }
-  };
+  }
 
   /**
    * @swagger
    * /api/demo/info:
    *   get:
    *     summary: Get demo user information
+   *     description: Returns detailed information about the demo user and their data
    *     tags: [Demo]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: Demo user information
@@ -105,21 +113,24 @@ export class DemoUserController {
    *               properties:
    *                 success:
    *                   type: boolean
+   *                   example: true
    *                 data:
    *                   $ref: '#/components/schemas/DemoUserData'
    *       404:
    *         description: Demo user not found
    */
-  getInfo = async (req: Request, res: Response): Promise<void> => {
+  async getInfo(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const info = await this.demoUserService.getInfo();
-
+      const info = await demoUserService.getInfo();
       if (!info) {
-        res.status(404).json({
+        return res.status(404).json({
           success: false,
           error: 'Demo user not found',
         });
-        return;
       }
 
       res.json({
@@ -127,20 +138,20 @@ export class DemoUserController {
         data: info,
       });
     } catch (error) {
-      logger.error('Failed to get demo user info:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get demo user info',
-      });
+      logger.error('Failed to get demo user info', { error });
+      next(error);
     }
-  };
+  }
 
   /**
    * @swagger
    * /api/demo/exists:
    *   get:
    *     summary: Check if demo user exists
+   *     description: Returns whether the demo user exists in the system
    *     tags: [Demo]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: Demo user existence status
@@ -151,32 +162,40 @@ export class DemoUserController {
    *               properties:
    *                 success:
    *                   type: boolean
-   *                 exists:
-   *                   type: boolean
+   *                   example: true
+   *                 data:
+   *                   type: object
+   *                   properties:
+   *                     exists:
+   *                       type: boolean
+   *                       example: true
    */
-  checkExists = async (req: Request, res: Response): Promise<void> => {
+  async checkExists(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const exists = await this.demoUserService.exists();
-
+      const exists = await demoUserService.exists();
       res.json({
         success: true,
-        exists,
+        data: { exists },
       });
     } catch (error) {
-      logger.error('Failed to check demo user existence:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to check demo user existence',
-      });
+      logger.error('Failed to check demo user existence', { error });
+      next(error);
     }
-  };
+  }
 
   /**
    * @swagger
    * /api/demo/create:
    *   post:
-   *     summary: Create demo user with sample data
+   *     summary: Create demo user
+   *     description: Creates a new demo user with sample data for testing
    *     tags: [Demo]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       201:
    *         description: Demo user created successfully
@@ -187,35 +206,49 @@ export class DemoUserController {
    *               properties:
    *                 success:
    *                   type: boolean
-   *                 data:
-   *                   $ref: '#/components/schemas/DemoUserData'
+   *                   example: true
+   *                 message:
+   *                   type: string
+   *                   example: Demo user created successfully
+   *       409:
+   *         description: Demo user already exists
    *       500:
    *         description: Failed to create demo user
    */
-  create = async (req: Request, res: Response): Promise<void> => {
+  async create(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      const demoUserData = await this.demoUserService.create();
+      const exists = await demoUserService.exists();
+      if (exists) {
+        return res.status(409).json({
+          success: false,
+          error: 'Demo user already exists',
+        });
+      }
 
+      await demoUserService.create();
       res.status(201).json({
         success: true,
-        data: demoUserData,
         message: 'Demo user created successfully',
       });
     } catch (error) {
-      logger.error('Failed to create demo user:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to create demo user',
-      });
+      logger.error('Failed to create demo user', { error });
+      next(error);
     }
-  };
+  }
 
   /**
    * @swagger
    * /api/demo/delete:
    *   delete:
-   *     summary: Delete demo user and all related data
+   *     summary: Delete demo user
+   *     description: Deletes the demo user and all associated data
    *     tags: [Demo]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       200:
    *         description: Demo user deleted successfully
@@ -226,25 +259,39 @@ export class DemoUserController {
    *               properties:
    *                 success:
    *                   type: boolean
+   *                   example: true
    *                 message:
    *                   type: string
+   *                   example: Demo user deleted successfully
+   *       404:
+   *         description: Demo user not found
    *       500:
    *         description: Failed to delete demo user
    */
-  delete = async (req: Request, res: Response): Promise<void> => {
+  async delete(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
-      await this.demoUserService.delete();
+      const exists = await demoUserService.exists();
+      if (!exists) {
+        return res.status(404).json({
+          success: false,
+          error: 'Demo user not found',
+        });
+      }
 
+      await demoUserService.delete();
       res.json({
         success: true,
         message: 'Demo user deleted successfully',
       });
     } catch (error) {
-      logger.error('Failed to delete demo user:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete demo user',
-      });
+      logger.error('Failed to delete demo user', { error });
+      next(error);
     }
-  };
+  }
 }
+
+export default new DemoUserController();

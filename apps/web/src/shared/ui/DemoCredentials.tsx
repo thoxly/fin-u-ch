@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './Card';
-import { Button } from './Button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
+import { Button } from '@/shared/ui/Button';
 import { Copy, Eye, EyeOff } from 'lucide-react';
-import { apiClient } from '../api/axios';
+import { apiClient } from '@/shared/api/axios';
 
 interface DemoCredentials {
   email: string;
