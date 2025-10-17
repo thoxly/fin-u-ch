@@ -55,6 +55,7 @@ export class DemoUserService {
   async exists(): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
       where: { email: DemoUserService.DEMO_EMAIL },
+      include: { company: true },
     });
     return !!user;
   }
@@ -788,9 +789,9 @@ export class DemoUserService {
     });
 
     // Создаем операции в базе
-    for (const op of operations) {
-      await this.prisma.operation.create({
-        data: {
+    if (operations.length > 0) {
+      await this.prisma.operation.createMany({
+        data: operations.map((op) => ({
           companyId,
           type: op.type,
           operationDate: op.date,
@@ -803,7 +804,7 @@ export class DemoUserService {
           counterpartyId: op.counterparty?.id,
           dealId: op.deal?.id,
           description: `Sample operation for ${op.date.toISOString().split('T')[0]}`,
-        },
+        })),
       });
     }
 
