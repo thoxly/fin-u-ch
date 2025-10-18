@@ -81,7 +81,8 @@ describe('UserProfileForm', () => {
   });
 
   it('calls updateUser when save button is clicked', async () => {
-    mockUpdateUser.mockResolvedValue({ unwrap: () => Promise.resolve() });
+    const mockUnwrap = jest.fn().mockResolvedValue({});
+    mockUpdateUser.mockReturnValue({ unwrap: mockUnwrap });
 
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
@@ -117,7 +118,7 @@ describe('UserProfileForm', () => {
 
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
   it('calls onClose when cancel button is clicked', () => {
