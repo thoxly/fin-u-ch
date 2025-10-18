@@ -1,7 +1,5 @@
 import { ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch } from 'react-redux';
-import { logout } from '../../store/slices/authSlice';
+import { Link, useLocation } from 'react-router-dom';
 import { useGetMeQuery } from '../../store/api/authApi';
 import * as Icons from 'lucide-react';
 import { IconPickerPopover } from './IconPickerPopover';
@@ -10,7 +8,7 @@ import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from './UserMenu';
-import { UserProfileModal } from './UserProfileModal';
+import { UserProfileModal } from '../../features/user-profile';
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,8 +40,6 @@ const navigation: NavigationItem[] = [
 
 export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { getIcon, updateIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
 
