@@ -123,7 +123,8 @@ describe('UserMenu', () => {
     );
 
     const menuButton = screen.getByRole('button');
-    const chevron = menuButton.querySelector('svg');
+    const chevrons = menuButton.querySelectorAll('svg');
+    const chevron = chevrons[1]; // Second SVG is the chevron
 
     expect(chevron).not.toHaveClass('rotate-180');
 

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, Save, User, Mail, Building } from 'lucide-react';
 import { useGetMeQuery, useUpdateUserMutation } from '../../store/api/authApi';
-import { Input } from './Input';
-import { Button } from './Button';
+import { Input } from '../../shared/ui/Input';
+import { Button } from '../../shared/ui/Button';
 
 interface UserProfileModalProps {
   isOpen: boolean;
