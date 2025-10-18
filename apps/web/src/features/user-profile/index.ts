@@ -1,1 +1,1 @@
-export { UserProfileModal } from './UserProfileModal';
+export { UserProfileForm } from './UserProfileForm';

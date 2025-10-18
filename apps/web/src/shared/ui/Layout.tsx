@@ -7,8 +7,8 @@ import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
-import { UserMenu } from './UserMenu';
-import { UserProfileModal } from '../../features/user-profile';
+import { UserMenu } from '../../features/user-menu';
+import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
 
 interface LayoutProps {
   children: ReactNode;
@@ -62,7 +62,8 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     catalogType: string;
   }>({ isOpen: false, title: '', catalogType: '' });
 
-  const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
+  const [userProfileOffCanvasOpen, setUserProfileOffCanvasOpen] =
+    useState(false);
 
   const isActive = (href: string): boolean => location.pathname === href;
 
@@ -194,7 +195,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             </div>
             <UserMenu
               userEmail={user?.email}
-              onProfileClick={() => setUserProfileModalOpen(true)}
+              onProfileClick={() => setUserProfileOffCanvasOpen(true)}
             />
           </div>
         </div>
@@ -303,11 +304,16 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         </OffCanvas>
       )}
 
-      {/* User Profile Modal */}
-      <UserProfileModal
-        isOpen={userProfileModalOpen}
-        onClose={() => setUserProfileModalOpen(false)}
-      />
+      {/* User Profile OffCanvas */}
+      {userProfileOffCanvasOpen && (
+        <OffCanvas
+          isOpen={userProfileOffCanvasOpen}
+          onClose={() => setUserProfileOffCanvasOpen(false)}
+          title="Мой профиль"
+        >
+          <UserProfileForm onClose={() => setUserProfileOffCanvasOpen(false)} />
+        </OffCanvas>
+      )}
     </div>
   );
 };
