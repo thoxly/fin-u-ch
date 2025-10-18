@@ -5,13 +5,13 @@ import { configureStore } from '@reduxjs/toolkit';
 import { UserProfileModal } from './UserProfileModal';
 
 // Mock the authApi
-jest.mock('../../store/api/authApi', () => ({
-  useGetMeQuery: jest.fn(),
-  useUpdateUserMutation: jest.fn(),
-}));
-
 const mockUseGetMeQuery = jest.fn();
 const mockUseUpdateUserMutation = jest.fn();
+
+jest.mock('../../store/api/authApi', () => ({
+  useGetMeQuery: () => mockUseGetMeQuery(),
+  useUpdateUserMutation: () => mockUseUpdateUserMutation(),
+}));
 
 const createMockStore = () => {
   return configureStore({
