@@ -2,12 +2,15 @@ import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
+import { useGetMeQuery } from '../../store/api/authApi';
 import * as Icons from 'lucide-react';
 import { IconPickerPopover } from './IconPickerPopover';
 import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
+import { UserMenu } from './UserMenu';
+import { UserProfileModal } from './UserProfileModal';
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,6 +45,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { getIcon, updateIcon } = useNavigationIcons();
+  const { data: user } = useGetMeQuery();
 
   const [iconPickerState, setIconPickerState] = useState<{
     isOpen: boolean;
@@ -62,10 +66,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     catalogType: string;
   }>({ isOpen: false, title: '', catalogType: '' });
 
-  const handleLogout = (): void => {
-    dispatch(logout());
-    navigate('/login');
-  };
+  const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
 
   const isActive = (href: string): boolean => location.pathname === href;
 
@@ -195,12 +196,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 Fin-U-CH
               </Link>
             </div>
-            <button
-              onClick={handleLogout}
-              className="text-gray-600 hover:text-gray-900 transition-colors dark:text-gray-300 dark:hover:text-gray-100"
-            >
-              Выйти
-            </button>
+            <UserMenu
+              userEmail={user?.email}
+              onProfileClick={() => setUserProfileModalOpen(true)}
+            />
           </div>
         </div>
       </header>
@@ -307,6 +306,12 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           />
         </OffCanvas>
       )}
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={userProfileModalOpen}
+        onClose={() => setUserProfileModalOpen(false)}
+      />
     </div>
   );
 };

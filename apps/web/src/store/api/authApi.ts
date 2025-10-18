@@ -16,6 +16,9 @@ interface AuthResponse {
     id: string;
     email: string;
     companyId: string;
+    firstName?: string;
+    lastName?: string;
+    companyName?: string;
   };
   accessToken: string;
   refreshToken: string;
@@ -23,6 +26,13 @@ interface AuthResponse {
 
 interface RefreshRequest {
   refreshToken: string;
+}
+
+interface UpdateUserRequest {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
 }
 
 export const authApi = apiSlice.injectEndpoints({
@@ -52,6 +62,14 @@ export const authApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    updateUser: builder.mutation<AuthResponse['user'], UpdateUserRequest>({
+      query: (data) => ({
+        url: '/users/me',
+        method: 'PATCH',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -60,4 +78,5 @@ export const {
   useRegisterMutation,
   useGetMeQuery,
   useRefreshMutation,
+  useUpdateUserMutation,
 } = authApi;

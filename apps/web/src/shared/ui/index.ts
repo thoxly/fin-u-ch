@@ -9,3 +9,5 @@ export { IconPickerPopover } from './IconPickerPopover';
 export { MenuPopover } from './MenuPopover';
 export type { MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 export { EmptyState } from './EmptyState';
+export { UserMenu } from './UserMenu';
+export { UserProfileModal } from './UserProfileModal';
