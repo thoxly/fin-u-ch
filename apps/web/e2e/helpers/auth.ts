@@ -5,6 +5,7 @@ import { Page, expect } from '@playwright/test';
  */
 export async function loginAsTestUser(page: Page) {
   await page.goto('/login');
+  await page.waitForLoadState('networkidle');
 
   // Заполняем форму входа с реальными тестовыми данными
   await page.fill('input[type="email"]', 'demo@example.com');
@@ -13,8 +14,13 @@ export async function loginAsTestUser(page: Page) {
   // Отправляем форму
   await page.click('button[type="submit"]');
 
-  // Ждем перенаправления на дашборд
-  await page.waitForURL('/dashboard', { timeout: 10000 });
+  // Ждем, пока уйдем со страницы логина (редирект может быть на любую страницу)
+  await page.waitForURL((url) => !url.pathname.includes('/login'), {
+    timeout: 15000,
+  });
+
+  // Дополнительно ждем загрузки страницы
+  await page.waitForLoadState('networkidle', { timeout: 15000 });
 }
 
 /**

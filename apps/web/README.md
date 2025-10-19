@@ -1,8 +1,8 @@
-# Web Frontend
+# Web (SPA)
 
-React frontend для финансовой системы Fin-U-CH.
+React + TypeScript + Vite frontend for Fin-U-CH.
 
-## Технологии
+## Tech stack
 
 - React 18 + TypeScript
 - Vite
@@ -11,120 +11,115 @@ React frontend для финансовой системы Fin-U-CH.
 - Tailwind CSS
 - Axios
 
-## Быстрый старт
+## Quick start
 
-### 1. Установка зависимостей
+### 1) Install
 
 ```bash
 pnpm install
 ```
 
-### 2. Запуск dev-сервера
+### 2) Run dev server
 
 ```bash
 pnpm dev
+# Open http://localhost:5173
 ```
 
-Приложение будет доступно на `http://localhost:3000`
-
-### 3. Сборка для production
+### 3) Build for production
 
 ```bash
 pnpm build
+pnpm preview
 ```
 
-## Доступные скрипты
+## Scripts
 
-- `pnpm dev` - запуск dev-сервера
-- `pnpm build` - сборка для production
-- `pnpm preview` - предпросмотр production сборки
-- `pnpm lint` - проверка кода с ESLint
+- `pnpm dev` — start dev server
+- `pnpm build` — production build
+- `pnpm preview` — preview production build
+- `pnpm lint` — run ESLint
 
-## Структура проекта
+## Project structure
 
 ```
 src/
 ├── main.tsx              # Entry point
-├── App.tsx               # Root component с роутингом
-├── components/           # Общие компоненты
-├── pages/                # Страницы приложения
-├── features/             # Feature-модули с бизнес-логикой
-├── store/                # Redux store и API
-└── shared/               # Переиспользуемые UI и утилиты
-    ├── ui/               # UI компоненты
-    ├── lib/              # Утилиты
-    ├── api/              # API клиент
-    └── config/           # Конфигурация
+├── App.tsx               # Root component with routing
+├── components/           # Shared components
+├── pages/                # Route pages
+├── features/             # Feature modules
+├── store/                # Redux store and API
+└── shared/               # Reusable UI & utilities
+    ├── ui/               # UI components
+    ├── lib/              # Utilities
+    ├── api/              # API client
+    └── config/           # Configuration
 ```
 
-## Маршруты
+## Routing
 
-### Публичные
+Defined in `src/App.tsx`:
 
-- `/login` - вход
-- `/register` - регистрация
+- Public: `/`, `/login`, `/register`
+- Private (wrapped by `PrivateRoute`):
+  - `/dashboard`
+  - `/operations`
+  - `/plans`
+  - `/reports`
+  - `/catalogs/articles`
+  - `/catalogs/accounts`
+  - `/catalogs/departments`
+  - `/catalogs/counterparties`
+  - `/catalogs/deals`
+  - `/catalogs/salaries`
 
-### Приватные
+Unknown paths redirect to `/`.
 
-- `/dashboard` - главная
-- `/operations` - операции
-- `/plans` - планы
-- `/reports` - отчеты
-- `/catalogs/*` - справочники
+## State management
 
-## API Integration
+- `src/store/store.ts` — store setup
+- `src/store/api/apiSlice.ts` — RTK Query API slice
+- Slices: `auth`, `notification`, etc.
+- Notifications via `NotificationContainer` mounted in `App`.
 
-- Все запросы через `/api` проксируются на backend (localhost:4000)
-- JWT токены хранятся в localStorage
-- Автоматический refresh при 401
+## Environment
 
-## Разработка
+- `VITE_API_URL=/api` (default dev/prod via Nginx/proxy)
+- See root `env.example` and `apps/web/vite.config.ts` for proxy settings.
 
-### Добавление новой страницы
+## Local development
 
-1. Создать компонент в `src/pages/`
-2. Добавить маршрут в `src/App.tsx`
-3. Обернуть в `<PrivateRoute>` если нужна авторизация
+Requirements:
 
-### Добавление нового API endpoint
+- API running on `localhost:4000` (see `apps/api`)
 
-1. Открыть соответствующий файл в `src/store/api/`
-2. Добавить endpoint через `injectEndpoints`
-3. Использовать сгенерированный hook в компоненте
-
-### Добавление нового UI компонента
-
-1. Создать компонент в `src/shared/ui/`
-2. Экспортировать из компонента
-3. Использовать в страницах/features
-
-## Переменные окружения
-
-Создать `.env.local`:
-
-```env
-VITE_API_URL=/api
-```
-
-## Troubleshooting
-
-### Не работает proxy к API
-
-Проверьте что backend запущен на порту 4000
-
-### TypeScript ошибки
+Start dev server (Vite HMR):
 
 ```bash
-pnpm tsc --noEmit
+cd apps/web
+pnpm dev
+# Open http://localhost:5173
 ```
 
-### Проблемы с типами из @shared
+Vite proxies `/api/*` to `http://localhost:4000`.
+
+## Testing
+
+- Unit/Integration: Jest + Testing Library
+- E2E: Playwright
 
 ```bash
-cd ../../packages/shared && pnpm build
+pnpm test
+pnpm test:e2e
+pnpm test:e2e:ui
 ```
 
-## Документация
+## Auth
 
-- [PHASE5_RESULTS.md](../../docs/PHASE5_RESULTS.md) - детальные результаты
-- [PHASE5_SUMMARY.md](../../PHASE5_SUMMARY.md) - краткая сводка
+- JWT-based. Requests attach `Authorization: Bearer <token>` via API client.
+
+## Notes
+
+- Keep routes in sync with backend prefixes under `/api/*`.
+- Use shared DTOs/constants from `packages/shared` when possible.

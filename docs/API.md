@@ -2,18 +2,18 @@
 
 ## OpenAPI / Swagger
 
-API автоматически документируется через **swagger-jsdoc** и доступна в интерактивном виде через **swagger-ui-express**.
+The API is documented via **swagger-jsdoc** and served with **swagger-ui-express**.
 
-- **URL документации**: `/api-docs` (в режиме разработки и production).
-- **Формат**: OpenAPI 3.0.
-- **Генерация**: аннотации JSDoc в контроллерах и роутах автоматически парсятся в OpenAPI спецификацию.
+- **Swagger UI**: `/api-docs` (both development and production)
+- **Format**: OpenAPI 3.0
+- **Generation**: JSDoc annotations in route files are compiled into the OpenAPI spec
 
-### Пример аннотации:
+### JSDoc annotation example
 
 ```javascript
 /**
  * @swagger
- * /operations:
+ * /api/operations:
  *   get:
  *     summary: Get all operations
  *     tags: [Operations]
@@ -29,16 +29,29 @@ API автоматически документируется через **swagg
  */
 ```
 
-### Конфигурация:
+### Configuration
 
-- Файл конфигурации: `apps/api/src/config/swagger.ts`.
-- Включает описание API, версию, сервер, security schemes (JWT).
+- Config file: `apps/api/src/config/swagger.ts`
+- Includes API info, servers, and security schemes (JWT bearer)
+
+---
+
+## Base URL and Health
+
+- All endpoints are prefixed with `/api` (see `apps/api/src/app.ts`).
+- Health check: `GET /api/health` → `{ status: "ok", timestamp: "..." }`
+
+## Security
+
+- Authentication uses JWT bearer tokens.
+- Most endpoints require `Authorization: Bearer <accessToken>`.
+- Public endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh`.
 
 ---
 
 ## Authentication
 
-### POST /auth/register
+### POST /api/auth/register
 
 Register a new user account.
 
@@ -63,7 +76,7 @@ Register a new user account.
 }
 ```
 
-### POST /auth/login
+### POST /api/auth/login
 
 Authenticate user and get tokens.
 
@@ -87,7 +100,7 @@ Authenticate user and get tokens.
 }
 ```
 
-### POST /auth/refresh
+### POST /api/auth/refresh
 
 Refresh access token using refresh token.
 
@@ -114,7 +127,7 @@ Refresh access token using refresh token.
 
 ### Articles
 
-**Endpoints:** `GET/POST /articles` | `GET/PATCH/DELETE /articles/:id`
+**Endpoints:** `GET/POST /api/articles` | `GET/PATCH/DELETE /api/articles/:id`
 
 **Request Body:**
 
@@ -131,46 +144,76 @@ Refresh access token using refresh token.
 
 ### Accounts
 
-**Endpoints:** `GET/POST /accounts` | `GET/PATCH/DELETE /accounts/:id`
+**Endpoints:** `GET/POST /api/accounts` | `GET/PATCH/DELETE /api/accounts/:id`
 
 **Request Body:**
 
 ```json
 {
   "name": "string",
-  "number": "string",
-  "currency": "string",
-  "openingBalance": "number",
-  "excludeFromTotals": "boolean",
-  "isActive": "boolean"
+  "number": "string (optional)",
+  "currency": "string (default: RUB)",
+  "openingBalance": "number (default: 0)",
+  "excludeFromTotals": "boolean (default: false)",
+  "isActive": "boolean (default: true)"
 }
 ```
+
+**Response includes:** account relationships with operations (source/target for transfers)
 
 ### Departments
 
-**Endpoints:** `GET/POST /departments` | `GET/PATCH/DELETE /departments/:id`
-
-### Counterparties
-
-**Endpoints:** `GET/POST /counterparties` | `GET/PATCH/DELETE /counterparties/:id`
+**Endpoints:** `GET/POST /api/departments` | `GET/PATCH/DELETE /api/departments/:id`
 
 **Request Body:**
 
 ```json
 {
   "name": "string",
-  "inn": "string",
-  "category": "string"
+  "description": "string (optional)"
 }
 ```
 
+**Response includes:** department relationships with deals, operations, and salaries
+
+### Counterparties
+
+**Endpoints:** `GET/POST /api/counterparties` | `GET/PATCH/DELETE /api/counterparties/:id`
+
+**Request Body:**
+
+```json
+{
+  "name": "string",
+  "inn": "string (optional)",
+  "category": "string (supplier|customer|gov|employee|other)",
+  "description": "string (optional)"
+}
+```
+
+**Response includes:** counterparty relationships with deals, operations, and salaries
+
 ### Deals
 
-**Endpoints:** `GET/POST /deals` | `GET/PATCH/DELETE /deals/:id`
+**Endpoints:** `GET/POST /api/deals` | `GET/PATCH/DELETE /api/deals/:id`
+
+**Request Body:**
+
+```json
+{
+  "name": "string",
+  "amount": "number (optional)",
+  "departmentId": "string (optional)",
+  "counterpartyId": "string (optional)",
+  "description": "string (optional)"
+}
+```
+
+**Response includes:** deal relationships with department, counterparty, operations, and plan items
 
 ### Salaries
 
-**Endpoints:** `GET/POST /salaries` | `GET/PATCH/DELETE /salaries/:id`
+**Endpoints:** `GET/POST /api/salaries` | `GET/PATCH/DELETE /api/salaries/:id`
 
 **Request Body:**
 
@@ -179,19 +222,25 @@ Refresh access token using refresh token.
   "employeeCounterpartyId": "string",
   "departmentId": "string (optional)",
   "baseWage": "number",
-  "contributionsPct": "number",
-  "incomeTaxPct": "number",
-  "periodicity": "string",
+  "contributionsPct": "number (default: 30.0)",
+  "incomeTaxPct": "number (default: 13.0)",
+  "periodicity": "string (default: monthly)",
   "effectiveFrom": "date",
   "effectiveTo": "date (optional)"
 }
 ```
 
+**Response includes:** salary relationships with employee counterparty and department
+
+**Note:** Salaries are automatically processed by the worker app to generate monthly salary operations (wage, contributions, income tax).
+
+**Implementation Status:** ✅ Fully implemented - Worker app generates 3 operations per salary record monthly.
+
 ## Operations and Planning
 
 ### Operations
 
-#### GET /operations
+#### GET /api/operations
 
 Get operations with filtering options.
 
@@ -205,7 +254,7 @@ Get operations with filtering options.
 - `departmentId`: string (optional)
 - `counterpartyId`: string (optional)
 
-#### POST /operations
+#### POST /api/operations
 
 Create a new operation.
 
@@ -237,7 +286,7 @@ Create a new operation.
 
 ### Plans
 
-#### GET /plans
+#### GET /api/plans
 
 Get plans with filtering options.
 
@@ -248,7 +297,7 @@ Get plans with filtering options.
 - `dateTo`: date
 - `articleId`: string (optional)
 
-#### POST /plans
+#### POST /api/plans
 
 Create a new plan.
 
@@ -267,31 +316,125 @@ Create a new plan.
 }
 ```
 
-#### PATCH/DELETE /plans/:id
+#### PATCH/DELETE /api/plans/:id
 
 Update or delete a specific plan.
 
-### Salary Engine
+### Demo System
 
-#### POST /salary-engine/run
+#### GET /api/demo/credentials
 
-Generate salary operations (payroll, income tax, contributions).
+Get demo user credentials (public endpoint).
 
-**Request Body:**
+**Response:**
 
 ```json
 {
-  "month": "string"
+  "email": "demo@example.com",
+  "password": "demo123",
+  "companyName": "Демо-компания"
+}
+```
+
+#### GET /api/demo/info
+
+Get information about the demo user and generated data.
+
+**Response:**
+
+```json
+{
+  "user": {
+    "id": "string",
+    "email": "string",
+    "companyId": "string"
+  },
+  "company": {
+    "id": "string",
+    "name": "string"
+  },
+  "operationsCount": "number",
+  "accountsCount": "number",
+  "articlesCount": "number",
+  "counterpartiesCount": "number"
+}
+```
+
+#### GET /api/demo/exists
+
+Check if demo user exists.
+
+**Response:**
+
+```json
+{
+  "exists": true
+}
+```
+
+#### POST /api/demo/create
+
+Create a demo user with sample data.
+
+**Response:**
+
+```json
+{
+  "user": {
+    "id": "string",
+    "email": "string",
+    "companyId": "string"
+  },
+  "company": {
+    "id": "string",
+    "name": "string"
+  },
+  "operationsCount": "number",
+  "accountsCount": "number",
+  "articlesCount": "number",
+  "counterpartiesCount": "number"
+}
+```
+
+#### DELETE /api/demo/delete
+
+Delete the demo user and all associated data.
+
+**Response:**
+
+```json
+{
+  "message": "Demo user and all related data deleted successfully"
 }
 ```
 
 ## Reports
 
+**Implementation Status:** ✅ All report endpoints are fully implemented and working.
+
+**Frontend Status:** ⚠️ Some frontend components have placeholder implementations:
+
+- Dashboard charts are placeholders (requires recharts integration)
+- Plan vs Fact calculations in CashflowTable use placeholder logic
+
+**UI/UX Features:** ✅ Fully implemented:
+
+- Complete notification system with Redux store and UI components
+- Dark/light theme support with automatic detection
+- Navigation icon customization
+- Company UI settings management
+- Responsive design for all devices
+- Comprehensive form system with validation
+- Modal and offcanvas systems
+- Table system with sorting and actions
+
 ### Dashboard Report
 
-#### GET /reports/dashboard
+#### GET /api/reports/dashboard
 
 Get dashboard analytics.
+
+**Implementation Status:** ✅ Fully implemented - Returns income, expense, net profit, account balances, and time series data.
 
 **Query Parameters:**
 
@@ -309,13 +452,15 @@ Get dashboard analytics.
   "balancesByAccount": [
     {
       "accountId": "string",
+      "accountName": "string",
       "balance": "number"
     }
   ],
   "series": [
     {
-      "name": "string",
-      "data": "number[]"
+      "month": "string",
+      "income": "number",
+      "expense": "number"
     }
   ]
 }
@@ -323,39 +468,71 @@ Get dashboard analytics.
 
 ### Cash Flow Report
 
-#### GET /reports/cashflow
+#### GET /api/reports/cashflow
 
-Get cash flow statement (fact).
-
-**Query Parameters:**
-
-- `periodFrom`: date
-- `periodTo`: date
-- `activity`: string (optional)
-- `rounding`: number (optional)
-
-**Response:** Cash flow table by months (factual data)
-
-### Cash Flow Budget Report
-
-#### GET /reports/bdds
-
-Get cash flow budget (planned).
+Get cash flow report by activity types.
 
 **Query Parameters:**
 
 - `periodFrom`: date
 - `periodTo`: date
-- `rounding`: number (optional)
-- `expandHierarchy`: boolean (optional)
+- `activity`: "operating" | "investing" | "financing" (optional)
+- `rounding`: number (optional, rounding unit)
 
-**Response:** Cash flow budget table
+**Response:**
 
-### Plan vs Fact Report
+```json
+{
+  "periodFrom": "string",
+  "periodTo": "string",
+  "activities": [
+    {
+      "activity": "string",
+      "incomeGroups": [...],
+      "expenseGroups": [...],
+      "totalIncome": "number",
+      "totalExpense": "number",
+      "netCashflow": "number"
+    }
+  ]
+}
+```
 
-#### GET /reports/planfact
+### Budget Report (BDDS)
 
-Get plan vs actual comparison.
+#### GET /api/reports/bdds
+
+Get budget report with planned operations.
+
+**Query Parameters:**
+
+- `periodFrom`: date
+- `periodTo`: date
+
+**Response:**
+
+```json
+[
+  {
+    "articleId": "string",
+    "articleName": "string",
+    "type": "string",
+    "months": [
+      {
+        "month": "string",
+        "amount": "number"
+      }
+    ],
+    "total": "number"
+  }
+]
+```
+
+### Plan-Fact Analysis
+
+#### GET /api/reports/planfact
+
+Compare planned vs actual operations.
 
 **Query Parameters:**
 
@@ -366,15 +543,171 @@ Get plan vs actual comparison.
 **Response:**
 
 ```json
+[
+  {
+    "month": "string",
+    "key": "string",
+    "name": "string",
+    "plan": "number",
+    "fact": "number",
+    "delta": "number"
+  }
+]
+```
+
+### Detailed Cash Flow (DDS)
+
+#### GET /api/reports/dds
+
+Returns a detailed cash flow statement with account balances and flows.
+
+**Query Parameters:**
+
+- `periodFrom`: date
+- `periodTo`: date
+- `accountId`: string (optional)
+- `limit`: number (optional, default 10000)
+- `offset`: number (optional, default 0)
+
+**Response:**
+
+```json
 {
-  "rows": [
+  "accounts": [
     {
-      "key": "string",
-      "month": "string",
-      "plan": "number",
-      "fact": "number",
-      "delta": "number"
+      "accountId": "string",
+      "accountName": "string",
+      "openingBalance": "number",
+      "closingBalance": "number"
     }
-  ]
+  ],
+  "inflows": [...],
+  "outflows": [...],
+  "summary": {
+    "totalInflow": "number",
+    "totalOutflow": "number",
+    "netCashflow": "number"
+  }
 }
 ```
+
+---
+
+### Company UI Settings
+
+#### GET /api/companies/ui-settings
+
+Get company UI settings (theme, navigation icons, etc.).
+
+**Response:**
+
+```json
+{
+  "navigationIcons": {
+    "dashboard": "string",
+    "operations": "string",
+    "plans": "string",
+    "reports": "string"
+  },
+  "theme": "light"
+}
+```
+
+#### PUT /api/companies/ui-settings
+
+Update company UI settings.
+
+**Request Body:**
+
+```json
+{
+  "navigationIcons": {
+    "dashboard": "string",
+    "operations": "string",
+    "plans": "string",
+    "reports": "string"
+  },
+  "theme": "dark"
+}
+```
+
+**Response:**
+
+```json
+{
+  "navigationIcons": {
+    "dashboard": "string",
+    "operations": "string",
+    "plans": "string",
+    "reports": "string"
+  },
+  "theme": "dark"
+}
+```
+
+---
+
+## Modules overview (routing prefixes)
+
+Defined in `apps/api/src/app.ts`:
+
+- `/api/auth` - Authentication (login, register, refresh)
+- `/api/users` - User management
+- `/api/companies` - Company management (including UI settings)
+- `/api/articles` - Articles catalog
+- `/api/accounts` - Accounts catalog
+- `/api/departments` - Departments catalog
+- `/api/counterparties` - Counterparties catalog
+- `/api/deals` - Deals catalog
+- `/api/salaries` - Salaries catalog
+- `/api/operations` - Financial operations
+- `/api/plans` - Budget planning
+- `/api/reports` - Financial reports (dashboard, cashflow, bdds, dds, planfact)
+- `/api/demo` - Demo system (credentials, create, info, exists, delete)
+
+Use Swagger UI at `/api-docs` for the authoritative, up-to-date contract.
+
+---
+
+## Worker App
+
+The Worker App is a separate Node.js application that handles background tasks and scheduled jobs.
+
+### Salary Generation
+
+The worker automatically generates salary operations every month on the 1st at 00:00 (Moscow time).
+
+**Generated Operations:**
+
+- **Wage Operation**: Base salary amount (expense)
+- **Contributions Operation**: Insurance contributions (expense, calculated as baseWage × contributionsPct/100)
+- **Income Tax Operation**: Personal income tax (expense, calculated as baseWage × incomeTaxPct/100)
+
+**Automatic Article Creation:**
+The worker automatically creates required articles if they don't exist:
+
+- "Зарплата" (Wage)
+- "Страховые взносы" (Insurance Contributions)
+- "НДФЛ" (Personal Income Tax)
+
+**Features:**
+
+- Multi-tenant support (generates for all companies or specific company)
+- Transaction-based operations creation
+- Detailed logging with structured output
+- Graceful shutdown handling
+- Database connection validation
+
+**Manual Execution:**
+
+```typescript
+// For testing purposes
+await runSalaryGenerationManually('2025-01'); // Generate for specific month
+```
+
+**Configuration:**
+
+- **Cron Schedule**: `0 0 1 * *` (1st of each month at 00:00)
+- **Timezone**: Europe/Moscow
+- **Logging**: Winston logger with structured logging
+- **Database**: Uses same Prisma client as main API

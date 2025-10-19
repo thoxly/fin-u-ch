@@ -1,17 +1,17 @@
-# AI Code Review
+# AI Code Review Agent
 
-Автоматический code review с использованием Claude API.
+Automated PR review using Anthropic Claude with GitHub integration.
 
-## Установка
+## Installation
 
 ```bash
 cd scripts/ai-review
 pnpm install
 ```
 
-## Конфигурация
+## Configuration
 
-Создайте `.env` файл или установите переменные окружения:
+Create `.env` or export the following environment variables:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
@@ -20,26 +20,26 @@ GITHUB_REPOSITORY_OWNER=your-org
 GITHUB_REPOSITORY_NAME=fin-u-ch
 ```
 
-## Использование
+## Usage
 
-### Локальный запуск
+### Run locally
 
 ```bash
 cd scripts/ai-review
 
-# Собрать проект
+# Build the project
 pnpm build
 
-# Запустить review для PR #123
-pnpm start 123
+# Review PR #123
+ pnpm start 123
 
-# Или в dev режиме без сборки
+# Or in dev mode without build
 pnpm dev 123
 ```
 
-### В GitHub Actions
+### In GitHub Actions
 
-Workflow автоматически запускает AI review для каждого PR:
+Workflow runs AI review for each PR:
 
 ```yaml
 - name: Run AI Code Review
@@ -54,37 +54,37 @@ Workflow автоматически запускает AI review для кажд
     pnpm start
 ```
 
-## Как это работает
+## How it works
 
-1. **Загружает контекст проекта** из документации (ARCHITECTURE.md, DOMAIN_MODEL.md, style-guide.md, etc.)
-2. **Получает diff PR** через GitHub API
-3. **Отправляет в Claude** для анализа на **двух уровнях**:
-   - **Level 1:** Проверка кода на уровне файлов/функций
-   - **Level 2:** Архитектурный и системный анализ
-4. **Парсит ответ** и создает комментарии к PR
-5. **Определяет результат review**:
-   - `REQUEST_CHANGES` - если найдены critical/high issues
-   - `COMMENT` - если только medium/low issues
-   - `APPROVE` - если проблем не найдено
+1. Loads project context from docs (ARCHITECTURE.md, DOMAIN_MODEL.md, style-guide.md, etc.)
+2. Fetches PR diff via GitHub API
+3. Sends for analysis to Claude at two levels:
+   - Level 1: Code-level review (security, performance, bugs, style)
+   - Level 2: Architectural/system review
+4. Parses response and creates PR comments
+5. Determines review result:
+   - `REQUEST_CHANGES` for critical/high issues
+   - `COMMENT` for medium/low issues
+   - `APPROVE` when no issues
 
-## Двухуровневая система проверки
+## Two-level review
 
 **Level 1: Code-Level** — Security, Performance, Bugs, Style  
-**Level 2: Architectural** — Структура, Переиспользование, Сложность, Domain Model
+**Level 2: Architectural** — Structure, Reuse, Complexity, Domain Model
 
 📖 [Полная документация](../../docs/ai-context/REVIEW_LEVELS.md) | 💡 [Примеры](../../docs/ai-context/REVIEW_EXAMPLE.md)
 
-## Отладка
+## Debugging
 
-Если AI review не работает:
+If AI review fails:
 
-1. Проверьте переменные окружения
-2. Проверьте логи в GitHub Actions
-3. Запустите локально с `pnpm dev <pr-number>`
-4. Проверьте формат ответа Claude (должен быть JSON)
+1. Verify environment variables
+2. Check GitHub Actions logs
+3. Run locally with `pnpm dev <pr-number>`
+4. Ensure Claude response format is valid JSON
 
-## Ограничения
+## Limits
 
-- Максимум 10 файлов на batch
-- Claude API лимиты: 16000 tokens на ответ
-- Не проверяет сгенерированные файлы (dist/, \*.d.ts, etc.)
+- Max 10 files per batch (`maxFilesPerBatch`)
+- Claude limits: 16000 tokens per response
+- Skips generated files (dist/, \*.d.ts, maps, lockfiles)

@@ -1,3 +1,32 @@
+# CI/CD Pipeline (English)
+
+This pipeline uses GitHub Actions with a cost-efficient strategy and an AI Code Review job. Summary:
+
+- Branch flow: feature → dev → main
+- Jobs:
+  1. Quick Checks (lint, format, type-check) — PRs only
+  2. AI Code Review (Claude) — PRs to dev only (skipped for PRs to main)
+  3. Build & Test (API, Web, Worker; Prisma migrations; coverage ≥ 60%) — always
+  4. E2E Tests (Playwright) — PRs to main only
+  5. Security Scan — PRs only
+  6. Docker Build & Push (GHCR) — push to main only
+  7. Deploy to VPS (backup → migrate → restart → health check) — push to main only
+
+Key URLs and configs:
+
+- Swagger UI: `/api-docs`
+- Health: `GET /api/health`
+- Secrets: `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `GHCR_TOKEN`, `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+- AI review context: `docs/ai-context/*`
+
+Cost optimization:
+
+- Skip AI review for PRs to main (already reviewed in feature → dev)
+- Run E2E only for PRs to main
+- Cache dependencies and Docker layers where possible
+
+---
+
 # CI/CD Pipeline
 
 Полное описание CI/CD процесса проекта Fin-U-CH с AI Code Review.
