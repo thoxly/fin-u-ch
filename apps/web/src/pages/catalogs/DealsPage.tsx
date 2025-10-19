@@ -5,8 +5,6 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Input } from '../../shared/ui/Input';
-import { Select } from '../../shared/ui/Select';
 import {
   useGetDealsQuery,
   useCreateDealMutation,
@@ -18,6 +16,7 @@ import {
 import { formatMoney } from '../../shared/lib/money';
 import type { Deal } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
+import { DealForm } from '@/features/catalog-forms/index';
 
 export const DealsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -92,81 +91,5 @@ export const DealsPage = () => {
         <DealForm deal={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
     </Layout>
-  );
-};
-
-export const DealForm = ({
-  deal,
-  onClose,
-}: {
-  deal: Deal | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(deal?.name || '');
-  const [amount, setAmount] = useState(deal?.amount?.toString() || '');
-  const [counterpartyId, setCounterpartyId] = useState(
-    deal?.counterpartyId || ''
-  );
-  const [departmentId, setDepartmentId] = useState(deal?.departmentId || '');
-  const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  const { data: departments = [] } = useGetDepartmentsQuery();
-  const [create, { isLoading: isCreating }] = useCreateDealMutation();
-  const [update, { isLoading: isUpdating }] = useUpdateDealMutation();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const data = {
-      name,
-      amount: parseFloat(amount),
-      counterpartyId: counterpartyId || undefined,
-      departmentId: departmentId || undefined,
-    };
-    try {
-      if (deal) await update({ id: deal.id, data }).unwrap();
-      else await create(data).unwrap();
-      onClose();
-    } catch (error) {
-      console.error('Failed to save deal:', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="Название"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <Input
-        label="Сумма"
-        type="number"
-        step="0.01"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-      />
-      <Select
-        label="Контрагент"
-        value={counterpartyId}
-        onChange={(e) => setCounterpartyId(e.target.value)}
-        options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
-        placeholder="Не выбран"
-      />
-      <Select
-        label="Подразделение"
-        value={departmentId}
-        onChange={(e) => setDepartmentId(e.target.value)}
-        options={departments.map((d) => ({ value: d.id, label: d.name }))}
-        placeholder="Не выбрано"
-      />
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
-          {deal ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-      </div>
-    </form>
   );
 };

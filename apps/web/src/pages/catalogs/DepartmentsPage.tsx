@@ -1,11 +1,9 @@
 import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Input } from '../../shared/ui/Input';
 import {
   useGetDepartmentsQuery,
   useCreateDepartmentMutation,
@@ -14,6 +12,7 @@ import {
 } from '../../store/api/catalogsApi';
 import type { Department } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
+import { DepartmentForm } from '@/features/catalog-forms/index';
 
 export const DepartmentsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,57 +84,5 @@ export const DepartmentsPage = () => {
         />
       </OffCanvas>
     </Layout>
-  );
-};
-
-export const DepartmentForm = ({
-  department,
-  onClose,
-}: {
-  department: Department | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(department?.name || '');
-  const [description, setDescription] = useState(department?.description || '');
-  const [create, { isLoading: isCreating }] = useCreateDepartmentMutation();
-  const [update, { isLoading: isUpdating }] = useUpdateDepartmentMutation();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (department)
-        await update({
-          id: department.id,
-          data: { name, description },
-        }).unwrap();
-      else await create({ name, description }).unwrap();
-      onClose();
-    } catch (error) {
-      console.error('Failed to save department:', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="Название"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <Input
-        label="Описание"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
-          {department ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-      </div>
-    </form>
   );
 };
