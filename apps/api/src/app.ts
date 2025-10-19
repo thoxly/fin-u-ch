@@ -19,6 +19,7 @@ import salariesRoutes from './modules/catalogs/salaries/salaries.routes';
 import operationsRoutes from './modules/operations/operations.routes';
 import plansRoutes from './modules/plans/plans.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import demoRoutes from './modules/demo/demo.routes';
 
 const app: Application = express();
 
@@ -55,6 +56,7 @@ app.use('/api/salaries', salariesRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/demo', demoRoutes);
 
 // Error handling
 app.use(errorHandler);

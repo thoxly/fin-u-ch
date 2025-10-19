@@ -46,12 +46,26 @@ jest.mock('../hooks/useNavigationIcons', () => ({
   }),
 }));
 
+// Mock the useGetMeQuery hook
+jest.mock('../../store/api/authApi', () => ({
+  useGetMeQuery: () => ({
+    data: { email: 'test@example.com' },
+    isLoading: false,
+  }),
+}));
+
 // Create a mock store
 const createMockStore = () => {
   return configureStore({
     reducer: {
       auth: (state = { user: null, token: null }) => state,
+      api: (state = {}) => state,
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+        immutableCheck: false,
+      }),
   });
 };
 

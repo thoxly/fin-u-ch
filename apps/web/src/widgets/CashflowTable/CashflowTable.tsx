@@ -45,7 +45,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
 
   // Функция для получения плановых данных по статье и месяцу
   const getPlanAmount = (articleId: string, month: string) => {
-    if (!planData) return 0;
+    if (!planData || !planData.rows) return 0;
     const planRow = planData.rows.find((row) => row.articleId === articleId);
     if (!planRow) return 0;
     const monthData = planRow.months.find((m) => m.month === month);
