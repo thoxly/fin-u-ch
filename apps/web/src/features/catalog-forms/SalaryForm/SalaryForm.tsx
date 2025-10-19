@@ -30,7 +30,7 @@ export const SalaryForm = ({
     salary?.periodicity || 'monthly'
   );
   const [effectiveFrom, setEffectiveFrom] = useState(
-    salary?.effectiveFrom.split('T')[0] || '' // Важно: split('T')[0] может вызвать ошибку, если effectiveFrom null/undefined
+    salary?.effectiveFrom ? salary.effectiveFrom.split('T')[0] : ''
   );
   const [effectiveTo, setEffectiveTo] = useState(
     salary?.effectiveTo ? salary.effectiveTo.split('T')[0] : ''
