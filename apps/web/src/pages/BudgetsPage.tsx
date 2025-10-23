@@ -203,7 +203,8 @@ export const BudgetsPage = () => {
         <Table
           columns={columns}
           data={budgets}
-          isLoading={isLoading}
+          keyExtractor={(budget) => budget.id}
+          loading={isLoading}
           emptyMessage="Нет бюджетов"
         />
       </Card>

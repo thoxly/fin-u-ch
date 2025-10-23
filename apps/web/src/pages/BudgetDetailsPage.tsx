@@ -259,7 +259,8 @@ export const BudgetDetailsPage = () => {
         <Table
           columns={columns}
           data={plans}
-          isLoading={isPlansLoading}
+          keyExtractor={(plan) => plan.id}
+          loading={isPlansLoading}
           emptyMessage="Нет плановых записей"
         />
       </Card>
