@@ -1,6 +1,9 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
-import budgetsService from './budgets.service';
+import budgetsService, {
+  CreateBudgetDTO,
+  UpdateBudgetDTO,
+} from './budgets.service';
 
 export class BudgetsController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
@@ -27,7 +30,15 @@ export class BudgetsController {
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await budgetsService.create(req.companyId!, req.body);
+      const data: CreateBudgetDTO = {
+        name: req.body.name,
+        startDate: new Date(req.body.startDate),
+        endDate:
+          req.body.endDate && req.body.endDate !== ''
+            ? new Date(req.body.endDate)
+            : undefined,
+      };
+      const result = await budgetsService.create(req.companyId!, data);
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -36,10 +47,22 @@ export class BudgetsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      const data: UpdateBudgetDTO = {};
+      if (req.body.name !== undefined) data.name = req.body.name;
+      if (req.body.startDate !== undefined)
+        data.startDate = new Date(req.body.startDate);
+      if (req.body.endDate !== undefined) {
+        data.endDate =
+          req.body.endDate && req.body.endDate !== ''
+            ? new Date(req.body.endDate)
+            : undefined;
+      }
+      if (req.body.status !== undefined) data.status = req.body.status;
+
       const result = await budgetsService.update(
         req.params.id,
         req.companyId!,
-        req.body
+        data
       );
       res.json(result);
     } catch (error) {
