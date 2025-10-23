@@ -34,6 +34,8 @@ export const ReportsPage = () => {
   // Загружаем активные бюджеты
   const { data: budgets = [] } = useGetBudgetsQuery({ status: 'active' });
 
+  console.log('Budgets loaded:', budgets);
+
   // Сохраняем выбранный бюджет в localStorage
   useEffect(() => {
     if (selectedBudget) {
@@ -60,6 +62,7 @@ export const ReportsPage = () => {
   };
 
   const handleBudgetClick = (budget: Budget | null) => {
+    console.log('Budget clicked:', budget);
     setSelectedBudget(budget);
     setShowBudgetMenu(false);
   };
