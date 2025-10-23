@@ -225,6 +225,11 @@ const CashflowTab = ({
       : skipToken
   );
 
+  // Debug: показываем что приходит от API
+  console.log('Selected Budget:', selectedBudget);
+  console.log('Plan Data:', planData);
+  console.log('Plan Loading:', planLoading);
+
   if (isLoading || (selectedBudget && planLoading)) {
     return (
       <Card>
