@@ -1,12 +1,12 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
-import plansService from './plans.service';
+import budgetsService from './budgets.service';
 
-export class PlansController {
+export class BudgetsController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const budgetId = req.query.budgetId as string | undefined;
-      const result = await plansService.getAll(req.companyId!, budgetId);
+      const status = req.query.status as string | undefined;
+      const result = await budgetsService.getAll(req.companyId!, status);
       res.json(result);
     } catch (error) {
       next(error);
@@ -15,7 +15,10 @@ export class PlansController {
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.getById(req.params.id, req.companyId!);
+      const result = await budgetsService.getById(
+        req.params.id,
+        req.companyId!
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -24,7 +27,7 @@ export class PlansController {
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.create(req.companyId!, req.body);
+      const result = await budgetsService.create(req.companyId!, req.body);
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -33,7 +36,7 @@ export class PlansController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.update(
+      const result = await budgetsService.update(
         req.params.id,
         req.companyId!,
         req.body
@@ -46,7 +49,7 @@ export class PlansController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.delete(req.params.id, req.companyId!);
+      const result = await budgetsService.delete(req.params.id, req.companyId!);
       res.json(result);
     } catch (error) {
       next(error);
@@ -54,4 +57,4 @@ export class PlansController {
   }
 }
 
-export default new PlansController();
+export default new BudgetsController();

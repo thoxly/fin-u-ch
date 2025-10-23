@@ -5,6 +5,8 @@ import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OperationsPage } from './pages/OperationsPage';
 import { PlansPage } from './pages/PlansPage';
+import { BudgetsPage } from './pages/BudgetsPage';
+import { BudgetDetailsPage } from './pages/BudgetDetailsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ArticlesPage } from './pages/catalogs/ArticlesPage';
 import { AccountsPage } from './pages/catalogs/AccountsPage';
@@ -51,6 +53,22 @@ function App() {
           element={
             <PrivateRoute>
               <PlansPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/budgets"
+          element={
+            <PrivateRoute>
+              <BudgetsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/budgets/:budgetId"
+          element={
+            <PrivateRoute>
+              <BudgetDetailsPage />
             </PrivateRoute>
           }
         />

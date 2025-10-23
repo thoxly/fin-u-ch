@@ -134,4 +134,5 @@ export interface ReportFilters {
   dealId?: string;
   counterpartyId?: string;
   accountId?: string;
+  budgetId?: string;
 }

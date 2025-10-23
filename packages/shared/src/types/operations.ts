@@ -38,6 +38,7 @@ export interface PlanItem {
   counterpartyId?: string | null;
   dealId?: string | null;
   departmentId?: string | null;
+  budgetId?: string | null;
   description?: string | null;
   repeat: Periodicity;
   accountId?: string | null;
@@ -74,6 +75,7 @@ export interface CreatePlanItemDTO {
   counterpartyId?: string;
   dealId?: string;
   departmentId?: string;
+  budgetId?: string;
   description?: string;
   repeat: Periodicity;
   accountId?: string;
@@ -85,4 +87,28 @@ export interface CreatePlanItemDTO {
 export interface MonthlyAmount {
   month: string;
   amount: number;
+}
+
+export interface Budget {
+  id: string;
+  companyId: string;
+  name: string;
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  status: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}
+
+export interface CreateBudgetDTO {
+  name: string;
+  startDate: Date | string;
+  endDate?: Date | string;
+}
+
+export interface UpdateBudgetDTO {
+  name?: string;
+  startDate?: Date | string;
+  endDate?: Date | string;
+  status?: string;
 }

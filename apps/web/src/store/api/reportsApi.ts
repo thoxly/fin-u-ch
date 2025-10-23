@@ -20,6 +20,12 @@ interface ReportParams {
   level?: string;
 }
 
+interface BDDSReportParams {
+  periodFrom: string;
+  periodTo: string;
+  budgetId?: string;
+}
+
 export const reportsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getDashboard: builder.query<DashboardReport, DashboardParams>({
@@ -36,7 +42,7 @@ export const reportsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Report'],
     }),
-    getBddsReport: builder.query<BDDSReport, ReportParams>({
+    getBddsReport: builder.query<BDDSReport, BDDSReportParams>({
       query: (params) => ({
         url: '/reports/bdds',
         params,

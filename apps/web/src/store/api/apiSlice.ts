@@ -104,6 +104,7 @@ export const apiSlice = createApi({
     'Salary',
     'Operation',
     'Plan',
+    'Budget',
     'Dashboard',
     'Report',
   ],

@@ -6,6 +6,7 @@ import plansService from '../../plans/plans.service';
 export interface BDDSParams {
   periodFrom: Date;
   periodTo: Date;
+  budgetId?: string;
 }
 
 export interface BDDSMonthlyData {
@@ -23,6 +24,11 @@ export interface BDDSRow {
 
 export class BDDSService {
   async getBDDS(companyId: string, params: BDDSParams): Promise<BDDSRow[]> {
+    // If no budgetId provided, return empty result
+    if (!params.budgetId) {
+      return [];
+    }
+
     const cacheKey = generateCacheKey(companyId, 'bdds', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -30,6 +36,7 @@ export class BDDSService {
     const planItems = await prisma.planItem.findMany({
       where: {
         companyId,
+        budgetId: params.budgetId,
         status: 'active',
         startDate: { lte: params.periodTo },
         OR: [{ endDate: null }, { endDate: { gte: params.periodFrom } }],

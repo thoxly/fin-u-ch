@@ -24,6 +24,7 @@ const navigation: NavigationItem[] = [
   { name: 'Дашборд', href: '/dashboard' },
   { name: 'Операции', href: '/operations' },
   { name: 'Планы', href: '/plans' },
+  { name: 'Бюджеты', href: '/budgets' },
   { name: 'Отчеты', href: '/reports' },
   {
     name: 'Справочники',

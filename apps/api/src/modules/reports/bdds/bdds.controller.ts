@@ -12,12 +12,14 @@ export class BDDSController {
         periodTo: req.query.periodTo
           ? new Date(req.query.periodTo as string)
           : new Date(),
+        budgetId: req.query.budgetId as string | undefined,
       };
 
       const rows = await bddsService.getBDDS(req.companyId!, params);
       const result = {
         periodFrom: params.periodFrom.toISOString().split('T')[0],
         periodTo: params.periodTo.toISOString().split('T')[0],
+        budgetId: params.budgetId,
         rows,
       };
       res.json(result);

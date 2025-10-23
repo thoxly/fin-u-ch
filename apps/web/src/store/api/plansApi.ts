@@ -1,10 +1,17 @@
 import { apiSlice } from './apiSlice';
 import type { PlanItem } from '@shared/types/operations';
 
+interface GetPlansParams {
+  budgetId?: string;
+}
+
 export const plansApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    getPlans: builder.query<PlanItem[], void>({
-      query: () => '/plans',
+    getPlans: builder.query<PlanItem[], GetPlansParams | void>({
+      query: (params) => ({
+        url: '/plans',
+        params: params || {},
+      }),
       providesTags: ['Plan'],
     }),
     getPlan: builder.query<PlanItem, string>({
@@ -17,7 +24,7 @@ export const plansApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Plan', 'Dashboard', 'Report'],
+      invalidatesTags: ['Plan', 'Budget', 'Dashboard', 'Report'],
     }),
     updatePlan: builder.mutation<
       PlanItem,
@@ -28,14 +35,14 @@ export const plansApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      invalidatesTags: ['Plan', 'Dashboard', 'Report'],
+      invalidatesTags: ['Plan', 'Budget', 'Dashboard', 'Report'],
     }),
     deletePlan: builder.mutation<void, string>({
       query: (id) => ({
         url: `/plans/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Plan', 'Dashboard', 'Report'],
+      invalidatesTags: ['Plan', 'Budget', 'Dashboard', 'Report'],
     }),
   }),
 });
