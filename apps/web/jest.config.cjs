@@ -18,6 +18,7 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^@fin-u-ch/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '^../../shared/config/env$': '<rootDir>/src/shared/config/env.mock.ts',
   },

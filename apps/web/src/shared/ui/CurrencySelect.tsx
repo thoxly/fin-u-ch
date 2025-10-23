@@ -1,48 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-
-interface Currency {
-  code: string;
-  name: string;
-  symbol: string;
-}
-
-const CURRENCIES: Currency[] = [
-  { code: 'RUB', name: 'Российский рубль', symbol: '₽' },
-  { code: 'USD', name: 'Доллар США', symbol: '$' },
-  { code: 'EUR', name: 'Евро', symbol: '€' },
-  { code: 'CNY', name: 'Китайский юань', symbol: '¥' },
-  { code: 'AMD', name: 'Армянский драм', symbol: '֏' },
-  { code: 'AED', name: 'Дирхам ОАЭ', symbol: 'د.إ' },
-  { code: 'AUD', name: 'Австралийский доллар', symbol: 'A$' },
-  { code: 'BGN', name: 'Болгарский лев', symbol: 'лв' },
-  { code: 'BRL', name: 'Бразильский реал', symbol: 'R$' },
-  { code: 'CAD', name: 'Канадский доллар', symbol: 'C$' },
-  { code: 'CHF', name: 'Швейцарский франк', symbol: 'CHF' },
-  { code: 'CZK', name: 'Чешская крона', symbol: 'Kč' },
-  { code: 'DKK', name: 'Датская крона', symbol: 'kr' },
-  { code: 'GBP', name: 'Британский фунт', symbol: '£' },
-  { code: 'HKD', name: 'Гонконгский доллар', symbol: 'HK$' },
-  { code: 'HUF', name: 'Венгерский форинт', symbol: 'Ft' },
-  { code: 'IDR', name: 'Индонезийская рупия', symbol: 'Rp' },
-  { code: 'ILS', name: 'Израильский шекель', symbol: '₪' },
-  { code: 'INR', name: 'Индийская рупия', symbol: '₹' },
-  { code: 'JPY', name: 'Японская иена', symbol: '¥' },
-  { code: 'KRW', name: 'Южнокорейская вона', symbol: '₩' },
-  { code: 'KZT', name: 'Казахстанский тенге', symbol: '₸' },
-  { code: 'MXN', name: 'Мексиканское песо', symbol: '$' },
-  { code: 'MYR', name: 'Малайзийский ринггит', symbol: 'RM' },
-  { code: 'NOK', name: 'Норвежская крона', symbol: 'kr' },
-  { code: 'NZD', name: 'Новозеландский доллар', symbol: 'NZ$' },
-  { code: 'PLN', name: 'Польский злотый', symbol: 'zł' },
-  { code: 'RON', name: 'Румынский лей', symbol: 'lei' },
-  { code: 'SAR', name: 'Саудовский риял', symbol: '﷼' },
-  { code: 'SEK', name: 'Шведская крона', symbol: 'kr' },
-  { code: 'SGD', name: 'Сингапурский доллар', symbol: 'S$' },
-  { code: 'THB', name: 'Тайский бат', symbol: '฿' },
-  { code: 'TRY', name: 'Турецкая лира', symbol: '₺' },
-  { code: 'UAH', name: 'Украинская гривна', symbol: '₴' },
-  { code: 'ZAR', name: 'Южноафриканский рэнд', symbol: 'R' },
-];
+import { CURRENCIES } from '@fin-u-ch/shared/lib/currencies';
 
 interface CurrencySelectProps {
   value: string;
