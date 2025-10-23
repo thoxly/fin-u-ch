@@ -251,6 +251,8 @@ const CashflowTab = ({
   console.log('Selected Budget:', selectedBudget);
   console.log('Plan Data:', planData);
   console.log('Plan Loading:', planLoading);
+  console.log('Plan rows:', planData?.rows);
+  console.log('Fact data:', data);
 
   if (isLoading || (selectedBudget && planLoading)) {
     return (
