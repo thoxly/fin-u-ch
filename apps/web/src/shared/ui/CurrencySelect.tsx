@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import { CURRENCIES } from '@fin-u-ch/shared/lib/currencies';
+import { CURRENCIES } from '@fin-u-ch/shared';
 
 interface CurrencySelectProps {
   value: string;
