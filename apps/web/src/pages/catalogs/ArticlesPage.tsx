@@ -5,8 +5,6 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Input } from '../../shared/ui/Input';
-import { Select } from '../../shared/ui/Select';
 import {
   useGetArticlesQuery,
   useCreateArticleMutation,
@@ -15,6 +13,7 @@ import {
 } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
+import { ArticleForm } from '@/features/catalog-forms/index';
 
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -103,87 +102,5 @@ export const ArticlesPage = () => {
         <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
     </Layout>
-  );
-};
-
-export const ArticleForm = ({
-  article,
-  onClose,
-}: {
-  article: Article | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(article?.name || '');
-  const [type, setType] = useState(article?.type || 'expense');
-  const [activity, setActivity] = useState(article?.activity || 'operating');
-  const [isActive, setIsActive] = useState(article?.isActive ?? true);
-
-  const [create, { isLoading: isCreating }] = useCreateArticleMutation();
-  const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (article) {
-        await update({
-          id: article.id,
-          data: { name, type, activity, isActive },
-        }).unwrap();
-      } else {
-        await create({ name, type, activity, isActive }).unwrap();
-      }
-      onClose();
-    } catch (error) {
-      console.error('Failed to save article:', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="Название"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <Select
-        label="Тип"
-        value={type}
-        onChange={(e) => setType(e.target.value)}
-        options={[
-          { value: 'income', label: 'Доход' },
-          { value: 'expense', label: 'Расход' },
-        ]}
-        required
-      />
-      <Select
-        label="Деятельность"
-        value={activity}
-        onChange={(e) => setActivity(e.target.value)}
-        options={[
-          { value: 'operating', label: 'Операционная' },
-          { value: 'investment', label: 'Инвестиционная' },
-          { value: 'financial', label: 'Финансовая' },
-        ]}
-        required
-      />
-      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-        />
-        <span className="text-sm">Активна</span>
-      </label>
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
-          {article ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-      </div>
-    </form>
   );
 };
