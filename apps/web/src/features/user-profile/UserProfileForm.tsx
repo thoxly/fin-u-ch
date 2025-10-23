@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Mail, Building } from 'lucide-react';
+import { Save, User, Mail, Building, DollarSign } from 'lucide-react';
 import { useGetMeQuery, useUpdateUserMutation } from '../../store/api/authApi';
+import { useUpdateCompanyMutation } from '../../store/api/companiesApi';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
+import { CurrencySelect } from '../../shared/ui/CurrencySelect';
 
 interface UserProfileFormProps {
   onClose: () => void;
@@ -16,10 +18,16 @@ export const UserProfileForm = ({
     firstName: '',
     lastName: '',
     companyName: '',
+    currencyBase: 'RUB',
   });
 
   const { data: user, isLoading: userLoading } = useGetMeQuery();
-  const [updateUser, { isLoading: updateLoading }] = useUpdateUserMutation();
+  const [updateUser, { isLoading: updateUserLoading }] =
+    useUpdateUserMutation();
+  const [updateCompany, { isLoading: updateCompanyLoading }] =
+    useUpdateCompanyMutation();
+
+  const updateLoading = updateUserLoading || updateCompanyLoading;
 
   useEffect(() => {
     if (user) {
@@ -28,6 +36,7 @@ export const UserProfileForm = ({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         companyName: user.companyName || '',
+        currencyBase: user.company?.currencyBase || 'RUB',
       });
     }
   }, [user]);
@@ -41,12 +50,19 @@ export const UserProfileForm = ({
 
   const handleSave = async (): Promise<void> => {
     try {
+      // Обновляем данные пользователя
       await updateUser({
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        companyName: formData.companyName,
       }).unwrap();
+
+      // Обновляем данные компании
+      await updateCompany({
+        name: formData.companyName,
+        currencyBase: formData.currencyBase,
+      }).unwrap();
+
       onClose();
     } catch (error) {
       console.error('Ошибка при обновлении профиля:', error);
@@ -112,6 +128,17 @@ export const UserProfileForm = ({
           onChange={(e) => handleInputChange('companyName', e.target.value)}
           icon={<Building size={16} />}
           placeholder="Введите название компании"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Базовая валюта
+        </label>
+        <CurrencySelect
+          value={formData.currencyBase}
+          onChange={(value) => handleInputChange('currencyBase', value)}
+          placeholder="Выберите базовую валюту"
         />
       </div>
 
