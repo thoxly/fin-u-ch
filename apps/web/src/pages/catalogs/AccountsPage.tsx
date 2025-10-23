@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
-import { Input } from '../../shared/ui/Input';
-import { Select } from '../../shared/ui/Select';
 import {
   useGetAccountsQuery,
   useCreateAccountMutation,
@@ -16,6 +13,7 @@ import {
 import { formatMoney } from '../../shared/lib/money';
 import type { Account } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
+import { AccountForm } from '@/features/catalog-forms/index';
 
 export const AccountsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -98,96 +96,5 @@ export const AccountsPage = () => {
         <AccountForm account={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
     </Layout>
-  );
-};
-
-export const AccountForm = ({
-  account,
-  onClose,
-}: {
-  account: Account | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(account?.name || '');
-  const [number, setNumber] = useState(account?.number || '');
-  const [currency, setCurrency] = useState(account?.currency || 'RUB');
-  const [openingBalance, setOpeningBalance] = useState(
-    account?.openingBalance?.toString() || '0'
-  );
-  const [isActive, setIsActive] = useState(account?.isActive ?? true);
-
-  const [create, { isLoading: isCreating }] = useCreateAccountMutation();
-  const [update, { isLoading: isUpdating }] = useUpdateAccountMutation();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const data = {
-      name,
-      number,
-      currency,
-      openingBalance: parseFloat(openingBalance),
-      isActive,
-    };
-    try {
-      if (account) {
-        await update({ id: account.id, data }).unwrap();
-      } else {
-        await create(data).unwrap();
-      }
-      onClose();
-    } catch (error) {
-      console.error('Failed to save account:', error);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <Input
-        label="Название"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <Input
-        label="Номер счета"
-        value={number}
-        onChange={(e) => setNumber(e.target.value)}
-      />
-      <Select
-        label="Валюта"
-        value={currency}
-        onChange={(e) => setCurrency(e.target.value)}
-        options={[
-          { value: 'RUB', label: 'RUB' },
-          { value: 'USD', label: 'USD' },
-          { value: 'EUR', label: 'EUR' },
-        ]}
-        required
-      />
-      <Input
-        label="Начальный остаток"
-        type="number"
-        step="0.01"
-        value={openingBalance}
-        onChange={(e) => setOpeningBalance(e.target.value)}
-      />
-      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 dark:focus:ring-primary-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-        />
-        <span className="text-sm">Активен</span>
-      </label>
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
-          {account ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-      </div>
-    </form>
   );
 };

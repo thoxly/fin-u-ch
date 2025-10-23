@@ -1,0 +1,1 @@
+export { SalaryForm } from './SalaryForm';

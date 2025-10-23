@@ -1,9 +1,9 @@
-import { ArticleForm } from '../../pages/catalogs/ArticlesPage';
-import { AccountForm } from '../../pages/catalogs/AccountsPage';
-import { DepartmentForm } from '../../pages/catalogs/DepartmentsPage';
-import { CounterpartyForm } from '../../pages/catalogs/CounterpartiesPage';
-import { DealForm } from '../../pages/catalogs/DealsPage';
-import { SalaryForm } from '../../pages/catalogs/SalariesPage';
+import { ArticleForm } from '../../features/catalog-forms/index';
+import { AccountForm } from '../../features/catalog-forms/index';
+import { DepartmentForm } from '../../features/catalog-forms/index';
+import { CounterpartyForm } from '../../features/catalog-forms/index';
+import { DealForm } from '../../features/catalog-forms/index';
+import { SalaryForm } from '../../features/catalog-forms/index';
 
 interface CatalogFormRendererProps {
   catalogType: string;

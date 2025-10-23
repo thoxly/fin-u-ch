@@ -78,7 +78,7 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await prisma.$transaction(async (tx: any) => {
           // 1. ФОТ (начисление зарплаты)
           await tx.operation.create({
             data: {
