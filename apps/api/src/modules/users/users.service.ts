@@ -8,6 +8,8 @@ export class UsersService {
       select: {
         id: true,
         email: true,
+        firstName: true,
+        lastName: true,
         companyId: true,
         isActive: true,
         createdAt: true,
@@ -25,7 +27,10 @@ export class UsersService {
       throw new AppError('User not found', 404);
     }
 
-    return user;
+    return {
+      ...user,
+      companyName: user.company.name,
+    };
   }
 
   async getAll(companyId: string) {
@@ -41,17 +46,39 @@ export class UsersService {
     });
   }
 
-  async updateMe(userId: string, data: { isActive?: boolean }) {
-    return prisma.user.update({
+  async updateMe(
+    userId: string,
+    data: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      isActive?: boolean;
+    }
+  ) {
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data,
       select: {
         id: true,
         email: true,
+        firstName: true,
+        lastName: true,
         companyId: true,
         isActive: true,
+        company: {
+          select: {
+            id: true,
+            name: true,
+            currencyBase: true,
+          },
+        },
       },
     });
+
+    return {
+      ...updatedUser,
+      companyName: updatedUser.company.name,
+    };
   }
 }
 

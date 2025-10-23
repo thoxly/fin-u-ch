@@ -4,13 +4,18 @@ import { BrowserRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { UserProfileForm } from './UserProfileForm';
 
-// Mock the authApi
+// Mock the authApi and companiesApi
 const mockUseGetMeQuery = jest.fn();
 const mockUseUpdateUserMutation = jest.fn();
+const mockUseUpdateCompanyMutation = jest.fn();
 
 jest.mock('../../store/api/authApi', () => ({
   useGetMeQuery: () => mockUseGetMeQuery(),
   useUpdateUserMutation: () => mockUseUpdateUserMutation(),
+}));
+
+jest.mock('../../store/api/companiesApi', () => ({
+  useUpdateCompanyMutation: () => mockUseUpdateCompanyMutation(),
 }));
 
 const createMockStore = () => {
@@ -40,6 +45,7 @@ const renderWithProviders = (component: React.ReactElement) => {
 describe('UserProfileForm', () => {
   const mockOnClose = jest.fn();
   const mockUpdateUser = jest.fn();
+  const mockUpdateCompany = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -52,12 +58,20 @@ describe('UserProfileForm', () => {
         firstName: 'John',
         lastName: 'Doe',
         companyName: 'Test Company',
+        company: {
+          currencyBase: 'USD',
+        },
       },
       isLoading: false,
     });
 
     mockUseUpdateUserMutation.mockReturnValue([
       mockUpdateUser,
+      { isLoading: false },
+    ]);
+
+    mockUseUpdateCompanyMutation.mockReturnValue([
+      mockUpdateCompany,
       { isLoading: false },
     ]);
   });
@@ -69,6 +83,7 @@ describe('UserProfileForm', () => {
     expect(screen.getByDisplayValue('John')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Doe')).toBeInTheDocument();
     expect(screen.getByDisplayValue('Test Company')).toBeInTheDocument();
+    expect(screen.getByText('Базовая валюта')).toBeInTheDocument();
   });
 
   it('updates form fields when user types', async () => {
@@ -80,9 +95,11 @@ describe('UserProfileForm', () => {
     expect(emailInput).toHaveValue('newemail@example.com');
   });
 
-  it('calls updateUser when save button is clicked', async () => {
-    const mockUnwrap = jest.fn().mockResolvedValue({});
-    mockUpdateUser.mockReturnValue({ unwrap: mockUnwrap });
+  it('calls updateUser and updateCompany when save button is clicked', async () => {
+    const mockUnwrapUser = jest.fn().mockResolvedValue({});
+    const mockUnwrapCompany = jest.fn().mockResolvedValue({});
+    mockUpdateUser.mockReturnValue({ unwrap: mockUnwrapUser });
+    mockUpdateCompany.mockReturnValue({ unwrap: mockUnwrapCompany });
 
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
@@ -94,14 +111,36 @@ describe('UserProfileForm', () => {
         email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
-        companyName: 'Test Company',
+      });
+      expect(mockUpdateCompany).toHaveBeenCalledWith({
+        name: 'Test Company',
+        currencyBase: 'USD',
       });
     });
   });
 
-  it('shows loading state when updating', () => {
+  it('shows loading state when updating user', () => {
     mockUseUpdateUserMutation.mockReturnValue([
       mockUpdateUser,
+      { isLoading: true },
+    ]);
+    mockUseUpdateCompanyMutation.mockReturnValue([
+      mockUpdateCompany,
+      { isLoading: false },
+    ]);
+
+    renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
+
+    expect(screen.getByText('Сохранение...')).toBeInTheDocument();
+  });
+
+  it('shows loading state when updating company', () => {
+    mockUseUpdateUserMutation.mockReturnValue([
+      mockUpdateUser,
+      { isLoading: false },
+    ]);
+    mockUseUpdateCompanyMutation.mockReturnValue([
+      mockUpdateCompany,
       { isLoading: true },
     ]);
 
