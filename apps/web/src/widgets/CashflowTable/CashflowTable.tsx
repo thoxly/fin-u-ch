@@ -32,16 +32,25 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     }));
   };
 
-  // Получаем все месяцы из данных
+  // Получаем все месяцы из данных (факт или план)
   const allMonths = useMemo(() => {
-    return data.activities.length > 0
-      ? data.activities[0].incomeGroups.length > 0
-        ? data.activities[0].incomeGroups[0].months.map((m) => m.month)
-        : data.activities[0].expenseGroups.length > 0
-          ? data.activities[0].expenseGroups[0].months.map((m) => m.month)
-          : []
-      : [];
-  }, [data.activities]);
+    // Сначала пробуем взять месяцы из фактических данных
+    if (data.activities.length > 0) {
+      if (data.activities[0].incomeGroups.length > 0) {
+        return data.activities[0].incomeGroups[0].months.map((m) => m.month);
+      }
+      if (data.activities[0].expenseGroups.length > 0) {
+        return data.activities[0].expenseGroups[0].months.map((m) => m.month);
+      }
+    }
+
+    // Если фактических данных нет, берем месяцы из плана
+    if (planData && planData.rows.length > 0) {
+      return planData.rows[0].months.map((m) => m.month);
+    }
+
+    return [];
+  }, [data.activities, planData]);
 
   // Функция для получения плановых данных по статье и месяцу
   const getPlanAmount = (articleId: string, month: string) => {
