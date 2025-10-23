@@ -67,20 +67,33 @@ export const ReportsPage = () => {
     setShowBudgetMenu(false);
   };
 
+  // Refs для dropdown меню
+  const reportMenuRef = useRef<HTMLDivElement>(null);
+  const budgetMenuRef = useRef<HTMLDivElement>(null);
+
   // Закрываем меню при клике вне
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      // Закрываем меню отчетов если клик вне кнопки и меню
       if (
+        showReportMenu &&
         reportButtonRef.current &&
-        !reportButtonRef.current.contains(event.target as Node) &&
-        showReportMenu
+        !reportButtonRef.current.contains(target) &&
+        reportMenuRef.current &&
+        !reportMenuRef.current.contains(target)
       ) {
         setShowReportMenu(false);
       }
+
+      // Закрываем меню бюджетов если клик вне кнопки и меню
       if (
+        showBudgetMenu &&
         budgetButtonRef.current &&
-        !budgetButtonRef.current.contains(event.target as Node) &&
-        showBudgetMenu
+        !budgetButtonRef.current.contains(target) &&
+        budgetMenuRef.current &&
+        !budgetMenuRef.current.contains(target)
       ) {
         setShowBudgetMenu(false);
       }
@@ -130,7 +143,10 @@ export const ReportsPage = () => {
                 <ChevronDown className="w-4 h-4" />
               </button>
               {showReportMenu && (
-                <div className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px]">
+                <div
+                  ref={reportMenuRef}
+                  className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px]"
+                >
                   <button
                     onClick={() => handleReportTypeClick('cashflow')}
                     className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
@@ -164,7 +180,10 @@ export const ReportsPage = () => {
                   <ChevronDown className="w-4 h-4" />
                 </button>
                 {showBudgetMenu && (
-                  <div className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto">
+                  <div
+                    ref={budgetMenuRef}
+                    className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto"
+                  >
                     {budgets.map((budget) => (
                       <button
                         key={budget.id}
