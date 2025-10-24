@@ -108,9 +108,6 @@ export const MenuPopover = ({
               className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700/50 pr-10"
               role="menuitem"
             >
-              <span className="flex-shrink-0">
-                {item.icon ? iconRenderer(item.icon) : null}
-              </span>
               <span>{item.name}</span>
             </Link>
             {item.createAction && (
@@ -119,12 +116,12 @@ export const MenuPopover = ({
                   item.createAction!.onClick();
                   onClose();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30"
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30 text-xs"
                 role="menuitem"
                 title={item.createAction.label}
                 aria-label={item.createAction.label}
               >
-                <Icons.Plus size={16} />
+                {item.createAction.label}
               </button>
             )}
           </div>
@@ -142,13 +139,6 @@ export const MenuPopover = ({
             className="w-full flex items-center gap-3 px-4 py-2 text-sm text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30"
             role="menuitem"
           >
-            <span className="flex-shrink-0">
-              {createAction.icon ? (
-                iconRenderer(createAction.icon)
-              ) : (
-                <Icons.Plus size={16} />
-              )}
-            </span>
             <span className="font-medium">{createAction.label}</span>
           </button>
         </>
