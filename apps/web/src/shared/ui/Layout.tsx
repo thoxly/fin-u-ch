@@ -110,7 +110,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
 
   const getCatalogCreateLabel = (catalogName: string): string => {
     const labels: Record<string, string> = {
-      Статьи: 'Создать статью',
+      Статьи: '+',
       Счета: 'Создать счет',
       Подразделения: 'Создать подразделение',
       Контрагенты: 'Создать контрагента',
