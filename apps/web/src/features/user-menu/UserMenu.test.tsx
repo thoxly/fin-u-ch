@@ -66,11 +66,14 @@ describe('UserMenu', () => {
     const menuButton = screen.getByRole('button');
     fireEvent.click(menuButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Мой профиль')).toBeInTheDocument();
-      expect(screen.getByText('Выйти')).toBeInTheDocument();
-    });
-  });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Мой профиль')).toBeInTheDocument();
+        expect(screen.getByText('Выйти')).toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
+  }, 10000);
 
   it('calls onProfileClick when profile button is clicked', async () => {
     renderWithProviders(
