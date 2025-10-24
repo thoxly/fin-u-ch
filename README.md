@@ -299,3 +299,5 @@ sudo /opt/fin-u-ch/scripts/setup-backups.sh
 # Force CI update
 
 # Force deploy for PR 85 and 86
+
+# Force deploy push
