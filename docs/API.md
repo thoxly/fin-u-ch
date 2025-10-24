@@ -284,6 +284,70 @@ Create a new operation.
 }
 ```
 
+### Budgets
+
+#### GET /api/budgets
+
+Get all budgets with filtering options.
+
+**Query Parameters:**
+
+- `status`: string (optional) - Filter by status (active|archived)
+
+**Response:**
+
+```json
+[
+  {
+    "id": "string",
+    "name": "string",
+    "startDate": "date",
+    "endDate": "date (optional)",
+    "status": "string",
+    "_count": {
+      "planItems": "number"
+    }
+  }
+]
+```
+
+#### GET /api/budgets/:id
+
+Get budget by ID with plan items count.
+
+#### POST /api/budgets
+
+Create a new budget.
+
+**Request Body:**
+
+```json
+{
+  "name": "string",
+  "startDate": "date",
+  "endDate": "date (optional)"
+}
+```
+
+#### PATCH /api/budgets/:id
+
+Update budget.
+
+**Request Body:**
+
+```json
+{
+  "name": "string",
+  "startDate": "date",
+  "endDate": "date (optional)",
+  "status": "string (active|archived)"
+}
+```
+
+#### DELETE /api/budgets/:id
+
+Delete budget (only if no plan items exist).
+
 ### Plans
 
 #### GET /api/plans
@@ -296,6 +360,7 @@ Get plans with filtering options.
 - `dateFrom`: date
 - `dateTo`: date
 - `articleId`: string (optional)
+- `budgetId`: string (optional) - Filter by budget
 
 #### POST /api/plans
 
@@ -312,6 +377,7 @@ Create a new plan.
   "currency": "string",
   "articleId": "string",
   "accountId": "string (or sourceAccountId/targetAccountId)",
+  "budgetId": "string (optional)",
   "repeat": "string"
 }
 ```
@@ -661,7 +727,8 @@ Defined in `apps/api/src/app.ts`:
 - `/api/deals` - Deals catalog
 - `/api/salaries` - Salaries catalog
 - `/api/operations` - Financial operations
-- `/api/plans` - Budget planning
+- `/api/budgets` - Budget management (new)
+- `/api/plans` - Budget planning (enhanced with budgetId support)
 - `/api/reports` - Financial reports (dashboard, cashflow, bdds, dds, planfact)
 - `/api/demo` - Demo system (credentials, create, info, exists, delete)
 

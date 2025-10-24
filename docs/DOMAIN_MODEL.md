@@ -105,6 +105,17 @@ Below is a concise entity overview aligned with current code. All entities are m
 - createdAt
 - updatedAt
 
+### Budget (Бюджет)
+
+- id
+- companyId
+- name
+- startDate
+- endDate?
+- status (enum: active|archived)
+- createdAt
+- updatedAt
+
 ### PlanItem (Плановая запись БДДС)
 
 - id
@@ -117,6 +128,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 - articleId?
 - accountId? (для income/expense)
 - dealId?
+- budgetId? (связь с бюджетом)
 - description?
 - repeat (enum: daily|weekly|monthly|quarterly|semiannual|annual|none)
 - status (enum: active|paused|archived)
@@ -203,6 +215,8 @@ Below is a concise entity overview aligned with current code. All entities are m
 - **Notifications System**: Полная система уведомлений с Redux store и UI компонентами
 - **UI Customization**: Настройка иконок навигации и тем компании
 - **Theme System**: Поддержка светлой/темной темы с автоматическим определением
+- **Budget Management**: Полная система управления бюджетами с группировкой плановых записей
+- **Plan Matrix Table**: Продвинутый компонент для отображения БДДС с группировкой по видам деятельности
 
 ### Частично реализованные функции
 

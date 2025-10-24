@@ -119,7 +119,11 @@
    │     │  │  └─ deals/
    │     │  ├─ salaries/
    │     │  ├─ operations/
-   │     │  ├─ plans/
+   │     │  ├─ budgets/        # управление бюджетами (новый)
+   │     │  │  ├─ budgets.service.ts
+   │     │  │  ├─ budgets.controller.ts
+   │     │  │  └─ budgets.routes.ts
+   │     │  ├─ plans/          # планирование с поддержкой бюджетов
    │     │  ├─ reports/
    │     │  │  ├─ dashboard/
    │     │  │  ├─ cashflow/
@@ -170,7 +174,8 @@
 - **companies, users** (включая UI настройки).
 - **catalogs**: articles, accounts, departments, counterparties, deals, salaries.
 - **operations** (факт).
-- **plans** (PlanItem).
+- **budgets** (управление бюджетами, группировка плановых записей).
+- **plans** (PlanItem с поддержкой budgetId).
 - **reports** (dashboard, cashflow/ODDS, plan-vs-fact BDDs, DDS).
 - **demo** (автоматическое создание демо-пользователя с тестовыми данными).
 - **permissions** (минимум: в рамках companyId).
@@ -180,7 +185,8 @@
 **Тяжёлые выборки**:
 
 - operations индекс: (companyId, operationDate), (companyId, articleId, operationDate).
-- plans индекс: (companyId, startDate, repeat).
+- plans индекс: (companyId, startDate, repeat), (companyId, budgetId, startDate).
+- budgets индекс: (companyId, status).
 - articles индекс: (companyId, parentId).
 
 Денормализации не делаем в MVP. При необходимости — materialized view для ОДДС.
