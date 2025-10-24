@@ -62,7 +62,8 @@ export interface MonthlyData {
 export interface BDDSReport {
   periodFrom: string;
   periodTo: string;
-  rows: BDDSRow[];
+  budgetId?: string;
+  activities: ActivityGroup[];
 }
 
 export interface BDDSRow {

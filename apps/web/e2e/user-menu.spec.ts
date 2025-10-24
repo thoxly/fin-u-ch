@@ -1,22 +1,21 @@
 import { test, expect } from '@playwright/test';
-import { loginUser, createTestUser } from './helpers/auth';
+import { loginAsTestUser, expectAuthenticated } from './helpers/auth';
 
 test.describe('User Menu', () => {
   test.beforeEach(async ({ page }) => {
-    // Create and login test user
-    const user = await createTestUser();
-    await loginUser(page, user.email, 'password123');
-    await page.waitForURL('/dashboard');
+    // Login test user
+    await loginAsTestUser(page);
+    await expectAuthenticated(page);
   });
 
   test('should display user menu with profile and logout options', async ({
     page,
   }) => {
     // Check that user menu is visible
-    await expect(page.getByText('test@example.com')).toBeVisible();
+    await expect(page.getByText('demo@example.com')).toBeVisible();
 
     // Click on user menu to open dropdown
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
 
     // Check that dropdown menu is visible with both options
     await expect(page.getByText('Мой профиль')).toBeVisible();
@@ -27,14 +26,14 @@ test.describe('User Menu', () => {
     page,
   }) => {
     // Open user menu
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
 
     // Click on profile option
     await page.getByText('Мой профиль').click();
 
     // Check that profile modal is opened
     await expect(page.getByText('Мой профиль')).toBeVisible();
-    await expect(page.getByDisplayValue('test@example.com')).toBeVisible();
+    await expect(page.getByDisplayValue('demo@example.com')).toBeVisible();
 
     // Check that form fields are present
     await expect(page.getByPlaceholder('Введите имя')).toBeVisible();
@@ -46,7 +45,7 @@ test.describe('User Menu', () => {
 
   test('should allow editing profile information', async ({ page }) => {
     // Open profile modal
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await page.getByText('Мой профиль').click();
 
     // Edit form fields
@@ -65,7 +64,7 @@ test.describe('User Menu', () => {
 
   test('should close profile modal when clicking cancel', async ({ page }) => {
     // Open profile modal
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await page.getByText('Мой профиль').click();
 
     // Click cancel button
@@ -79,7 +78,7 @@ test.describe('User Menu', () => {
     page,
   }) => {
     // Open profile modal
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await page.getByText('Мой профиль').click();
 
     // Click X button
@@ -91,7 +90,7 @@ test.describe('User Menu', () => {
 
   test('should logout when clicking "Выйти"', async ({ page }) => {
     // Open user menu
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
 
     // Click logout option
     await page.getByText('Выйти').click();
@@ -103,7 +102,7 @@ test.describe('User Menu', () => {
 
   test('should close dropdown when clicking outside', async ({ page }) => {
     // Open user menu
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
 
     // Check that dropdown is visible
     await expect(page.getByText('Мой профиль')).toBeVisible();
@@ -117,11 +116,11 @@ test.describe('User Menu', () => {
 
   test('should handle form validation', async ({ page }) => {
     // Open profile modal
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await page.getByText('Мой профиль').click();
 
     // Clear email field to test validation
-    await page.getByDisplayValue('test@example.com').clear();
+    await page.getByDisplayValue('demo@example.com').clear();
 
     // Try to save with invalid email
     await page.getByRole('button', { name: /сохранить/i }).click();
@@ -132,7 +131,7 @@ test.describe('User Menu', () => {
 
   test('should show loading state when saving profile', async ({ page }) => {
     // Open profile modal
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await page.getByText('Мой профиль').click();
 
     // Make a change
@@ -150,10 +149,10 @@ test.describe('User Menu', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     // Check that user menu is still visible and functional
-    await expect(page.getByText('test@example.com')).toBeVisible();
+    await expect(page.getByText('demo@example.com')).toBeVisible();
 
     // Test dropdown functionality on mobile
-    await page.getByRole('button', { name: /test@example.com/i }).click();
+    await page.getByRole('button', { name: /demo@example.com/i }).click();
     await expect(page.getByText('Мой профиль')).toBeVisible();
     await expect(page.getByText('Выйти')).toBeVisible();
   });
