@@ -120,24 +120,15 @@ describe('MenuPopover', () => {
     expect(screen.getByText('Test Item')).toBeInTheDocument();
   });
 
-  it('should render custom icon using renderIcon prop', () => {
-    const customRenderIcon = jest.fn(() => (
-      <span data-testid="custom-icon">⭐</span>
-    ));
+  it('should not render icons in menu items', () => {
+    renderMenuPopover();
 
-    render(
-      <BrowserRouter>
-        <MenuPopover
-          items={mockItems}
-          onClose={mockOnClose}
-          anchorPosition={{ top: 100, left: 200 }}
-          renderIcon={customRenderIcon}
-        />
-      </BrowserRouter>
-    );
-
-    expect(customRenderIcon).toHaveBeenCalled();
-    expect(screen.getAllByTestId('custom-icon')).toHaveLength(mockItems.length);
+    // Icons should not be rendered in the menu items
+    const menuItems = screen.getAllByRole('menuitem');
+    menuItems.forEach((menuItem) => {
+      const icon = menuItem.querySelector('svg');
+      expect(icon).not.toBeInTheDocument();
+    });
   });
 
   it('should have proper ARIA attributes', () => {
