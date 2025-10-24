@@ -7,8 +7,6 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import {
   useGetArticlesQuery,
-  useCreateArticleMutation,
-  useUpdateArticleMutation,
   useDeleteArticleMutation,
 } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
@@ -19,8 +17,13 @@ export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
 
-  const { data: articles = [], isLoading } = useGetArticlesQuery();
+  const { data: articles = [], isLoading, error } = useGetArticlesQuery();
   const [deleteArticle] = useDeleteArticleMutation();
+
+  // Отладочная информация
+  console.log('ArticlesPage - articles:', articles);
+  console.log('ArticlesPage - isLoading:', isLoading);
+  console.log('ArticlesPage - error:', error);
 
   const handleCreate = () => {
     setEditing(null);
@@ -28,6 +31,7 @@ export const ArticlesPage = () => {
   };
 
   const handleEdit = (article: Article) => {
+    console.log('ArticlesPage - handleEdit called with article:', article);
     setEditing(article);
     setIsFormOpen(true);
   };

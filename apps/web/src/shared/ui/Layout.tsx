@@ -67,6 +67,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     isOpen: boolean;
     title: string;
     catalogType: string;
+    editingData?: unknown; // Данные для редактирования
   }>({ isOpen: false, title: '', catalogType: '' });
 
   const [userProfileOffCanvasOpen, setUserProfileOffCanvasOpen] =
@@ -124,6 +125,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       isOpen: true,
       title: getCatalogCreateLabel(catalogName),
       catalogType: catalogName,
+      editingData: undefined,
     });
   };
 
@@ -180,6 +182,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       isOpen: false,
       title: '',
       catalogType: '',
+      editingData: undefined,
     });
   };
 
@@ -316,6 +319,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           <CatalogFormRenderer
             catalogType={offCanvasState.catalogType}
             onClose={handleCloseOffCanvas}
+            editingData={offCanvasState.editingData}
           />
         </OffCanvas>
       )}

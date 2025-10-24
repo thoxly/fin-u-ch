@@ -8,26 +8,35 @@ import { SalaryForm } from '../../features/catalog-forms/index';
 interface CatalogFormRendererProps {
   catalogType: string;
   onClose: () => void;
+  editingData?: unknown; // Данные для редактирования
 }
 
 export const CatalogFormRenderer = ({
   catalogType,
   onClose,
+  editingData,
 }: CatalogFormRendererProps): JSX.Element => {
   const getFormComponent = (): JSX.Element => {
     switch (catalogType) {
       case 'Статьи':
-        return <ArticleForm article={null} onClose={onClose} />;
+        return <ArticleForm article={editingData || null} onClose={onClose} />;
       case 'Счета':
-        return <AccountForm account={null} onClose={onClose} />;
+        return <AccountForm account={editingData || null} onClose={onClose} />;
       case 'Подразделения':
-        return <DepartmentForm department={null} onClose={onClose} />;
+        return (
+          <DepartmentForm department={editingData || null} onClose={onClose} />
+        );
       case 'Контрагенты':
-        return <CounterpartyForm counterparty={null} onClose={onClose} />;
+        return (
+          <CounterpartyForm
+            counterparty={editingData || null}
+            onClose={onClose}
+          />
+        );
       case 'Сделки':
-        return <DealForm deal={null} onClose={onClose} />;
+        return <DealForm deal={editingData || null} onClose={onClose} />;
       case 'Зарплаты':
-        return <SalaryForm salary={null} onClose={onClose} />;
+        return <SalaryForm salary={editingData || null} onClose={onClose} />;
       default:
         return (
           <div className="p-4 text-gray-600 dark:text-gray-400">
