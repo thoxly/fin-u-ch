@@ -85,6 +85,11 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
   // Проверяем есть ли данные
   const hasData = data.activities && data.activities.length > 0;
 
+  // Отладочная информация
+  console.log('PlanMatrixTable data:', data);
+  console.log('PlanMatrixTable hasData:', hasData);
+  console.log('PlanMatrixTable allMonths:', allMonths);
+
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
       {/* Верхняя панель с информацией о периоде */}
@@ -172,6 +177,16 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
                       0
                     );
                     const monthNet = monthIncome - monthExpense;
+
+                    // Отладочная информация для каждого месяца
+                    console.log(`Month ${month}:`, {
+                      monthIncome,
+                      monthExpense,
+                      monthNet,
+                      activity: activity.activity,
+                      incomeGroups: activity.incomeGroups,
+                      expenseGroups: activity.expenseGroups,
+                    });
 
                     return (
                       <td

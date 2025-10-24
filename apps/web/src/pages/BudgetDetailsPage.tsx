@@ -32,6 +32,11 @@ export const BudgetDetailsPage = () => {
   const { data: plans = [], isLoading: isPlansLoading } = useGetPlansQuery(
     budgetId ? { budgetId } : skipToken
   );
+
+  // Отладочная информация
+  console.log('BudgetDetailsPage - plans:', plans);
+  console.log('BudgetDetailsPage - isPlansLoading:', isPlansLoading);
+  console.log('BudgetDetailsPage - editingPlan:', editingPlan);
   const [deletePlan] = useDeletePlanMutation();
   const [updateBudget] = useUpdateBudgetMutation();
 
@@ -65,6 +70,7 @@ export const BudgetDetailsPage = () => {
   };
 
   const handleEdit = (plan: PlanItem) => {
+    console.log('BudgetDetailsPage - handleEdit called with plan:', plan);
     setEditingPlan(plan);
     setIsFormOpen(true);
   };

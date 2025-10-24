@@ -21,12 +21,20 @@ export const ArticleForm = ({
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
   useEffect(() => {
+    console.log('ArticleForm - article prop changed:', article);
     if (article) {
+      console.log('ArticleForm - setting form values from article:', {
+        name: article.name,
+        type: article.type,
+        activity: article.activity,
+        isActive: article.isActive,
+      });
       setName(article.name || '');
       setType(article.type || 'expense');
       setActivity(article.activity || 'operating');
       setIsActive(article.isActive ?? true);
     } else {
+      console.log('ArticleForm - resetting form for new article');
       // Сброс при создании новой статьи
       setName('');
       setType('expense');

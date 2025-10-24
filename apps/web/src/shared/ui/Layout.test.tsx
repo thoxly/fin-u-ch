@@ -317,7 +317,7 @@ describe('Layout - MenuPopover Integration', () => {
     });
   });
 
-  it('should show icons in menu items', async () => {
+  it('should not show icons in menu items', async () => {
     renderLayout();
 
     const catalogButton = screen
@@ -330,9 +330,9 @@ describe('Layout - MenuPopover Integration', () => {
     await waitFor(() => {
       const menuItem = screen.getByText('Статьи').closest('[role="menuitem"]');
       expect(menuItem).toBeInTheDocument();
-      // Icons should be rendered in the menu items
+      // Icons should not be rendered in the menu items
       const icon = menuItem?.querySelector('svg');
-      expect(icon).toBeInTheDocument();
+      expect(icon).not.toBeInTheDocument();
     });
   });
 });

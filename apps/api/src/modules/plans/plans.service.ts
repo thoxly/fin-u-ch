@@ -202,9 +202,16 @@ export class PlansService {
           }
           break;
         }
-        case 'annual':
+        case 'annual': {
+          // Для годового повтора также учитываем последний день месяца
+          const originalDayAnnual = currentDate.getDate();
           currentDate.setFullYear(currentDate.getFullYear() + 1);
+
+          if (currentDate.getDate() !== originalDayAnnual) {
+            currentDate.setDate(0);
+          }
           break;
+        }
         default:
           return result;
       }
