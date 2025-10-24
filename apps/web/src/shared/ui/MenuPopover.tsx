@@ -79,7 +79,7 @@ export const MenuPopover = ({
 
   const iconRenderer = renderIcon || defaultRenderIcon;
 
-  const offset = 8; // Offset to make popover feel "attached" to trigger element
+  const offset = 8;
   const positionStyle =
     position === 'right' && anchorPosition.right !== undefined
       ? {
@@ -108,9 +108,6 @@ export const MenuPopover = ({
               className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700/50 pr-10"
               role="menuitem"
             >
-              {item.icon && (
-                <span className="flex-shrink-0">{iconRenderer(item.icon)}</span>
-              )}
               <span>{item.name}</span>
             </Link>
             {item.createAction && (

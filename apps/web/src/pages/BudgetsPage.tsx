@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderOpen, Trash2, Archive, RotateCcw } from 'lucide-react';
+import { Trash2, Archive, RotateCcw } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -134,15 +134,10 @@ export const BudgetsPage = () => {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => handleOpenDetails(budget.id)}
-            title="Открыть бюджет"
-          >
-            <FolderOpen className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => handleArchive(budget)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleArchive(budget);
+            }}
             title={budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
           >
             {budget.status === 'active' ? (
@@ -154,14 +149,17 @@ export const BudgetsPage = () => {
           <Button
             variant="danger"
             size="sm"
-            onClick={() => handleDelete(budget.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete(budget.id);
+            }}
             title="Удалить"
           >
             <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       ),
-      width: '150px',
+      width: '120px',
     },
   ];
 
@@ -204,6 +202,7 @@ export const BudgetsPage = () => {
           columns={columns}
           data={budgets}
           keyExtractor={(budget) => budget.id}
+          onRowClick={(budget) => handleOpenDetails(budget.id)}
           loading={isLoading}
           emptyMessage="Нет бюджетов"
         />

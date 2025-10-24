@@ -25,7 +25,13 @@ const navigation: NavigationItem[] = [
   { name: 'Операции', href: '/operations' },
   { name: 'Планы', href: '/plans' },
   { name: 'Бюджеты', href: '/budgets' },
-  { name: 'Отчеты', href: '/reports' },
+  {
+    name: 'Отчеты',
+    children: [
+      { name: 'ДДС', href: '/reports?type=cashflow' },
+      { name: 'ДДС детально', href: '/reports?type=dds' },
+    ],
+  },
   {
     name: 'Справочники',
     children: [
@@ -55,6 +61,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     items: MenuPopoverItem[];
     position: { top: number; left: number; right?: number };
     createAction?: MenuPopoverAction;
+    activeParentName?: string;
   }>({ isOpen: false, items: [], position: { top: 0, left: 0 } });
 
   const [offCanvasState, setOffCanvasState] = useState<{
@@ -67,6 +74,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     useState(false);
 
   const isActive = (href: string): boolean => location.pathname === href;
+
+  const isPopoverActive = (itemName: string): boolean =>
+    menuPopoverState.isOpen && menuPopoverState.activeParentName === itemName;
 
   const handleIconClick = (
     e: React.MouseEvent<HTMLButtonElement>,
@@ -152,6 +162,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         right: rect.right + 5,
       },
       createAction: undefined,
+      activeParentName: parentName,
     });
   };
 
@@ -161,6 +172,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       items: [],
       position: { top: 0, left: 0 },
       createAction: undefined,
+      activeParentName: undefined,
     });
   };
 
@@ -202,9 +214,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         </div>
       </header>
 
-      <div className="flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex max-w-full mx-auto px-2 sm:px-4 lg:px-6 py-8">
         {/* Sidebar */}
-        <aside className="w-64 pr-8">
+        <aside className="w-48 pr-4">
           <nav className="space-y-1">
             {navigation.map((item) =>
               item.children ? (
@@ -213,7 +225,11 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                     onClick={(e) =>
                       handleMenuClick(e, item.children || [], item.name)
                     }
-                    className="group relative flex items-center gap-2 text-sm font-medium text-gray-700 px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+                    className={`group relative flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                      isPopoverActive(item.name)
+                        ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                        : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -266,7 +282,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0">{children}</main>
+        <main className="flex-1 min-w-0 pl-4">{children}</main>
       </div>
 
       {/* Icon Picker Popover */}

@@ -4,7 +4,6 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OperationsPage } from './pages/OperationsPage';
-import { PlansPage } from './pages/PlansPage';
 import { BudgetsPage } from './pages/BudgetsPage';
 import { BudgetDetailsPage } from './pages/BudgetDetailsPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -45,14 +44,6 @@ function App() {
           element={
             <PrivateRoute>
               <OperationsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/plans"
-          element={
-            <PrivateRoute>
-              <PlansPage />
             </PrivateRoute>
           }
         />

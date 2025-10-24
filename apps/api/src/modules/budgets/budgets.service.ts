@@ -1,6 +1,7 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { validateRequired } from '../../utils/validation';
+import { invalidateReportCache } from '../reports/utils/cache';
 
 export interface CreateBudgetDTO {
   name: string;
@@ -61,13 +62,18 @@ export class BudgetsService {
       throw new AppError('End date must be after start date', 400);
     }
 
-    return prisma.budget.create({
+    const result = await prisma.budget.create({
       data: {
         ...data,
         companyId,
         status: 'active',
       },
     });
+
+    // Инвалидируем кэш отчетов после создания бюджета
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 
   async update(id: string, companyId: string, data: UpdateBudgetDTO) {
@@ -85,10 +91,15 @@ export class BudgetsService {
       }
     }
 
-    return prisma.budget.update({
+    const result = await prisma.budget.update({
       where: { id },
       data,
     });
+
+    // Инвалидируем кэш отчетов после обновления бюджета
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 
   async delete(id: string, companyId: string) {
@@ -111,9 +122,14 @@ export class BudgetsService {
       );
     }
 
-    return prisma.budget.delete({
+    const result = await prisma.budget.delete({
       where: { id },
     });
+
+    // Инвалидируем кэш отчетов после удаления бюджета
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 }
 
