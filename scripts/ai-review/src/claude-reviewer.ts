@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { CONFIG } from './config.js';
 import { ReviewComment, PullRequestFile } from './github-client.js';
 
@@ -18,11 +18,12 @@ interface ClaudeIssue {
 }
 
 export class ClaudeReviewer {
-  private anthropic: Anthropic;
+  private openai: OpenAI;
 
   constructor() {
-    this.anthropic = new Anthropic({
-      apiKey: CONFIG.anthropic.apiKey,
+    this.openai = new OpenAI({
+      apiKey: CONFIG.deepseek.apiKey,
+      baseURL: 'https://api.deepseek.com/v1',
     });
   }
 
@@ -31,14 +32,14 @@ export class ClaudeReviewer {
     diff: string,
     projectContext: string
   ): Promise<ReviewComment[]> {
-    console.log('Sending code to Claude for review...');
+    console.log('Sending code to DeepSeek for review...');
 
     const prompt = this.buildPrompt(files, diff, projectContext);
 
     try {
-      const message = await this.anthropic.messages.create({
-        model: CONFIG.anthropic.model,
-        max_tokens: CONFIG.anthropic.maxTokens,
+      const completion = await this.openai.chat.completions.create({
+        model: CONFIG.deepseek.model,
+        max_tokens: CONFIG.deepseek.maxTokens,
         messages: [
           {
             role: 'user',
@@ -47,18 +48,17 @@ export class ClaudeReviewer {
         ],
       });
 
-      const responseText =
-        message.content[0].type === 'text' ? message.content[0].text : '';
+      const responseText = completion.choices[0]?.message?.content || '';
 
-      console.log('  Claude review completed\n');
-      console.log('Claude response:');
+      console.log('  DeepSeek review completed\n');
+      console.log('DeepSeek response:');
       console.log(responseText);
       console.log('\n');
 
       const issues = this.parseClaudeResponse(responseText);
       return this.convertToReviewComments(issues, files);
     } catch (error) {
-      console.error('Error calling Claude API:', error);
+      console.error('Error calling DeepSeek API:', error);
       throw error;
     }
   }

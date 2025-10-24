@@ -10,9 +10,9 @@ const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, '../../..');
 
 export const CONFIG = {
-  anthropic: {
-    apiKey: process.env.ANTHROPIC_API_KEY || '',
-    model: 'claude-sonnet-4-20250514',
+  deepseek: {
+    apiKey: process.env.DEEPSEEK_API_KEY || '',
+    model: 'deepseek-reasoner',
     maxTokens: 16000, // Increased for Level 2 architectural review
   },
   github: {
@@ -40,8 +40,8 @@ export const CONFIG = {
 export function validateConfig(): void {
   const errors: string[] = [];
 
-  if (!CONFIG.anthropic.apiKey) {
-    errors.push('ANTHROPIC_API_KEY is required');
+  if (!CONFIG.deepseek.apiKey) {
+    errors.push('DEEPSEEK_API_KEY is required');
   }
 
   if (!CONFIG.github.token) {
