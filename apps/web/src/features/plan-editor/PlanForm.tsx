@@ -15,10 +15,11 @@ import type { PlanItem } from '@shared/types/operations';
 
 interface PlanFormProps {
   plan: PlanItem | null;
+  budgetId?: string;
   onClose: () => void;
 }
 
-export const PlanForm = ({ plan, onClose }: PlanFormProps) => {
+export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [type, setType] = useState(plan?.type || 'expense');
   const [startDate, setStartDate] = useState(
     plan?.startDate.split('T')[0] || toISODate(new Date())
@@ -50,6 +51,7 @@ export const PlanForm = ({ plan, onClose }: PlanFormProps) => {
       currency,
       articleId: articleId || undefined,
       accountId: accountId || undefined,
+      budgetId: budgetId || plan?.budgetId || undefined,
       repeat,
       status,
     };

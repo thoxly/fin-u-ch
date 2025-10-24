@@ -15,3 +15,6 @@ export * from './schemas/notifications';
 // Constants
 export * from './constants/enums';
 export * from './constants/config';
+
+// Utilities
+export * from './lib/currencies';

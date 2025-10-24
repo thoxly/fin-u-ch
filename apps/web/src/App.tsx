@@ -4,7 +4,8 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { OperationsPage } from './pages/OperationsPage';
-import { PlansPage } from './pages/PlansPage';
+import { BudgetsPage } from './pages/BudgetsPage';
+import { BudgetDetailsPage } from './pages/BudgetDetailsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ArticlesPage } from './pages/catalogs/ArticlesPage';
 import { AccountsPage } from './pages/catalogs/AccountsPage';
@@ -47,10 +48,18 @@ function App() {
           }
         />
         <Route
-          path="/plans"
+          path="/budgets"
           element={
             <PrivateRoute>
-              <PlansPage />
+              <BudgetsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/budgets/:budgetId"
+          element={
+            <PrivateRoute>
+              <BudgetDetailsPage />
             </PrivateRoute>
           }
         />

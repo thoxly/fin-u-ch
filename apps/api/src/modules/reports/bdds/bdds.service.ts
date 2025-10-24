@@ -6,6 +6,7 @@ import plansService from '../../plans/plans.service';
 export interface BDDSParams {
   periodFrom: Date;
   periodTo: Date;
+  budgetId?: string;
 }
 
 export interface BDDSMonthlyData {
@@ -21,8 +22,25 @@ export interface BDDSRow {
   total: number;
 }
 
+export interface BDDSActivity {
+  activity: string;
+  incomeGroups: BDDSRow[];
+  expenseGroups: BDDSRow[];
+  totalIncome: number;
+  totalExpense: number;
+  netCashflow: number;
+}
+
 export class BDDSService {
-  async getBDDS(companyId: string, params: BDDSParams): Promise<BDDSRow[]> {
+  async getBDDS(
+    companyId: string,
+    params: BDDSParams
+  ): Promise<BDDSActivity[]> {
+    // If no budgetId provided, return empty result
+    if (!params.budgetId) {
+      return [];
+    }
+
     const cacheKey = generateCacheKey(companyId, 'bdds', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
@@ -30,21 +48,45 @@ export class BDDSService {
     const planItems = await prisma.planItem.findMany({
       where: {
         companyId,
+        budgetId: params.budgetId,
         status: 'active',
         startDate: { lte: params.periodTo },
         OR: [{ endDate: null }, { endDate: { gte: params.periodFrom } }],
       },
       include: {
-        article: { select: { id: true, name: true, type: true } },
+        article: {
+          select: { id: true, name: true, type: true, activity: true },
+        },
       },
     });
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
     const monthsIndex = new Map(months.map((m, idx) => [m, idx]));
+
+    // Group by activity
+    const activitiesMap = new Map<string, BDDSActivity>();
+    const activityTypes = ['operating', 'investing', 'financing'];
+
+    // Initialize activities
+    activityTypes.forEach((activity) => {
+      activitiesMap.set(activity, {
+        activity,
+        incomeGroups: [],
+        expenseGroups: [],
+        totalIncome: 0,
+        totalExpense: 0,
+        netCashflow: 0,
+      });
+    });
+
+    // Group plan items by activity and type
     const articleMap = new Map<string, BDDSRow>();
 
     for (const planItem of planItems) {
-      if (!planItem.article) continue;
+      if (!planItem.article || !planItem.article.activity) continue;
+
+      const activity = activitiesMap.get(planItem.article.activity);
+      if (!activity) continue;
 
       const expanded = plansService.expandPlan(
         planItem,
@@ -54,13 +96,20 @@ export class BDDSService {
 
       const key = planItem.article.id;
       if (!articleMap.has(key)) {
-        articleMap.set(key, {
+        const row = {
           articleId: planItem.article.id,
           articleName: planItem.article.name,
           type: planItem.article.type,
           months: months.map((m) => ({ month: m, amount: 0 })),
           total: 0,
-        });
+        };
+        articleMap.set(key, row);
+
+        if (planItem.article.type === 'income') {
+          activity.incomeGroups.push(row);
+        } else {
+          activity.expenseGroups.push(row);
+        }
       }
 
       const row = articleMap.get(key)!;
@@ -73,14 +122,22 @@ export class BDDSService {
       }
     }
 
-    const result = Array.from(articleMap.values()).sort(
-      (a, b) =>
-        a.type.localeCompare(b.type) ||
-        a.articleName.localeCompare(b.articleName)
-    );
+    // Calculate totals for each activity
+    activitiesMap.forEach((activity) => {
+      activity.totalIncome = activity.incomeGroups.reduce(
+        (sum, group) => sum + group.total,
+        0
+      );
+      activity.totalExpense = activity.expenseGroups.reduce(
+        (sum, group) => sum + group.total,
+        0
+      );
+      activity.netCashflow = activity.totalIncome - activity.totalExpense;
+    });
 
-    await cacheReport(cacheKey, result);
-    return result;
+    const activities = Array.from(activitiesMap.values());
+    await cacheReport(cacheKey, activities);
+    return activities;
   }
 }
 

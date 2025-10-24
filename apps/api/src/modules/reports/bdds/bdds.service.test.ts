@@ -63,7 +63,12 @@ describe('BDDSService', () => {
           status: 'active',
           startDate: new Date('2025-01-01'),
           endDate: new Date('2025-12-31'),
-          article: { id: 'art-1', name: 'Sales', type: 'income' },
+          article: {
+            id: 'art-1',
+            name: 'Sales',
+            type: 'income',
+            activity: 'operating',
+          },
         },
         {
           id: '2',
@@ -74,7 +79,12 @@ describe('BDDSService', () => {
           status: 'active',
           startDate: new Date('2025-02-01'),
           endDate: new Date('2025-12-31'),
-          article: { id: 'art-1', name: 'Sales', type: 'income' },
+          article: {
+            id: 'art-1',
+            name: 'Sales',
+            type: 'income',
+            activity: 'operating',
+          },
         },
       ];
 
@@ -92,20 +102,29 @@ describe('BDDSService', () => {
       const result = await service.getBDDS('company-id', {
         periodFrom: new Date('2025-01-01'),
         periodTo: new Date('2025-02-28'),
+        budgetId: 'test-budget-id',
       });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].articleName).toBe('Sales');
-      expect(result[0].total).toBe(4000); // 1000 + 1000 + 2000
+      expect(result).toHaveLength(3); // operating, investing, financing activities
+
+      // Find the operating activity (should contain our test data)
+      const operatingActivity = result.find((a) => a.activity === 'operating');
+      expect(operatingActivity).toBeDefined();
+      expect(operatingActivity!.incomeGroups).toHaveLength(1);
+      expect(operatingActivity!.incomeGroups[0].articleName).toBe('Sales');
+      expect(operatingActivity!.incomeGroups[0].total).toBe(4000); // 1000 + 1000 + 2000
       expect(mockPlanItemFindMany).toHaveBeenCalledWith({
         where: {
           companyId: 'company-id',
+          budgetId: 'test-budget-id',
           status: 'active',
           startDate: { lte: new Date('2025-02-28') },
           OR: [{ endDate: null }, { endDate: { gte: new Date('2025-01-01') } }],
         },
         include: {
-          article: { select: { id: true, name: true, type: true } },
+          article: {
+            select: { id: true, name: true, type: true, activity: true },
+          },
         },
       });
     });
@@ -130,9 +149,16 @@ describe('BDDSService', () => {
       const result = await service.getBDDS('company-id', {
         periodFrom: new Date('2025-01-01'),
         periodTo: new Date('2025-01-31'),
+        budgetId: 'test-budget-id',
       });
 
-      expect(result).toEqual([]);
+      // Should return 3 activities (operating, investing, financing) but with empty groups
+      expect(result).toHaveLength(3);
+      expect(
+        result.every(
+          (a) => a.incomeGroups.length === 0 && a.expenseGroups.length === 0
+        )
+      ).toBe(true);
     });
 
     it('should sort rows by type and article name', async () => {
@@ -141,12 +167,17 @@ describe('BDDSService', () => {
           id: '1',
           companyId: 'company-id',
           amount: 1000,
-          type: 'income',
+          type: 'expense',
           repeat: 'once',
           status: 'active',
           startDate: new Date('2025-01-01'),
           endDate: new Date('2025-12-31'),
-          article: { id: 'art-2', name: 'Salary', type: 'expense' },
+          article: {
+            id: 'art-2',
+            name: 'Salary',
+            type: 'expense',
+            activity: 'operating',
+          },
         },
         {
           id: '2',
@@ -157,7 +188,12 @@ describe('BDDSService', () => {
           status: 'active',
           startDate: new Date('2025-01-01'),
           endDate: new Date('2025-12-31'),
-          article: { id: 'art-1', name: 'Sales', type: 'income' },
+          article: {
+            id: 'art-1',
+            name: 'Sales',
+            type: 'income',
+            activity: 'operating',
+          },
         },
       ];
 
@@ -169,12 +205,20 @@ describe('BDDSService', () => {
       const result = await service.getBDDS('company-id', {
         periodFrom: new Date('2025-01-01'),
         periodTo: new Date('2025-01-31'),
+        budgetId: 'test-budget-id',
       });
 
-      expect(result).toHaveLength(2);
+      expect(result).toHaveLength(3); // operating, investing, financing activities
+
+      // Find the operating activity
+      const operatingActivity = result.find((a) => a.activity === 'operating');
+      expect(operatingActivity).toBeDefined();
+      expect(operatingActivity!.expenseGroups).toHaveLength(1);
+      expect(operatingActivity!.incomeGroups).toHaveLength(1);
+
       // Should be sorted by type first (expense before income), then by name
-      expect(result[0].type).toBe('expense');
-      expect(result[1].type).toBe('income');
+      expect(operatingActivity!.expenseGroups[0].type).toBe('expense');
+      expect(operatingActivity!.incomeGroups[0].type).toBe('income');
     });
 
     it('should verify companyId filter is applied for security', async () => {
@@ -183,6 +227,7 @@ describe('BDDSService', () => {
       await service.getBDDS('test-company-123', {
         periodFrom: new Date('2025-01-01'),
         periodTo: new Date('2025-01-31'),
+        budgetId: 'test-budget-id',
       });
 
       expect(mockPlanItemFindMany).toHaveBeenCalledWith(

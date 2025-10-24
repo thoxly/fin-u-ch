@@ -25,6 +25,7 @@ model Company {
   operations     Operation[]
   planItems      PlanItem[]
   salaries       Salary[]
+  budgets        Budget[]
 
   @@map("companies")
 }
@@ -34,6 +35,8 @@ model User {
   companyId    String
   email        String   @unique
   passwordHash String
+  firstName    String?
+  lastName     String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -191,6 +194,7 @@ model PlanItem {
   articleId   String?
   accountId   String?
   dealId      String?
+  budgetId    String?
   repeat      String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
   status      String    @default("active") // active|paused|archived
   description String?
@@ -201,8 +205,10 @@ model PlanItem {
   article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
   account Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  budget  Budget?  @relation(fields: [budgetId], references: [id], onDelete: SetNull)
 
   @@index([companyId, startDate, repeat])
+  @@index([companyId, budgetId, startDate])
   @@map("plan_items")
 }
 
@@ -226,5 +232,22 @@ model Salary {
 
   @@index([companyId])
   @@map("salaries")
+}
+
+model Budget {
+  id        String    @id @default(uuid())
+  companyId String
+  name      String
+  startDate DateTime
+  endDate   DateTime?
+  status    String    @default("active") // active|archived
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  planItems PlanItem[]
+
+  @@index([companyId, status])
+  @@map("budgets")
 }
 

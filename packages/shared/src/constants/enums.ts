@@ -38,6 +38,11 @@ export enum PlanStatus {
   ARCHIVED = 'archived',
 }
 
+export enum BudgetStatus {
+  ACTIVE = 'active',
+  ARCHIVED = 'archived',
+}
+
 export enum ArticleIndicator {
   // For expense
   AMORTIZATION = 'amortization',

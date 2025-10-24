@@ -5,7 +5,8 @@ import plansService from './plans.service';
 export class PlansController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await plansService.getAll(req.companyId!);
+      const budgetId = req.query.budgetId as string | undefined;
+      const result = await plansService.getAll(req.companyId!, budgetId);
       res.json(result);
     } catch (error) {
       next(error);

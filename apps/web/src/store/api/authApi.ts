@@ -33,6 +33,7 @@ interface UpdateUserRequest {
   firstName?: string;
   lastName?: string;
   companyName?: string;
+  currencyBase?: string;
 }
 
 export const authApi = apiSlice.injectEndpoints({

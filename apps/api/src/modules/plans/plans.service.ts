@@ -11,6 +11,7 @@ export interface CreatePlanItemDTO {
   articleId?: string;
   accountId?: string;
   dealId?: string;
+  budgetId?: string;
   repeat?: string;
   status?: string;
   description?: string;
@@ -22,13 +23,19 @@ export interface MonthlyAmount {
 }
 
 export class PlansService {
-  async getAll(companyId: string) {
+  async getAll(companyId: string, budgetId?: string) {
+    const where: { companyId: string; budgetId?: string } = { companyId };
+    if (budgetId) {
+      where.budgetId = budgetId;
+    }
+
     return prisma.planItem.findMany({
-      where: { companyId },
+      where,
       include: {
         article: { select: { id: true, name: true } },
         account: { select: { id: true, name: true } },
         deal: { select: { id: true, name: true } },
+        budget: { select: { id: true, name: true } },
       },
       orderBy: { startDate: 'desc' },
     });
@@ -41,6 +48,7 @@ export class PlansService {
         article: { select: { id: true, name: true } },
         account: { select: { id: true, name: true } },
         deal: { select: { id: true, name: true } },
+        budget: { select: { id: true, name: true } },
       },
     });
 
@@ -109,7 +117,12 @@ export class PlansService {
    * Expand plan item into monthly amounts based on repeat setting
    */
   expandPlan(
-    planItem: any,
+    planItem: {
+      startDate: Date;
+      endDate?: Date | null;
+      amount: number;
+      repeat: string;
+    },
     periodStart: Date,
     periodEnd: Date
   ): MonthlyAmount[] {

@@ -1,110 +1,220 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Input } from '../shared/ui/Input';
-// import { Button } from '../shared/ui/Button';
 import {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
-  useGetPlanFactReportQuery,
   useGetDdsReportQuery,
 } from '../store/api/reportsApi';
+import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { formatMoney } from '../shared/lib/money';
 import { toISODate } from '../shared/lib/date';
 import { subMonths, startOfMonth } from 'date-fns';
 import { CashflowTable } from '../widgets/CashflowTable';
+import type { Budget } from '@fin-u-ch/shared';
+import { skipToken } from '@reduxjs/toolkit/query';
 
-type TabType = 'cashflow' | 'bdds' | 'planfact' | 'dds';
+type ReportType = 'cashflow' | 'dds';
 
 export const ReportsPage = () => {
   const today = new Date();
-  const [activeTab, setActiveTab] = useState<TabType>('cashflow');
+  const [reportType, setReportType] = useState<ReportType>('cashflow');
   const [periodFrom, setPeriodFrom] = useState(
     toISODate(startOfMonth(subMonths(today, 2)))
   );
   const [periodTo, setPeriodTo] = useState(toISODate(today));
-  const [showPlan, setShowPlan] = useState(false);
+  const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
+  const [showReportMenu, setShowReportMenu] = useState(false);
+  const [showBudgetMenu, setShowBudgetMenu] = useState(false);
+  const reportButtonRef = useRef<HTMLButtonElement>(null);
+  const budgetButtonRef = useRef<HTMLButtonElement>(null);
 
-  const tabs = [
-    { id: 'cashflow' as TabType, label: 'ОДДС (факт)' },
-    { id: 'bdds' as TabType, label: 'БДДС (план)' },
-    { id: 'planfact' as TabType, label: 'План vs Факт' },
-    { id: 'dds' as TabType, label: 'ДДС (детально)' },
-  ];
+  // Загружаем активные бюджеты
+  const { data: budgets = [] } = useGetBudgetsQuery({ status: 'active' });
+
+  console.log('Budgets loaded:', budgets);
+
+  // Сохраняем выбранный бюджет в localStorage
+  useEffect(() => {
+    if (selectedBudget) {
+      localStorage.setItem('selectedBudgetId', selectedBudget.id);
+    } else {
+      localStorage.removeItem('selectedBudgetId');
+    }
+  }, [selectedBudget]);
+
+  // Восстанавливаем выбранный бюджет из localStorage
+  useEffect(() => {
+    const savedBudgetId = localStorage.getItem('selectedBudgetId');
+    if (savedBudgetId && budgets.length > 0) {
+      const budget = budgets.find((b) => b.id === savedBudgetId);
+      if (budget) {
+        setSelectedBudget(budget);
+      }
+    }
+  }, [budgets]);
+
+  const handleReportTypeClick = (type: ReportType) => {
+    setReportType(type);
+    setShowReportMenu(false);
+  };
+
+  const handleBudgetClick = (budget: Budget | null) => {
+    console.log('Budget clicked:', budget);
+    setSelectedBudget(budget);
+    setShowBudgetMenu(false);
+  };
+
+  // Refs для dropdown меню
+  const reportMenuRef = useRef<HTMLDivElement>(null);
+  const budgetMenuRef = useRef<HTMLDivElement>(null);
+
+  // Закрываем меню при клике вне
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      // Закрываем меню отчетов если клик вне кнопки и меню
+      if (
+        showReportMenu &&
+        reportButtonRef.current &&
+        !reportButtonRef.current.contains(target) &&
+        reportMenuRef.current &&
+        !reportMenuRef.current.contains(target)
+      ) {
+        setShowReportMenu(false);
+      }
+
+      // Закрываем меню бюджетов если клик вне кнопки и меню
+      if (
+        showBudgetMenu &&
+        budgetButtonRef.current &&
+        !budgetButtonRef.current.contains(target) &&
+        budgetMenuRef.current &&
+        !budgetMenuRef.current.contains(target)
+      ) {
+        setShowBudgetMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showReportMenu, showBudgetMenu]);
 
   return (
     <Layout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Отчеты</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          Отчеты
+        </h1>
 
         {/* Фильтры */}
         <Card>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <Input
-              label="Период с"
-              type="date"
-              value={periodFrom}
-              onChange={(e) => setPeriodFrom(e.target.value)}
-            />
-            <Input
-              label="Период по"
-              type="date"
-              value={periodTo}
-              onChange={(e) => setPeriodTo(e.target.value)}
-            />
-            {activeTab === 'cashflow' && (
-              <label className="flex items-center space-x-2 cursor-pointer pb-1">
-                <input
-                  type="checkbox"
-                  checked={showPlan}
-                  onChange={(e) => setShowPlan(e.target.checked)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-5 w-5"
-                />
-                <span className="text-sm font-medium text-gray-700">
-                  Показать план
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <Input
+                label="Период с"
+                type="date"
+                value={periodFrom}
+                onChange={(e) => setPeriodFrom(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <Input
+                label="Период по"
+                type="date"
+                value={periodTo}
+                onChange={(e) => setPeriodTo(e.target.value)}
+              />
+            </div>
+
+            {/* Выбор типа отчета */}
+            <div className="flex-shrink-0 relative">
+              <button
+                ref={reportButtonRef}
+                onClick={() => setShowReportMenu(!showReportMenu)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors"
+              >
+                <span className="font-medium">
+                  {reportType === 'cashflow' ? 'ДДС' : 'ДДС детально'}
                 </span>
-              </label>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {showReportMenu && (
+                <div
+                  ref={reportMenuRef}
+                  className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px]"
+                >
+                  <button
+                    onClick={() => handleReportTypeClick('cashflow')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    ДДС
+                  </button>
+                  <button
+                    onClick={() => handleReportTypeClick('dds')}
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    ДДС детально
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Выбор бюджета (только для ДДС) */}
+            {reportType === 'cashflow' && (
+              <div className="flex-shrink-0 relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  План
+                </label>
+                <button
+                  ref={budgetButtonRef}
+                  onClick={() => setShowBudgetMenu(!showBudgetMenu)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors min-w-[150px] justify-between"
+                >
+                  <span className="font-medium">
+                    {selectedBudget ? selectedBudget.name : 'Нет'}
+                  </span>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                {showBudgetMenu && (
+                  <div
+                    ref={budgetMenuRef}
+                    className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto"
+                  >
+                    {budgets.map((budget) => (
+                      <button
+                        key={budget.id}
+                        onClick={() => handleBudgetClick(budget)}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                      >
+                        {budget.name}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => handleBudgetClick(null)}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors border-t border-gray-200 dark:border-gray-700"
+                    >
+                      Нет
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </Card>
 
-        {/* Вкладки */}
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm
-                  ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Контент вкладок */}
-        {activeTab === 'cashflow' && (
+        {/* Контент отчетов */}
+        {reportType === 'cashflow' && (
           <CashflowTab
             periodFrom={periodFrom}
             periodTo={periodTo}
-            showPlan={showPlan}
+            selectedBudget={selectedBudget}
           />
         )}
-        {activeTab === 'bdds' && (
-          <BddsTab periodFrom={periodFrom} periodTo={periodTo} />
-        )}
-        {activeTab === 'planfact' && (
-          <PlanFactTab periodFrom={periodFrom} periodTo={periodTo} />
-        )}
-        {activeTab === 'dds' && (
+        {reportType === 'dds' && (
           <DDSTab periodFrom={periodFrom} periodTo={periodTo} />
         )}
       </div>
@@ -112,51 +222,64 @@ export const ReportsPage = () => {
   );
 };
 
-// ОДДС (факт)
+// ДДС (факт + план-факт)
 const CashflowTab = ({
   periodFrom,
   periodTo,
-  showPlan,
+  selectedBudget,
 }: {
   periodFrom: string;
   periodTo: string;
-  showPlan: boolean;
+  selectedBudget: Budget | null;
 }) => {
   const { data, isLoading, error } = useGetCashflowReportQuery({
     periodFrom,
     periodTo,
   });
 
-  const {
-    data: planData,
-    isLoading: planLoading,
-    error: planError,
-  } = useGetBddsReportQuery({
-    periodFrom,
-    periodTo,
-  });
+  const { data: planData, isLoading: planLoading } = useGetBddsReportQuery(
+    selectedBudget
+      ? {
+          periodFrom,
+          periodTo,
+          budgetId: selectedBudget.id,
+        }
+      : skipToken
+  );
 
-  if (isLoading || planLoading) {
+  // Debug: показываем что приходит от API
+  console.log('Selected Budget:', selectedBudget);
+  console.log('Plan Data:', planData);
+  console.log('Plan Loading:', planLoading);
+  console.log('Plan rows:', planData?.rows);
+  console.log('Fact data:', data);
+  console.log('Fact activities:', data?.activities);
+
+  if (isLoading || (selectedBudget && planLoading)) {
     return (
       <Card>
-        <div className="text-center py-8 text-gray-500">Загрузка...</div>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          Загрузка...
+        </div>
       </Card>
     );
   }
 
-  if (error || planError) {
+  if (error) {
     return (
       <Card>
-        <div className="text-red-600">Ошибка загрузки отчета</div>
+        <div className="text-red-600 dark:text-red-400">
+          Ошибка загрузки отчета
+        </div>
       </Card>
     );
   }
 
-  if (!data || !data.activities || data.activities.length === 0) {
+  if (!data) {
     return (
       <Card>
-        <div className="text-center py-8 text-gray-500">
-          Нет данных за выбранный период
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          Нет данных
         </div>
       </Card>
     );
@@ -165,176 +288,15 @@ const CashflowTab = ({
   return (
     <CashflowTable
       data={data}
-      planData={planData}
-      showPlan={showPlan}
+      planData={selectedBudget ? planData : undefined}
+      showPlan={!!selectedBudget}
       periodFrom={periodFrom}
       periodTo={periodTo}
     />
   );
 };
 
-// БДДС (план)
-const BddsTab = ({
-  periodFrom,
-  periodTo,
-}: {
-  periodFrom: string;
-  periodTo: string;
-}) => {
-  const { data, isLoading, error } = useGetBddsReportQuery({
-    periodFrom,
-    periodTo,
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500">Загрузка...</div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <div className="text-red-600">Ошибка загрузки отчета</div>
-      </Card>
-    );
-  }
-
-  if (!data || !data.rows || data.rows.length === 0) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500">
-          Нет данных за выбранный период
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Статья</th>
-              <th className="text-right">Плановая сумма</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map((row) => (
-              <tr key={row.articleId}>
-                <td>{row.articleName || 'Без статьи'}</td>
-                <td className="text-right">{formatMoney(row.total)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-};
-
-// План vs Факт
-const PlanFactTab = ({
-  periodFrom,
-  periodTo,
-}: {
-  periodFrom: string;
-  periodTo: string;
-}) => {
-  const { data, isLoading, error } = useGetPlanFactReportQuery({
-    periodFrom,
-    periodTo,
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500">Загрузка...</div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <div className="text-red-600">Ошибка загрузки отчета</div>
-      </Card>
-    );
-  }
-
-  if (!data || !data.rows || data.rows.length === 0) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500">
-          Нет данных за выбранный период
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <div className="overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Статья</th>
-              <th className="text-right">План</th>
-              <th className="text-right">Факт</th>
-              <th className="text-right">Отклонение</th>
-              <th className="text-right">%</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.rows.map(
-              (
-                row: {
-                  key: string;
-                  article: string;
-                  plan: number;
-                  fact: number;
-                  delta: number;
-                },
-                idx: number
-              ) => {
-                const percentage =
-                  row.plan !== 0
-                    ? ((row.delta / row.plan) * 100).toFixed(1)
-                    : '0';
-                return (
-                  <tr key={idx}>
-                    <td>{row.article || 'Без статьи'}</td>
-                    <td className="text-right">{formatMoney(row.plan)}</td>
-                    <td className="text-right">{formatMoney(row.fact)}</td>
-                    <td
-                      className={`text-right ${
-                        row.delta >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {formatMoney(row.delta)}
-                    </td>
-                    <td
-                      className={`text-right ${
-                        row.delta >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {percentage}%
-                    </td>
-                  </tr>
-                );
-              }
-            )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-};
-
-// ДДС (детально)
+// ДДС детально
 const DDSTab = ({
   periodFrom,
   periodTo,
@@ -350,34 +312,18 @@ const DDSTab = ({
   if (isLoading) {
     return (
       <Card>
-        <div className="text-center py-8 text-gray-500">Загрузка...</div>
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          Загрузка...
+        </div>
       </Card>
     );
   }
 
   if (error) {
-    // Enhanced error handling with logging
-    console.error('DDS Report Error:', error);
-
-    const errorMessage =
-      'status' in error && error.status === 400
-        ? 'Некорректные параметры запроса. Проверьте выбранные даты.'
-        : 'status' in error && error.status === 403
-          ? 'Недостаточно прав для просмотра отчета.'
-          : 'status' in error && error.status === 500
-            ? 'Ошибка сервера. Попробуйте позже.'
-            : 'Ошибка загрузки отчета. Попробуйте обновить страницу.';
-
     return (
       <Card>
-        <div className="space-y-4">
-          <div className="text-red-600 font-semibold">Ошибка</div>
-          <div className="text-gray-700">{errorMessage}</div>
-          {'data' in error && error.data && (
-            <div className="text-sm text-gray-500">
-              Детали: {JSON.stringify(error.data)}
-            </div>
-          )}
+        <div className="text-red-600 dark:text-red-400">
+          Ошибка загрузки отчета
         </div>
       </Card>
     );
@@ -386,149 +332,164 @@ const DDSTab = ({
   if (!data) {
     return (
       <Card>
-        <div className="text-center py-8 text-gray-500">
-          Нет данных за выбранный период
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          Нет данных
         </div>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Остатки на счетах */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4">Остатки на счетах</h3>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Счет</th>
-                <th className="text-right">Остаток на начало</th>
-                <th className="text-right">Остаток на конец</th>
-                <th className="text-right">Изменение</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.accounts.map((account) => {
-                const change = account.closingBalance - account.openingBalance;
-                return (
-                  <tr key={account.accountId}>
-                    <td>{account.accountName}</td>
-                    <td className="text-right">
-                      {formatMoney(account.openingBalance)}
+    <Card>
+      <div className="space-y-6">
+        {/* Остатки по счетам */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-gray-100">
+            Остатки по счетам
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">
+                    Счет
+                  </th>
+                  <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                    Начальный остаток
+                  </th>
+                  <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                    Конечный остаток
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.accounts.map((acc) => (
+                  <tr
+                    key={acc.accountId}
+                    className="border-b border-gray-200 dark:border-gray-700"
+                  >
+                    <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                      {acc.accountName}
                     </td>
-                    <td className="text-right">
-                      {formatMoney(account.closingBalance)}
+                    <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                      {formatMoney(acc.openingBalance, 'RUB')}
                     </td>
-                    <td
-                      className={`text-right ${
-                        change >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {formatMoney(change)}
+                    <td className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                      {formatMoney(acc.closingBalance, 'RUB')}
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Поступления */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4 text-green-600">
-          Поступления
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Статья</th>
-                <th className="text-right">Сумма</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.inflows.map((flow) => (
-                <tr key={flow.articleId}>
-                  <td>{flow.articleName}</td>
-                  <td className="text-right">{formatMoney(flow.total)}</td>
-                </tr>
-              ))}
-              <tr className="font-bold border-t-2">
-                <td>Итого поступлений</td>
-                <td className="text-right text-green-600">
-                  {formatMoney(data.summary.totalInflow)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Выбытия */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4 text-red-600">Выбытия</h3>
-        <div className="overflow-x-auto">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Статья</th>
-                <th className="text-right">Сумма</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.outflows.map((flow) => (
-                <tr key={flow.articleId}>
-                  <td>{flow.articleName}</td>
-                  <td className="text-right">{formatMoney(flow.total)}</td>
-                </tr>
-              ))}
-              <tr className="font-bold border-t-2">
-                <td>Итого выбытий</td>
-                <td className="text-right text-red-600">
-                  {formatMoney(data.summary.totalOutflow)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {/* Итого */}
-      <Card>
-        <h3 className="text-lg font-semibold mb-4">Итого</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-green-50 p-4 rounded-lg">
-            <div className="text-sm text-gray-600">Поступления</div>
-            <div className="text-2xl font-bold text-green-600">
-              {formatMoney(data.summary.totalInflow)}
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="bg-red-50 p-4 rounded-lg">
-            <div className="text-sm text-gray-600">Выбытия</div>
-            <div className="text-2xl font-bold text-red-600">
-              {formatMoney(data.summary.totalOutflow)}
-            </div>
+        </div>
+
+        {/* Поступления */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-green-700 dark:text-green-400">
+            Поступления
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">
+                    Статья
+                  </th>
+                  <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                    Сумма
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.inflows.map((flow) => (
+                  <tr
+                    key={flow.articleId}
+                    className="border-b border-gray-200 dark:border-gray-700"
+                  >
+                    <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                      {flow.articleName}
+                    </td>
+                    <td className="px-4 py-2 text-right text-green-600 dark:text-green-400">
+                      {formatMoney(flow.total, 'RUB')}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="font-semibold bg-green-50 dark:bg-green-900/20">
+                  <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                    Итого поступлений
+                  </td>
+                  <td className="px-4 py-2 text-right text-green-700 dark:text-green-400">
+                    {formatMoney(data.summary.totalInflow, 'RUB')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div
-            className={`p-4 rounded-lg ${
-              data.summary.netCashflow >= 0 ? 'bg-blue-50' : 'bg-orange-50'
-            }`}
-          >
-            <div className="text-sm text-gray-600">Чистое изменение</div>
-            <div
-              className={`text-2xl font-bold ${
+        </div>
+
+        {/* Выплаты */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 text-red-700 dark:text-red-400">
+            Выплаты
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-4 py-2 text-left text-gray-700 dark:text-gray-300">
+                    Статья
+                  </th>
+                  <th className="px-4 py-2 text-right text-gray-700 dark:text-gray-300">
+                    Сумма
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.outflows.map((flow) => (
+                  <tr
+                    key={flow.articleId}
+                    className="border-b border-gray-200 dark:border-gray-700"
+                  >
+                    <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                      {flow.articleName}
+                    </td>
+                    <td className="px-4 py-2 text-right text-red-600 dark:text-red-400">
+                      {formatMoney(flow.total, 'RUB')}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="font-semibold bg-red-50 dark:bg-red-900/20">
+                  <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                    Итого выплат
+                  </td>
+                  <td className="px-4 py-2 text-right text-red-700 dark:text-red-400">
+                    {formatMoney(data.summary.totalOutflow, 'RUB')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Итоговый денежный поток */}
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Чистый денежный поток:
+            </span>
+            <span
+              className={`text-xl font-bold ${
                 data.summary.netCashflow >= 0
-                  ? 'text-blue-600'
-                  : 'text-orange-600'
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-red-700 dark:text-red-400'
               }`}
             >
-              {formatMoney(data.summary.netCashflow)}
-            </div>
+              {formatMoney(data.summary.netCashflow, 'RUB')}
+            </span>
           </div>
         </div>
-      </Card>
-    </div>
+      </div>
+    </Card>
   );
 };
