@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import { Button } from '../../shared/ui/Button';
@@ -20,6 +20,9 @@ interface PlanFormProps {
 }
 
 export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
+  console.log('PlanForm - plan prop:', plan);
+  console.log('PlanForm - budgetId prop:', budgetId);
+
   const [type, setType] = useState(plan?.type || 'expense');
   const [startDate, setStartDate] = useState(
     plan?.startDate.split('T')[0] || toISODate(new Date())
@@ -39,6 +42,44 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
 
   const [createPlan, { isLoading: isCreating }] = useCreatePlanMutation();
   const [updatePlan, { isLoading: isUpdating }] = useUpdatePlanMutation();
+
+  // Отслеживаем изменения в пропе plan
+  useEffect(() => {
+    console.log('PlanForm - plan prop changed:', plan);
+    if (plan) {
+      console.log('PlanForm - setting form values from plan:', {
+        type: plan.type,
+        startDate: plan.startDate,
+        endDate: plan.endDate,
+        amount: plan.amount,
+        currency: plan.currency,
+        articleId: plan.articleId,
+        accountId: plan.accountId,
+        repeat: plan.repeat,
+        status: plan.status,
+      });
+      setType(plan.type || 'expense');
+      setStartDate(plan.startDate.split('T')[0] || toISODate(new Date()));
+      setEndDate(plan.endDate ? plan.endDate.split('T')[0] : '');
+      setAmount(plan.amount.toString() || '');
+      setCurrency(plan.currency || 'RUB');
+      setArticleId(plan.articleId || '');
+      setAccountId(plan.accountId || '');
+      setRepeat(plan.repeat || 'monthly');
+      setStatus(plan.status || 'active');
+    } else {
+      console.log('PlanForm - resetting form for new plan');
+      setType('expense');
+      setStartDate(toISODate(new Date()));
+      setEndDate('');
+      setAmount('');
+      setCurrency('RUB');
+      setArticleId('');
+      setAccountId('');
+      setRepeat('monthly');
+      setStatus('active');
+    }
+  }, [plan]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
