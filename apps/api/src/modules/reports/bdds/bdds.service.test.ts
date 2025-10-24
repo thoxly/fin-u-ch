@@ -167,7 +167,7 @@ describe('BDDSService', () => {
           id: '1',
           companyId: 'company-id',
           amount: 1000,
-          type: 'income',
+          type: 'expense',
           repeat: 'once',
           status: 'active',
           startDate: new Date('2025-01-01'),
