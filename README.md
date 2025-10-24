@@ -295,3 +295,9 @@ sudo /opt/fin-u-ch/scripts/setup-backups.sh
 ```
 
 Подробнее: [Backup Strategy](docs/BACKUP_STRATEGY.md) | [Scripts README](scripts/README.md)
+
+# Force CI update
+
+# Force deploy for PR 85 and 86
+
+# Force deploy push
