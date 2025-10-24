@@ -1,0 +1,19 @@
+[
+  {
+    "type": "income",
+    "date": "2025-01-15",
+    "amount": 150000,
+    "article": "Выручка от продаж",
+    "counterparty": "ООО \"Клиент-1\"",
+    "deal": "Проект А",
+    "description": "Sample operation for 2025-01-15"
+  },
+  {
+    "type": "expense",
+    "date": "2025-01-05",
+    "amount": 50000,
+    "article": "Зарплата",
+    "counterparty": "Иванов Иван Иванович",
+    "description": "Sample operation for 2025-01-05"
+  }
+]
