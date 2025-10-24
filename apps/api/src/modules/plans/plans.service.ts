@@ -1,6 +1,7 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { validateRequired } from '../../utils/validation';
+import { invalidateReportCache } from '../reports/utils/cache';
 
 export interface CreatePlanItemDTO {
   type: string;
@@ -84,12 +85,17 @@ export class PlansService {
       throw new AppError('Invalid repeat value', 400);
     }
 
-    return prisma.planItem.create({
+    const result = await prisma.planItem.create({
       data: {
         ...data,
         companyId,
       },
     });
+
+    // Инвалидируем кэш отчетов после создания плановой записи
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 
   async update(
@@ -99,18 +105,28 @@ export class PlansService {
   ) {
     await this.getById(id, companyId);
 
-    return prisma.planItem.update({
+    const result = await prisma.planItem.update({
       where: { id },
       data,
     });
+
+    // Инвалидируем кэш отчетов после обновления плановой записи
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 
   async delete(id: string, companyId: string) {
     await this.getById(id, companyId);
 
-    return prisma.planItem.delete({
+    const result = await prisma.planItem.delete({
       where: { id },
     });
+
+    // Инвалидируем кэш отчетов после удаления плановой записи
+    await invalidateReportCache(companyId);
+
+    return result;
   }
 
   /**
@@ -153,15 +169,39 @@ export class PlansService {
         case 'weekly':
           currentDate.setDate(currentDate.getDate() + 7);
           break;
-        case 'monthly':
+        case 'monthly': {
+          // Для ежемесячного повтора учитываем последний день месяца
+          const originalDay = currentDate.getDate();
           currentDate.setMonth(currentDate.getMonth() + 1);
+
+          // Если день месяца изменился (например, 31 января -> 3 марта),
+          // значит мы "перекатились" на следующий месяц
+          if (currentDate.getDate() !== originalDay) {
+            // Устанавливаем последний день предыдущего месяца
+            currentDate.setDate(0); // Это устанавливает последний день предыдущего месяца
+          }
           break;
-        case 'quarterly':
+        }
+        case 'quarterly': {
+          // Для квартального повтора также учитываем последний день месяца
+          const originalDayQuarterly = currentDate.getDate();
           currentDate.setMonth(currentDate.getMonth() + 3);
+
+          if (currentDate.getDate() !== originalDayQuarterly) {
+            currentDate.setDate(0);
+          }
           break;
-        case 'semiannual':
+        }
+        case 'semiannual': {
+          // Для полугодового повтора также учитываем последний день месяца
+          const originalDaySemiannual = currentDate.getDate();
           currentDate.setMonth(currentDate.getMonth() + 6);
+
+          if (currentDate.getDate() !== originalDaySemiannual) {
+            currentDate.setDate(0);
+          }
           break;
+        }
         case 'annual':
           currentDate.setFullYear(currentDate.getFullYear() + 1);
           break;

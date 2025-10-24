@@ -45,8 +45,14 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     }
 
     // Если фактических данных нет, берем месяцы из плана
-    if (planData && planData.rows.length > 0) {
-      return planData.rows[0].months.map((m) => m.month);
+    if (planData && planData.activities.length > 0) {
+      const firstActivity = planData.activities[0];
+      if (firstActivity.incomeGroups.length > 0) {
+        return firstActivity.incomeGroups[0].months.map((m) => m.month);
+      }
+      if (firstActivity.expenseGroups.length > 0) {
+        return firstActivity.expenseGroups[0].months.map((m) => m.month);
+      }
     }
 
     return [];
@@ -54,11 +60,29 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
 
   // Функция для получения плановых данных по статье и месяцу
   const getPlanAmount = (articleId: string, month: string) => {
-    if (!planData || !planData.rows) return 0;
-    const planRow = planData.rows.find((row) => row.articleId === articleId);
-    if (!planRow) return 0;
-    const monthData = planRow.months.find((m) => m.month === month);
-    return monthData?.amount || 0;
+    if (!planData || !planData.activities) return 0;
+
+    for (const activity of planData.activities) {
+      // Ищем в доходах
+      const incomeRow = activity.incomeGroups.find(
+        (row) => row.articleId === articleId
+      );
+      if (incomeRow) {
+        const monthData = incomeRow.months.find((m) => m.month === month);
+        return monthData?.amount || 0;
+      }
+
+      // Ищем в расходах
+      const expenseRow = activity.expenseGroups.find(
+        (row) => row.articleId === articleId
+      );
+      if (expenseRow) {
+        const monthData = expenseRow.months.find((m) => m.month === month);
+        return monthData?.amount || 0;
+      }
+    }
+
+    return 0;
   };
 
   // Вычисляем общий денежный поток
@@ -66,6 +90,23 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     (sum, activity) => sum + activity.netCashflow,
     0
   );
+
+  // Вычисляем ширину колонок
+  const columnWidths = useMemo(() => {
+    const totalColumns = allMonths.length + 2; // месяцы + статья + итого
+    const articleColumnWidth = 240; // фиксированная ширина для колонки "Статья"
+    const totalColumnWidth = 120; // фиксированная ширина для колонки "Итого"
+    const monthColumnWidth = Math.max(
+      100,
+      (1000 - articleColumnWidth - totalColumnWidth) / allMonths.length
+    );
+
+    return {
+      article: articleColumnWidth,
+      month: monthColumnWidth,
+      total: totalColumnWidth,
+    };
+  }, [allMonths.length]);
 
   // Вычисляем остаток на конец периода (кумулятивно)
   const cumulativeBalances = useMemo(() => {
@@ -112,18 +153,22 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       </div>
 
       {/* Таблица с freeze и скроллом */}
-      <div className="w-full max-w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
-        <table className="w-max border-collapse relative">
+      <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
+        <table className="w-full border-collapse relative table-fixed">
           <thead className="sticky top-0 z-30">
             <tr className="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-b-2 border-gray-300 dark:border-gray-950">
-              <th className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider sticky left-0 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 min-w-[240px] z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]">
+              <th
+                className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider sticky left-0 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"
+                style={{ width: `${columnWidths.article}px` }}
+              >
                 Статья
               </th>
               {allMonths.map((month) => (
                 <th
                   key={month}
                   colSpan={showPlan ? 2 : 1}
-                  className="px-2 py-3 text-center text-[10px] font-bold text-gray-800 dark:text-white uppercase tracking-wide min-w-[100px] border-l border-gray-300 dark:border-gray-700"
+                  className="px-2 py-3 text-center text-[10px] font-bold text-gray-800 dark:text-white uppercase tracking-wide border-l border-gray-300 dark:border-gray-700"
+                  style={{ width: `${columnWidths.month}px` }}
                 >
                   {new Date(month + '-01')
                     .toLocaleDateString('ru-RU', {
@@ -133,7 +178,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                     .replace('.', '')}
                 </th>
               ))}
-              <th className="px-4 py-3 text-right text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 min-w-[120px] border-l-2 border-gray-300 dark:border-gray-700">
+              <th
+                className="px-4 py-3 text-right text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-l-2 border-gray-300 dark:border-gray-700"
+                style={{ width: `${columnWidths.total}px` }}
+              >
                 Итого
               </th>
             </tr>
@@ -158,224 +206,402 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             {/* Если нет фактических данных, но есть план - показываем план */}
             {data.activities.length === 0 &&
             planData &&
-            planData.rows.length > 0 ? (
-              <tr className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 cursor-pointer border-b border-blue-200 dark:border-gray-700 transition-colors duration-150">
-                <td className="px-4 py-2.5 font-semibold text-xs text-blue-800 dark:text-blue-200 sticky left-0 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
-                  <div className="flex items-center space-x-3">
-                    <span className="text-blue-500 dark:text-blue-400 font-bold text-base">
-                      ▸
-                    </span>
-                    <span className="font-bold">Плановые данные</span>
-                  </div>
-                </td>
-                {allMonths.map((month) => {
-                  const monthPlan = planData.rows.reduce((sum, row) => {
-                    const monthData = row.months.find((m) => m.month === month);
-                    return sum + (monthData?.amount || 0);
-                  }, 0);
-
-                  if (showPlan) {
-                    return (
-                      <React.Fragment key={month}>
-                        <td className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700">
-                          {formatMoney(monthPlan)}
-                        </td>
-                        <td className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700">
-                          {formatMoney(0)}
-                        </td>
-                      </React.Fragment>
-                    );
-                  } else {
-                    return (
+            planData.activities.length > 0
+              ? planData.activities.map((activity) => (
+                  <React.Fragment key={activity.activity}>
+                    {/* Заголовок потока */}
+                    <tr
+                      className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 cursor-pointer border-b border-blue-200 dark:border-gray-700 transition-colors duration-150"
+                      onClick={() => toggleSection(activity.activity)}
+                    >
                       <td
-                        key={month}
-                        className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                        className="px-4 py-2.5 font-semibold text-xs text-blue-800 dark:text-blue-200 sticky left-0 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                        style={{ width: `${columnWidths.article}px` }}
                       >
-                        {formatMoney(0)}
+                        <div className="flex items-center space-x-3">
+                          <span
+                            className={`transform transition-transform text-blue-500 dark:text-blue-400 font-bold text-base ${expandedSections[activity.activity] ? 'rotate-90' : ''}`}
+                          >
+                            ▸
+                          </span>
+                          <span className="font-bold">
+                            {getActivityDisplayName(activity.activity)}
+                          </span>
+                        </div>
                       </td>
-                    );
-                  }
-                })}
-                <td className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700">
-                  {formatMoney(0)}
-                </td>
-              </tr>
-            ) : (
-              data.activities.map((activity) => (
-                <React.Fragment key={activity.activity}>
-                  {/* Заголовок потока */}
-                  <tr
-                    className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 cursor-pointer border-b border-blue-200 dark:border-gray-700 transition-colors duration-150"
-                    onClick={() => toggleSection(activity.activity)}
-                  >
-                    <td className="px-4 py-2.5 font-semibold text-xs text-blue-800 dark:text-blue-200 sticky left-0 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
-                      <div className="flex items-center space-x-3">
-                        <span
-                          className={`transform transition-transform text-blue-500 dark:text-blue-400 font-bold text-base ${expandedSections[activity.activity] ? 'rotate-90' : ''}`}
-                        >
-                          ▸
-                        </span>
-                        <span className="font-bold">
-                          {getActivityDisplayName(activity.activity)}
-                        </span>
-                      </div>
-                    </td>
-                    {allMonths.map((month) => {
-                      const monthIncome = activity.incomeGroups.reduce(
-                        (sum, group) => {
-                          const monthData = group.months.find(
-                            (m) => m.month === month
-                          );
-                          return sum + (monthData?.amount || 0);
-                        },
-                        0
-                      );
-                      const monthExpense = activity.expenseGroups.reduce(
-                        (sum, group) => {
-                          const monthData = group.months.find(
-                            (m) => m.month === month
-                          );
-                          return sum + (monthData?.amount || 0);
-                        },
-                        0
-                      );
-                      const monthNet = monthIncome - monthExpense;
+                      {allMonths.map((month) => {
+                        const monthIncome = activity.incomeGroups.reduce(
+                          (sum, group) => {
+                            const monthData = group.months.find(
+                              (m) => m.month === month
+                            );
+                            return sum + (monthData?.amount || 0);
+                          },
+                          0
+                        );
+                        const monthExpense = activity.expenseGroups.reduce(
+                          (sum, group) => {
+                            const monthData = group.months.find(
+                              (m) => m.month === month
+                            );
+                            return sum + (monthData?.amount || 0);
+                          },
+                          0
+                        );
+                        const monthNet = monthIncome - monthExpense;
 
-                      // TODO: Вычислить плановые значения для потока
-                      const monthNetPlan = monthNet; // Пока используем факт
+                        // TODO: Вычислить плановые значения для потока
+                        const monthNetPlan = monthNet; // Пока используем факт
 
-                      if (showPlan) {
-                        return (
-                          <React.Fragment key={month}>
-                            <td className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700">
-                              {formatMoney(monthNetPlan)}
-                            </td>
-                            <td className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700">
+                        if (showPlan) {
+                          return (
+                            <React.Fragment key={month}>
+                              <td
+                                className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700"
+                                style={{ width: `${columnWidths.month}px` }}
+                              >
+                                {formatMoney(monthNetPlan)}
+                              </td>
+                              <td
+                                className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                                style={{ width: `${columnWidths.month}px` }}
+                              >
+                                {formatMoney(monthNet)}
+                              </td>
+                            </React.Fragment>
+                          );
+                        } else {
+                          return (
+                            <td
+                              key={month}
+                              className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                              style={{ width: `${columnWidths.month}px` }}
+                            >
                               {formatMoney(monthNet)}
                             </td>
-                          </React.Fragment>
-                        );
-                      } else {
-                        return (
-                          <td
-                            key={month}
-                            className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                          );
+                        }
+                      })}
+                      <td
+                        className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700"
+                        style={{ width: `${columnWidths.total}px` }}
+                      >
+                        {formatMoney(activity.netCashflow)}
+                      </td>
+                    </tr>
+
+                    {/* Детализация (доходы и расходы) */}
+                    {expandedSections[activity.activity] && (
+                      <>
+                        {/* Доходы */}
+                        {activity.incomeGroups.map((group) => (
+                          <tr
+                            key={`income-${group.articleId}`}
+                            className="bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
                           >
-                            {formatMoney(monthNet)}
-                          </td>
+                            <td
+                              className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                              style={{ width: `${columnWidths.article}px` }}
+                            >
+                              <span className="flex items-center">
+                                <span className="text-green-600 dark:text-green-400 mr-2">
+                                  ↑
+                                </span>
+                                {group.articleName}
+                              </span>
+                            </td>
+                            {group.months.map((monthData) => {
+                              if (showPlan) {
+                                const planAmount = getPlanAmount(
+                                  group.articleId,
+                                  monthData.month
+                                );
+                                return (
+                                  <React.Fragment key={monthData.month}>
+                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
+                                      {formatMoney(planAmount)}
+                                    </td>
+                                    <td
+                                      className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{
+                                        width: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {formatMoney(monthData.amount)}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              } else {
+                                return (
+                                  <td
+                                    key={monthData.month}
+                                    className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    style={{ width: `${columnWidths.month}px` }}
+                                  >
+                                    {formatMoney(monthData.amount)}
+                                  </td>
+                                );
+                              }
+                            })}
+                            <td
+                              className="px-4 py-2.5 text-right text-sm font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-l-2 border-gray-300 dark:border-gray-700"
+                              style={{ width: `${columnWidths.total}px` }}
+                            >
+                              {formatMoney(group.total)}
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Расходы */}
+                        {activity.expenseGroups.map((group) => (
+                          <tr
+                            key={`expense-${group.articleId}`}
+                            className="bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
+                          >
+                            <td className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+                              <span className="flex items-center">
+                                <span className="text-red-600 dark:text-red-400 mr-2">
+                                  ↓
+                                </span>
+                                {group.articleName}
+                              </span>
+                            </td>
+                            {group.months.map((monthData) => {
+                              if (showPlan) {
+                                const planAmount = getPlanAmount(
+                                  group.articleId,
+                                  monthData.month
+                                );
+                                return (
+                                  <React.Fragment key={monthData.month}>
+                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
+                                      {formatMoney(planAmount)}
+                                    </td>
+                                    <td
+                                      className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{
+                                        width: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {formatMoney(monthData.amount)}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              } else {
+                                return (
+                                  <td
+                                    key={monthData.month}
+                                    className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    style={{ width: `${columnWidths.month}px` }}
+                                  >
+                                    {formatMoney(monthData.amount)}
+                                  </td>
+                                );
+                              }
+                            })}
+                            <td
+                              className="px-4 py-2.5 text-right text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-l-2 border-gray-300 dark:border-gray-700"
+                              style={{ width: `${columnWidths.total}px` }}
+                            >
+                              {formatMoney(group.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </React.Fragment>
+                ))
+              : data.activities.map((activity) => (
+                  <React.Fragment key={activity.activity}>
+                    {/* Заголовок потока */}
+                    <tr
+                      className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 cursor-pointer border-b border-blue-200 dark:border-gray-700 transition-colors duration-150"
+                      onClick={() => toggleSection(activity.activity)}
+                    >
+                      <td className="px-4 py-2.5 font-semibold text-xs text-blue-800 dark:text-blue-200 sticky left-0 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-blue-500 dark:text-blue-400 font-bold text-base">
+                            {expandedSections[activity.activity] ? '▾' : '▸'}
+                          </span>
+                          <span className="font-bold">
+                            {getActivityDisplayName(activity.activity)}
+                          </span>
+                        </div>
+                      </td>
+                      {allMonths.map((month) => {
+                        const monthIncome = activity.incomeGroups.reduce(
+                          (sum, group) => {
+                            const monthData = group.months.find(
+                              (m) => m.month === month
+                            );
+                            return sum + (monthData?.amount || 0);
+                          },
+                          0
                         );
-                      }
-                    })}
-                    <td className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700">
-                      {formatMoney(activity.netCashflow)}
-                    </td>
-                  </tr>
+                        const monthExpense = activity.expenseGroups.reduce(
+                          (sum, group) => {
+                            const monthData = group.months.find(
+                              (m) => m.month === month
+                            );
+                            return sum + (monthData?.amount || 0);
+                          },
+                          0
+                        );
+                        const monthNet = monthIncome - monthExpense;
 
-                  {/* Детализация (доходы и расходы) */}
-                  {expandedSections[activity.activity] && (
-                    <>
-                      {/* Доходы */}
-                      {activity.incomeGroups.map((group) => (
-                        <tr
-                          key={`income-${group.articleId}`}
-                          className="bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
-                        >
-                          <td className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
-                            <span className="flex items-center">
-                              <span className="text-green-600 dark:text-green-400 mr-2">
-                                ↑
+                        // TODO: Вычислить плановые значения для потока
+                        const monthNetPlan = monthNet; // Пока используем факт
+
+                        if (showPlan) {
+                          return (
+                            <React.Fragment key={month}>
+                              <td
+                                className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700"
+                                style={{ width: `${columnWidths.month}px` }}
+                              >
+                                {formatMoney(monthNetPlan)}
+                              </td>
+                              <td
+                                className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                                style={{ width: `${columnWidths.month}px` }}
+                              >
+                                {formatMoney(monthNet)}
+                              </td>
+                            </React.Fragment>
+                          );
+                        } else {
+                          return (
+                            <td
+                              key={month}
+                              className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
+                              style={{ width: `${columnWidths.month}px` }}
+                            >
+                              {formatMoney(monthNet)}
+                            </td>
+                          );
+                        }
+                      })}
+                      <td
+                        className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700"
+                        style={{ width: `${columnWidths.total}px` }}
+                      >
+                        {formatMoney(activity.netCashflow)}
+                      </td>
+                    </tr>
+
+                    {/* Детали потока */}
+                    {expandedSections[activity.activity] && (
+                      <>
+                        {/* Доходы */}
+                        {activity.incomeGroups.map((group) => (
+                          <tr
+                            key={`${activity.activity}-income-${group.articleId}`}
+                            className="bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-900 dark:to-green-800 dark:hover:from-green-800 dark:hover:to-green-700 border-b border-green-200 dark:border-gray-700 transition-colors duration-150"
+                          >
+                            <td className="px-6 py-2 text-xs text-green-800 dark:text-green-200 sticky left-0 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-900 dark:to-green-800 dark:hover:from-green-800 dark:hover:to-green-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+                              <span className="text-green-600 dark:text-green-400 font-medium">
+                                {group.articleName}
                               </span>
-                              {group.articleName}
-                            </span>
-                          </td>
-                          {group.months.map((monthData) => {
-                            if (showPlan) {
-                              const planAmount = getPlanAmount(
-                                group.articleId,
-                                monthData.month
-                              );
-                              return (
-                                <React.Fragment key={monthData.month}>
-                                  <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                    {formatMoney(planAmount)}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50">
+                            </td>
+                            {group.months.map((monthData) => {
+                              if (showPlan) {
+                                const planAmount = getPlanAmount(
+                                  group.articleId,
+                                  monthData.month
+                                );
+                                return (
+                                  <React.Fragment key={monthData.month}>
+                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
+                                      {formatMoney(planAmount)}
+                                    </td>
+                                    <td
+                                      className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{
+                                        width: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {formatMoney(monthData.amount)}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              } else {
+                                return (
+                                  <td
+                                    key={monthData.month}
+                                    className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    style={{ width: `${columnWidths.month}px` }}
+                                  >
                                     {formatMoney(monthData.amount)}
                                   </td>
-                                </React.Fragment>
-                              );
-                            } else {
-                              return (
-                                <td
-                                  key={monthData.month}
-                                  className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
-                                >
-                                  {formatMoney(monthData.amount)}
-                                </td>
-                              );
-                            }
-                          })}
-                          <td className="px-4 py-2.5 text-right text-sm font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-l-2 border-gray-300 dark:border-gray-700">
-                            {formatMoney(group.total)}
-                          </td>
-                        </tr>
-                      ))}
+                                );
+                              }
+                            })}
+                            <td className="px-4 py-2.5 text-right text-sm font-bold text-green-700 dark:text-green-400 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-900 dark:to-green-800 dark:hover:from-green-800 dark:hover:to-green-700 border-l-2 border-green-200 dark:border-gray-700">
+                              {formatMoney(group.total)}
+                            </td>
+                          </tr>
+                        ))}
 
-                      {/* Расходы */}
-                      {activity.expenseGroups.map((group) => (
-                        <tr
-                          key={`expense-${group.articleId}`}
-                          className="bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
-                        >
-                          <td className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
-                            <span className="flex items-center">
-                              <span className="text-red-600 dark:text-red-400 mr-2">
-                                ↓
+                        {/* Расходы */}
+                        {activity.expenseGroups.map((group) => (
+                          <tr
+                            key={`${activity.activity}-expense-${group.articleId}`}
+                            className="bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 dark:from-red-900 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-700 border-b border-red-200 dark:border-gray-700 transition-colors duration-150"
+                          >
+                            <td className="px-6 py-2 text-xs text-red-800 dark:text-red-200 sticky left-0 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 dark:from-red-900 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+                              <span className="text-red-600 dark:text-red-400 font-medium">
+                                {group.articleName}
                               </span>
-                              {group.articleName}
-                            </span>
-                          </td>
-                          {group.months.map((monthData) => {
-                            if (showPlan) {
-                              const planAmount = getPlanAmount(
-                                group.articleId,
-                                monthData.month
-                              );
-                              return (
-                                <React.Fragment key={monthData.month}>
-                                  <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                    {formatMoney(planAmount)}
-                                  </td>
-                                  <td className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50">
+                            </td>
+                            {group.months.map((monthData) => {
+                              if (showPlan) {
+                                const planAmount = getPlanAmount(
+                                  group.articleId,
+                                  monthData.month
+                                );
+                                return (
+                                  <React.Fragment key={monthData.month}>
+                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
+                                      {formatMoney(planAmount)}
+                                    </td>
+                                    <td
+                                      className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{
+                                        width: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {formatMoney(monthData.amount)}
+                                    </td>
+                                  </React.Fragment>
+                                );
+                              } else {
+                                return (
+                                  <td
+                                    key={monthData.month}
+                                    className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    style={{ width: `${columnWidths.month}px` }}
+                                  >
                                     {formatMoney(monthData.amount)}
                                   </td>
-                                </React.Fragment>
-                              );
-                            } else {
-                              return (
-                                <td
-                                  key={monthData.month}
-                                  className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
-                                >
-                                  {formatMoney(monthData.amount)}
-                                </td>
-                              );
-                            }
-                          })}
-                          <td className="px-4 py-2.5 text-right text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-l-2 border-gray-300 dark:border-gray-700">
-                            {formatMoney(group.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </>
-                  )}
-                </React.Fragment>
-              ))
-            )}
+                                );
+                              }
+                            })}
+                            <td className="px-4 py-2.5 text-right text-sm font-bold text-red-700 dark:text-red-400 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 dark:from-red-900 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-700 border-l-2 border-red-200 dark:border-gray-700">
+                              {formatMoney(group.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </>
+                    )}
+                  </React.Fragment>
+                ))}
 
             {/* Итоговые строки */}
             <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
-              <td className="px-4 py-4 font-bold text-sm text-gray-900 dark:text-gray-100 uppercase tracking-wide sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+              <td
+                className="px-4 py-4 font-bold text-sm text-gray-900 dark:text-gray-100 uppercase tracking-wide sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                style={{ width: `${columnWidths.article}px` }}
+              >
                 Общий денежный поток
               </td>
               {allMonths.map((month) => {
@@ -410,7 +636,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                       <td className="px-3 py-4 text-right text-sm font-bold text-gray-600 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600">
                         {formatMoney(monthTotalPlan)}
                       </td>
-                      <td className="px-3 py-4 text-right text-sm font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600">
+                      <td
+                        className="px-3 py-4 text-right text-sm font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
+                        style={{ width: `${columnWidths.month}px` }}
+                      >
                         {formatMoney(monthTotal)}
                       </td>
                     </React.Fragment>
@@ -420,19 +649,26 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                     <td
                       key={month}
                       className="px-3 py-4 text-right text-sm font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
+                      style={{ width: `${columnWidths.month}px` }}
                     >
                       {formatMoney(monthTotal)}
                     </td>
                   );
                 }
               })}
-              <td className="px-4 py-4 text-right text-base font-extrabold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-l-2 border-gray-300 dark:border-gray-600">
+              <td
+                className="px-4 py-4 text-right text-base font-extrabold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-l-2 border-gray-300 dark:border-gray-600"
+                style={{ width: `${columnWidths.total}px` }}
+              >
                 {formatMoney(totalNetCashflow)}
               </td>
             </tr>
 
             <tr className="bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 border-t border-indigo-300 dark:border-gray-700">
-              <td className="px-4 py-3 font-bold text-sm text-indigo-900 dark:text-indigo-300 sticky left-0 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+              <td
+                className="px-4 py-3 font-bold text-sm text-indigo-900 dark:text-indigo-300 sticky left-0 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                style={{ width: `${columnWidths.article}px` }}
+              >
                 Остаток на конец периода
               </td>
               {cumulativeBalances.map(({ month, balance }) => {
@@ -440,11 +676,15 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 if (showPlan) {
                   return (
                     <React.Fragment key={month}>
-                      <td className="px-3 py-3 text-right text-sm text-gray-500 border-l border-indigo-300 dark:border-gray-700">
+                      <td
+                        className="px-3 py-3 text-right text-sm text-gray-500 border-l border-indigo-300 dark:border-gray-700"
+                        style={{ width: `${columnWidths.month}px` }}
+                      >
                         {formatMoney(balance)}
                       </td>
                       <td
                         className={`px-3 py-3 text-right text-sm font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                        style={{ width: `${columnWidths.month}px` }}
                       >
                         {formatMoney(balance)}
                       </td>
@@ -455,6 +695,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                     <td
                       key={month}
                       className={`px-3 py-3 text-right text-sm font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                      style={{ width: `${columnWidths.month}px` }}
                     >
                       {formatMoney(balance)}
                     </td>
