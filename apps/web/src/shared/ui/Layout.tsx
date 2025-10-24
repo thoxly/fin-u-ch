@@ -111,13 +111,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const getCatalogCreateLabel = (catalogName: string): string => {
     const labels: Record<string, string> = {
       Статьи: '+',
-      Счета: 'Создать счет',
-      Подразделения: 'Создать подразделение',
-      Контрагенты: 'Создать контрагента',
-      Сделки: 'Создать сделку',
-      Зарплаты: 'Добавить зарплату',
+      Счета: '+',
+      Подразделения: '+',
+      Контрагенты: '+',
+      Сделки: '+',
+      Зарплаты: '+',
     };
-    return labels[catalogName] || 'Создать';
+    return labels[catalogName] || '+';
   };
 
   const handleCreateCatalog = (catalogName: string): void => {
