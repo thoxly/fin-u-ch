@@ -213,11 +213,15 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link
-                to="/dashboard"
-                className="text-xl font-bold text-primary-600 dark:text-primary-400"
-              >
-                Fin-U-CH
+              <Link to="/dashboard" className="flex items-center gap-2">
+                <img
+                  src="/images/logo.png"
+                  alt="Fin-U-CH"
+                  className="h-8 w-auto"
+                />
+                <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
+                  Fin-U-CH
+                </span>
               </Link>
             </div>
             <UserMenu
