@@ -120,10 +120,22 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     return labels[catalogName] || '+';
   };
 
+  const getCatalogCreateTitle = (catalogName: string): string => {
+    const titles: Record<string, string> = {
+      Статьи: 'Создать статью',
+      Счета: 'Создать счет',
+      Подразделения: 'Создать подразделение',
+      Контрагенты: 'Создать контрагента',
+      Сделки: 'Создать сделку',
+      Зарплаты: 'Добавить зарплату',
+    };
+    return titles[catalogName] || 'Создать';
+  };
+
   const handleCreateCatalog = (catalogName: string): void => {
     setOffCanvasState({
       isOpen: true,
-      title: getCatalogCreateLabel(catalogName),
+      title: getCatalogCreateTitle(catalogName),
       catalogType: catalogName,
       editingData: undefined,
     });
