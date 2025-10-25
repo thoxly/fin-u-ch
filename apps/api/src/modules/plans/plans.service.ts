@@ -85,9 +85,24 @@ export class PlansService {
       throw new AppError('Invalid repeat value', 400);
     }
 
+    // Проверяем и корректируем дату, если она не существует в месяце
+    const adjustedStartDate = new Date(data.startDate);
+    const originalDay = data.startDate.getDate();
+    const testDate = new Date(
+      data.startDate.getFullYear(),
+      data.startDate.getMonth(),
+      originalDay
+    );
+
+    if (testDate.getDate() !== originalDay) {
+      // День не существует в этом месяце, устанавливаем последний день месяца
+      adjustedStartDate.setDate(0);
+    }
+
     const result = await prisma.planItem.create({
       data: {
         ...data,
+        startDate: adjustedStartDate,
         companyId,
       },
     });
@@ -105,9 +120,27 @@ export class PlansService {
   ) {
     await this.getById(id, companyId);
 
+    // Если обновляется startDate, проверяем и корректируем дату
+    const updateData = { ...data };
+    if (data.startDate) {
+      const adjustedStartDate = new Date(data.startDate);
+      const originalDay = data.startDate.getDate();
+      const testDate = new Date(
+        data.startDate.getFullYear(),
+        data.startDate.getMonth(),
+        originalDay
+      );
+
+      if (testDate.getDate() !== originalDay) {
+        // День не существует в этом месяце, устанавливаем последний день месяца
+        adjustedStartDate.setDate(0);
+        updateData.startDate = adjustedStartDate;
+      }
+    }
+
     const result = await prisma.planItem.update({
       where: { id },
-      data,
+      data: updateData,
     });
 
     // Инвалидируем кэш отчетов после обновления плановой записи
@@ -157,6 +190,19 @@ export class PlansService {
 
     while (currentDate <= endDate && currentDate <= periodEnd) {
       if (currentDate >= periodStart) {
+        // Проверяем, что дата корректна для текущего месяца
+        // Если день не существует в месяце, устанавливаем последний день месяца
+        const originalDay = currentDate.getDate();
+        const testDate = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          originalDay
+        );
+        if (testDate.getDate() !== originalDay) {
+          // День не существует в этом месяце, устанавливаем последний день месяца
+          currentDate.setDate(0);
+        }
+
         const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
         result.push({ month, amount: planItem.amount });
       }
