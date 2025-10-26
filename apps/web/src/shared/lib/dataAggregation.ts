@@ -1,25 +1,16 @@
-import { 
-  startOfDay, 
-  endOfDay, 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfQuarter, 
-  endOfQuarter,
-  startOfYear,
-  endOfYear,
+import {
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
   format,
   eachDayOfInterval,
-  eachWeekOfInterval,
-  eachMonthOfInterval,
-  eachQuarterOfInterval,
   addDays,
   addWeeks,
   addMonths,
   addQuarters,
   addYears,
-  isWithinInterval
+  isWithinInterval,
 } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { PeriodFormat } from '../types/period';
@@ -36,14 +27,14 @@ export interface OperationData {
   operationDate: string;
   amount: number;
   type: 'income' | 'expense';
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AccountBalanceData {
   date: string;
   accountId: string;
   balance: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -58,27 +49,27 @@ export const formatSmartLabel = (
 ): string => {
   // Всегда показываем конец интервала как конкретную дату
   // Это правильный подход для точек на графике
-  
+
   // Для одного дня - показываем дату
   if (daysPerInterval === 1) {
     return format(intervalEnd, 'dd.MM', { locale: ru });
   }
-  
+
   // Для коротких интервалов (2-6 дней) - показываем конец периода
   if (daysPerInterval < 7) {
     return format(intervalEnd, 'dd MMM', { locale: ru });
   }
-  
+
   // Для недельных интервалов - показываем конец недели
   if (daysPerInterval >= 7 && daysPerInterval < 30) {
     return format(intervalEnd, 'dd MMM', { locale: ru });
   }
-  
+
   // Для месячных интервалов - показываем конец месяца
   if (daysPerInterval >= 30) {
     return format(intervalEnd, 'MMM yyyy', { locale: ru });
   }
-  
+
   // Fallback - показываем конец интервала
   return format(intervalEnd, 'dd.MM', { locale: ru });
 };
@@ -92,45 +83,49 @@ export const createCompactLabels = (
   return intervals.map((interval, index) => {
     // Всегда показываем конец интервала как конкретную дату
     // Это правильный подход для точек на графике
-    
-    const daysDiff = Math.ceil((interval.end.getTime() - interval.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
+
+    const daysDiff =
+      Math.ceil(
+        (interval.end.getTime() - interval.start.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
     // Для одного дня - показываем дату
     if (daysDiff === 1) {
       return {
         ...interval,
-        label: format(interval.end, 'dd.MM', { locale: ru })
+        label: format(interval.end, 'dd.MM', { locale: ru }),
       };
     }
-    
+
     // Для коротких интервалов (2-6 дней) - показываем конец периода
     if (daysDiff < 7) {
       return {
         ...interval,
-        label: format(interval.end, 'dd MMM', { locale: ru })
+        label: format(interval.end, 'dd MMM', { locale: ru }),
       };
     }
-    
+
     // Для недельных интервалов - показываем конец недели
     if (daysDiff >= 7 && daysDiff < 30) {
       return {
         ...interval,
-        label: format(interval.end, 'dd MMM', { locale: ru })
+        label: format(interval.end, 'dd MMM', { locale: ru }),
       };
     }
-    
+
     // Для месячных интервалов - показываем конец месяца
     if (daysDiff >= 30) {
       return {
         ...interval,
-        label: format(interval.end, 'MMM yyyy', { locale: ru })
+        label: format(interval.end, 'MMM yyyy', { locale: ru }),
       };
     }
-    
+
     // Fallback - показываем конец интервала
     return {
       ...interval,
-      label: format(interval.end, 'dd.MM', { locale: ru })
+      label: format(interval.end, 'dd.MM', { locale: ru }),
     };
   });
 };
@@ -144,12 +139,14 @@ export const getOptimalDataPoints = (
   toDate: Date,
   operationCount: number
 ): number => {
-  const daysDiff = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
-  
+  const daysDiff = Math.ceil(
+    (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
   // Максимальное количество точек для читаемости графика
   const maxPoints = 20;
   const minPoints = 3;
-  
+
   // Базовое количество точек в зависимости от периода
   let basePoints: number;
   switch (periodFormat) {
@@ -173,10 +170,9 @@ export const getOptimalDataPoints = (
     default:
       basePoints = 10;
   }
-  
+
   return Math.max(minPoints, Math.min(maxPoints, basePoints));
 };
-
 
 /**
  * Создает умные интервалы для месяца с равномерным распределением
@@ -186,11 +182,13 @@ export const getMonthIntervals = (
   toDate: Date,
   operationCount: number = 0
 ): Array<{ start: Date; end: Date; label: string }> => {
-  const totalDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  
+  const totalDays =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
+
   // Определяем оптимальное количество точек для месяца
   let optimalPoints: number;
-  
+
   if (operationCount === 0) {
     // Если операций нет, показываем 5-7 точек
     optimalPoints = Math.min(7, Math.max(5, Math.floor(totalDays / 5)));
@@ -202,41 +200,48 @@ export const getMonthIntervals = (
     optimalPoints = Math.min(12, Math.max(6, operationCount + 3));
   } else {
     // Если операций много, показываем больше точек
-    optimalPoints = Math.min(15, Math.max(8, Math.floor(operationCount / 2) + 5));
+    optimalPoints = Math.min(
+      15,
+      Math.max(8, Math.floor(operationCount / 2) + 5)
+    );
   }
-  
+
   // Ограничиваем максимальное количество точек
   optimalPoints = Math.min(optimalPoints, Math.floor(totalDays / 2));
-  
+
   const intervals: Array<{ start: Date; end: Date; label: string }> = [];
-  
+
   // Вычисляем шаг между точками
   const step = Math.max(1, Math.floor((totalDays - 1) / (optimalPoints - 1)));
-  
+
   // Создаем интервалы с равномерным распределением
   for (let i = 0; i < optimalPoints; i++) {
     const dayOffset = i * step;
     const currentDate = addDays(fromDate, dayOffset);
-    
+
     // Проверяем, что не выходим за границы месяца
     if (currentDate <= toDate) {
       intervals.push({
         start: startOfDay(currentDate),
         end: endOfDay(currentDate),
-        label: format(currentDate, 'dd', { locale: ru })
+        label: format(currentDate, 'dd', { locale: ru }),
       });
     }
   }
-  
+
   // Убеждаемся, что последний день включен
-  if (intervals.length > 0 && intervals[intervals.length - 1].label !== format(toDate, 'dd', { locale: ru })) {
+  if (
+    intervals.length > 0 &&
+    intervals[intervals.length - 1].label !==
+      format(toDate, 'dd', { locale: ru })
+  ) {
     intervals.push({
       start: startOfDay(toDate),
       end: endOfDay(toDate),
-      label: format(toDate, 'dd', { locale: ru })
+      label: format(toDate, 'dd', { locale: ru }),
     });
   }
-  
+
   return intervals;
 };
 
@@ -244,18 +249,18 @@ export const getMonthIntervals = (
  * Определяет интервалы для агрегации данных в зависимости от формата периода и количества операций
  */
 export const getAggregationIntervals = (
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date,
   toDate: Date,
   operationCount: number = 0
 ): Array<{ start: Date; end: Date; label: string }> => {
   // Для месяца всегда показываем все дни месяца
-  if (periodFormat === 'month') {
+  if (_periodFormat === 'month') {
     const intervals: Array<{ start: Date; end: Date; label: string }> = [];
-    
+
     // Создаем интервалы для каждого дня месяца
     const days = eachDayOfInterval({ start: fromDate, end: toDate });
-    
+
     // Если дней слишком много (>15), показываем только каждый N-й день
     if (days.length > 15) {
       const step = Math.ceil(days.length / 15);
@@ -264,16 +269,20 @@ export const getAggregationIntervals = (
         intervals.push({
           start: startOfDay(currentDate),
           end: endOfDay(currentDate),
-          label: format(currentDate, 'dd', { locale: ru })
+          label: format(currentDate, 'dd', { locale: ru }),
         });
       }
-      
+
       // Убеждаемся, что последний день включен
-      if (intervals.length > 0 && intervals[intervals.length - 1].label !== format(toDate, 'dd', { locale: ru })) {
+      if (
+        intervals.length > 0 &&
+        intervals[intervals.length - 1].label !==
+          format(toDate, 'dd', { locale: ru })
+      ) {
         intervals.push({
           start: startOfDay(toDate),
           end: endOfDay(toDate),
-          label: format(toDate, 'dd', { locale: ru })
+          label: format(toDate, 'dd', { locale: ru }),
         });
       }
     } else {
@@ -282,19 +291,24 @@ export const getAggregationIntervals = (
         intervals.push({
           start: startOfDay(day),
           end: endOfDay(day),
-          label: format(day, 'dd', { locale: ru })
+          label: format(day, 'dd', { locale: ru }),
         });
       }
     }
-    
+
     return intervals;
   }
-  
+
   // Для квартала используем умную логику в зависимости от количества операций
   if (periodFormat === 'quarter') {
-    const optimalPoints = getOptimalDataPoints(periodFormat, fromDate, toDate, operationCount);
+    const optimalPoints = getOptimalDataPoints(
+      periodFormat,
+      fromDate,
+      toDate,
+      operationCount
+    );
     const intervals: Array<{ start: Date; end: Date; label: string }> = [];
-    
+
     if (optimalPoints === 3) {
       // 3 точки: 1-й квартал, 2-й квартал, 3-й квартал
       const quarter1Start = new Date(fromDate.getFullYear(), 0, 1); // Январь
@@ -303,37 +317,37 @@ export const getAggregationIntervals = (
       const quarter2End = new Date(fromDate.getFullYear(), 5, 30); // Июнь
       const quarter3Start = new Date(fromDate.getFullYear(), 6, 1); // Июль
       const quarter3End = new Date(fromDate.getFullYear(), 8, 30); // Сентябрь
-      
+
       intervals.push({
         start: quarter1Start,
         end: quarter1End,
-        label: '1-й квартал'
+        label: '1-й квартал',
       });
-      
+
       intervals.push({
         start: quarter2Start,
         end: quarter2End,
-        label: '2-й квартал'
+        label: '2-й квартал',
       });
-      
+
       intervals.push({
         start: quarter3Start,
         end: quarter3End,
-        label: '3-й квартал'
+        label: '3-й квартал',
       });
     } else {
       // 5 точек: показываем отдельные месяцы
       const seenLabels = new Set<string>(); // Для дедупликации лейблов
       let current = new Date(fromDate);
       current.setDate(1); // Начало месяца
-      
+
       while (current <= toDate) {
         const monthStart = startOfMonth(current);
         const monthEnd = endOfMonth(current);
-        
+
         // Создаем уникальный лейбл для месяца
-        let label = format(current, 'MMM yyyy', { locale: ru });
-        
+        const label = format(current, 'MMM yyyy', { locale: ru });
+
         // Если лейбл уже существует, добавляем суффикс
         let counter = 1;
         let uniqueLabel = label;
@@ -341,38 +355,38 @@ export const getAggregationIntervals = (
           uniqueLabel = `${label} (${counter})`;
           counter++;
         }
-        
+
         seenLabels.add(uniqueLabel);
-        
+
         intervals.push({
           start: monthStart,
           end: monthEnd,
-          label: uniqueLabel
+          label: uniqueLabel,
         });
-        
+
         // Переходим к следующему месяцу
         current = new Date(current);
         current.setMonth(current.getMonth() + 1);
       }
     }
-    
+
     return intervals;
   }
-  
+
   // Для года всегда показываем отдельные месяцы
   if (periodFormat === 'year') {
     const intervals: Array<{ start: Date; end: Date; label: string }> = [];
     const seenLabels = new Set<string>(); // Для дедупликации лейблов
     let current = new Date(fromDate);
     current.setDate(1); // Начало месяца
-    
+
     while (current <= toDate) {
       const monthStart = startOfMonth(current);
       const monthEnd = endOfMonth(current);
-      
+
       // Создаем уникальный лейбл для месяца
-      let label = format(current, 'MMM yyyy', { locale: ru });
-      
+      const label = format(current, 'MMM yyyy', { locale: ru });
+
       // Если лейбл уже существует, добавляем суффикс
       let counter = 1;
       let uniqueLabel = label;
@@ -380,59 +394,73 @@ export const getAggregationIntervals = (
         uniqueLabel = `${label} (${counter})`;
         counter++;
       }
-      
+
       seenLabels.add(uniqueLabel);
-      
+
       intervals.push({
         start: monthStart,
         end: monthEnd,
-        label: uniqueLabel
+        label: uniqueLabel,
       });
-      
+
       // Переходим к следующему месяцу
       current = new Date(current);
       current.setMonth(current.getMonth() + 1);
     }
-    
+
     return intervals;
   }
-  
+
   // Для недели всегда показываем отдельные дни
   if (periodFormat === 'week') {
     const days = eachDayOfInterval({ start: fromDate, end: toDate });
-    return days.map(day => ({
+    return days.map((day) => ({
       start: startOfDay(day),
       end: endOfDay(day),
-      label: format(day, 'dd.MM', { locale: ru })
+      label: format(day, 'dd.MM', { locale: ru }),
     }));
   }
-  
-  const optimalPoints = getOptimalDataPoints(periodFormat, fromDate, toDate, operationCount);
-  const totalDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  const optimalPoints = getOptimalDataPoints(
+    periodFormat,
+    fromDate,
+    toDate,
+    operationCount
+  );
+  const totalDays = Math.ceil(
+    (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
   const daysPerInterval = Math.max(1, Math.ceil(totalDays / optimalPoints));
-  
+
   const intervals: Array<{ start: Date; end: Date; label: string }> = [];
   let currentDate = new Date(fromDate);
-  
+
   while (currentDate <= toDate) {
     const intervalStart = new Date(currentDate);
-    const intervalEnd = new Date(Math.min(
-      addDays(currentDate, daysPerInterval - 1).getTime(),
-      toDate.getTime()
-    ));
-    
+    const intervalEnd = new Date(
+      Math.min(
+        addDays(currentDate, daysPerInterval - 1).getTime(),
+        toDate.getTime()
+      )
+    );
+
     // Умное форматирование лейблов для лучшей читаемости
-    const label = formatSmartLabel(intervalStart, intervalEnd, daysPerInterval, periodFormat);
-    
+    const label = formatSmartLabel(
+      intervalStart,
+      intervalEnd,
+      daysPerInterval,
+      periodFormat
+    );
+
     intervals.push({
       start: startOfDay(intervalStart),
       end: endOfDay(intervalEnd),
-      label
+      label,
     });
-    
+
     currentDate = addDays(intervalEnd, 1);
   }
-  
+
   return intervals;
 };
 
@@ -443,28 +471,33 @@ export const aggregateOperationsByIntervals = (
   operations: OperationData[],
   intervals: Array<{ start: Date; end: Date; label: string }>
 ): AggregatedDataPoint[] => {
-  return intervals.map(interval => {
-    const intervalOperations = operations.filter(op => {
+  return intervals.map((interval) => {
+    const intervalOperations = operations.filter((op) => {
       // Создаем дату операции в местном времени (без времени)
       const opDate = new Date(op.operationDate);
-      const opDateLocal = new Date(opDate.getFullYear(), opDate.getMonth(), opDate.getDate());
-      
+      const opDateLocal = new Date(
+        opDate.getFullYear(),
+        opDate.getMonth(),
+        opDate.getDate()
+      );
+
       // Используем даты интервала напрямую, так как они уже созданы с startOfDay/endOfDay
       const intervalStart = interval.start;
       const intervalEnd = interval.end;
-      
+
       // Проверяем, что дата операции находится в интервале (включительно)
-      const isWithin = opDateLocal >= intervalStart && opDateLocal <= intervalEnd;
-      
+      const isWithin =
+        opDateLocal >= intervalStart && opDateLocal <= intervalEnd;
+
       return isWithin;
     });
 
     const intervalIncome = intervalOperations
-      .filter(op => op.type === 'income')
+      .filter((op) => op.type === 'income')
       .reduce((sum, op) => sum + op.amount, 0);
 
     const intervalExpense = intervalOperations
-      .filter(op => op.type === 'expense')
+      .filter((op) => op.type === 'expense')
       .reduce((sum, op) => sum + op.amount, 0);
 
     const result = {
@@ -472,9 +505,9 @@ export const aggregateOperationsByIntervals = (
       label: interval.label,
       income: intervalIncome,
       expense: intervalExpense,
-      netCashFlow: intervalIncome - intervalExpense
+      netCashFlow: intervalIncome - intervalExpense,
     };
-    
+
     console.log(`Interval ${interval.label}:`, result);
     return result;
   });
@@ -493,7 +526,7 @@ export const getPreviousPeriodData = (
 
   // Чётко обрезаем предыдущий период, чтобы не пересекаться с текущим
   const currentPeriodStart = startOfDay(fromDate);
-  
+
   // Определяем предыдущий период в зависимости от формата
   switch (periodFormat) {
     case 'week': {
@@ -523,24 +556,27 @@ export const getPreviousPeriodData = (
   }
 
   // Фильтруем операции за предыдущий период
-  const previousPeriodOperations = operations.filter(op => {
+  const previousPeriodOperations = operations.filter((op) => {
     const opDate = new Date(op.operationDate);
-    return isWithinInterval(opDate, { start: previousPeriodStart, end: previousPeriodEnd });
+    return isWithinInterval(opDate, {
+      start: previousPeriodStart,
+      end: previousPeriodEnd,
+    });
   });
 
   // Считаем суммы за предыдущий период
   const income = previousPeriodOperations
-    .filter(op => op.type === 'income')
+    .filter((op) => op.type === 'income')
     .reduce((sum, op) => sum + op.amount, 0);
 
   const expense = previousPeriodOperations
-    .filter(op => op.type === 'expense')
+    .filter((op) => op.type === 'expense')
     .reduce((sum, op) => sum + op.amount, 0);
 
   return {
     income,
     expense,
-    netCashFlow: income - expense
+    netCashFlow: income - expense,
   };
 };
 
@@ -550,23 +586,30 @@ export const getPreviousPeriodData = (
 export const aggregateAccountBalancesByIntervals = (
   balances: AccountBalanceData[],
   intervals: Array<{ start: Date; end: Date; label: string }>
-): Array<{ date: string; label: string; [accountId: string]: number | string }> => {
-  return intervals.map(interval => {
-    const intervalBalances = balances.filter(balance => {
+): Array<{
+  date: string;
+  label: string;
+  [accountId: string]: number | string;
+}> => {
+  return intervals.map((interval) => {
+    const intervalBalances = balances.filter((balance) => {
       const balanceDate = new Date(balance.date);
-      return isWithinInterval(balanceDate, { start: interval.start, end: interval.end });
+      return isWithinInterval(balanceDate, {
+        start: interval.start,
+        end: interval.end,
+      });
     });
 
     // Группируем по счетам и берем последний баланс для каждого счета в интервале
     const accountBalances: Record<string, number> = {};
-    intervalBalances.forEach(balance => {
+    intervalBalances.forEach((balance) => {
       accountBalances[balance.accountId] = balance.balance;
     });
 
     return {
       date: format(interval.start, 'yyyy-MM-dd'),
       label: interval.label,
-      ...accountBalances
+      ...accountBalances,
     };
   });
 };
@@ -575,31 +618,31 @@ export const aggregateAccountBalancesByIntervals = (
  * Создает дефолтные интервалы для периода когда нет данных
  */
 export const createDefaultIntervals = (
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date,
   toDate: Date
 ): Array<{ start: Date; end: Date; label: string }> => {
   const intervals: Array<{ start: Date; end: Date; label: string }> = [];
-  
-  switch (periodFormat) {
+
+  switch (_periodFormat) {
     case 'month': {
       // Для месяца используем умные интервалы
       return getMonthIntervals(fromDate, toDate, 0);
     }
-    
+
     case 'week': {
       // Для недели шаг день
       const days = eachDayOfInterval({ start: fromDate, end: toDate });
-      days.forEach(day => {
+      days.forEach((day) => {
         intervals.push({
           start: startOfDay(day),
           end: endOfDay(day),
-          label: format(day, 'dd.MM', { locale: ru })
+          label: format(day, 'dd.MM', { locale: ru }),
         });
       });
       break;
     }
-    
+
     case 'quarter': {
       // Для квартала создаем интервалы в зависимости от количества операций
       // По умолчанию используем 3 точки (1-й, 2-й, 3-й квартал)
@@ -609,40 +652,40 @@ export const createDefaultIntervals = (
       const quarter2End = new Date(fromDate.getFullYear(), 5, 30); // Июнь
       const quarter3Start = new Date(fromDate.getFullYear(), 6, 1); // Июль
       const quarter3End = new Date(fromDate.getFullYear(), 8, 30); // Сентябрь
-      
+
       intervals.push({
         start: quarter1Start,
         end: quarter1End,
-        label: '1-й квартал'
+        label: '1-й квартал',
       });
-      
+
       intervals.push({
         start: quarter2Start,
         end: quarter2End,
-        label: '2-й квартал'
+        label: '2-й квартал',
       });
-      
+
       intervals.push({
         start: quarter3Start,
         end: quarter3End,
-        label: '3-й квартал'
+        label: '3-й квартал',
       });
       break;
     }
-    
+
     case 'year': {
       // Для года создаем месяцы вручную
       const seenLabels = new Set<string>(); // Для дедупликации лейблов
       let current = new Date(fromDate);
       current.setDate(1);
-      
+
       while (current <= toDate) {
         const monthStart = startOfMonth(current);
         const monthEnd = endOfMonth(current);
-        
+
         // Создаем уникальный лейбл для месяца
-        let label = format(current, 'MMM yyyy', { locale: ru });
-        
+        const label = format(current, 'MMM yyyy', { locale: ru });
+
         // Если лейбл уже существует, добавляем суффикс
         let counter = 1;
         let uniqueLabel = label;
@@ -650,22 +693,22 @@ export const createDefaultIntervals = (
           uniqueLabel = `${label} (${counter})`;
           counter++;
         }
-        
+
         seenLabels.add(uniqueLabel);
-        
+
         intervals.push({
           start: monthStart,
           end: monthEnd,
-          label: uniqueLabel
+          label: uniqueLabel,
         });
-        
+
         current = new Date(current);
         current.setMonth(current.getMonth() + 1);
       }
       break;
     }
   }
-  
+
   return intervals;
 };
 
@@ -679,24 +722,41 @@ export const aggregateDashboardData = (
   toDate: Date
 ): {
   incomeExpenseData: AggregatedDataPoint[];
-  accountBalancesData: Array<{ date: string; label: string; [accountId: string]: number | string }>;
+  accountBalancesData: Array<{
+    date: string;
+    label: string;
+    [accountId: string]: number | string;
+  }>;
 } => {
   // Для месяца всегда используем интервалы по дням
   // Для других периодов используем умную логику
-  const intervals = periodFormat === 'month' 
-    ? getAggregationIntervals(periodFormat, fromDate, toDate, operations.length)
-    : createDefaultIntervals(periodFormat, fromDate, toDate);
-  
+  const intervals =
+    periodFormat === 'month'
+      ? getAggregationIntervals(
+          periodFormat,
+          fromDate,
+          toDate,
+          operations.length
+        )
+      : createDefaultIntervals(periodFormat, fromDate, toDate);
+
   // Агрегируем операции по интервалам (динамика потока)
-  const incomeExpenseData = aggregateOperationsByIntervals(operations, intervals);
-  
+  const incomeExpenseData = aggregateOperationsByIntervals(
+    operations,
+    intervals
+  );
+
   // Для остатков по счетам пока используем заглушку
   // В реальном приложении здесь будет логика получения остатков
-  const accountBalancesData: Array<{ date: string; label: string; [accountId: string]: number | string }> = [];
+  const accountBalancesData: Array<{
+    date: string;
+    label: string;
+    [accountId: string]: number | string;
+  }> = [];
 
   return {
     incomeExpenseData,
-    accountBalancesData
+    accountBalancesData,
   };
 };
 
@@ -713,23 +773,28 @@ export const createSmartIntervals = (
   if (operations.length === 0) {
     return getAggregationIntervals(periodFormat, fromDate, toDate, 0);
   }
-  
+
   // Для месяца эта функция НЕ должна вызываться
   if (periodFormat === 'month') {
-    throw new Error('createSmartIntervals should not be called for month period. Use direct day intervals instead.');
+    throw new Error(
+      'createSmartIntervals should not be called for month period. Use direct day intervals instead.'
+    );
   }
-  
+
   // Для других периодов используем существующую логику
-  const sortedOps = [...operations].sort((a, b) => 
-    new Date(a.operationDate).getTime() - new Date(b.operationDate).getTime()
+  const sortedOps = [...operations].sort(
+    (a, b) =>
+      new Date(a.operationDate).getTime() - new Date(b.operationDate).getTime()
   );
-  
-  const totalDays = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24));
+
+  const totalDays = Math.ceil(
+    (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
   const operationCount = operations.length;
-  
+
   // Определяем оптимальное количество интервалов
   let optimalIntervals: number;
-  
+
   if (periodFormat === 'week') {
     // Для недели: 3-7 интервалов в зависимости от количества операций
     optimalIntervals = Math.min(7, Math.max(3, Math.ceil(operationCount / 2)));
@@ -738,43 +803,53 @@ export const createSmartIntervals = (
     optimalIntervals = Math.min(12, Math.max(4, Math.ceil(operationCount / 5)));
   } else {
     // Для года: 6-12 интервалов
-    optimalIntervals = Math.min(12, Math.max(6, Math.ceil(operationCount / 10)));
+    optimalIntervals = Math.min(
+      12,
+      Math.max(6, Math.ceil(operationCount / 10))
+    );
   }
-  
+
   // Если операций мало, группируем по дням
   if (operationCount <= optimalIntervals) {
     const days = eachDayOfInterval({ start: fromDate, end: toDate });
-    return days.map(day => ({
+    return days.map((day) => ({
       start: startOfDay(day),
       end: endOfDay(day),
-      label: format(day, 'dd.MM', { locale: ru })
+      label: format(day, 'dd.MM', { locale: ru }),
     }));
   }
-  
+
   // Если операций много, создаем равномерные интервалы
   const daysPerInterval = Math.max(1, Math.ceil(totalDays / optimalIntervals));
   const intervals: Array<{ start: Date; end: Date; label: string }> = [];
   let currentDate = new Date(fromDate);
-  
+
   while (currentDate <= toDate) {
     const intervalStart = new Date(currentDate);
-    const intervalEnd = new Date(Math.min(
-      addDays(currentDate, daysPerInterval - 1).getTime(),
-      toDate.getTime()
-    ));
-    
+    const intervalEnd = new Date(
+      Math.min(
+        addDays(currentDate, daysPerInterval - 1).getTime(),
+        toDate.getTime()
+      )
+    );
+
     // Умное форматирование лейбла
-    const label = formatSmartLabel(intervalStart, intervalEnd, daysPerInterval, periodFormat);
-    
+    const label = formatSmartLabel(
+      intervalStart,
+      intervalEnd,
+      daysPerInterval,
+      periodFormat
+    );
+
     intervals.push({
       start: startOfDay(intervalStart),
       end: endOfDay(intervalEnd),
-      label
+      label,
     });
-    
+
     currentDate = addDays(intervalEnd, 1);
   }
-  
+
   return intervals;
 };
 
@@ -785,13 +860,19 @@ export const validateMonthDays = (
   fromDate: Date,
   toDate: Date
 ): { isValid: boolean; daysCount: number; monthName: string } => {
-  const daysCount = Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const daysCount =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
   const monthName = fromDate.toLocaleDateString('ru', { month: 'long' });
-  
+
   // Проверяем, что количество дней соответствует реальному месяцу
-  const expectedDays = new Date(fromDate.getFullYear(), fromDate.getMonth() + 1, 0).getDate();
+  const expectedDays = new Date(
+    fromDate.getFullYear(),
+    fromDate.getMonth() + 1,
+    0
+  ).getDate();
   const isValid = daysCount === expectedDays;
-  
+
   return { isValid, daysCount, monthName };
 };
 
@@ -802,9 +883,9 @@ export const formatChartData = (
   data: AggregatedDataPoint[],
   periodFormat: PeriodFormat
 ): AggregatedDataPoint[] => {
-  return data.map(point => ({
+  return data.map((point) => ({
     ...point,
     // Для разных форматов можно добавить дополнительное форматирование
-    label: point.label
+    label: point.label,
   }));
 };

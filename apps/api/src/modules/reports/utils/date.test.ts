@@ -3,8 +3,6 @@ import {
   parseMonthKey,
   formatIntervalLabel,
   createIntervals,
-  PeriodFormat,
-  Interval,
 } from './date';
 
 describe('Date utilities', () => {

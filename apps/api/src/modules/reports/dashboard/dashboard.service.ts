@@ -1,5 +1,4 @@
 import prisma from '../../../config/db';
-import { getMonthKey } from '../utils/date';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import { createIntervals, PeriodFormat, Interval } from '../utils/date';
 
@@ -17,7 +16,7 @@ export interface DashboardResponse {
     expense: number;
     netProfit: number;
   };
-  
+
   // Серии для графика доходов/расходов
   incomeExpenseSeries: Array<{
     date: string;
@@ -26,20 +25,20 @@ export interface DashboardResponse {
     expense: number;
     netCashFlow: number;
   }>;
-  
+
   // Остатки по счетам по интервалам
   accountBalancesSeries: Array<{
     date: string;
     label: string;
     accounts: Record<string, number>;
   }>;
-  
+
   // Справочник счетов
   accounts: Array<{
     id: string;
     name: string;
   }>;
-  
+
   // Финальные балансы на конец периода
   finalBalances: Array<{
     accountId: string;
@@ -68,7 +67,7 @@ export interface CumulativeCashFlowResponse {
     }>;
     hasOperations: boolean; // Флаг, есть ли операции в этот день
   }>;
-  
+
   // Общие суммы за период
   summary: {
     totalIncome: number;
@@ -115,21 +114,25 @@ export class DashboardService {
     });
 
     // Создаем интервалы
-    const intervals = createIntervals(periodFormat, params.periodFrom, params.periodTo);
+    const intervals = createIntervals(
+      periodFormat,
+      params.periodFrom,
+      params.periodTo
+    );
 
     // 1. Рассчитываем доходы/расходы по интервалам
-    const incomeExpenseSeries = intervals.map(interval => {
-      const intervalOps = operations.filter(op => {
+    const incomeExpenseSeries = intervals.map((interval) => {
+      const intervalOps = operations.filter((op) => {
         const opDate = new Date(op.operationDate);
         return opDate >= interval.start && opDate <= interval.end;
       });
 
       const income = intervalOps
-        .filter(op => op.type === 'income')
+        .filter((op) => op.type === 'income')
         .reduce((sum, op) => sum + op.amount, 0);
 
       const expense = intervalOps
-        .filter(op => op.type === 'expense')
+        .filter((op) => op.type === 'expense')
         .reduce((sum, op) => sum + op.amount, 0);
 
       return {
@@ -142,31 +145,41 @@ export class DashboardService {
     });
 
     // 2. Рассчитываем общие суммы
-    const totalIncome = incomeExpenseSeries.reduce((sum, point) => sum + point.income, 0);
-    const totalExpense = incomeExpenseSeries.reduce((sum, point) => sum + point.expense, 0);
-
-    // 3. Рассчитываем балансы по счетам на каждый интервал
-    const accountBalancesSeries = await this.calculateAccountBalancesByIntervals(
-      companyId,
-      accounts,
-      operations,
-      intervals
+    const totalIncome = incomeExpenseSeries.reduce(
+      (sum, point) => sum + point.income,
+      0
+    );
+    const totalExpense = incomeExpenseSeries.reduce(
+      (sum, point) => sum + point.expense,
+      0
     );
 
+    // 3. Рассчитываем балансы по счетам на каждый интервал
+    const accountBalancesSeries =
+      await this.calculateAccountBalancesByIntervals(
+        companyId,
+        accounts,
+        operations,
+        intervals
+      );
+
     // 4. Рассчитываем финальные балансы на конец периода
-    const finalBalances = accountBalancesSeries.length > 0
-      ? Object.entries(accountBalancesSeries[accountBalancesSeries.length - 1].accounts).map(([accountId, balance]) => {
-          const account = accounts.find(a => a.id === accountId);
-          return {
-            accountId,
-            accountName: account?.name || 'Unknown',
-            balance,
-          };
-        })
-      : [];
+    const finalBalances =
+      accountBalancesSeries.length > 0
+        ? Object.entries(
+            accountBalancesSeries[accountBalancesSeries.length - 1].accounts
+          ).map(([accountId, balance]) => {
+            const account = accounts.find((a) => a.id === accountId);
+            return {
+              accountId,
+              accountName: account?.name || 'Unknown',
+              balance,
+            };
+          })
+        : [];
 
     // 5. Формируем справочник счетов
-    const accountsList = accounts.map(acc => ({
+    const accountsList = accounts.map((acc) => ({
       id: acc.id,
       name: acc.name,
     }));
@@ -194,7 +207,11 @@ export class DashboardService {
     companyId: string,
     params: DashboardParams
   ): Promise<CumulativeCashFlowResponse> {
-    const cacheKey = generateCacheKey(companyId, 'cumulative-cash-flow', params);
+    const cacheKey = generateCacheKey(
+      companyId,
+      'cumulative-cash-flow',
+      params
+    );
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
 
@@ -221,7 +238,11 @@ export class DashboardService {
     });
 
     // Создаем интервалы
-    const intervals = createIntervals(periodFormat, params.periodFrom, params.periodTo);
+    const intervals = createIntervals(
+      periodFormat,
+      params.periodFrom,
+      params.periodTo
+    );
 
     // Рассчитываем накопительные данные
     const cumulativeSeries = intervals.map((interval, index) => {
@@ -231,25 +252,27 @@ export class DashboardService {
 
       for (let i = 0; i <= index; i++) {
         const currentInterval = intervals[i];
-        const intervalOps = operations.filter(op => {
+        const intervalOps = operations.filter((op) => {
           const opDate = new Date(op.operationDate);
-          return opDate >= currentInterval.start && opDate <= currentInterval.end;
+          return (
+            opDate >= currentInterval.start && opDate <= currentInterval.end
+          );
         });
 
         const intervalIncome = intervalOps
-          .filter(op => op.type === 'income')
+          .filter((op) => op.type === 'income')
           .reduce((sum, op) => sum + op.amount, 0);
 
         const intervalExpense = intervalOps
-          .filter(op => op.type === 'expense')
+          .filter((op) => op.type === 'expense')
           .reduce((sum, op) => sum + op.amount, 0);
 
         cumulativeIncome += intervalIncome;
         cumulativeExpense += intervalExpense;
       }
-      
+
       // Получаем операции для текущего интервала
-      const currentIntervalOps = operations.filter(op => {
+      const currentIntervalOps = operations.filter((op) => {
         const opDate = new Date(op.operationDate);
         return opDate >= interval.start && opDate <= interval.end;
       });
@@ -260,12 +283,14 @@ export class DashboardService {
         cumulativeIncome,
         cumulativeExpense,
         cumulativeNetCashFlow: cumulativeIncome - cumulativeExpense,
-        operations: currentIntervalOps.map(op => ({
+        operations: currentIntervalOps.map((op) => ({
           id: op.id,
           type: op.type,
           amount: op.amount,
           description: op.description,
-          article: op.article ? { id: op.article.id, name: op.article.name } : null,
+          article: op.article
+            ? { id: op.article.id, name: op.article.name }
+            : null,
         })),
         hasOperations: currentIntervalOps.length > 0,
       };
@@ -273,11 +298,11 @@ export class DashboardService {
 
     // Рассчитываем общие суммы за период
     const totalIncome = operations
-      .filter(op => op.type === 'income')
+      .filter((op) => op.type === 'income')
       .reduce((sum, op) => sum + op.amount, 0);
 
     const totalExpense = operations
-      .filter(op => op.type === 'expense')
+      .filter((op) => op.type === 'expense')
       .reduce((sum, op) => sum + op.amount, 0);
 
     const result: CumulativeCashFlowResponse = {
@@ -299,11 +324,24 @@ export class DashboardService {
   private async calculateAccountBalancesByIntervals(
     companyId: string,
     accounts: Array<{ id: string; name: string; openingBalance: number }>,
-    operations: any[],
+    operations: Array<{
+      type: string;
+      amount: number;
+      accountId?: string;
+      sourceAccountId?: string;
+      targetAccountId?: string;
+      operationDate: string;
+    }>,
     intervals: Interval[]
-  ): Promise<Array<{ date: string; label: string; accounts: Record<string, number> }>> {
-    const result: Array<{ date: string; label: string; accounts: Record<string, number> }> = [];
-    const accountIds = accounts.map(a => a.id);
+  ): Promise<
+    Array<{ date: string; label: string; accounts: Record<string, number> }>
+  > {
+    const result: Array<{
+      date: string;
+      label: string;
+      accounts: Record<string, number>;
+    }> = [];
+    const accountIds = accounts.map((a) => a.id);
 
     // Получаем все операции с начала истории (для расчета начальных балансов)
     const allOperations = await prisma.operation.findMany({
@@ -327,14 +365,14 @@ export class DashboardService {
     intervals.forEach((interval, index) => {
       // Начинаем с начального баланса для каждого счета
       const balances: Record<string, number> = {};
-      
-      accounts.forEach(account => {
+
+      accounts.forEach((account) => {
         balances[account.id] = account.openingBalance;
       });
 
       // Применяем все операции до текущего интервала
       // 1. Исторические операции (до первого интервала)
-      allOperations.forEach(op => {
+      allOperations.forEach((op) => {
         if (op.type === 'income' && op.accountId) {
           if (balances[op.accountId] !== undefined) {
             balances[op.accountId] += op.amount;
@@ -344,10 +382,16 @@ export class DashboardService {
             balances[op.accountId] -= op.amount;
           }
         } else if (op.type === 'transfer') {
-          if (op.sourceAccountId && balances[op.sourceAccountId] !== undefined) {
+          if (
+            op.sourceAccountId &&
+            balances[op.sourceAccountId] !== undefined
+          ) {
             balances[op.sourceAccountId] -= op.amount;
           }
-          if (op.targetAccountId && balances[op.targetAccountId] !== undefined) {
+          if (
+            op.targetAccountId &&
+            balances[op.targetAccountId] !== undefined
+          ) {
             balances[op.targetAccountId] += op.amount;
           }
         }
@@ -357,11 +401,11 @@ export class DashboardService {
       for (let i = 0; i < index; i++) {
         const prevInterval = intervals[i];
         operations
-          .filter(op => {
+          .filter((op) => {
             const opDate = new Date(op.operationDate);
             return opDate >= prevInterval.start && opDate <= prevInterval.end;
           })
-          .forEach(op => {
+          .forEach((op) => {
             if (op.type === 'income' && op.accountId) {
               if (balances[op.accountId] !== undefined) {
                 balances[op.accountId] += op.amount;
@@ -371,10 +415,16 @@ export class DashboardService {
                 balances[op.accountId] -= op.amount;
               }
             } else if (op.type === 'transfer') {
-              if (op.sourceAccountId && balances[op.sourceAccountId] !== undefined) {
+              if (
+                op.sourceAccountId &&
+                balances[op.sourceAccountId] !== undefined
+              ) {
                 balances[op.sourceAccountId] -= op.amount;
               }
-              if (op.targetAccountId && balances[op.targetAccountId] !== undefined) {
+              if (
+                op.targetAccountId &&
+                balances[op.targetAccountId] !== undefined
+              ) {
                 balances[op.targetAccountId] += op.amount;
               }
             }
@@ -383,11 +433,11 @@ export class DashboardService {
 
       // 3. Операции из текущего интервала
       operations
-        .filter(op => {
+        .filter((op) => {
           const opDate = new Date(op.operationDate);
           return opDate >= interval.start && opDate <= interval.end;
         })
-        .forEach(op => {
+        .forEach((op) => {
           if (op.type === 'income' && op.accountId) {
             if (balances[op.accountId] !== undefined) {
               balances[op.accountId] += op.amount;
@@ -397,10 +447,16 @@ export class DashboardService {
               balances[op.accountId] -= op.amount;
             }
           } else if (op.type === 'transfer') {
-            if (op.sourceAccountId && balances[op.sourceAccountId] !== undefined) {
+            if (
+              op.sourceAccountId &&
+              balances[op.sourceAccountId] !== undefined
+            ) {
               balances[op.sourceAccountId] -= op.amount;
             }
-            if (op.targetAccountId && balances[op.targetAccountId] !== undefined) {
+            if (
+              op.targetAccountId &&
+              balances[op.targetAccountId] !== undefined
+            ) {
               balances[op.targetAccountId] += op.amount;
             }
           }

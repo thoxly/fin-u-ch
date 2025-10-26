@@ -2,19 +2,23 @@ import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { useGetOperationsQuery } from '../../store/api/operationsApi';
 import { PeriodFiltersState } from '../types/period';
-import { 
-  aggregateDashboardData, 
+import {
+  aggregateDashboardData,
   formatChartData,
   getAggregationIntervals,
   OperationData,
-  AggregatedDataPoint 
+  AggregatedDataPoint,
 } from '../lib/dataAggregation';
 
 export interface UsePeriodDataResult {
   incomeExpenseData: AggregatedDataPoint[];
-  accountBalancesData: Array<{ date: string; label: string; [accountId: string]: number | string }>;
+  accountBalancesData: Array<{
+    date: string;
+    label: string;
+    [accountId: string]: number | string;
+  }>;
   isLoading: boolean;
-  error: any;
+  error: unknown;
   totalIncome: number;
   totalExpense: number;
   totalNetProfit: number;
@@ -24,8 +28,14 @@ export interface UsePeriodDataResult {
  * Хук для работы с данными по периодам
  * Автоматически агрегирует данные в зависимости от выбранного формата периода
  */
-export const usePeriodData = (periodFilters: PeriodFiltersState): UsePeriodDataResult => {
-  const { data: operations = [], isLoading, error } = useGetOperationsQuery({
+export const usePeriodData = (
+  periodFilters: PeriodFiltersState
+): UsePeriodDataResult => {
+  const {
+    data: operations = [],
+    isLoading,
+    error,
+  } = useGetOperationsQuery({
     dateFrom: periodFilters.range.from,
     dateTo: periodFilters.range.to,
   });
@@ -35,16 +45,20 @@ export const usePeriodData = (periodFilters: PeriodFiltersState): UsePeriodDataR
     const toDate = new Date(periodFilters.range.to);
 
     // Всегда создаем интервалы, даже если нет операций
-    const intervals = getAggregationIntervals(periodFilters.format, fromDate, toDate);
-    
+    const intervals = getAggregationIntervals(
+      periodFilters.format,
+      fromDate,
+      toDate
+    );
+
     if (!operations.length) {
       // Создаем пустые данные для всех интервалов
-      const emptyData = intervals.map(interval => ({
+      const emptyData = intervals.map((interval) => ({
         date: format(interval.start, 'yyyy-MM-dd'),
         label: interval.label,
         income: 0,
         expense: 0,
-        netCashFlow: 0
+        netCashFlow: 0,
       }));
 
       return {
@@ -52,15 +66,15 @@ export const usePeriodData = (periodFilters: PeriodFiltersState): UsePeriodDataR
         accountBalancesData: [],
         totalIncome: 0,
         totalExpense: 0,
-        totalNetProfit: 0
+        totalNetProfit: 0,
       };
     }
 
     // Преобразуем операции в формат для агрегации
-    const operationData: OperationData[] = operations.map(op => ({
+    const operationData: OperationData[] = operations.map((op) => ({
       operationDate: op.operationDate,
       amount: op.amount,
-      type: op.type === 'income' ? 'income' : 'expense'
+      type: op.type === 'income' ? 'income' : 'expense',
     }));
 
     const { incomeExpenseData, accountBalancesData } = aggregateDashboardData(
@@ -70,25 +84,33 @@ export const usePeriodData = (periodFilters: PeriodFiltersState): UsePeriodDataR
       toDate
     );
 
-
     // Вычисляем общие суммы
-    const totalIncome = incomeExpenseData.reduce((sum, point) => sum + point.income, 0);
-    const totalExpense = incomeExpenseData.reduce((sum, point) => sum + point.expense, 0);
+    const totalIncome = incomeExpenseData.reduce(
+      (sum, point) => sum + point.income,
+      0
+    );
+    const totalExpense = incomeExpenseData.reduce(
+      (sum, point) => sum + point.expense,
+      0
+    );
     const totalNetProfit = totalIncome - totalExpense;
 
     return {
-      incomeExpenseData: formatChartData(incomeExpenseData, periodFilters.format),
+      incomeExpenseData: formatChartData(
+        incomeExpenseData,
+        periodFilters.format
+      ),
       accountBalancesData,
       totalIncome,
       totalExpense,
-      totalNetProfit
+      totalNetProfit,
     };
   }, [operations, periodFilters]);
 
   return {
     ...aggregatedData,
     isLoading,
-    error
+    error,
   };
 };
 
@@ -107,29 +129,29 @@ export const useChartData = (
         return {
           data: periodData.incomeExpenseData,
           isLoading: periodData.isLoading,
-          error: periodData.error
+          error: periodData.error,
         };
-      
+
       case 'accountBalances':
         return {
           data: periodData.accountBalancesData,
           isLoading: periodData.isLoading,
-          error: periodData.error
+          error: periodData.error,
         };
-      
+
       case 'weeklyFlow':
         // Для weeklyFlow можно использовать те же данные, но с другой группировкой
         return {
           data: periodData.incomeExpenseData,
           isLoading: periodData.isLoading,
-          error: periodData.error
+          error: periodData.error,
         };
-      
+
       default:
         return {
           data: [],
           isLoading: periodData.isLoading,
-          error: periodData.error
+          error: periodData.error,
         };
     }
   }, [periodData, chartType]);
