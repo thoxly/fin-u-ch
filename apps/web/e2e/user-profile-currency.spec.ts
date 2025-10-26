@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginAsTestUser } from './helpers/auth';
-import { TEST_USERS } from './helpers/test-data';
+// import { TEST_USERS } from './helpers/test-data';
 
 test.describe('User Profile Currency Selection', () => {
   test.beforeEach(async ({ page }) => {
