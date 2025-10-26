@@ -27,7 +27,6 @@ export class PlanFactService {
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached;
 
-    const months = getMonthsBetween(params.periodFrom, params.periodTo);
     const resultMap = new Map<string, PlanFactRow>();
 
     // Get plan data

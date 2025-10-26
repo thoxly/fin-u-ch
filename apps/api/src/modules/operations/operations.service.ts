@@ -29,7 +29,7 @@ export interface OperationFilters {
 
 export class OperationsService {
   async getAll(companyId: string, filters: OperationFilters) {
-    const where: any = { companyId };
+    const where: Record<string, unknown> = { companyId };
 
     if (filters.type) where.type = filters.type;
     if (filters.articleId) where.articleId = filters.articleId;
