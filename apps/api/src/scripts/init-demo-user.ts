@@ -11,7 +11,7 @@ import path from 'path';
 // Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-import { env } from '../config/env';
+// import { env } from '../config/env';
 import logger from '../config/logger';
 import demoUserService from '../modules/demo/demo.service';
 

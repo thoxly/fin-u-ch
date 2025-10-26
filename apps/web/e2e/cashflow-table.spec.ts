@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginAsTestUser, expectAuthenticated } from './helpers/auth';
-import { UI_TEXT } from './helpers/test-data';
+// import { UI_TEXT } from './helpers/test-data';
 
 test.describe('CashflowTable E2E Tests', () => {
   test.beforeEach(async ({ page }) => {

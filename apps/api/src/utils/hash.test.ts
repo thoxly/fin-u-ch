@@ -39,7 +39,6 @@ describe('Hash Utils', () => {
     });
 
     it('should reject incorrect password', async () => {
-      const password = 'testPassword123';
       const wrongPassword = 'wrongPassword';
       const hash = '$2b$10$hashedPassword';
 
