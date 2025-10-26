@@ -5,11 +5,41 @@
 import { OperationType, Activity } from '../constants/enums';
 
 export interface DashboardReport {
-  income: number;
-  expense: number;
-  netProfit: number;
-  balancesByAccount: AccountBalance[];
-  series: TimeSeries[];
+  // Общие суммы
+  summary: {
+    income: number;
+    expense: number;
+    netProfit: number;
+  };
+  
+  // Серии для графика доходов/расходов
+  incomeExpenseSeries: Array<{
+    date: string;
+    label: string;
+    income: number;
+    expense: number;
+    netCashFlow: number;
+  }>;
+  
+  // Остатки по счетам по интервалам
+  accountBalancesSeries: Array<{
+    date: string;
+    label: string;
+    accounts: Record<string, number>;
+  }>;
+  
+  // Справочник счетов
+  accounts: Array<{
+    id: string;
+    name: string;
+  }>;
+  
+  // Финальные балансы на конец периода
+  finalBalances: Array<{
+    accountId: string;
+    accountName: string;
+    balance: number;
+  }>;
 }
 
 export interface AccountBalance {
