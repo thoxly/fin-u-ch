@@ -93,7 +93,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
 
   // Вычисляем ширину колонок
   const columnWidths = useMemo(() => {
-    const totalColumns = allMonths.length + 2; // месяцы + статья + итого
+    // const totalColumns = allMonths.length + 2; // месяцы + статья + итого
     const articleColumnWidth = 240; // фиксированная ширина для колонки "Статья"
     const totalColumnWidth = 120; // фиксированная ширина для колонки "Итого"
     const monthColumnWidth = Math.max(

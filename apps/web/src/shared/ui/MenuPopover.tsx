@@ -32,7 +32,7 @@ export const MenuPopover = ({
   items,
   onClose,
   anchorPosition,
-  renderIcon,
+  _renderIcon,
   className = '',
   createAction,
   position = 'left',
@@ -64,18 +64,18 @@ export const MenuPopover = ({
     };
   }, [onClose]);
 
-  const defaultRenderIcon = (iconName?: string): JSX.Element => {
-    if (!iconName) {
-      return <></>;
-    }
-    const IconComponent = Icons[iconName as keyof typeof Icons] as
-      | Icons.LucideIcon
-      | undefined;
-    if (!IconComponent) {
-      return <></>;
-    }
-    return <IconComponent size={16} />;
-  };
+  // const defaultRenderIcon = (iconName?: string): JSX.Element => {
+  //   if (!iconName) {
+  //     return <></>;
+  //   }
+  //   const IconComponent = Icons[iconName as keyof typeof Icons] as
+  //     | Icons.LucideIcon
+  //     | undefined;
+  //   if (!IconComponent) {
+  //     return <></>;
+  //   }
+  //   return <IconComponent size={16} />;
+  // };
 
   // const iconRenderer = renderIcon || defaultRenderIcon;
 

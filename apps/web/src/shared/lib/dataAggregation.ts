@@ -139,9 +139,9 @@ export const getOptimalDataPoints = (
   toDate: Date,
   operationCount: number
 ): number => {
-  const daysDiff = Math.ceil(
-    (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
+  // const daysDiff = Math.ceil(
+  //   (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
+  // );
 
   // Максимальное количество точек для читаемости графика
   const maxPoints = 20;
