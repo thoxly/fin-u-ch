@@ -3,27 +3,27 @@ import { Input } from './Input';
 import { Select } from './Select';
 import { Button } from './Button';
 import { PeriodFiltersProps, PeriodFormat } from '../types/period';
-import { 
-  getPeriodRange, 
-  getNextPeriod, 
-  getPreviousPeriod, 
+import {
+  getPeriodRange,
+  getNextPeriod,
+  getPreviousPeriod,
   formatPeriodDisplay,
-  getPeriodFormatOptions 
+  getPeriodFormatOptions,
 } from '../lib/period';
 
 export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
-  const [periodDisplay, setPeriodDisplay] = useState('');
+  // const [periodDisplay, setPeriodDisplay] = useState('');
 
   // Обновляем отображение периода при изменении
-  useEffect(() => {
-    setPeriodDisplay(formatPeriodDisplay(value.range, value.format));
-  }, [value.range, value.format]);
+  // useEffect(() => {
+  //   setPeriodDisplay(formatPeriodDisplay(value.range, value.format));
+  // }, [value.range, value.format]);
 
   const handleFormatChange = (newFormat: PeriodFormat) => {
     const newRange = getPeriodRange(new Date(value.range.from), newFormat);
     onChange({
       format: newFormat,
-      range: newRange
+      range: newRange,
     });
   };
 
@@ -31,7 +31,7 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
     const newRange = getPreviousPeriod(value.range, value.format);
     onChange({
       format: value.format,
-      range: newRange
+      range: newRange,
     });
   };
 
@@ -39,18 +39,18 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
     const newRange = getNextPeriod(value.range, value.format);
     onChange({
       format: value.format,
-      range: newRange
+      range: newRange,
     });
   };
 
   const handleManualDateChange = (field: 'from' | 'to', dateValue: string) => {
     const newRange = {
       ...value.range,
-      [field]: dateValue
+      [field]: dateValue,
     };
     onChange({
       format: value.format,
-      range: newRange
+      range: newRange,
     });
   };
 
@@ -66,7 +66,7 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
             onChange={(e) => handleManualDateChange('from', e.target.value)}
           />
         </div>
-        
+
         <div className="flex-1">
           <Input
             label="Период по"
@@ -75,7 +75,7 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
             onChange={(e) => handleManualDateChange('to', e.target.value)}
           />
         </div>
-        
+
         <div className="w-32">
           <Select
             label="Формат периода"
@@ -90,26 +90,18 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
       <div className="flex items-center gap-4">
         {/* Кнопка "Предыдущий" под полем "Период с" - прижата к левому краю */}
         <div className="flex-1 flex justify-start">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePreviousPeriod}
-          >
+          <Button variant="outline" size="sm" onClick={handlePreviousPeriod}>
             ←
           </Button>
         </div>
-        
+
         {/* Кнопка "Следующий" под полем "Период по" - прижата к правому краю */}
         <div className="flex-1 flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNextPeriod}
-          >
+          <Button variant="outline" size="sm" onClick={handleNextPeriod}>
             →
           </Button>
         </div>
-        
+
         {/* Пустое место под форматом */}
         <div className="w-32"></div>
       </div>

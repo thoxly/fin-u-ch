@@ -77,7 +77,7 @@ export const MenuPopover = ({
     return <IconComponent size={16} />;
   };
 
-  const iconRenderer = renderIcon || defaultRenderIcon;
+  // const iconRenderer = renderIcon || defaultRenderIcon;
 
   const offset = 8;
   const positionStyle =

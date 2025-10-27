@@ -45,7 +45,7 @@ export const formatSmartLabel = (
   intervalStart: Date,
   intervalEnd: Date,
   daysPerInterval: number,
-  periodFormat: PeriodFormat
+  _periodFormat: PeriodFormat
 ): string => {
   // Всегда показываем конец интервала как конкретную дату
   // Это правильный подход для точек на графике
@@ -80,7 +80,7 @@ export const formatSmartLabel = (
 export const createCompactLabels = (
   intervals: Array<{ start: Date; end: Date; label: string }>
 ): Array<{ start: Date; end: Date; label: string }> => {
-  return intervals.map((interval, index) => {
+  return intervals.map((interval, _index) => {
     // Всегда показываем конец интервала как конкретную дату
     // Это правильный подход для точек на графике
 
@@ -134,7 +134,7 @@ export const createCompactLabels = (
  * Определяет оптимальное количество точек для графика на основе периода и количества операций
  */
 export const getOptimalDataPoints = (
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date,
   toDate: Date,
   operationCount: number
@@ -518,7 +518,7 @@ export const aggregateOperationsByIntervals = (
  */
 export const getPreviousPeriodData = (
   operations: OperationData[],
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date
 ): { income: number; expense: number; netCashFlow: number } => {
   let previousPeriodStart: Date;
@@ -717,7 +717,7 @@ export const createDefaultIntervals = (
  */
 export const aggregateDashboardData = (
   operations: OperationData[],
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date,
   toDate: Date
 ): {
@@ -766,7 +766,7 @@ export const aggregateDashboardData = (
  */
 export const createSmartIntervals = (
   operations: OperationData[],
-  periodFormat: PeriodFormat,
+  _periodFormat: PeriodFormat,
   fromDate: Date,
   toDate: Date
 ): Array<{ start: Date; end: Date; label: string }> => {
@@ -782,10 +782,10 @@ export const createSmartIntervals = (
   }
 
   // Для других периодов используем существующую логику
-  const sortedOps = [...operations].sort(
-    (a, b) =>
-      new Date(a.operationDate).getTime() - new Date(b.operationDate).getTime()
-  );
+  // const sortedOps = [...operations].sort(
+  //   (a, b) =>
+  //     new Date(a.operationDate).getTime() - new Date(b.operationDate).getTime()
+  // );
 
   const totalDays = Math.ceil(
     (toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -881,7 +881,7 @@ export const validateMonthDays = (
  */
 export const formatChartData = (
   data: AggregatedDataPoint[],
-  periodFormat: PeriodFormat
+  _periodFormat: PeriodFormat
 ): AggregatedDataPoint[] => {
   return data.map((point) => ({
     ...point,
