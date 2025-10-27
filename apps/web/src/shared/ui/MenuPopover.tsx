@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import * as Icons from 'lucide-react';
+// import * as Icons from 'lucide-react';
 
 export interface MenuPopoverItem {
   name: string;

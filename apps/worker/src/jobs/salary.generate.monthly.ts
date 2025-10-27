@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
-import type { Prisma } from '@prisma/client';
+// import type { Prisma } from '@prisma/client';
 
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
