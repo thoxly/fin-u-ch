@@ -6,8 +6,6 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import {
   useGetDepartmentsQuery,
-  useCreateDepartmentMutation,
-  useUpdateDepartmentMutation,
   useDeleteDepartmentMutation,
 } from '../../store/api/catalogsApi';
 import type { Department } from '@shared/types/catalogs';
