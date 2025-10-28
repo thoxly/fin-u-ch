@@ -13,7 +13,13 @@ export class DashboardController {
           ? new Date(req.query.periodTo as string)
           : new Date(),
         mode: (req.query.mode as 'plan' | 'fact' | 'both') || 'fact',
-        periodFormat: req.query.periodFormat as 'day' | 'week' | 'month' | 'quarter' | 'year' | undefined,
+        periodFormat: req.query.periodFormat as
+          | 'day'
+          | 'week'
+          | 'month'
+          | 'quarter'
+          | 'year'
+          | undefined,
       };
 
       const result = await dashboardService.getDashboard(
@@ -26,7 +32,11 @@ export class DashboardController {
     }
   }
 
-  async getCumulativeCashFlow(req: TenantRequest, res: Response, next: NextFunction) {
+  async getCumulativeCashFlow(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
     try {
       const params = {
         periodFrom: req.query.periodFrom
@@ -36,7 +46,13 @@ export class DashboardController {
           ? new Date(req.query.periodTo as string)
           : new Date(),
         mode: (req.query.mode as 'plan' | 'fact' | 'both') || 'fact',
-        periodFormat: req.query.periodFormat as 'day' | 'week' | 'month' | 'quarter' | 'year' | undefined,
+        periodFormat: req.query.periodFormat as
+          | 'day'
+          | 'week'
+          | 'month'
+          | 'quarter'
+          | 'year'
+          | undefined,
       };
 
       const result = await dashboardService.getCumulativeCashFlow(

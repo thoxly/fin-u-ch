@@ -7,15 +7,15 @@ interface RecentOperationsTableProps {
   className?: string;
 }
 
-export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({ 
-  operations, 
-  className = '' 
+export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
+  operations,
+  className = '',
 }) => {
   const formatDate = (date: Date | string) => {
     const d = new Date(date);
-    return d.toLocaleDateString('ru-RU', { 
-      day: '2-digit', 
-      month: '2-digit' 
+    return d.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
     });
   };
 
@@ -23,7 +23,7 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
     const labels: Record<string, string> = {
       income: 'Поступление',
       expense: 'Списание',
-      transfer: 'Перевод'
+      transfer: 'Перевод',
     };
     return labels[type] || type;
   };
@@ -32,13 +32,15 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
     const colors: Record<string, string> = {
       income: 'text-green-600 dark:text-green-400',
       expense: 'text-red-600 dark:text-red-400',
-      transfer: 'text-blue-600 dark:text-blue-400'
+      transfer: 'text-blue-600 dark:text-blue-400',
     };
     return colors[type] || 'text-gray-600 dark:text-gray-400';
   };
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
+    <div
+      className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
+    >
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
         Последние операции
       </h3>
@@ -62,7 +64,10 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
           </thead>
           <tbody>
             {operations.slice(0, 5).map((operation) => (
-              <tr key={operation.id} className="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
+              <tr
+                key={operation.id}
+                className="border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+              >
                 <td className="py-3 px-2 text-sm text-gray-900 dark:text-gray-100">
                   {formatDate(operation.operationDate)}
                 </td>

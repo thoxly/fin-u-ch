@@ -37,31 +37,34 @@ export const reportsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Dashboard'],
     }),
-    getCumulativeCashFlow: builder.query<{
-      cumulativeSeries: Array<{
-        date: string;
-        label: string;
-        cumulativeIncome: number;
-        cumulativeExpense: number;
-        cumulativeNetCashFlow: number;
-        operations?: Array<{
-          id: string;
-          type: string;
-          amount: number;
-          description: string | null;
-          article: {
+    getCumulativeCashFlow: builder.query<
+      {
+        cumulativeSeries: Array<{
+          date: string;
+          label: string;
+          cumulativeIncome: number;
+          cumulativeExpense: number;
+          cumulativeNetCashFlow: number;
+          operations?: Array<{
             id: string;
-            name: string;
-          } | null;
+            type: string;
+            amount: number;
+            description: string | null;
+            article: {
+              id: string;
+              name: string;
+            } | null;
+          }>;
+          hasOperations?: boolean;
         }>;
-        hasOperations?: boolean;
-      }>;
-      summary: {
-        totalIncome: number;
-        totalExpense: number;
-        totalNetCashFlow: number;
-      };
-    }, DashboardParams>({
+        summary: {
+          totalIncome: number;
+          totalExpense: number;
+          totalNetCashFlow: number;
+        };
+      },
+      DashboardParams
+    >({
       query: (params) => ({
         url: '/reports/dashboard/cumulative-cash-flow',
         params,
