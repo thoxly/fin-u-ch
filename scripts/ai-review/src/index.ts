@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { CONFIG, validateConfig } from './config.js';
+import { validateConfig } from './config.js';
 import { loadProjectContext } from './context-loader.js';
 import { GitHubClient } from './github-client.js';
 import { ClaudeReviewer } from './claude-reviewer.js';

@@ -43,7 +43,7 @@ export class BDDSService {
 
     const cacheKey = generateCacheKey(companyId, 'bdds', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as BDDSActivity[];
 
     const planItems = await prisma.planItem.findMany({
       where: {

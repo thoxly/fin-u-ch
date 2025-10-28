@@ -149,7 +149,7 @@ export const getOptimalDataPoints = (
 
   // Базовое количество точек в зависимости от периода
   let basePoints: number;
-  switch (periodFormat) {
+  switch (_periodFormat) {
     case 'week':
       basePoints = Math.min(7, Math.max(3, Math.ceil(operationCount / 2)));
       break;
@@ -300,9 +300,9 @@ export const getAggregationIntervals = (
   }
 
   // Для квартала используем умную логику в зависимости от количества операций
-  if (periodFormat === 'quarter') {
+  if (_periodFormat === 'quarter') {
     const optimalPoints = getOptimalDataPoints(
-      periodFormat,
+      _periodFormat,
       fromDate,
       toDate,
       operationCount
@@ -374,7 +374,7 @@ export const getAggregationIntervals = (
   }
 
   // Для года всегда показываем отдельные месяцы
-  if (periodFormat === 'year') {
+  if (_periodFormat === 'year') {
     const intervals: Array<{ start: Date; end: Date; label: string }> = [];
     const seenLabels = new Set<string>(); // Для дедупликации лейблов
     let current = new Date(fromDate);
@@ -412,7 +412,7 @@ export const getAggregationIntervals = (
   }
 
   // Для недели всегда показываем отдельные дни
-  if (periodFormat === 'week') {
+  if (_periodFormat === 'week') {
     const days = eachDayOfInterval({ start: fromDate, end: toDate });
     return days.map((day) => ({
       start: startOfDay(day),
@@ -422,7 +422,7 @@ export const getAggregationIntervals = (
   }
 
   const optimalPoints = getOptimalDataPoints(
-    periodFormat,
+    _periodFormat,
     fromDate,
     toDate,
     operationCount
@@ -528,7 +528,7 @@ export const getPreviousPeriodData = (
   const currentPeriodStart = startOfDay(fromDate);
 
   // Определяем предыдущий период в зависимости от формата
-  switch (periodFormat) {
+  switch (_periodFormat) {
     case 'week': {
       previousPeriodEnd = endOfDay(addDays(currentPeriodStart, -1));
       previousPeriodStart = startOfDay(addWeeks(previousPeriodEnd, -1));
@@ -731,14 +731,14 @@ export const aggregateDashboardData = (
   // Для месяца всегда используем интервалы по дням
   // Для других периодов используем умную логику
   const intervals =
-    periodFormat === 'month'
+    _periodFormat === 'month'
       ? getAggregationIntervals(
-          periodFormat,
+          _periodFormat,
           fromDate,
           toDate,
           operations.length
         )
-      : createDefaultIntervals(periodFormat, fromDate, toDate);
+      : createDefaultIntervals(_periodFormat, fromDate, toDate);
 
   // Агрегируем операции по интервалам (динамика потока)
   const incomeExpenseData = aggregateOperationsByIntervals(
@@ -775,7 +775,7 @@ export const createSmartIntervals = (
   }
 
   // Для месяца эта функция НЕ должна вызываться
-  if (periodFormat === 'month') {
+  if (_periodFormat === 'month') {
     throw new Error(
       'createSmartIntervals should not be called for month period. Use direct day intervals instead.'
     );
@@ -795,10 +795,10 @@ export const createSmartIntervals = (
   // Определяем оптимальное количество интервалов
   let optimalIntervals: number;
 
-  if (periodFormat === 'week') {
+  if (_periodFormat === 'week') {
     // Для недели: 3-7 интервалов в зависимости от количества операций
     optimalIntervals = Math.min(7, Math.max(3, Math.ceil(operationCount / 2)));
-  } else if (periodFormat === 'quarter') {
+  } else if (_periodFormat === 'quarter') {
     // Для квартала: 4-12 интервалов
     optimalIntervals = Math.min(12, Math.max(4, Math.ceil(operationCount / 5)));
   } else {

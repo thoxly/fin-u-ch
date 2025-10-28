@@ -38,9 +38,11 @@ export class OperationsService {
     if (filters.counterpartyId) where.counterpartyId = filters.counterpartyId;
 
     if (filters.dateFrom || filters.dateTo) {
-      where.operationDate = {} as Record<string, unknown>;
-      if (filters.dateFrom) where.operationDate.gte = filters.dateFrom;
-      if (filters.dateTo) where.operationDate.lte = filters.dateTo;
+      where.operationDate = {};
+      if (filters.dateFrom)
+        (where.operationDate as Record<string, unknown>).gte = filters.dateFrom;
+      if (filters.dateTo)
+        (where.operationDate as Record<string, unknown>).lte = filters.dateTo;
     }
 
     return prisma.operation.findMany({

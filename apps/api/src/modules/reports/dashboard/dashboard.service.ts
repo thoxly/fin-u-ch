@@ -83,7 +83,7 @@ export class DashboardService {
   ): Promise<DashboardResponse> {
     const cacheKey = generateCacheKey(companyId, 'dashboard', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as DashboardResponse;
 
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
@@ -159,7 +159,14 @@ export class DashboardService {
       await this.calculateAccountBalancesByIntervals(
         companyId,
         accounts,
-        operations,
+        operations.map((op) => ({
+          type: op.type,
+          amount: op.amount,
+          accountId: op.accountId || undefined,
+          sourceAccountId: op.sourceAccountId || undefined,
+          targetAccountId: op.targetAccountId || undefined,
+          operationDate: op.operationDate.toISOString(),
+        })),
         intervals
       );
 
@@ -213,7 +220,7 @@ export class DashboardService {
       params
     );
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as CumulativeCashFlowResponse;
 
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';

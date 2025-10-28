@@ -31,12 +31,21 @@
     "docker:ps": "cd ops/docker && docker compose -f docker-compose.local.yml ps",
     "docker:restart": "cd ops/docker && docker compose -f docker-compose.local.yml restart",
     "docker:clean": "cd ops/docker && docker compose -f docker-compose.local.yml down -v",
+    "docker:hybrid:up": "cd ops/docker && docker compose -f docker-compose.hybrid.yml up -d",
+    "docker:hybrid:down": "cd ops/docker && docker compose -f docker-compose.hybrid.yml down",
+    "docker:hybrid:logs": "cd ops/docker && docker compose -f docker-compose.hybrid.yml logs -f",
+    "docker:hybrid:ps": "cd ops/docker && docker compose -f docker-compose.hybrid.yml ps",
+    "docker:hybrid:restart": "cd ops/docker && docker compose -f docker-compose.hybrid.yml restart",
+    "docker:hybrid:clean": "cd ops/docker && docker compose -f docker-compose.hybrid.yml down -v",
     "prisma:generate": "pnpm --filter api prisma:generate && pnpm --filter worker prisma:generate",
-    "demo:create": "npx tsx scripts/create-demo-user.ts"
+    "demo:create": "npx tsx scripts/create-demo-user.ts",
+    "dev:hybrid": "concurrently \"pnpm docker:hybrid:up\" \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
+    "dev:hybrid:stop": "pnpm docker:hybrid:down"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
+    "concurrently": "^8.2.2",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "husky": "^8.0.3",

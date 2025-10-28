@@ -16,7 +16,26 @@ export const getMonthsBetween = (startDate: Date, endDate: Date): string[] => {
 };
 
 export const parseMonthKey = (monthKey: string): Date => {
-  const [year, month] = monthKey.split('-').map(Number);
+  if (!monthKey || typeof monthKey !== 'string') {
+    throw new Error('Invalid month key: empty or not a string');
+  }
+
+  const parts = monthKey.split('-');
+  if (parts.length !== 2) {
+    throw new Error('Invalid month key format: expected YYYY-MM');
+  }
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+
+  if (isNaN(year) || isNaN(month)) {
+    throw new Error('Invalid month key: year and month must be numbers');
+  }
+
+  if (month < 1 || month > 12) {
+    throw new Error('Invalid month key: month must be between 1 and 12');
+  }
+
   return new Date(year, month - 1, 1);
 };
 

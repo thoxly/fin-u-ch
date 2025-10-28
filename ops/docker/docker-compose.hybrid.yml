@@ -1,0 +1,58 @@
+# ================================================
+# Docker Compose для ГИБРИДНОГО РЕЖИМА
+# ================================================
+# Запускает только базу данных и Redis в Docker
+# Фронт и бэк запускаются локально
+#
+# Использование:
+#   1. Запустить: pnpm docker:hybrid:up
+#   2. Остановить: pnpm docker:hybrid:down
+#   3. Логи: pnpm docker:hybrid:logs
+#
+# После запуска:
+#   - API: http://localhost:4000
+#   - Web: http://localhost:5173 (Vite dev server)
+#   - PostgreSQL: localhost:5432
+#   - Redis: localhost:6379
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: fin-u-ch-postgres-hybrid
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fin_u_ch_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data_hybrid:/var/lib/postgresql/data
+    networks:
+      - fin-u-ch-hybrid
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: fin-u-ch-redis-hybrid
+    ports:
+      - '6379:6379'
+    networks:
+      - fin-u-ch-hybrid
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data_hybrid:
+
+networks:
+  fin-u-ch-hybrid:
+    driver: bridge

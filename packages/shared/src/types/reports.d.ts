@@ -1,18 +1,13 @@
 /**
  * Report types
  */
-
 import { OperationType, Activity } from '../constants/enums';
-
 export interface DashboardReport {
-  // Общие суммы
   summary: {
     income: number;
     expense: number;
     netProfit: number;
   };
-
-  // Серии для графика доходов/расходов
   incomeExpenseSeries: Array<{
     date: string;
     label: string;
@@ -20,35 +15,27 @@ export interface DashboardReport {
     expense: number;
     netCashFlow: number;
   }>;
-
-  // Остатки по счетам по интервалам
   accountBalancesSeries: Array<{
     date: string;
     label: string;
     accounts: Record<string, number>;
   }>;
-
-  // Справочник счетов
   accounts: Array<{
     id: string;
     name: string;
   }>;
-
-  // Финальные балансы на конец периода
   finalBalances: Array<{
     accountId: string;
     accountName: string;
     balance: number;
   }>;
 }
-
 export interface AccountBalance {
   accountId: string;
   accountName: string;
   currency: string;
   balance: number;
 }
-
 export interface TimeSeries {
   month: string;
   income: number;
@@ -60,13 +47,11 @@ export interface TimeSeries {
     netProfit: number;
   };
 }
-
 export interface CashflowReport {
   periodFrom: string;
   periodTo: string;
   activities: ActivityGroup[];
 }
-
 export interface ActivityGroup {
   activity: Activity;
   incomeGroups: ArticleGroup[];
@@ -75,7 +60,6 @@ export interface ActivityGroup {
   totalExpense: number;
   netCashflow: number;
 }
-
 export interface ArticleGroup {
   articleId: string;
   articleName: string;
@@ -83,19 +67,16 @@ export interface ArticleGroup {
   months: MonthlyData[];
   total: number;
 }
-
 export interface MonthlyData {
   month: string;
   amount: number;
 }
-
 export interface BDDSReport {
   periodFrom: string;
   periodTo: string;
   budgetId?: string;
   activities: ActivityGroup[];
 }
-
 export interface BDDSRow {
   articleId: string;
   articleName: string;
@@ -103,14 +84,12 @@ export interface BDDSRow {
   months: MonthlyData[];
   total: number;
 }
-
 export interface PlanFactReport {
   periodFrom: string;
   periodTo: string;
   level: 'article' | 'department' | 'deal';
   rows: PlanFactRow[];
 }
-
 export interface PlanFactRow {
   key: string;
   month: string;
@@ -125,21 +104,18 @@ export interface PlanFactRow {
   delta: number;
   deltaPercent: number;
 }
-
 export interface DDSReport {
   accounts: DDSAccountBalance[];
   inflows: DDSFlow[];
   outflows: DDSFlow[];
   summary: DDSSummary;
 }
-
 export interface DDSAccountBalance {
   accountId: string;
   accountName: string;
   openingBalance: number;
   closingBalance: number;
 }
-
 export interface DDSFlow {
   articleId: string;
   articleName: string;
@@ -147,13 +123,11 @@ export interface DDSFlow {
   months: Record<string, number>;
   total: number;
 }
-
 export interface DDSSummary {
   totalInflow: number;
   totalOutflow: number;
   netCashflow: number;
 }
-
 export interface ReportFilters {
   periodFrom: string;
   periodTo: string;
@@ -167,6 +141,4 @@ export interface ReportFilters {
   accountId?: string;
   budgetId?: string;
 }
-
-// Экспорт для совместимости с ES модулями
-export const REPORT_TYPES_VERSION = '1.0.0';
+//# sourceMappingURL=reports.d.ts.map

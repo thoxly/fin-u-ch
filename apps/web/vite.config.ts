@@ -8,9 +8,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@shared': path.resolve(__dirname, '../../packages/shared/src'),
-      '@fin-u-ch/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@shared': path.resolve(__dirname, '../../packages/shared/dist'),
+      '@fin-u-ch/shared': path.resolve(__dirname, '../../packages/shared/dist'),
     },
+  },
+  optimizeDeps: {
+    include: ['@fin-u-ch/shared'],
   },
   server: {
     port: 5173,

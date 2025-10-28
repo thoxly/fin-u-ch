@@ -25,7 +25,7 @@ export class PlanFactService {
   ): Promise<PlanFactRow[]> {
     const cacheKey = generateCacheKey(companyId, 'planfact', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as PlanFactRow[];
 
     const resultMap = new Map<string, PlanFactRow>();
 
