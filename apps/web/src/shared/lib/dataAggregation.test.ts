@@ -2,7 +2,7 @@ import {
   getAggregationIntervals,
   createDefaultIntervals,
 } from './dataAggregation';
-import { PeriodFormat } from '../types/period';
+import { PeriodFormat } from '@fin-u-ch/shared';
 
 describe('Data Aggregation - Label Deduplication', () => {
   describe('getAggregationIntervals', () => {

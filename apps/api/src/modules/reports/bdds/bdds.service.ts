@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getMonthsBetween } from '../utils/date';
+import { getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
 

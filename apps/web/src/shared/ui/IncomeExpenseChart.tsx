@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   LineChart,
   Line,
@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatMoney } from '../lib/money';
+import { CustomTooltip } from './CustomTooltip';
 
 interface Operation {
   id: string;
@@ -36,103 +37,6 @@ interface IncomeExpenseChartProps {
   data: CumulativeDataPoint[];
   className?: string;
 }
-
-// Кастомный Tooltip с отображением операций
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: CumulativeDataPoint }>;
-  label?: string;
-}) => {
-  const [showAll, setShowAll] = useState(false);
-  const maxVisible = 3;
-
-  if (!active || !payload || payload.length === 0) return null;
-
-  const data = payload[0].payload as CumulativeDataPoint;
-  const operations = data.operations || [];
-
-  // Не показываем tooltip, если нет операций
-  if (operations.length === 0) return null;
-
-  return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 min-w-[300px]">
-      {/* Дата */}
-      <div className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-          {label}
-        </p>
-      </div>
-
-      {/* Список операций */}
-      <div className="max-h-[300px] overflow-y-auto">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Операции ({operations.length}):
-        </p>
-        <div className="space-y-1">
-          {(showAll ? operations : operations.slice(0, maxVisible)).map(
-            (op) => (
-              <div
-                key={op.id}
-                className="text-xs p-2 bg-gray-50 dark:bg-gray-700 rounded"
-              >
-                <div className="flex justify-between items-start gap-2 mb-1">
-                  <span
-                    className={`font-medium ${
-                      op.type === 'income'
-                        ? 'text-green-600 dark:text-green-400'
-                        : op.type === 'expense'
-                          ? 'text-red-600 dark:text-red-400'
-                          : 'text-blue-600 dark:text-blue-400'
-                    }`}
-                  >
-                    {formatMoney(op.amount)}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase">
-                    {op.type === 'income'
-                      ? 'Доход'
-                      : op.type === 'expense'
-                        ? 'Расход'
-                        : 'Перевод'}
-                  </span>
-                </div>
-                {op.article && (
-                  <div className="text-gray-600 dark:text-gray-400 truncate">
-                    {op.article.name}
-                  </div>
-                )}
-                {op.description && (
-                  <div className="text-gray-500 dark:text-gray-500 text-[10px] truncate mt-1">
-                    {op.description}
-                  </div>
-                )}
-              </div>
-            )
-          )}
-          {operations.length > maxVisible && !showAll && (
-            <button
-              onClick={() => setShowAll(true)}
-              className="w-full text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1"
-            >
-              Показать все ({operations.length - maxVisible} еще)...
-            </button>
-          )}
-          {operations.length > maxVisible && showAll && (
-            <button
-              onClick={() => setShowAll(false)}
-              className="w-full text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1"
-            >
-              Свернуть
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   data,

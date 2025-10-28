@@ -5,7 +5,7 @@ import {
   formatPeriodDisplay,
   getPeriodFormatOptions,
 } from './period';
-import { PeriodFormat } from '../types/period';
+import { PeriodFormat } from '@fin-u-ch/shared';
 
 describe('period utilities', () => {
   const testDate = new Date('2024-01-15'); // Понедельник, середина января

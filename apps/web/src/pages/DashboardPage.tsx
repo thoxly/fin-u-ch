@@ -13,7 +13,7 @@ import {
 } from '../store/api/reportsApi';
 import { useGetOperationsQuery } from '../store/api/operationsApi';
 import { formatMoney } from '../shared/lib/money';
-import { PeriodFiltersState } from '../shared/types/period';
+import { PeriodFiltersState } from '@fin-u-ch/shared';
 import { getPeriodRange } from '../shared/lib/period';
 
 export const DashboardPage = () => {

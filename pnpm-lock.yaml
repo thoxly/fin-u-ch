@@ -113,7 +113,7 @@ importers:
         version: 5.22.0
       ts-jest:
         specifier: ^29.4.4
-        version: 29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8)(ts-node@10.9.2(@types/node@22.18.8)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8))(typescript@5.9.3)
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@22.18.8)(typescript@5.9.3)
@@ -216,7 +216,7 @@ importers:
         version: 3.4.18(tsx@4.20.6)(yaml@2.8.1)
       ts-jest:
         specifier: ^29.4.4
-        version: 29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8)(ts-node@10.9.2(@types/node@22.18.8)(typescript@5.9.3)))(typescript@5.9.3)
+        version: 29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8))(typescript@5.9.3)
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -260,6 +260,9 @@ importers:
 
   packages/shared:
     dependencies:
+      date-fns:
+        specifier: ^3.6.0
+        version: 3.6.0
       zod:
         specifier: ^4.1.12
         version: 4.1.12
@@ -10121,7 +10124,7 @@ snapshots:
       babel-jest: 30.2.0(@babel/core@7.28.4)
       jest-util: 30.2.0
 
-  ts-jest@29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8)(ts-node@10.9.2(@types/node@22.18.8)(typescript@5.9.3)))(typescript@5.9.3):
+  ts-jest@29.4.4(@babel/core@7.28.4)(@jest/transform@30.2.0)(@jest/types@30.2.0)(babel-jest@30.2.0(@babel/core@7.28.4))(jest-util@30.2.0)(jest@30.2.0(@types/node@22.18.8))(typescript@5.9.3):
     dependencies:
       bs-logger: 0.2.6
       fast-json-stable-stringify: 2.1.0

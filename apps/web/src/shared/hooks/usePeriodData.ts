@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { format } from 'date-fns';
 import { useGetOperationsQuery } from '../../store/api/operationsApi';
-import { PeriodFiltersState } from '../types/period';
+import { PeriodFiltersState } from '@fin-u-ch/shared';
 import {
   aggregateDashboardData,
   formatChartData,

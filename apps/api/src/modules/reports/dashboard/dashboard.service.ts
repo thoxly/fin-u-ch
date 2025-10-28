@@ -1,6 +1,6 @@
 import prisma from '../../../config/db';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
-import { createIntervals, PeriodFormat, Interval } from '../utils/date';
+import { createIntervals, PeriodFormat, Interval } from '@fin-u-ch/shared';
 
 export interface DashboardParams {
   periodFrom: Date;
@@ -327,6 +327,7 @@ export class DashboardService {
 
   /**
    * Рассчитывает балансы по счетам на каждый интервал
+   * Оптимизированная версия с использованием Map и reduce для лучшей производительности
    */
   private async calculateAccountBalancesByIntervals(
     companyId: string,
@@ -343,12 +344,8 @@ export class DashboardService {
   ): Promise<
     Array<{ date: string; label: string; accounts: Record<string, number> }>
   > {
-    const result: Array<{
-      date: string;
-      label: string;
-      accounts: Record<string, number>;
-    }> = [];
     const accountIds = accounts.map((a) => a.id);
+    const accountIdsSet = new Set(accountIds);
 
     // Получаем все операции с начала истории (для расчета начальных балансов)
     const allOperations = await prisma.operation.findMany({
@@ -368,115 +365,107 @@ export class DashboardService {
       },
     });
 
+    // Создаем Map для быстрого доступа к операциям по интервалам
+    const operationsByInterval = new Map<number, typeof operations>();
+
+    // Предварительно группируем операции по интервалам
+    intervals.forEach((interval, index) => {
+      const intervalOps = operations.filter((op) => {
+        const opDate = new Date(op.operationDate);
+        return opDate >= interval.start && opDate <= interval.end;
+      });
+      operationsByInterval.set(index, intervalOps);
+    });
+
+    // Создаем Map для накопления изменений балансов
+    const balanceChanges = new Map<string, number>();
+
+    // Инициализируем начальные балансы
+    accounts.forEach((account) => {
+      balanceChanges.set(account.id, account.openingBalance);
+    });
+
+    // Применяем исторические операции один раз
+    allOperations.forEach((op) => {
+      this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
+    });
+
+    const result: Array<{
+      date: string;
+      label: string;
+      accounts: Record<string, number>;
+    }> = [];
+
     // Для каждого интервала вычисляем балансы
     intervals.forEach((interval, index) => {
-      // Начинаем с начального баланса для каждого счета
-      const balances: Record<string, number> = {};
+      // Копируем текущие балансы для этого интервала
+      const currentBalances = new Map(balanceChanges);
 
+      // Применяем операции из текущего интервала
+      const currentIntervalOps = operationsByInterval.get(index) || [];
+      currentIntervalOps.forEach((op) => {
+        this.applyOperationToBalances(currentBalances, op, accountIdsSet);
+      });
+
+      // Конвертируем Map в объект для результата
+      const balancesObj: Record<string, number> = {};
       accounts.forEach((account) => {
-        balances[account.id] = account.openingBalance;
+        balancesObj[account.id] = currentBalances.get(account.id) || 0;
       });
-
-      // Применяем все операции до текущего интервала
-      // 1. Исторические операции (до первого интервала)
-      allOperations.forEach((op) => {
-        if (op.type === 'income' && op.accountId) {
-          if (balances[op.accountId] !== undefined) {
-            balances[op.accountId] += op.amount;
-          }
-        } else if (op.type === 'expense' && op.accountId) {
-          if (balances[op.accountId] !== undefined) {
-            balances[op.accountId] -= op.amount;
-          }
-        } else if (op.type === 'transfer') {
-          if (
-            op.sourceAccountId &&
-            balances[op.sourceAccountId] !== undefined
-          ) {
-            balances[op.sourceAccountId] -= op.amount;
-          }
-          if (
-            op.targetAccountId &&
-            balances[op.targetAccountId] !== undefined
-          ) {
-            balances[op.targetAccountId] += op.amount;
-          }
-        }
-      });
-
-      // 2. Операции из текущего периода до текущего интервала
-      for (let i = 0; i < index; i++) {
-        const prevInterval = intervals[i];
-        operations
-          .filter((op) => {
-            const opDate = new Date(op.operationDate);
-            return opDate >= prevInterval.start && opDate <= prevInterval.end;
-          })
-          .forEach((op) => {
-            if (op.type === 'income' && op.accountId) {
-              if (balances[op.accountId] !== undefined) {
-                balances[op.accountId] += op.amount;
-              }
-            } else if (op.type === 'expense' && op.accountId) {
-              if (balances[op.accountId] !== undefined) {
-                balances[op.accountId] -= op.amount;
-              }
-            } else if (op.type === 'transfer') {
-              if (
-                op.sourceAccountId &&
-                balances[op.sourceAccountId] !== undefined
-              ) {
-                balances[op.sourceAccountId] -= op.amount;
-              }
-              if (
-                op.targetAccountId &&
-                balances[op.targetAccountId] !== undefined
-              ) {
-                balances[op.targetAccountId] += op.amount;
-              }
-            }
-          });
-      }
-
-      // 3. Операции из текущего интервала
-      operations
-        .filter((op) => {
-          const opDate = new Date(op.operationDate);
-          return opDate >= interval.start && opDate <= interval.end;
-        })
-        .forEach((op) => {
-          if (op.type === 'income' && op.accountId) {
-            if (balances[op.accountId] !== undefined) {
-              balances[op.accountId] += op.amount;
-            }
-          } else if (op.type === 'expense' && op.accountId) {
-            if (balances[op.accountId] !== undefined) {
-              balances[op.accountId] -= op.amount;
-            }
-          } else if (op.type === 'transfer') {
-            if (
-              op.sourceAccountId &&
-              balances[op.sourceAccountId] !== undefined
-            ) {
-              balances[op.sourceAccountId] -= op.amount;
-            }
-            if (
-              op.targetAccountId &&
-              balances[op.targetAccountId] !== undefined
-            ) {
-              balances[op.targetAccountId] += op.amount;
-            }
-          }
-        });
 
       result.push({
         date: interval.start.toISOString().split('T')[0],
         label: interval.label,
-        accounts: { ...balances },
+        accounts: balancesObj,
+      });
+
+      // Обновляем накопленные балансы для следующего интервала
+      currentIntervalOps.forEach((op) => {
+        this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
       });
     });
 
     return result;
+  }
+
+  /**
+   * Применяет операцию к балансам счетов
+   */
+  private applyOperationToBalances(
+    balances: Map<string, number>,
+    op: {
+      type: string;
+      amount: number;
+      accountId?: string | null;
+      sourceAccountId?: string | null;
+      targetAccountId?: string | null;
+    },
+    accountIdsSet: Set<string>
+  ): void {
+    if (
+      op.type === 'income' &&
+      op.accountId &&
+      accountIdsSet.has(op.accountId)
+    ) {
+      const currentBalance = balances.get(op.accountId) || 0;
+      balances.set(op.accountId, currentBalance + op.amount);
+    } else if (
+      op.type === 'expense' &&
+      op.accountId &&
+      accountIdsSet.has(op.accountId)
+    ) {
+      const currentBalance = balances.get(op.accountId) || 0;
+      balances.set(op.accountId, currentBalance - op.amount);
+    } else if (op.type === 'transfer') {
+      if (op.sourceAccountId && accountIdsSet.has(op.sourceAccountId)) {
+        const currentBalance = balances.get(op.sourceAccountId) || 0;
+        balances.set(op.sourceAccountId, currentBalance - op.amount);
+      }
+      if (op.targetAccountId && accountIdsSet.has(op.targetAccountId)) {
+        const currentBalance = balances.get(op.targetAccountId) || 0;
+        balances.set(op.targetAccountId, currentBalance + op.amount);
+      }
+    }
   }
 }
 

@@ -2,7 +2,7 @@
 import { Input } from './Input';
 import { Select } from './Select';
 import { Button } from './Button';
-import { PeriodFiltersProps, PeriodFormat } from '../types/period';
+import { PeriodFiltersProps, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
   getNextPeriod,
