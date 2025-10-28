@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getMonthsBetween } from '../utils/date';
+import { getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
 
@@ -43,7 +43,7 @@ export class BDDSService {
 
     const cacheKey = generateCacheKey(companyId, 'bdds', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as BDDSActivity[];
 
     const planItems = await prisma.planItem.findMany({
       where: {

@@ -7,8 +7,6 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import {
   useGetCounterpartiesQuery,
-  useCreateCounterpartyMutation,
-  useUpdateCounterpartyMutation,
   useDeleteCounterpartyMutation,
 } from '../../store/api/catalogsApi';
 import type { Counterparty } from '@shared/types/catalogs';

@@ -11,6 +11,7 @@ interface DashboardParams {
   periodFrom: string;
   periodTo: string;
   mode?: 'plan' | 'fact' | 'both';
+  periodFormat?: 'day' | 'week' | 'month' | 'quarter' | 'year';
 }
 
 interface ReportParams {
@@ -23,6 +24,7 @@ interface ReportParams {
 interface BDDSReportParams {
   periodFrom: string;
   periodTo: string;
+  activity?: string;
   budgetId?: string;
 }
 
@@ -31,6 +33,40 @@ export const reportsApi = apiSlice.injectEndpoints({
     getDashboard: builder.query<DashboardReport, DashboardParams>({
       query: (params) => ({
         url: '/reports/dashboard',
+        params,
+      }),
+      providesTags: ['Dashboard'],
+    }),
+    getCumulativeCashFlow: builder.query<
+      {
+        cumulativeSeries: Array<{
+          date: string;
+          label: string;
+          cumulativeIncome: number;
+          cumulativeExpense: number;
+          cumulativeNetCashFlow: number;
+          operations?: Array<{
+            id: string;
+            type: string;
+            amount: number;
+            description: string | null;
+            article: {
+              id: string;
+              name: string;
+            } | null;
+          }>;
+          hasOperations?: boolean;
+        }>;
+        summary: {
+          totalIncome: number;
+          totalExpense: number;
+          totalNetCashFlow: number;
+        };
+      },
+      DashboardParams
+    >({
+      query: (params) => ({
+        url: '/reports/dashboard/cumulative-cash-flow',
         params,
       }),
       providesTags: ['Dashboard'],
@@ -68,6 +104,7 @@ export const reportsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetDashboardQuery,
+  useGetCumulativeCashFlowQuery,
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
   useGetPlanFactReportQuery,

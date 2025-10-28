@@ -9,11 +9,11 @@ export const prisma = new PrismaClient({
 });
 
 // Log Prisma warnings and errors
-prisma.$on('warn' as never, (e: any) => {
+prisma.$on('warn' as never, (e: unknown) => {
   logger.warn('Prisma warning:', e);
 });
 
-prisma.$on('error' as never, (e: any) => {
+prisma.$on('error' as never, (e: unknown) => {
   logger.error('Prisma error:', e);
 });
 

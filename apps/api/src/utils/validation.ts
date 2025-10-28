@@ -13,7 +13,7 @@ export const validatePassword = (password: string): void => {
   }
 };
 
-export const validateRequired = (fields: Record<string, any>): void => {
+export const validateRequired = (fields: Record<string, unknown>): void => {
   for (const [key, value] of Object.entries(fields)) {
     if (value === undefined || value === null || value === '') {
       throw new AppError(`Field '${key}' is required`, 400);

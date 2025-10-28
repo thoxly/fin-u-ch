@@ -6,11 +6,7 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import {
   useGetSalariesQuery,
-  useCreateSalaryMutation,
-  useUpdateSalaryMutation,
   useDeleteSalaryMutation,
-  useGetCounterpartiesQuery,
-  useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
 import { formatDate } from '../../shared/lib/date';

@@ -7,11 +7,7 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import {
   useGetDealsQuery,
-  useCreateDealMutation,
-  useUpdateDealMutation,
   useDeleteDealMutation,
-  useGetCounterpartiesQuery,
-  useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
 import { formatMoney } from '../../shared/lib/money';
 import type { Deal } from '@shared/types/catalogs';

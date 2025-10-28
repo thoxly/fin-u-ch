@@ -80,7 +80,7 @@ describe('CurrencySelect', () => {
   it('should include major currencies in options', () => {
     render(<CurrencySelect {...defaultProps} />);
 
-    const select = screen.getByRole('combobox');
+    // const select = screen.getByRole('combobox');
     const usdOption = screen.getByText('USD - Доллар США ($)');
     const eurOption = screen.getByText('EUR - Евро (€)');
     const rubOption = screen.getByText('RUB - Российский рубль (₽)');

@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getMonthKey, getMonthsBetween } from '../utils/date';
+import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 
 export interface CashflowParams {
@@ -55,7 +55,7 @@ export class CashflowService {
   ): Promise<CashflowReport> {
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as CashflowReport;
 
     const operations = await prisma.operation.findMany({
       where: {

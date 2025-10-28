@@ -14,9 +14,9 @@ export const CurrencySelect = ({
   placeholder = 'Выберите валюту',
   disabled = false,
 }: CurrencySelectProps): JSX.Element => {
-  const selectedCurrency = CURRENCIES.find(
-    (currency) => currency.code === value
-  );
+  // const selectedCurrency = CURRENCIES.find(
+  //   (currency) => currency.code === value
+  // );
 
   return (
     <div className="relative">

@@ -108,18 +108,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     });
   };
 
-  const getCatalogCreateLabel = (catalogName: string): string => {
-    const labels: Record<string, string> = {
-      Статьи: '+',
-      Счета: '+',
-      Подразделения: '+',
-      Контрагенты: '+',
-      Сделки: '+',
-      Зарплаты: '+',
-    };
-    return labels[catalogName] || '+';
-  };
-
   const getCatalogCreateTitle = (catalogName: string): string => {
     const titles: Record<string, string> = {
       Статьи: 'Создать статью',
@@ -160,7 +148,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       icon: getIcon(child.name),
       createAction: isCatalogMenu
         ? {
-            label: getCatalogCreateLabel(child.name),
+            label: getCatalogCreateTitle(child.name),
             onClick: () => handleCreateCatalog(child.name),
           }
         : undefined,
