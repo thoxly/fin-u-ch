@@ -1,18 +1,19 @@
 {
   "name": "@fin-u-ch/worker",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "description": "Background worker for scheduled tasks (salary generation, etc.)",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc && node scripts/add-js-extensions.js",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "^6.2.0",
+    "@prisma/client": "^5.22.0",
     "node-cron": "^3.0.3",
     "dotenv": "^16.4.7",
     "winston": "^3.17.0"
@@ -21,8 +22,7 @@
     "@types/node": "^20.17.15",
     "@types/node-cron": "^3.0.11",
     "typescript": "^5.7.3",
-    "ts-node": "^10.9.2",
-    "nodemon": "^3.1.9",
-    "prisma": "^6.2.0"
+    "tsx": "^4.20.6",
+    "prisma": "^5.22.0"
   }
 }

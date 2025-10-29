@@ -13,6 +13,11 @@ Financial management system for small teams with plan vs fact analytics, operati
 
 ## 📦 Быстрый старт
 
+```bash
+# Умный запуск (решает все проблемы автоматически)
+./scripts/start-hybrid.sh
+```
+
 > **🪟 Для Windows:** Смотрите раздел "Особенности для Windows" в [Dev Guide](docs/DEV_GUIDE.md#51--особенности-для-windows)
 
 ### Локальная разработка
@@ -52,7 +57,7 @@ Financial management system for small teams with plan vs fact analytics, operati
 3. **Запустить инфраструктуру (PostgreSQL, Redis, PgAdmin)**:
 
    ```bash
-   # Вариант 1: Только БД и Redis для разработки (рекомендуется)
+   # Вариант 1: Гибридный режим - только БД и Redis в Docker (рекомендуется)
    docker-compose -f ops/docker/docker-compose.yml up -d
    # Порты: PostgreSQL 5432, Redis 6379
 
@@ -221,6 +226,12 @@ cd apps/api && npx prisma studio
 
 # Логи Docker
 docker-compose -f ops/docker/docker-compose.yml logs -f
+
+# Гибридный режим (только БД и Redis в Docker)
+pnpm docker:hybrid:up      # Запустить только БД и Redis
+pnpm docker:hybrid:down    # Остановить
+pnpm docker:hybrid:logs    # Логи
+pnpm docker:hybrid:ps      # Статус контейнеров
 ```
 
 ### Управление окружениями

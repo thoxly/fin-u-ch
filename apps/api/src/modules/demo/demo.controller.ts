@@ -1,9 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import {
-  DemoUserService,
-  DemoUserCredentials,
-  DemoUserData,
-} from './demo.service';
+import { DemoUserService } from './demo.service';
 import logger from '../../config/logger';
 
 interface TenantRequest extends Request {

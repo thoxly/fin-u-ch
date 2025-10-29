@@ -1,6 +1,11 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
-import type { Prisma } from '@prisma/client';
+
+// Type helper for Prisma transaction client
+type TransactionClient = Omit<
+  typeof prisma,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
 
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
@@ -78,7 +83,7 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx: any) => {
+        await prisma.$transaction(async (tx: TransactionClient) => {
           // 1. ФОТ (начисление зарплаты)
           await tx.operation.create({
             data: {

@@ -1,4 +1,4 @@
-import { DDSService } from './dds.service';
+// import { DDSService } from './dds.service';
 
 interface TestOperation {
   type: string;
@@ -12,10 +12,8 @@ interface TestOperation {
 }
 
 describe('DDSService', () => {
-  let ddsService: DDSService;
-
   beforeEach(() => {
-    ddsService = new DDSService();
+    // Service initialization if needed
   });
 
   describe('cash flow calculations', () => {

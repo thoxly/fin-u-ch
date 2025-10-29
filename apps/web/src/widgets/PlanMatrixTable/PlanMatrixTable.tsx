@@ -52,7 +52,7 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
 
   // Вычисляем ширину колонок
   const columnWidths = useMemo(() => {
-    const totalColumns = allMonths.length + 2; // месяцы + статья + итого
+    // const totalColumns = allMonths.length + 2; // месяцы + статья + итого
     const articleColumnWidth = 240; // фиксированная ширина для колонки "Статья"
     const totalColumnWidth = 120; // фиксированная ширина для колонки "Итого"
     const monthColumnWidth = Math.max(
@@ -73,14 +73,14 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
     0
   );
 
-  const formatMonthHeader = (month: string) => {
-    const [year, monthNum] = month.split('-');
-    const date = new Date(parseInt(year), parseInt(monthNum) - 1);
-    return date.toLocaleDateString('ru-RU', {
-      month: 'short',
-      year: '2-digit',
-    });
-  };
+  // const formatMonthHeader = (month: string) => {
+  //   const [year, monthNum] = month.split('-');
+  //   const date = new Date(parseInt(year), parseInt(monthNum) - 1);
+  //   return date.toLocaleDateString('ru-RU', {
+  //     month: 'short',
+  //     year: '2-digit',
+  //   });
+  // };
 
   // Проверяем есть ли данные
   const hasData = data.activities && data.activities.length > 0;

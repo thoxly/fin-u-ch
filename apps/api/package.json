@@ -1,11 +1,12 @@
 {
   "name": "api",
   "version": "0.1.0",
+  "type": "module",
   "description": "Fin-U-CH Backend API",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon --exec ts-node src/server.ts",
-    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc && node scripts/add-js-extensions.js",
     "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -40,10 +41,9 @@
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.6",
     "jest": "^30.2.0",
-    "nodemon": "^3.1.9",
     "prisma": "^5.22.0",
     "ts-jest": "^29.4.4",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.20.6",
     "typescript": "^5.7.3"
   }
 }

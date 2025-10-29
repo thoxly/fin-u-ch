@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getMonthKey, getMonthsBetween } from '../utils/date';
+import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 
 export interface DDSParams {
@@ -40,7 +40,7 @@ export class DDSService {
   async getDDS(companyId: string, params: DDSParams): Promise<DDSReport> {
     const cacheKey = generateCacheKey(companyId, 'dds', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as DDSReport;
 
     // Get accounts - Prisma ensures companyId filtering at database level
     const accounts = await prisma.account.findMany({

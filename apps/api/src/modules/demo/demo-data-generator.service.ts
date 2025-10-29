@@ -18,14 +18,12 @@ export class DemoDataGeneratorService {
    * Генерирует демо-операции
    */
   private async generateSampleOperations(companyId: string): Promise<void> {
-    const [accounts, articles, counterparties, deals, departments] =
-      await Promise.all([
-        prisma.account.findMany({ where: { companyId } }),
-        prisma.article.findMany({ where: { companyId } }),
-        prisma.counterparty.findMany({ where: { companyId } }),
-        prisma.deal.findMany({ where: { companyId } }),
-        prisma.department.findMany({ where: { companyId } }),
-      ]);
+    const [accounts, articles, counterparties, deals] = await Promise.all([
+      prisma.account.findMany({ where: { companyId } }),
+      prisma.article.findMany({ where: { companyId } }),
+      prisma.counterparty.findMany({ where: { companyId } }),
+      prisma.deal.findMany({ where: { companyId } }),
+    ]);
 
     const operations = [];
 

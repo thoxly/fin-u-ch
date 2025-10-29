@@ -1,7 +1,7 @@
 {
   "name": "@fin-u-ch/ai-review",
   "version": "1.0.0",
-  "description": "AI-powered code review using Claude API",
+  "description": "AI-powered code review using DeepSeek API",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.0",
+    "openai": "^4.0.0",
     "@octokit/rest": "^20.0.2",
     "dotenv": "^16.4.0"
   },

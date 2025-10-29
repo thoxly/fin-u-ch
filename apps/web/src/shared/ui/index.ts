@@ -9,3 +9,8 @@ export { IconPickerPopover } from './IconPickerPopover';
 export { MenuPopover } from './MenuPopover';
 export type { MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 export { EmptyState } from './EmptyState';
+export { PeriodFilters } from './PeriodFilters';
+export { IncomeExpenseChart } from './IncomeExpenseChart';
+export { WeeklyFlowChart } from './WeeklyFlowChart';
+export { AccountBalancesChart } from './AccountBalancesChart';
+export { RecentOperationsTable } from './RecentOperationsTable';

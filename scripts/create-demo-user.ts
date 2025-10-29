@@ -99,7 +99,17 @@ async function createSampleOperations(prisma: PrismaClient, companyId: string) {
   const deal = deals.find((d) => d.name === 'Проект А')!;
 
   // Операции за 2025 год (помесячно)
-  const operations: any[] = [];
+  const operations: Array<{
+    type: string;
+    date: string;
+    amount: number;
+    description: string;
+    articleId: string;
+    accountId: string;
+    counterpartyId?: string;
+    dealId?: string;
+    departmentId?: string;
+  }> = [];
 
   // Январь 2025
   operations.push(

@@ -253,7 +253,7 @@ upstream api {
 }
 
 upstream web {
-    server web:3000;
+    server web:5173;
 }
 
 server {
@@ -273,7 +273,7 @@ server {
 
     # API endpoints
     location /api {
-        proxy_pass http://api;
+        proxy_pass http://api:4000;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -282,12 +282,12 @@ server {
 
     # Swagger UI
     location /api-docs {
-        proxy_pass http://api/api-docs;
+        proxy_pass http://api:4000/api-docs;
     }
 
     # Frontend
     location / {
-        proxy_pass http://web;
+        proxy_pass http://web:5173;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
@@ -364,9 +364,8 @@ pnpm start  # запуск production версии
 
 - **Soft Delete**: Поля есть в схеме, но не используются в сервисах
 - **Swagger Documentation**: Основные endpoints документированы, некоторые каталоги без полной документации
-- **Dashboard Charts**: График на дашборде помечен как заглушка (требует библиотеку recharts)
+- **Dashboard Charts**: График на дашборде помечен как заглушка (recharts подключен, требуется реализация)
 - **Plan vs Fact в CashflowTable**: Плановые значения в отчете ОДДС вычисляются как заглушка (TODO комментарии в коде)
-- **GeneratedSalaryOperation**: Тип определен в shared, но не используется в коде
 - **Article Hierarchy**: Поле parentId есть в схеме, но иерархия не реализована в UI
 
 ### ❌ Не реализовано
@@ -377,10 +376,3 @@ pnpm start  # запуск production версии
 - **Advanced Permissions**: Только базовая изоляция по companyId
 - **Article Hierarchy UI**: Иерархия статей не отображается в интерфейсе
 - **Plan vs Fact Calculations**: Плановые значения в отчетах вычисляются как заглушки
-
-### ⚠️ Частично реализовано / Требует доработки
-
-- **Dashboard Charts**: График на дашборде помечен как заглушка (требует библиотеку recharts)
-- **Plan vs Fact в CashflowTable**: Плановые значения в отчете ОДДС вычисляются как заглушка
-- **GeneratedSalaryOperation**: Тип определен в shared, но не используется в коде
-- **Article Hierarchy**: Поле parentId есть в схеме, но иерархия не реализована в UI

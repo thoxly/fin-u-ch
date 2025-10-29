@@ -1,6 +1,6 @@
 # AI Code Review Agent
 
-Automated PR review using Anthropic Claude with GitHub integration.
+Automated PR review using DeepSeek with GitHub integration.
 
 ## Installation
 
@@ -14,7 +14,7 @@ pnpm install
 Create `.env` or export the following environment variables:
 
 ```bash
-ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=sk-...
 GITHUB_TOKEN=ghp_...
 GITHUB_REPOSITORY_OWNER=your-org
 GITHUB_REPOSITORY_NAME=fin-u-ch
@@ -44,7 +44,7 @@ Workflow runs AI review for each PR:
 ```yaml
 - name: Run AI Code Review
   env:
-    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
   run: |
@@ -58,7 +58,7 @@ Workflow runs AI review for each PR:
 
 1. Loads project context from docs (ARCHITECTURE.md, DOMAIN_MODEL.md, style-guide.md, etc.)
 2. Fetches PR diff via GitHub API
-3. Sends for analysis to Claude at two levels:
+3. Sends for analysis to DeepSeek at two levels:
    - Level 1: Code-level review (security, performance, bugs, style)
    - Level 2: Architectural/system review
 4. Parses response and creates PR comments
@@ -81,10 +81,10 @@ If AI review fails:
 1. Verify environment variables
 2. Check GitHub Actions logs
 3. Run locally with `pnpm dev <pr-number>`
-4. Ensure Claude response format is valid JSON
+4. Ensure DeepSeek response format is valid JSON
 
 ## Limits
 
 - Max 10 files per batch (`maxFilesPerBatch`)
-- Claude limits: 16000 tokens per response
+- DeepSeek limits: 16000 tokens per response
 - Skips generated files (dist/, \*.d.ts, maps, lockfiles)

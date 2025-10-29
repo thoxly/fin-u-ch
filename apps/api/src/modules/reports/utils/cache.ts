@@ -5,7 +5,7 @@ const DEFAULT_TTL = 300; // 5 minutes
 
 export const cacheReport = async (
   key: string,
-  data: any,
+  data: unknown,
   ttl: number = DEFAULT_TTL
 ): Promise<void> => {
   try {
@@ -15,7 +15,7 @@ export const cacheReport = async (
   }
 };
 
-export const getCachedReport = async (key: string): Promise<any | null> => {
+export const getCachedReport = async (key: string): Promise<unknown | null> => {
   try {
     const cached = await redis.get(key);
     return cached ? JSON.parse(cached) : null;
@@ -45,7 +45,7 @@ export const invalidateReportCache = async (
 export const generateCacheKey = (
   companyId: string,
   reportType: string,
-  params: any
+  params: unknown
 ): string => {
   const paramsHash = JSON.stringify(params);
   return `report:${companyId}:${reportType}:${Buffer.from(paramsHash).toString('base64')}`;

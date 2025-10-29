@@ -1,5 +1,5 @@
 import prisma from '../../../config/db';
-import { getMonthKey, getMonthsBetween } from '../utils/date';
+import { getMonthKey } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
 
@@ -25,9 +25,8 @@ export class PlanFactService {
   ): Promise<PlanFactRow[]> {
     const cacheKey = generateCacheKey(companyId, 'planfact', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached;
+    if (cached) return cached as PlanFactRow[];
 
-    const months = getMonthsBetween(params.periodFrom, params.periodTo);
     const resultMap = new Map<string, PlanFactRow>();
 
     // Get plan data

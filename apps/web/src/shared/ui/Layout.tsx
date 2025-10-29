@@ -108,8 +108,8 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     });
   };
 
-  const getCatalogCreateLabel = (catalogName: string): string => {
-    const labels: Record<string, string> = {
+  const getCatalogCreateTitle = (catalogName: string): string => {
+    const titles: Record<string, string> = {
       Статьи: 'Создать статью',
       Счета: 'Создать счет',
       Подразделения: 'Создать подразделение',
@@ -117,13 +117,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       Сделки: 'Создать сделку',
       Зарплаты: 'Добавить зарплату',
     };
-    return labels[catalogName] || 'Создать';
+    return titles[catalogName] || 'Создать';
   };
 
   const handleCreateCatalog = (catalogName: string): void => {
     setOffCanvasState({
       isOpen: true,
-      title: getCatalogCreateLabel(catalogName),
+      title: getCatalogCreateTitle(catalogName),
       catalogType: catalogName,
       editingData: undefined,
     });
@@ -148,7 +148,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       icon: getIcon(child.name),
       createAction: isCatalogMenu
         ? {
-            label: getCatalogCreateLabel(child.name),
+            label: getCatalogCreateTitle(child.name),
             onClick: () => handleCreateCatalog(child.name),
           }
         : undefined,
@@ -201,11 +201,12 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Link
-                to="/dashboard"
-                className="text-xl font-bold text-primary-600 dark:text-primary-400"
-              >
-                Fin-U-CH
+              <Link to="/dashboard" className="flex items-center">
+                <img
+                  src="/images/logo.png"
+                  alt="Fin-U-CH"
+                  className="h-8 w-auto"
+                />
               </Link>
             </div>
             <UserMenu

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, User, Mail, Building, DollarSign } from 'lucide-react';
+import { Save, Mail, Building } from 'lucide-react';
 import { useGetMeQuery, useUpdateUserMutation } from '../../store/api/authApi';
 import { useUpdateCompanyMutation } from '../../store/api/companiesApi';
 import { Input } from '../../shared/ui/Input';
