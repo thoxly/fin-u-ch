@@ -76,6 +76,29 @@ export interface CumulativeCashFlowResponse {
   };
 }
 
+// Тип операции из Prisma
+type PrismaOperation = {
+  id: string;
+  type: string;
+  amount: number;
+  description: string | null;
+  operationDate: Date;
+  accountId: string | null;
+  sourceAccountId: string | null;
+  targetAccountId: string | null;
+  article?: { id: string; name: string } | null;
+  account?: { id: string; name: string } | null;
+  sourceAccount?: { id: string; name: string } | null;
+  targetAccount?: { id: string; name: string } | null;
+};
+
+// Тип аккаунта
+type AccountType = {
+  id: string;
+  name: string;
+  openingBalance: number;
+};
+
 export class DashboardService {
   async getDashboard(
     companyId: string,
@@ -122,18 +145,18 @@ export class DashboardService {
 
     // 1. Рассчитываем доходы/расходы по интервалам
     const incomeExpenseSeries = intervals.map((interval) => {
-      const intervalOps = operations.filter((op) => {
+      const intervalOps = operations.filter((op: PrismaOperation) => {
         const opDate = new Date(op.operationDate);
         return opDate >= interval.start && opDate <= interval.end;
       });
 
       const income = intervalOps
-        .filter((op) => op.type === 'income')
-        .reduce((sum, op) => sum + op.amount, 0);
+        .filter((op: PrismaOperation) => op.type === 'income')
+        .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
       const expense = intervalOps
-        .filter((op) => op.type === 'expense')
-        .reduce((sum, op) => sum + op.amount, 0);
+        .filter((op: PrismaOperation) => op.type === 'expense')
+        .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
       return {
         date: interval.start.toISOString().split('T')[0],
@@ -159,7 +182,7 @@ export class DashboardService {
       await this.calculateAccountBalancesByIntervals(
         companyId,
         accounts,
-        operations.map((op) => ({
+        operations.map((op: PrismaOperation) => ({
           type: op.type,
           amount: op.amount,
           accountId: op.accountId || undefined,
@@ -176,7 +199,9 @@ export class DashboardService {
         ? Object.entries(
             accountBalancesSeries[accountBalancesSeries.length - 1].accounts
           ).map(([accountId, balance]) => {
-            const account = accounts.find((a) => a.id === accountId);
+            const account = accounts.find(
+              (a: AccountType) => a.id === accountId
+            );
             return {
               accountId,
               accountName: account?.name || 'Unknown',
@@ -186,7 +211,7 @@ export class DashboardService {
         : [];
 
     // 5. Формируем справочник счетов
-    const accountsList = accounts.map((acc) => ({
+    const accountsList = accounts.map((acc: AccountType) => ({
       id: acc.id,
       name: acc.name,
     }));
@@ -259,7 +284,7 @@ export class DashboardService {
 
       for (let i = 0; i <= index; i++) {
         const currentInterval = intervals[i];
-        const intervalOps = operations.filter((op) => {
+        const intervalOps = operations.filter((op: PrismaOperation) => {
           const opDate = new Date(op.operationDate);
           return (
             opDate >= currentInterval.start && opDate <= currentInterval.end
@@ -267,19 +292,19 @@ export class DashboardService {
         });
 
         const intervalIncome = intervalOps
-          .filter((op) => op.type === 'income')
-          .reduce((sum, op) => sum + op.amount, 0);
+          .filter((op: PrismaOperation) => op.type === 'income')
+          .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
         const intervalExpense = intervalOps
-          .filter((op) => op.type === 'expense')
-          .reduce((sum, op) => sum + op.amount, 0);
+          .filter((op: PrismaOperation) => op.type === 'expense')
+          .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
         cumulativeIncome += intervalIncome;
         cumulativeExpense += intervalExpense;
       }
 
       // Получаем операции для текущего интервала
-      const currentIntervalOps = operations.filter((op) => {
+      const currentIntervalOps = operations.filter((op: PrismaOperation) => {
         const opDate = new Date(op.operationDate);
         return opDate >= interval.start && opDate <= interval.end;
       });
@@ -290,7 +315,7 @@ export class DashboardService {
         cumulativeIncome,
         cumulativeExpense,
         cumulativeNetCashFlow: cumulativeIncome - cumulativeExpense,
-        operations: currentIntervalOps.map((op) => ({
+        operations: currentIntervalOps.map((op: PrismaOperation) => ({
           id: op.id,
           type: op.type,
           amount: op.amount,
@@ -305,12 +330,12 @@ export class DashboardService {
 
     // Рассчитываем общие суммы за период
     const totalIncome = operations
-      .filter((op) => op.type === 'income')
-      .reduce((sum, op) => sum + op.amount, 0);
+      .filter((op: PrismaOperation) => op.type === 'income')
+      .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
     const totalExpense = operations
-      .filter((op) => op.type === 'expense')
-      .reduce((sum, op) => sum + op.amount, 0);
+      .filter((op: PrismaOperation) => op.type === 'expense')
+      .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
     const result: CumulativeCashFlowResponse = {
       cumulativeSeries,
@@ -386,7 +411,7 @@ export class DashboardService {
     });
 
     // Применяем исторические операции один раз
-    allOperations.forEach((op) => {
+    allOperations.forEach((op: any) => {
       this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
     });
 

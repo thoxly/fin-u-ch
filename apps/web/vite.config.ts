@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import * as path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -8,8 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@shared': path.resolve(__dirname, '../../packages/shared/dist'),
-      '@fin-u-ch/shared': path.resolve(__dirname, '../../packages/shared/dist'),
+      '@shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@fin-u-ch/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
   optimizeDeps: {
