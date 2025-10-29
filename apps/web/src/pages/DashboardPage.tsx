@@ -65,9 +65,25 @@ export const DashboardPage = () => {
         date: string;
         label: string;
         [accountName: string]: string | number;
+        operations?: Array<{
+          id: string;
+          type: string;
+          amount: number;
+          description: string | null;
+          accountId: string | null;
+          sourceAccountId: string | null;
+          targetAccountId: string | null;
+          article: {
+            id: string;
+            name: string;
+          } | null;
+        }>;
+        hasOperations?: boolean;
       } = {
         date: series.date,
         label: series.label,
+        operations: series.operations,
+        hasOperations: series.hasOperations,
       };
 
       // Добавляем данные по каждому счету
@@ -241,7 +257,10 @@ export const DashboardPage = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* График остатков на счетах */}
-              <AccountBalancesChart data={accountBalancesData} />
+              <AccountBalancesChart
+                data={accountBalancesData}
+                accounts={dashboardData?.accounts || []}
+              />
 
               {/* Таблица последних операций */}
               <RecentOperationsTable operations={operations} />

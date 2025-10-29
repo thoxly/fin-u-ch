@@ -31,6 +31,20 @@ export interface DashboardResponse {
     date: string;
     label: string;
     accounts: Record<string, number>;
+    operations: Array<{
+      id: string;
+      type: string;
+      amount: number;
+      description: string | null;
+      accountId: string | null;
+      sourceAccountId: string | null;
+      targetAccountId: string | null;
+      article: {
+        id: string;
+        name: string;
+      } | null;
+    }>;
+    hasOperations: boolean;
   }>;
 
   // Справочник счетов
@@ -124,6 +138,7 @@ export class DashboardService {
         account: { select: { id: true, name: true } },
         sourceAccount: { select: { id: true, name: true } },
         targetAccount: { select: { id: true, name: true } },
+        article: { select: { id: true, name: true } },
       },
       orderBy: {
         operationDate: 'asc',
@@ -182,14 +197,7 @@ export class DashboardService {
       await this.calculateAccountBalancesByIntervals(
         companyId,
         accounts,
-        operations.map((op: PrismaOperation) => ({
-          type: op.type,
-          amount: op.amount,
-          accountId: op.accountId || undefined,
-          sourceAccountId: op.sourceAccountId || undefined,
-          targetAccountId: op.targetAccountId || undefined,
-          operationDate: op.operationDate.toISOString(),
-        })),
+        operations,
         intervals
       );
 
@@ -357,17 +365,28 @@ export class DashboardService {
   private async calculateAccountBalancesByIntervals(
     companyId: string,
     accounts: Array<{ id: string; name: string; openingBalance: number }>,
-    operations: Array<{
-      type: string;
-      amount: number;
-      accountId?: string;
-      sourceAccountId?: string;
-      targetAccountId?: string;
-      operationDate: string;
-    }>,
+    operations: PrismaOperation[],
     intervals: Interval[]
   ): Promise<
-    Array<{ date: string; label: string; accounts: Record<string, number> }>
+    Array<{
+      date: string;
+      label: string;
+      accounts: Record<string, number>;
+      operations: Array<{
+        id: string;
+        type: string;
+        amount: number;
+        description: string | null;
+        accountId: string | null;
+        sourceAccountId: string | null;
+        targetAccountId: string | null;
+        article: {
+          id: string;
+          name: string;
+        } | null;
+      }>;
+      hasOperations: boolean;
+    }>
   > {
     const accountIds = accounts.map((a) => a.id);
     const accountIdsSet = new Set(accountIds);
@@ -391,7 +410,7 @@ export class DashboardService {
     });
 
     // Создаем Map для быстрого доступа к операциям по интервалам
-    const operationsByInterval = new Map<number, typeof operations>();
+    const operationsByInterval = new Map<number, PrismaOperation[]>();
 
     // Предварительно группируем операции по интервалам
     intervals.forEach((interval, index) => {
@@ -411,7 +430,7 @@ export class DashboardService {
     });
 
     // Применяем исторические операции один раз
-    allOperations.forEach((op: any) => {
+    allOperations.forEach((op: PrismaOperation) => {
       this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
     });
 
@@ -419,6 +438,20 @@ export class DashboardService {
       date: string;
       label: string;
       accounts: Record<string, number>;
+      operations: Array<{
+        id: string;
+        type: string;
+        amount: number;
+        description: string | null;
+        accountId: string | null;
+        sourceAccountId: string | null;
+        targetAccountId: string | null;
+        article: {
+          id: string;
+          name: string;
+        } | null;
+      }>;
+      hasOperations: boolean;
     }> = [];
 
     // Для каждого интервала вычисляем балансы
@@ -438,10 +471,24 @@ export class DashboardService {
         balancesObj[account.id] = currentBalances.get(account.id) || 0;
       });
 
+      // Формируем операции для интервала
+      const intervalOperations = currentIntervalOps.map((op) => ({
+        id: op.id,
+        type: op.type,
+        amount: op.amount,
+        description: op.description,
+        accountId: op.accountId,
+        sourceAccountId: op.sourceAccountId,
+        targetAccountId: op.targetAccountId,
+        article: op.article || null,
+      }));
+
       result.push({
         date: interval.start.toISOString().split('T')[0],
         label: interval.label,
         accounts: balancesObj,
+        operations: intervalOperations,
+        hasOperations: currentIntervalOps.length > 0,
       });
 
       // Обновляем накопленные балансы для следующего интервала
