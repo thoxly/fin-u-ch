@@ -339,10 +339,8 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
+      - name: Build shared package
+        run: pnpm --filter @fin-u-ch/shared build
 
       - name: Cache Playwright browsers
         uses: actions/cache@v3
@@ -367,6 +365,12 @@ jobs:
       - name: Generate Prisma Client (API)
         if: steps.cache-prisma.outputs.cache-hit != 'true'
         run: pnpm --filter api prisma:generate
+
+      - name: Build API
+        run: pnpm --filter api build
+
+      - name: Build Web
+        run: pnpm --filter web build
 
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
