@@ -12,25 +12,45 @@ import {
 import { formatMoney } from '../lib/money';
 
 interface AccountBalancesChartProps {
-  data: Array<{
-    date: string;
-    label: string;
-    [accountName: string]: string | number;
-    operations?: Array<{
-      id: string;
-      type: string;
-      amount: number;
-      description: string | null;
-      accountId: string | null;
-      sourceAccountId: string | null;
-      targetAccountId: string | null;
-      article: {
+  data: Array<
+    {
+      date: string;
+      label: string;
+      operations?: Array<{
         id: string;
-        name: string;
-      } | null;
-    }>;
-    hasOperations?: boolean;
-  }>;
+        type: string;
+        amount: number;
+        description: string | null;
+        accountId: string | null;
+        sourceAccountId: string | null;
+        targetAccountId: string | null;
+        article: {
+          id: string;
+          name: string;
+        } | null;
+      }>;
+      hasOperations?: boolean;
+    } & {
+      [accountName: string]:
+        | string
+        | number
+        | Array<{
+            id: string;
+            type: string;
+            amount: number;
+            description: string | null;
+            accountId: string | null;
+            sourceAccountId: string | null;
+            targetAccountId: string | null;
+            article: {
+              id: string;
+              name: string;
+            } | null;
+          }>
+        | boolean
+        | undefined;
+    }
+  >;
   accounts?: Array<{
     id: string;
     name: string;
@@ -249,13 +269,19 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                   // Показываем точку только если есть операции в этот день
                   const dataPoint = data[props.index];
                   const hasOperations = dataPoint?.hasOperations || false;
-                  return hasOperations
-                    ? {
-                        fill: getAccountColor(index),
-                        strokeWidth: 2,
-                        r: 4,
-                      }
-                    : false;
+                  if (!hasOperations) {
+                    return null;
+                  }
+                  return (
+                    <circle
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={4}
+                      fill={getAccountColor(index)}
+                      strokeWidth={2}
+                      stroke={getAccountColor(index)}
+                    />
+                  );
                 }}
                 name={accountName}
               />
