@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/add-js-extensions.js",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "test": "jest",
