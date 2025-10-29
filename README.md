@@ -13,6 +13,11 @@ Financial management system for small teams with plan vs fact analytics, operati
 
 ## 📦 Быстрый старт
 
+```bash
+# Умный запуск (решает все проблемы автоматически)
+./scripts/start-hybrid.sh
+```
+
 > **🪟 Для Windows:** Смотрите раздел "Особенности для Windows" в [Dev Guide](docs/DEV_GUIDE.md#51--особенности-для-windows)
 
 ### Локальная разработка
