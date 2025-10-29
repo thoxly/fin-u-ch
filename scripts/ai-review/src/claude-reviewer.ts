@@ -76,7 +76,7 @@ ${projectContext}
 
 # YOUR TASK
 
-Review the following pull request changes and identify issues at TWO LEVELS:
+Review the following pull request changes and identify issues at THREE LEVELS:
 
 ## LEVEL 1: CODE-LEVEL REVIEW (File/Function level)
 
@@ -162,6 +162,33 @@ Perform a high-level architectural review. Detect issues that affect scalability
 - **medium** — Non-scalable structure, inconsistent abstraction, complexity issues
 - **low** — Naming inconsistency, minor structural improvements
 
+## LEVEL 3: CONFIGURATION & SECURITY REVIEW
+
+If any of the changed files are configuration or infrastructure files 
+(e.g. \`.env\`, \`.env.example\`, \`package.json\`, \`tsconfig.json\`, 
+\`vite.config.ts\`, \`docker-compose.yml\`, \`.github/workflows/*\`, \`.eslintrc\`, 
+\`nodemon.json\`, or files inside \`/ops\` or \`/infra\` folders), 
+perform a dedicated configuration review.
+
+Check for:
+1. Security risks:
+   - Hardcoded secrets or tokens
+   - Disabled validation, lint, or type checking
+   - Insecure CORS or HTTPS settings
+2. Dependency and environment integrity:
+   - Downgraded or replaced dependencies
+   - Modified versions of runtime (Node, pnpm, etc.)
+   - Broken or removed build steps
+3. Deployment and CI/CD risks:
+   - Removed test/build/lint stages
+   - Changed Docker or workflow commands that affect safety
+
+**Severity rules (Level 3):**
+- critical — leaked secrets, disabled security validation, public tokens
+- high — build or deployment bypass, unsafe env config
+- medium — bad dependency management, missing validation
+- low — naming or formatting inconsistencies
+
 # CHANGED FILES
 
 ${files.map((f) => `- ${f.filename} (+${f.additions}/-${f.deletions})`).join('\n')}
@@ -230,9 +257,10 @@ Example:
 **IMPORTANT**: 
 - Only output the JSON array, no other text
 - If no issues found, return empty array []
-- Perform BOTH Level 1 (code) and Level 2 (architecture) reviews
+- Perform ALL THREE LEVELS: Level 1 (code), Level 2 (architecture), and Level 3 (configuration & security)
 - Be specific about line numbers and file paths
 - For architecture issues, reference the correct folder structure from ARCHITECTURE.md
+- For configuration files, always check for security risks and dependency changes
 
 Begin your review:`;
 
