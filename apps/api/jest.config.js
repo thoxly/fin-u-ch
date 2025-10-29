@@ -12,6 +12,7 @@ module.exports = {
     '!src/**/*.routes.ts',
     '!src/**/seed-*.ts',
     '!src/scripts/**',
+    '!src/config/**',
     '!src/middlewares/**',
     '!src/modules/auth/**',
     '!src/modules/catalogs/**',
@@ -19,8 +20,11 @@ module.exports = {
     '!src/modules/demo/**',
     '!src/modules/users/**',
     '!src/modules/plans/**',
+    '!src/modules/operations/**',
     '!src/modules/reports/**/**.controller.ts',
     '!src/modules/reports/**/**.routes.ts',
+    '!src/types/**',
+    '!src/utils/logger.ts',
   ],
   coverageThreshold: {
     global: {

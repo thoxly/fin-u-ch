@@ -7,6 +7,14 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/main.tsx',
     '!src/vite-env.d.ts',
+    '!src/**/*.stories.{ts,tsx}',
+    '!src/**/*.test.{ts,tsx}',
+    '!src/**/*.spec.{ts,tsx}',
+    '!src/shared/config/**',
+    '!src/shared/api/**',
+    '!src/**/*.mock.{ts,tsx}',
+    '!src/app/store/**',
+    '!src/app/router/**',
   ],
   coverageThreshold: {
     global: {

@@ -375,31 +375,63 @@ jobs:
         working-directory: apps/api
         run: npx tsx ../../scripts/setup-demo-user.ts
 
+      - name: Check API build artifacts
+        run: |
+          echo "Checking API build artifacts..."
+          ls -la apps/api/dist/ || echo "dist directory not found"
+          if [ ! -f "apps/api/dist/server.js" ]; then
+            echo "❌ server.js not found in dist!"
+            exit 1
+          fi
+          echo "✅ server.js found"
+
       - name: Start API server in background
         working-directory: apps/api
         run: |
-          node dist/server.js &
+          echo "Starting API server..."
+          NODE_ENV=$NODE_ENV DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL JWT_SECRET=$JWT_SECRET PORT=4000 \
+            node dist/server.js > api.log 2>&1 &
           echo $! > api.pid
+          echo "API PID: $(cat api.pid)"
+          sleep 2
+          if ! ps -p $(cat api.pid) > /dev/null 2>&1; then
+            echo "❌ API process died immediately after start!"
+            echo "=== API logs ==="
+            cat api.log || echo "No log file"
+            exit 1
+          fi
+          echo "✅ API process started successfully"
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           REDIS_URL: ${{ env.REDIS_URL }}
           JWT_SECRET: ${{ env.JWT_SECRET }}
           NODE_ENV: ${{ env.NODE_ENV }}
-          PORT: 4000
 
       - name: Wait for API to be ready
         run: |
           echo "Waiting for API to be ready..."
-          for i in {1..20}; do
+          for i in {1..30}; do
             if curl -f http://localhost:4000/api/health 2>/dev/null; then
               echo "✅ API is ready!"
               exit 0
             fi
-            echo "Attempt $i/20: API not ready yet, waiting..."
-            sleep 1
+            echo "Attempt $i/30: API not ready yet, waiting..."
+            
+            # Check if process is still running
+            if ! ps -p $(cat apps/api/api.pid) > /dev/null 2>&1; then
+              echo "❌ API process is not running!"
+              echo "=== API logs ==="
+              cat apps/api/api.log || echo "No log file"
+              exit 1
+            fi
+            
+            sleep 2
           done
-          echo "❌ API failed to start"
-          cat apps/api/api.pid || true
+          echo "❌ API failed to respond after 30 attempts"
+          echo "=== API logs ==="
+          cat apps/api/api.log || echo "No log file"
+          echo "=== Process status ==="
+          ps aux | grep node || true
           exit 1
 
       - name: Start Web server in background
@@ -433,6 +465,15 @@ jobs:
           NODE_ENV: ${{ env.NODE_ENV }}
           CI: true
 
+      - name: Show API logs on failure
+        if: failure()
+        run: |
+          echo "=== API Logs ==="
+          cat apps/api/api.log || echo "No API log file found"
+          echo ""
+          echo "=== Web Logs ==="
+          cat apps/web/web.log || echo "No Web log file found"
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -440,6 +481,16 @@ jobs:
           name: playwright-report
           path: apps/web/playwright-report
           retention-days: 7
+
+      - name: Upload server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs
+          path: |
+            apps/api/api.log
+            apps/web/web.log
+          retention-days: 3
 
   # ============================================
   # Security Scan (только для PR, параллельно с build)
