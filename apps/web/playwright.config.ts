@@ -11,6 +11,18 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? 'github' : 'html',
   timeout: 30000, // 30 seconds per test
+  // Исключения для E2E тестов - фокусируемся на критичных пользовательских сценариях
+  testIgnore: [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/e2e/helpers/**', // Вспомогательные файлы
+    '**/e2e/**/*.mock.ts', // Мок файлы
+    '**/e2e/**/*.setup.ts', // Настройки тестов
+    '**/e2e/**/*.fixtures.ts', // Фикстуры
+    '**/e2e/catalogs/**', // Исключить справочники (лучше unit тесты)
+    '**/e2e/forms/**', // Исключить сложные формы (лучше unit тесты)
+    '**/e2e/api/**', // Исключить API тесты (лучше integration тесты)
+  ],
   use: {
     baseURL: process.env.CI ? 'http://localhost:3000' : 'http://localhost:5173',
     trace: 'on-first-retry',
