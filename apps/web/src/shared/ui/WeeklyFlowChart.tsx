@@ -33,6 +33,22 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   // Показываем все данные
   const filteredData = data;
 
+  // Адаптивная ширина столбцов в зависимости от длины периода
+  const pointsCount = filteredData?.length || 0;
+  const maxBarSize =
+    pointsCount <= 7
+      ? 36
+      : pointsCount <= 14
+        ? 26
+        : pointsCount <= 31
+          ? 18
+          : pointsCount <= 90
+            ? 10
+            : 8;
+  const barGap = pointsCount <= 7 ? 8 : pointsCount <= 31 ? 6 : 4; // зазор между барами в категории
+  const barCategoryGap =
+    pointsCount <= 7 ? '25%' : pointsCount <= 31 ? '15%' : '8%'; // зазор между категориями
+
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
 
@@ -105,6 +121,8 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
           <BarChart
             data={filteredData}
             margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+            barGap={barGap}
+            barCategoryGap={barCategoryGap}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -142,12 +160,14 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               fill="#10b981"
               name="Поступления"
               radius={[2, 2, 0, 0]}
+              maxBarSize={maxBarSize}
             />
             <Bar
               dataKey="expense"
               fill="#ef4444"
               name="Списания"
               radius={[2, 2, 0, 0]}
+              maxBarSize={maxBarSize}
             />
           </BarChart>
         </ResponsiveContainer>
