@@ -12,8 +12,8 @@ import {
 import { formatMoney } from '../lib/money';
 import { CustomTooltip } from './CustomTooltip';
 import { ChartLegend } from './ChartLegend';
-import { ExportButton } from './ExportButton';
-import { downloadCsv, ExportRow } from '../lib/exportData';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
 
 interface Operation {
@@ -50,6 +50,31 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   // Показываем все данные для оси X
   const filteredData = data;
 
+  const buildExportRows = (): ExportRow[] => {
+    const rows: ExportRow[] = [];
+    (filteredData || []).forEach((p) => {
+      rows.push({
+        date: p.date || p.label,
+        category: 'Доходы',
+        amount: p.cumulativeIncome,
+        type: 'income',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Расходы',
+        amount: p.cumulativeExpense,
+        type: 'expense',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Чистый поток',
+        amount: p.cumulativeNetCashFlow,
+        type: 'net',
+      });
+    });
+    return rows;
+  };
+
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
 
@@ -69,8 +94,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 Накопление доходов, расходов и чистего потока с начала периода
               </p>
             </div>
-            <ExportButton
-              onClick={() => downloadCsv([], 'income_expense.csv')}
+            <ExportMenu
+              filenameBase="income_expense"
+              buildRows={buildExportRows}
+              columns={['date', 'category', 'amount', 'type']}
             />
           </div>
         </div>
@@ -133,37 +160,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               Накопление доходов, расходов и чистого потока с начала периода
             </p>
           </div>
-          <ExportButton
-            onClick={() => {
-              const rows: ExportRow[] = [];
-              filteredData.forEach((p) => {
-                rows.push({
-                  date: p.date || p.label,
-                  category: 'Доходы',
-                  amount: p.cumulativeIncome,
-                  type: 'income',
-                });
-                rows.push({
-                  date: p.date || p.label,
-                  category: 'Расходы',
-                  amount: p.cumulativeExpense,
-                  type: 'expense',
-                });
-                rows.push({
-                  date: p.date || p.label,
-                  category: 'Чистый поток',
-                  amount: p.cumulativeNetCashFlow,
-                  type: 'net',
-                });
-              });
-              downloadCsv(rows, 'income_expense.csv', [
-                'date',
-                'category',
-                'amount',
-                'type',
-              ]);
-            }}
-            title="Экспорт"
+          <ExportMenu
+            filenameBase="income_expense"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
           />
         </div>
       </div>

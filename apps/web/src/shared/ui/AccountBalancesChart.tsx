@@ -11,8 +11,8 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
-import { ExportButton } from './ExportButton';
-import { downloadCsv, ExportRow } from '../lib/exportData';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
 
 interface AccountBalancesChartProps {
@@ -163,7 +163,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   // Проверяем, есть ли данные для отображения
   const hasData = accountsWithBalance.length > 0;
 
-  const handleExport = (): void => {
+  const buildExportRows = (): ExportRow[] => {
     const rows: ExportRow[] = [];
     (data || []).forEach((point) => {
       accountsWithBalance.forEach((accountName) => {
@@ -178,12 +178,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         }
       });
     });
-    downloadCsv(rows, 'account_balances.csv', [
-      'date',
-      'category',
-      'amount',
-      'type',
-    ]);
+    return rows;
   };
 
   // Если нет данных, показываем график без линий, но с сообщением
@@ -255,7 +250,11 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           Остаток денег на счетах
         </h3>
-        <ExportButton onClick={handleExport} title="Экспорт" />
+        <ExportMenu
+          filenameBase="account_balances"
+          buildRows={buildExportRows}
+          columns={['date', 'category', 'amount', 'type']}
+        />
       </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">

@@ -12,8 +12,8 @@ import {
 import { formatMoney } from '../lib/money';
 import { AggregatedDataPoint } from '../lib/dataAggregation';
 import { ChartLegend } from './ChartLegend';
-import { ExportButton } from './ExportButton';
-import { downloadCsv, ExportRow } from '../lib/exportData';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
 
 interface WeeklyFlowChartProps {
@@ -40,6 +40,25 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
 
+  const buildExportRows = (): ExportRow[] => {
+    const rows: ExportRow[] = [];
+    (filteredData || []).forEach((p) => {
+      rows.push({
+        date: p.date || p.label,
+        category: 'Поступления',
+        amount: p.income,
+        type: 'income',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Списания',
+        amount: p.expense,
+        type: 'expense',
+      });
+    });
+    return rows;
+  };
+
   // Если нет данных, показываем график без столбцов, но с сообщением
   if (!data || data.length === 0 || !hasData) {
     return (
@@ -50,7 +69,11 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
             Динамика поступлений и списаний
           </h3>
-          <ExportButton onClick={() => downloadCsv([], 'weekly_flow.csv')} />
+          <ExportMenu
+            filenameBase="weekly_flow"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+          />
         </div>
 
         <div className="h-80 relative">
@@ -108,31 +131,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
           Динамика поступлений и списаний
         </h3>
-        <ExportButton
-          onClick={() => {
-            const rows: ExportRow[] = [];
-            filteredData.forEach((p) => {
-              rows.push({
-                date: p.date || p.label,
-                category: 'Поступления',
-                amount: p.income,
-                type: 'income',
-              });
-              rows.push({
-                date: p.date || p.label,
-                category: 'Списания',
-                amount: p.expense,
-                type: 'expense',
-              });
-            });
-            downloadCsv(rows, 'weekly_flow.csv', [
-              'date',
-              'category',
-              'amount',
-              'type',
-            ]);
-          }}
-          title="Экспорт"
+        <ExportMenu
+          filenameBase="weekly_flow"
+          buildRows={buildExportRows}
+          columns={['date', 'category', 'amount', 'type']}
         />
       </div>
       <div className="h-80">
