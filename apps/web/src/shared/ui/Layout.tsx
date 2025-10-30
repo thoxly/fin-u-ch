@@ -9,6 +9,7 @@ import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
+import { ThemeToggle } from './ThemeToggle';
 
 interface LayoutProps {
   children: ReactNode;
@@ -209,10 +210,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-            <UserMenu
-              userEmail={user?.email}
-              onProfileClick={() => setUserProfileOffCanvasOpen(true)}
-            />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <UserMenu
+                userEmail={user?.email}
+                onProfileClick={() => setUserProfileOffCanvasOpen(true)}
+              />
+            </div>
           </div>
         </div>
       </header>

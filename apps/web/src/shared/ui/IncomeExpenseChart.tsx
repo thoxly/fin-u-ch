@@ -16,6 +16,7 @@ import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
 import { InfoHint } from './InfoHint';
+import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
 
 interface Operation {
   id: string;
@@ -48,6 +49,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   className = '',
 }) => {
   const [highContrast] = useHighContrast();
+  const isSmall = useIsSmallScreen();
   // Показываем все данные для оси X
   const filteredData = data;
 
@@ -119,7 +121,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
           </div>
         </div>
 
-        <div className="h-80 relative">
+        <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={filteredData || []}
@@ -144,6 +146,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 className="text-gray-600 dark:text-gray-400"
                 fontSize={12}
                 tickFormatter={(value) => formatMoney(value)}
+                domain={[
+                  (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                  (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+                ]}
               />
               <Tooltip content={<CustomTooltip />} />
             </LineChart>
@@ -201,7 +207,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         </div>
       </div>
 
-      <div className="h-80">
+      <div className="chart-body">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
@@ -224,18 +230,24 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
               tickFormatter={(value) => formatMoney(value)}
+              domain={[
+                (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+              ]}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              verticalAlign="bottom"
-              align="center"
-              content={
-                <ChartLegend
-                  preferredOrder={['Доходы', 'Расходы', 'Чистый поток']}
-                />
-              }
-              wrapperStyle={{ paddingTop: 8 }}
-            />
+            {!isSmall && (
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                content={
+                  <ChartLegend
+                    preferredOrder={['Доходы', 'Расходы', 'Чистый поток']}
+                  />
+                }
+                wrapperStyle={{ paddingTop: 8 }}
+              />
+            )}
             <Line
               type="monotone"
               dataKey="cumulativeIncome"
