@@ -662,19 +662,24 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
-            
+
       - name: Replace yourdomain.com with actual domain
         run: |
           sed -i "s/yourdomain.com/${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
           sed -i "s/www.yourdomain.com/www.${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
 
-      - name: Copy docker-compose to VPS
+      - name: Copy docker-compose and scripts to VPS
         run: |
           scp -i ~/.ssh/deploy_key ops/docker/docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/docker-compose.prod.yml
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
           scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
           scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
-          
+
+          # Copy diagnostic scripts
+          scp -i ~/.ssh/deploy_key ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
+          scp -i ~/.ssh/deploy_key ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh' || true
+
       - name: Upload SSL certificate
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/ssl'
@@ -736,7 +741,7 @@ jobs:
 
           # Create demo user for production
           echo "=== Creating demo user for production ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx tsx apps/api/src/scripts/init-demo-user.ts || echo "Demo user creation failed, continuing deployment..."
+          docker compose -f docker-compose.prod.yml run --rm api npx tsx ../../scripts/setup-demo-user.ts || echo "Demo user creation failed, continuing deployment..."
 
           # Stop and remove old containers
           echo "=== Stopping and removing old containers ==="
@@ -790,6 +795,27 @@ jobs:
           done
 
           echo "❌ Health check failed after 5 attempts"
+          echo ""
+          echo "=== Starting diagnostic... ==="
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAGNOSTIC'
+            echo "1. Container status:"
+            docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo ""
+            echo "2. API container logs (last 50 lines):"
+            docker logs --tail 50 fin-u-ch-api 2>&1 || echo "API container not found"
+            echo ""
+            echo "3. NGINX container logs (last 30 lines):"
+            docker logs --tail 30 fin-u-ch-nginx 2>&1 || echo "NGINX container not found"
+            echo ""
+            echo "4. Health check from inside API container:"
+            docker exec fin-u-ch-api wget -qO- http://localhost:4000/api/health 2>&1 || echo "Failed"
+            echo ""
+            echo "5. Health check via NGINX (localhost):"
+            curl -v http://localhost/api/health 2>&1 || echo "Failed"
+            echo ""
+            echo "6. Check listening ports:"
+            ss -tulpn | grep -E ":(80|443|4000)" || echo "Ports not listening"
+          DIAGNOSTIC
           exit 1
 
       - name: Notify deployment status
