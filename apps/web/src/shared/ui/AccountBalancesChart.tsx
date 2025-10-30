@@ -12,7 +12,6 @@ import {
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
 import { ExportMenu } from './ExportMenu';
-import { useHighContrast } from '../hooks/useHighContrast';
 import { CustomTooltip } from './CustomTooltip';
 import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
@@ -71,7 +70,6 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   accounts = [],
   className = '',
 }) => {
-  const [highContrast] = useHighContrast();
   const isSmall = useIsSmallScreen();
   const {
     isPanelOpen,
@@ -84,7 +82,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     hasData,
     getAccountColor,
     buildExportRows,
-  } = useAccountBalancesChart(data, highContrast);
+  } = useAccountBalancesChart(data, false);
   // Tooltip content moved to CustomTooltip with aggregated income/expense
 
   // data transformation and interactions are handled by hook
@@ -248,7 +246,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 type="monotone"
                 dataKey={accountName}
                 stroke={getAccountColor(index)}
-                strokeWidth={highContrast ? 3 : 2}
+                strokeWidth={2}
                 activeDot={false}
                 dot={(props) => {
                   // Показываем точку только для счетов, по которым есть операции в этот день
@@ -277,9 +275,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                     <circle
                       cx={props.cx}
                       cy={props.cy}
-                      r={highContrast ? 5 : 4}
+                      r={4}
                       fill={getAccountColor(index)}
-                      strokeWidth={highContrast ? 2.5 : 2}
+                      strokeWidth={2}
                       stroke={getAccountColor(index)}
                       style={{ cursor: 'pointer' }}
                       onClick={() => handleOpenPanel(props.index)}
