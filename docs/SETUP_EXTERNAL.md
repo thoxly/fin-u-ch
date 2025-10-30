@@ -45,6 +45,14 @@
 | `VPS_HOST`          | Хост VPS сервера              | `example.com` или `123.45.67.89` |
 | `VPS_USER`          | Пользователь для SSH          | `deploy` или `root`              |
 | `VPS_SSH_KEY`       | Приватный SSH ключ            | Содержимое `~/.ssh/id_rsa`       |
+| `SERVER_DOMAIN`     | Доменное имя сайта            | `yourdomain.com`                 |
+
+### Опциональные секреты
+
+| Имя секрета         | Описание                                      | Пример значения                  |
+| ------------------- | --------------------------------------------- | -------------------------------- |
+| `SSL_FULLCHAIN_B64` | Сертификат + промежуточные в кодировке base64 | `LS0tLS1CRUdJTi...S0tLQo=`       |
+| `SSL_PRIVKEY_B64`   | Закрытый ключ сертификата  в кодировке base64 | `LS0tCkyVmFuNmm...30tLQo=`       |
 
 ### Генерация SSH ключа для VPS
 
@@ -67,6 +75,17 @@ cat ~/.ssh/github_actions
 ssh -i ~/.ssh/github_actions user@your-vps-host
 
 # Если работает - ключ настроен правильно
+```
+
+### Кодирование файла сертификата в Base64
+
+```bash
+# Объединяем сертификат домена и промежуточный сертификат (при наличии)
+cat cert.pem chain.pem > fullchain.pem
+# Проводим конвертацию сертификата (без переносов) в base64 → скопировать в GitHub Secrets (SSL_FULLCHAIN_B64)
+base64 -b 0 cert.pem
+# Проводим конвертацию сертификата (без переносов) в base64 → скопировать в GitHub Secrets (SSL_PRIVKEY_B64)
+base64 -b 0 private.pem
 ```
 
 ---

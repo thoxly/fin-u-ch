@@ -662,6 +662,11 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+            
+      - name: Replace yourdomain.com with actual domain
+        run: |
+          sed -i "s/yourdomain.com/${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
+          sed -i "s/www.yourdomain.com/www.${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
 
       - name: Copy docker-compose to VPS
         run: |
@@ -669,6 +674,15 @@ jobs:
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
           scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
           scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
+          
+      - name: Upload SSL certificate
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/ssl'
+          scp -i ~/.ssh/deploy_key -r ops/nginx/ssl/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/ssl || true
+          if [ -n "${{ secrets.SSL_FULLCHAIN_B64 }}" ] && [ -n "${{ secrets.SSL_PRIVKEY_B64 }}" ]; then
+            echo "${{ secrets.SSL_FULLCHAIN_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/fullchain.pem'
+            echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
+          fi
 
       - name: Ensure VPS environment variables
         run: |
@@ -765,7 +779,7 @@ jobs:
           # Retry health check up to 5 times with 10 second intervals
           for i in {1..5}; do
             echo "Health check attempt $i/5..."
-            if curl -f http://${{ secrets.VPS_HOST }}/api/health; then
+            if curl -L --max-redirs 3 -f http://${{ secrets.SERVER_DOMAIN }}/api/health; then
               echo "✅ Health check passed!"
               exit 0
             fi
