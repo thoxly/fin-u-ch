@@ -1,19 +1,18 @@
 import React from 'react';
 import type { TooltipProps } from 'recharts';
+import type { Article } from '@fin-u-ch/shared';
+import { OperationType } from '@fin-u-ch/shared';
 type RechartsValue = number | string | (number | string)[];
 type RechartsName = number | string;
 import { formatMoney } from '../lib/money';
 
-interface Operation {
+type OperationLite = {
   id: string;
-  type: string;
+  type: OperationType | string;
   amount: number;
   description: string | null;
-  article: {
-    id: string;
-    name: string;
-  } | null;
-}
+  article: Pick<Article, 'id' | 'name'> | null;
+};
 
 interface CumulativeDataPoint {
   date: string;
@@ -21,7 +20,7 @@ interface CumulativeDataPoint {
   cumulativeIncome: number;
   cumulativeExpense: number;
   cumulativeNetCashFlow: number;
-  operations?: Operation[];
+  operations?: OperationLite[];
   hasOperations?: boolean;
 }
 

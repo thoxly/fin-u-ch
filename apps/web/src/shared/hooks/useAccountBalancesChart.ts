@@ -1,14 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { Article } from '@fin-u-ch/shared';
+import { OperationType } from '@fin-u-ch/shared';
 
 type Operation = {
   id: string;
-  type: string;
+  type: OperationType | string;
   amount: number;
   description: string | null;
   accountId: string | null;
   sourceAccountId: string | null;
   targetAccountId: string | null;
-  article: { id: string; name: string } | null;
+  article: Pick<Article, 'id' | 'name'> | null;
 };
 
 export type AccountBalancesPoint = {

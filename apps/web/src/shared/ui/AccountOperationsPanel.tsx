@@ -1,18 +1,18 @@
 import React from 'react';
 import { OffCanvas } from './OffCanvas';
 import { formatMoney } from '../lib/money';
-
-type Article = { id: string; name: string } | null;
+import type { Article } from '@fin-u-ch/shared';
+import { OperationType } from '@fin-u-ch/shared';
 
 type Operation = {
   id: string;
-  type: string;
+  type: OperationType | string;
   amount: number;
   description: string | null;
   accountId: string | null;
   sourceAccountId: string | null;
   targetAccountId: string | null;
-  article: Article;
+  article: Pick<Article, 'id' | 'name'> | null;
 };
 
 export type AccountPoint = {
