@@ -15,6 +15,7 @@ import { ChartLegend } from './ChartLegend';
 import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
+import { InfoHint } from './InfoHint';
 
 interface Operation {
   id: string;
@@ -85,11 +86,27 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
       >
         <div className="mb-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-                Денежный поток
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                  Денежный поток
+                </h3>
+                <InfoHint
+                  content={
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                        Денежный поток
+                      </div>
+                      <div>
+                        Показывает, как меняются доходы, расходы и чистый
+                        результат во времени. Помогает понять, положительный ли
+                        поток и когда происходят основные движения средств.
+                      </div>
+                    </div>
+                  }
+                />
+              </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Накопление доходов, расходов и чистего потока с начала периода
               </p>
@@ -151,11 +168,27 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
       <div className="mb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-              Денежный поток
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                Денежный поток
+              </h3>
+              <InfoHint
+                content={
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                      Денежный поток
+                    </div>
+                    <div>
+                      Показывает, как меняются доходы, расходы и чистый
+                      результат во времени. Помогает понять, положительный ли
+                      поток и когда происходят основные движения средств.
+                    </div>
+                  </div>
+                }
+              />
+            </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Накопление доходов, расходов и чистого потока с начала периода
             </p>

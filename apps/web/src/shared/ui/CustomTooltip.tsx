@@ -1,16 +1,18 @@
-import React, { useState, useCallback } from 'react';
+import React from 'react';
+import type { TooltipProps } from 'recharts';
+import type { Article } from '@fin-u-ch/shared';
+import { OperationType } from '@fin-u-ch/shared';
+type RechartsValue = number | string | (number | string)[];
+type RechartsName = number | string;
 import { formatMoney } from '../lib/money';
 
-interface Operation {
+type OperationLite = {
   id: string;
-  type: string;
+  type: OperationType | string;
   amount: number;
   description: string | null;
-  article: {
-    id: string;
-    name: string;
-  } | null;
-}
+  article: Pick<Article, 'id' | 'name'> | null;
+};
 
 interface CumulativeDataPoint {
   date: string;
@@ -18,109 +20,53 @@ interface CumulativeDataPoint {
   cumulativeIncome: number;
   cumulativeExpense: number;
   cumulativeNetCashFlow: number;
-  operations?: Operation[];
+  operations?: OperationLite[];
   hasOperations?: boolean;
 }
 
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: Array<{ payload: CumulativeDataPoint }>;
-  label?: string;
-}
+type CustomTooltipProps = TooltipProps<RechartsValue, RechartsName>;
 
 export const CustomTooltip: React.FC<CustomTooltipProps> = ({
   active,
   payload,
   label,
 }) => {
-  const [showAll, setShowAll] = useState(false);
-  const maxVisible = 3;
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
 
-  const handleToggleShowAll = useCallback(() => {
-    setShowAll((prev) => !prev);
-  }, []);
-
-  if (!active || !payload || payload.length === 0) return null;
-
-  const data = payload[0].payload as CumulativeDataPoint;
+  const first = payload[0] as { payload?: CumulativeDataPoint } | undefined;
+  const data = first?.payload;
+  if (!data) return null;
   const operations = data.operations || [];
 
-  // Не показываем tooltip, если нет операций
-  if (operations.length === 0) return null;
-
-  const visibleOperations = showAll
-    ? operations
-    : operations.slice(0, maxVisible);
-  const hasMoreOperations = operations.length > maxVisible;
+  // Агрегируем суммы по типам
+  const incomeTotal = operations
+    .filter((op) => op.type === 'income')
+    .reduce((sum, op) => sum + op.amount, 0);
+  const expenseTotal = operations
+    .filter((op) => op.type === 'expense')
+    .reduce((sum, op) => sum + op.amount, 0);
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3 min-w-[300px]">
-      {/* Дата */}
-      <div className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 min-w-[170px]">
+      <div className="mb-2">
+        <p className="text-[13px] font-semibold text-gray-900 dark:text-white">
           {label}
         </p>
       </div>
-
-      {/* Список операций */}
-      <div className="max-h-[300px] overflow-y-auto">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-          Операции ({operations.length}):
-        </p>
-        <div className="space-y-1">
-          {visibleOperations.map((op) => (
-            <div
-              key={op.id}
-              className="text-xs p-2 bg-gray-50 dark:bg-gray-700 rounded"
-            >
-              <div className="flex justify-between items-start gap-2 mb-1">
-                <span
-                  className={`font-medium ${
-                    op.type === 'income'
-                      ? 'text-green-600 dark:text-green-400'
-                      : op.type === 'expense'
-                        ? 'text-red-600 dark:text-red-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                  }`}
-                >
-                  {formatMoney(op.amount)}
-                </span>
-                <span className="text-gray-500 dark:text-gray-400 text-[10px] uppercase">
-                  {op.type === 'income'
-                    ? 'Доход'
-                    : op.type === 'expense'
-                      ? 'Расход'
-                      : 'Перевод'}
-                </span>
-              </div>
-              {op.article && (
-                <div className="text-gray-600 dark:text-gray-400 truncate">
-                  {op.article.name}
-                </div>
-              )}
-              {op.description && (
-                <div className="text-gray-500 dark:text-gray-500 text-[10px] truncate mt-1">
-                  {op.description}
-                </div>
-              )}
-            </div>
-          ))}
-          {hasMoreOperations && !showAll && (
-            <button
-              onClick={handleToggleShowAll}
-              className="w-full text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1"
-            >
-              Показать все ({operations.length - maxVisible} еще)...
-            </button>
-          )}
-          {hasMoreOperations && showAll && (
-            <button
-              onClick={handleToggleShowAll}
-              className="w-full text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium py-1"
-            >
-              Свернуть
-            </button>
-          )}
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-gray-600 dark:text-gray-400">Доход</span>
+          <span className="font-semibold text-green-600 dark:text-green-400">
+            {formatMoney(incomeTotal)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="text-gray-600 dark:text-gray-400">Расход</span>
+          <span className="font-semibold text-red-600 dark:text-red-400">
+            {formatMoney(expenseTotal)}
+          </span>
         </div>
       </div>
     </div>

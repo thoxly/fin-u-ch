@@ -14,6 +14,10 @@ import { ChartLegend } from './ChartLegend';
 import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
+import { CustomTooltip } from './CustomTooltip';
+import { AccountOperationsPanel } from './AccountOperationsPanel';
+import { InfoHint } from './InfoHint';
+import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -68,118 +72,21 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   className = '',
 }) => {
   const [highContrast] = useHighContrast();
-  const formatTooltipValue = (
-    value: number,
-    name: string,
-    props: { payload?: { index: number } }
-  ) => {
-    const dataPoint = data[props.payload?.index];
-    const operations = dataPoint?.operations || [];
+  const {
+    isPanelOpen,
+    hoveredOnce,
+    setHoveredOnce,
+    handleOpenPanel,
+    handleClosePanel,
+    selectedPoint,
+    accountsWithBalance,
+    hasData,
+    getAccountColor,
+    buildExportRows,
+  } = useAccountBalancesChart(data, highContrast);
+  // Tooltip content moved to CustomTooltip with aggregated income/expense
 
-    // Находим ID счета по имени
-    const account = accounts.find((acc) => acc.name === name);
-    const accountId = account?.id;
-
-    // Находим операции для данного счета
-    const accountOperations = operations.filter(
-      (op) =>
-        op.accountId === accountId ||
-        op.sourceAccountId === accountId ||
-        op.targetAccountId === accountId
-    );
-
-    return [
-      <div key="value">
-        <div className="font-semibold text-gray-900 dark:text-white">
-          {formatMoney(value)}
-        </div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">{name}</div>
-        {accountOperations.length > 0 && (
-          <div className="mt-2 space-y-1">
-            <div className="text-xs font-medium text-gray-700 dark:text-gray-300">
-              Операции:
-            </div>
-            {accountOperations.map((op) => (
-              <div
-                key={op.id}
-                className="text-xs text-gray-600 dark:text-gray-400"
-              >
-                <div className="flex justify-between">
-                  <span>
-                    {op.type === 'income'
-                      ? 'Поступление'
-                      : op.type === 'expense'
-                        ? 'Списание'
-                        : 'Перевод'}
-                  </span>
-                  <span className="font-medium">{formatMoney(op.amount)}</span>
-                </div>
-                {op.article && (
-                  <div className="text-gray-500 dark:text-gray-500">
-                    {op.article.name}
-                  </div>
-                )}
-                {op.description && (
-                  <div className="text-gray-500 dark:text-gray-500">
-                    {op.description}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>,
-    ];
-  };
-
-  // Получаем цвета для счетов
-  const getAccountColor = (index: number) => {
-    const colors = highContrast
-      ? ['#1f2937', '#000000', '#065f46', '#7c2d12', '#111827'] // high contrast dark tones
-      : ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
-    return colors[index % colors.length];
-  };
-
-  // Получаем все ключи счетов (исключая date, label, operations, hasOperations)
-  const accountKeys =
-    data && data.length > 0
-      ? Object.keys(data[0]).filter(
-          (key) =>
-            key !== 'date' &&
-            key !== 'label' &&
-            key !== 'operations' &&
-            key !== 'hasOperations'
-        )
-      : [];
-
-  // Фильтруем счета, которые имеют ненулевые остатки хотя бы в одной точке
-  const accountsWithBalance = accountKeys.filter((accountKey) => {
-    return data.some((point) => {
-      const value = point[accountKey];
-      return typeof value === 'number' && value > 0;
-    });
-  });
-
-  // Проверяем, есть ли данные для отображения
-  const hasData = accountsWithBalance.length > 0;
-
-  const buildExportRows = (): ExportRow[] => {
-    const rows: ExportRow[] = [];
-    (data || []).forEach((point) => {
-      accountsWithBalance.forEach((accountName) => {
-        const value = point[accountName];
-        if (typeof value === 'number') {
-          rows.push({
-            date: point.date || point.label,
-            category: accountName,
-            amount: value,
-            type: 'balance',
-          });
-        }
-      });
-    });
-    return rows;
-  };
+  // data transformation and interactions are handled by hook
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -212,17 +119,14 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 tickFormatter={(value) => formatMoney(value)}
               />
               <Tooltip
-                formatter={(value, name, props) =>
-                  formatTooltipValue(value as number, name as string, props)
-                }
-                labelFormatter={(label) => `Дата: ${label}`}
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                  maxWidth: '300px',
-                }}
+                content={({ active, payload, label }) => (
+                  <CustomTooltip
+                    active={active}
+                    payload={payload}
+                    label={label}
+                  />
+                )}
+                labelFormatter={(label) => `${label}`}
               />
               {/* Не отображаем легенду и линии, когда нет данных */}
             </LineChart>
@@ -247,16 +151,37 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Остаток денег на счетах
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Остаток денег на счетах
+          </h3>
+          <InfoHint
+            content={
+              <div>
+                <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                  Остаток денег на счетах
+                </div>
+                <div>
+                  Отображает баланс всех счетов на каждый день. Позволяет
+                  отследить, сколько средств доступно и как менялась сумма во
+                  времени.
+                </div>
+              </div>
+            }
+          />
+        </div>
         <ExportMenu
           filenameBase="account_balances"
           buildRows={buildExportRows}
           columns={['date', 'category', 'amount', 'type']}
         />
       </div>
-      <div className="h-80">
+      <div className="h-80 relative" onMouseEnter={() => setHoveredOnce(true)}>
+        {!hoveredOnce && hasData && (
+          <div className="absolute top-2 right-2 bg-gray-700/80 text-gray-100 text-xs px-3 py-1.5 rounded-lg shadow-sm">
+            💡 Наведите на точку, чтобы увидеть операции
+          </div>
+        )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
@@ -281,16 +206,20 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               tickFormatter={(value) => formatMoney(value)}
             />
             <Tooltip
-              formatter={(value, name, props) =>
-                formatTooltipValue(value as number, name as string, props)
-              }
-              labelFormatter={(label) => `Дата: ${label}`}
-              contentStyle={{
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '6px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                maxWidth: '300px',
+              cursor={false}
+              content={({ active, payload, label }) => {
+                const currentPoint = data.find((d) => d.label === label);
+                const hasOps = currentPoint?.operations?.some(
+                  (op) => op.amount && op.amount !== 0
+                );
+                if (!active || !hasOps) return null;
+                return (
+                  <CustomTooltip
+                    active={active}
+                    payload={payload}
+                    label={label}
+                  />
+                );
               }}
             />
             <Legend
@@ -306,13 +235,30 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 dataKey={accountName}
                 stroke={getAccountColor(index)}
                 strokeWidth={highContrast ? 3 : 2}
+                activeDot={false}
                 dot={(props) => {
-                  // Показываем точку только если есть операции в этот день
+                  // Показываем точку только для счетов, по которым есть операции в этот день
                   const dataPoint = data[props.index];
-                  const hasOperations = dataPoint?.hasOperations || false;
-                  if (!hasOperations) {
-                    return null;
-                  }
+                  const operations = dataPoint?.operations || [];
+                  if (!operations.length) return null;
+
+                  const account = accounts.find(
+                    (acc) => acc.name === accountName
+                  );
+                  const accountId = account?.id;
+                  if (!accountId) return null;
+
+                  const hasAccountOperation = operations.some(
+                    (op) =>
+                      (op.type === 'income' || op.type === 'expense') &&
+                      op.amount &&
+                      op.amount !== 0 &&
+                      (op.accountId === accountId ||
+                        op.sourceAccountId === accountId ||
+                        op.targetAccountId === accountId)
+                  );
+
+                  if (!hasAccountOperation) return null;
                   return (
                     <circle
                       cx={props.cx}
@@ -321,6 +267,8 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                       fill={getAccountColor(index)}
                       strokeWidth={highContrast ? 2.5 : 2}
                       stroke={getAccountColor(index)}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleOpenPanel(props.index)}
                     />
                   );
                 }}
@@ -330,6 +278,12 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      <AccountOperationsPanel
+        isOpen={isPanelOpen}
+        onClose={handleClosePanel}
+        point={selectedPoint}
+      />
     </div>
   );
 };
