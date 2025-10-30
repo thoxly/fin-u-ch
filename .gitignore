@@ -53,6 +53,10 @@ Thumbs.db
 .temp/
 .tmp/
 
+# --- Allow test SSL certs in nginx folder ---
+!ops/nginx/ssl/
+!ops/nginx/ssl/*.pem
+
 # Docker
 *.env.docker
 
