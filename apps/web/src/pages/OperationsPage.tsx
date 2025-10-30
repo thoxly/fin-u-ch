@@ -21,6 +21,12 @@ import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 
 export const OperationsPage = () => {
+  type OperationWithRelations = Operation & {
+    article?: { name?: string } | null;
+    account?: { name?: string } | null;
+    sourceAccount?: { name?: string } | null;
+    targetAccount?: { name?: string } | null;
+  };
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
     null
@@ -86,16 +92,21 @@ export const OperationsPage = () => {
       width: '150px',
     },
     {
-      key: 'articleName',
+      key: 'article',
       header: 'Статья',
-      // @ts-expect-error backend includes articleName in API response, not in shared type
-      render: (op: Operation) => op.articleName || '-',
+      render: (op: OperationWithRelations) => op.article?.name || '-',
     },
     {
-      key: 'accountName',
+      key: 'account',
       header: 'Счет',
-      // @ts-expect-error backend includes accountName in API response, not in shared type
-      render: (op: Operation) => op.accountName || '-',
+      render: (op: OperationWithRelations) => {
+        if (op.type === 'transfer') {
+          const left = op.sourceAccount?.name || '-';
+          const right = op.targetAccount?.name || '-';
+          return `${left} → ${right}`;
+        }
+        return op.account?.name || '-';
+      },
     },
     {
       key: 'description',
