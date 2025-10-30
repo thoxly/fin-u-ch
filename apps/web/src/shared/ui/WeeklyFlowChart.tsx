@@ -39,15 +39,15 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
     pointsCount <= 7
       ? 36
       : pointsCount <= 14
-        ? 26
+        ? 28
         : pointsCount <= 31
-          ? 18
+          ? 26
           : pointsCount <= 90
             ? 10
             : 8;
-  const barGap = pointsCount <= 7 ? 8 : pointsCount <= 31 ? 6 : 4; // зазор между барами в категории
+  const barGap = pointsCount <= 7 ? 8 : pointsCount <= 31 ? 4 : 4; // зазор между барами в категории
   const barCategoryGap =
-    pointsCount <= 7 ? '25%' : pointsCount <= 31 ? '15%' : '8%'; // зазор между категориями
+    pointsCount <= 7 ? '25%' : pointsCount <= 31 ? '10%' : '8%'; // зазор между категориями
 
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
