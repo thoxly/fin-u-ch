@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, Contrast } from 'lucide-react';
+import { User, LogOut, Settings } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
-import { useHighContrast } from '../../shared/hooks/useHighContrast';
 
 interface UserMenuProps {
   userEmail?: string;
@@ -18,7 +17,6 @@ export const UserMenu = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [highContrast, setHighContrast] = useHighContrast();
 
   const handleLogout = (): void => {
     dispatch(logout());
@@ -75,14 +73,6 @@ export const UserMenu = ({
           >
             <Settings size={16} />
             Мой профиль
-          </button>
-          <button
-            onClick={() => setHighContrast()}
-            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
-            title="Высокий контраст"
-          >
-            <Contrast size={16} />
-            {highContrast ? 'Обычная палитра' : 'Высокий контраст'}
           </button>
           <hr className="my-1 border-gray-200 dark:border-gray-700" />
           <button
