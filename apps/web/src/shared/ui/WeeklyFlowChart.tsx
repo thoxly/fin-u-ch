@@ -157,14 +157,22 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             />
             <Bar
               dataKey="income"
-              fill="#10b981"
+              fill={
+                document.documentElement.classList.contains('high-contrast')
+                  ? '#008000'
+                  : '#10b981'
+              }
               name="Поступления"
               radius={[2, 2, 0, 0]}
               maxBarSize={maxBarSize}
             />
             <Bar
               dataKey="expense"
-              fill="#ef4444"
+              fill={
+                document.documentElement.classList.contains('high-contrast')
+                  ? '#B22222'
+                  : '#ef4444'
+              }
               name="Списания"
               radius={[2, 2, 0, 0]}
               maxBarSize={maxBarSize}

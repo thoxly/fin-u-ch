@@ -159,7 +159,11 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <Line
               type="monotone"
               dataKey="cumulativeIncome"
-              stroke="#10b981"
+              stroke={
+                document.documentElement.classList.contains('high-contrast')
+                  ? '#008000'
+                  : '#10b981'
+              }
               strokeWidth={1.5}
               strokeOpacity={0.6}
               dot={(props: {
@@ -179,9 +183,21 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                     cx={cx}
                     cy={cy}
                     r={3}
-                    fill="#10b981"
+                    fill={
+                      document.documentElement.classList.contains(
+                        'high-contrast'
+                      )
+                        ? '#008000'
+                        : '#10b981'
+                    }
                     strokeWidth={1.5}
-                    stroke="#10b981"
+                    stroke={
+                      document.documentElement.classList.contains(
+                        'high-contrast'
+                      )
+                        ? '#008000'
+                        : '#10b981'
+                    }
                   />
                 );
               }}
@@ -190,7 +206,11 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <Line
               type="monotone"
               dataKey="cumulativeExpense"
-              stroke="#ef4444"
+              stroke={
+                document.documentElement.classList.contains('high-contrast')
+                  ? '#B22222'
+                  : '#ef4444'
+              }
               strokeWidth={1.5}
               strokeOpacity={0.6}
               dot={(props: {
@@ -210,9 +230,21 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                     cx={cx}
                     cy={cy}
                     r={3}
-                    fill="#ef4444"
+                    fill={
+                      document.documentElement.classList.contains(
+                        'high-contrast'
+                      )
+                        ? '#B22222'
+                        : '#ef4444'
+                    }
                     strokeWidth={1.5}
-                    stroke="#ef4444"
+                    stroke={
+                      document.documentElement.classList.contains(
+                        'high-contrast'
+                      )
+                        ? '#B22222'
+                        : '#ef4444'
+                    }
                   />
                 );
               }}
@@ -221,7 +253,11 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <Line
               type="monotone"
               dataKey="cumulativeNetCashFlow"
-              stroke="#3b82f6"
+              stroke={
+                document.documentElement.classList.contains('high-contrast')
+                  ? '#0000FF'
+                  : '#3b82f6'
+              }
               strokeWidth={3}
               strokeOpacity={0.8}
               dot={false}

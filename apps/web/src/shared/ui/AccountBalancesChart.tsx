@@ -130,11 +130,15 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
 
   // Получаем цвета для счетов
   const getAccountColor = (index: number) => {
-    const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+    const isHighContrast =
+      document.documentElement.classList.contains('high-contrast');
+    const colors = isHighContrast
+      ? ['#0000FF', '#800080', '#008000', '#FF8C00', '#B22222']
+      : ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
     return colors[index % colors.length];
   };
 
-  // Получаем все ключи счетов (исключая date, label, operations, hasOperations)
+  // Получаем все ключи счетов (исключая служебные поля)
   const accountKeys =
     data && data.length > 0
       ? Object.keys(data[0]).filter(
@@ -146,16 +150,45 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         )
       : [];
 
-  // Фильтруем счета, которые имеют ненулевые остатки хотя бы в одной точке
-  const accountsWithBalance = accountKeys.filter((accountKey) => {
-    return data.some((point) => {
-      const value = point[accountKey];
-      return typeof value === 'number' && value > 0;
+  // Построим быстрый поиск: accountName -> accountId
+  const accountNameToId: Record<string, string | undefined> =
+    Object.fromEntries(accounts.map((a) => [a.name, a.id]));
+
+  // Проверка наличия операций для конкретного счета в конкретной точке
+  const pointHasOpsForAccount = (
+    pointOperations:
+      | AccountBalancesChartProps['data'][number]['operations']
+      | undefined,
+    accountName: string
+  ): boolean => {
+    if (!pointOperations || pointOperations.length === 0) return false;
+    const accountId = accountNameToId[accountName];
+    if (!accountId) return false;
+    return pointOperations.some(
+      (op) =>
+        op.accountId === accountId ||
+        op.sourceAccountId === accountId ||
+        op.targetAccountId === accountId
+    );
+  };
+
+  // Выбираем счета для отображения:
+  // - Если на любом шаге баланс != 0
+  // - ИЛИ если есть хотя бы одна операция по этому счету за период
+  const accountsToShow = accountKeys.filter((accountName) => {
+    const hasNonZeroBalance = data.some((point) => {
+      const value = point[accountName];
+      return typeof value === 'number' && value !== 0;
     });
+    if (hasNonZeroBalance) return true;
+    const hasAnyOps = data.some((point) =>
+      pointHasOpsForAccount(point.operations, accountName)
+    );
+    return hasAnyOps;
   });
 
   // Проверяем, есть ли данные для отображения
-  const hasData = accountsWithBalance.length > 0;
+  const hasData = accountsToShow.length > 0;
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -264,7 +297,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               content={<ChartLegend />}
               wrapperStyle={{ paddingTop: 8 }}
             />
-            {accountsWithBalance.map((accountName, index) => (
+            {accountsToShow.map((accountName, index) => (
               <Line
                 key={accountName}
                 type="monotone"
@@ -272,12 +305,13 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 stroke={getAccountColor(index)}
                 strokeWidth={2}
                 dot={(props) => {
-                  // Показываем точку только если есть операции в этот день
+                  // Показываем точку только если в этот день есть операции по этому счету
                   const dataPoint = data[props.index];
-                  const hasOperations = dataPoint?.hasOperations || false;
-                  if (!hasOperations) {
-                    return null;
-                  }
+                  const hasOpsForThisAccount = pointHasOpsForAccount(
+                    dataPoint?.operations,
+                    accountName
+                  );
+                  if (!hasOpsForThisAccount) return null;
                   return (
                     <circle
                       cx={props.cx}
