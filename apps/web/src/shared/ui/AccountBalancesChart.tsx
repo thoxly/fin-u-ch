@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { formatMoney } from '../lib/money';
+import { ChartLegend } from './ChartLegend';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -170,7 +171,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data || []}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -228,7 +229,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 56 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -257,7 +258,12 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 maxWidth: '300px',
               }}
             />
-            <Legend />
+            <Legend
+              verticalAlign="bottom"
+              align="center"
+              content={<ChartLegend />}
+              wrapperStyle={{ paddingTop: 8 }}
+            />
             {accountsWithBalance.map((accountName, index) => (
               <Line
                 key={accountName}

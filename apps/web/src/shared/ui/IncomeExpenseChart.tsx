@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { CustomTooltip } from './CustomTooltip';
+import { ChartLegend } from './ChartLegend';
 
 interface Operation {
   id: string;
@@ -124,7 +125,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -145,7 +146,16 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               tickFormatter={(value) => formatMoney(value)}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend
+              verticalAlign="bottom"
+              align="center"
+              content={
+                <ChartLegend
+                  preferredOrder={['Доходы', 'Расходы', 'Чистый поток']}
+                />
+              }
+              wrapperStyle={{ paddingTop: 8 }}
+            />
             <Line
               type="monotone"
               dataKey="cumulativeIncome"
