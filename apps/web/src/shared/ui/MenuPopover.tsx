@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-// import * as Icons from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 export interface MenuPopoverItem {
   name: string;
@@ -116,12 +116,12 @@ export const MenuPopover = ({
                   item.createAction!.onClick();
                   onClose();
                 }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30 text-xs"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-primary-600 hover:bg-primary-50 transition-colors dark:text-primary-400 dark:hover:bg-primary-900/30"
                 role="menuitem"
                 title={item.createAction.label}
                 aria-label={item.createAction.label}
               >
-                {item.createAction.label}
+                <Plus size={16} />
               </button>
             )}
           </div>
