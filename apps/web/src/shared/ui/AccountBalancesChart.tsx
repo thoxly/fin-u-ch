@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React from 'react';
 import {
   LineChart,
   Line,
@@ -15,8 +15,9 @@ import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { useHighContrast } from '../hooks/useHighContrast';
 import { CustomTooltip } from './CustomTooltip';
-import { OffCanvas } from './OffCanvas';
+import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
+import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -71,75 +72,21 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   className = '',
 }) => {
   const [highContrast] = useHighContrast();
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
-    null
-  );
-  const [hoveredOnce, setHoveredOnce] = useState(false);
-
-  const selectedPoint = useMemo(() => {
-    if (selectedPointIndex == null) return null;
-    return data?.[selectedPointIndex] ?? null;
-  }, [selectedPointIndex, data]);
-
-  const handleOpenPanel = useCallback((index: number) => {
-    setSelectedPointIndex(index);
-    setIsPanelOpen(true);
-  }, []);
-
-  const handleClosePanel = useCallback(() => {
-    setIsPanelOpen(false);
-  }, []);
+  const {
+    isPanelOpen,
+    hoveredOnce,
+    setHoveredOnce,
+    handleOpenPanel,
+    handleClosePanel,
+    selectedPoint,
+    accountsWithBalance,
+    hasData,
+    getAccountColor,
+    buildExportRows,
+  } = useAccountBalancesChart(data, highContrast);
   // Tooltip content moved to CustomTooltip with aggregated income/expense
 
-  // Получаем цвета для счетов
-  const getAccountColor = (index: number) => {
-    const colors = highContrast
-      ? ['#1f2937', '#000000', '#065f46', '#7c2d12', '#111827'] // high contrast dark tones
-      : ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
-    return colors[index % colors.length];
-  };
-
-  // Получаем все ключи счетов (исключая date, label, operations, hasOperations)
-  const accountKeys =
-    data && data.length > 0
-      ? Object.keys(data[0]).filter(
-          (key) =>
-            key !== 'date' &&
-            key !== 'label' &&
-            key !== 'operations' &&
-            key !== 'hasOperations'
-        )
-      : [];
-
-  // Фильтруем счета, которые имеют ненулевые остатки хотя бы в одной точке
-  const accountsWithBalance = accountKeys.filter((accountKey) => {
-    return data.some((point) => {
-      const value = point[accountKey];
-      return typeof value === 'number' && value > 0;
-    });
-  });
-
-  // Проверяем, есть ли данные для отображения
-  const hasData = accountsWithBalance.length > 0;
-
-  const buildExportRows = (): ExportRow[] => {
-    const rows: ExportRow[] = [];
-    (data || []).forEach((point) => {
-      accountsWithBalance.forEach((accountName) => {
-        const value = point[accountName];
-        if (typeof value === 'number') {
-          rows.push({
-            date: point.date || point.label,
-            category: accountName,
-            amount: value,
-            type: 'balance',
-          });
-        }
-      });
-    });
-    return rows;
-  };
+  // data transformation and interactions are handled by hook
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -326,57 +273,11 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         </ResponsiveContainer>
       </div>
 
-      <OffCanvas
+      <AccountOperationsPanel
         isOpen={isPanelOpen}
         onClose={handleClosePanel}
-        title={
-          selectedPoint
-            ? `Детали операций — ${selectedPoint.label}`
-            : 'Детали операций'
-        }
-      >
-        {selectedPoint && (
-          <div className="space-y-2">
-            {Array.isArray(selectedPoint.operations) &&
-            selectedPoint.operations.length > 0 ? (
-              selectedPoint.operations.map((op) => (
-                <div
-                  key={op.id}
-                  className="text-sm p-3 rounded border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-gray-700 dark:text-gray-300">
-                        {op.article?.name || 'Операция'}
-                      </div>
-                      {op.description && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                          {op.description}
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      className={
-                        op.type === 'income'
-                          ? 'text-green-600 dark:text-green-400 font-semibold'
-                          : op.type === 'expense'
-                            ? 'text-red-600 dark:text-red-400 font-semibold'
-                            : 'text-blue-600 dark:text-blue-400 font-semibold'
-                      }
-                    >
-                      {formatMoney(op.amount)}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Нет операций в этот день
-              </div>
-            )}
-          </div>
-        )}
-      </OffCanvas>
+        point={selectedPoint}
+      />
     </div>
   );
 };
