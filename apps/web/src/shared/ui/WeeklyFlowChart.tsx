@@ -12,6 +12,9 @@ import {
 import { formatMoney } from '../lib/money';
 import { AggregatedDataPoint } from '../lib/dataAggregation';
 import { ChartLegend } from './ChartLegend';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
+import { useHighContrast } from '../hooks/useHighContrast';
 
 interface WeeklyFlowChartProps {
   data: AggregatedDataPoint[];
@@ -22,6 +25,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   data,
   className = '',
 }) => {
+  const [highContrast] = useHighContrast();
   const formatTooltipValue = (value: number, name: string) => {
     const labels: Record<string, string> = {
       income: 'Поступления',
@@ -33,24 +37,27 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   // Показываем все данные
   const filteredData = data;
 
-  // Адаптивная ширина столбцов в зависимости от длины периода
-  const pointsCount = filteredData?.length || 0;
-  const maxBarSize =
-    pointsCount <= 7
-      ? 36
-      : pointsCount <= 14
-        ? 28
-        : pointsCount <= 31
-          ? 26
-          : pointsCount <= 90
-            ? 10
-            : 8;
-  const barGap = pointsCount <= 7 ? 8 : pointsCount <= 31 ? 4 : 4; // зазор между барами в категории
-  const barCategoryGap =
-    pointsCount <= 7 ? '25%' : pointsCount <= 31 ? '10%' : '8%'; // зазор между категориями
-
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
+
+  const buildExportRows = (): ExportRow[] => {
+    const rows: ExportRow[] = [];
+    (filteredData || []).forEach((p) => {
+      rows.push({
+        date: p.date || p.label,
+        category: 'Поступления',
+        amount: p.income,
+        type: 'income',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Списания',
+        amount: p.expense,
+        type: 'expense',
+      });
+    });
+    return rows;
+  };
 
   // Если нет данных, показываем график без столбцов, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -58,9 +65,16 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
       <div
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
       >
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Динамика поступлений и списаний
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Динамика поступлений и списаний
+          </h3>
+          <ExportMenu
+            filenameBase="weekly_flow"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+          />
+        </div>
 
         <div className="h-80 relative">
           <ResponsiveContainer width="100%" height="100%">
@@ -113,16 +127,21 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
     <div
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Динамика поступлений и списаний
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Динамика поступлений и списаний
+        </h3>
+        <ExportMenu
+          filenameBase="weekly_flow"
+          buildRows={buildExportRows}
+          columns={['date', 'category', 'amount', 'type']}
+        />
+      </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
             margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
-            barGap={barGap}
-            barCategoryGap={barCategoryGap}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -132,6 +151,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
+              tick={{ fontSize: 11 }}
+              angle={filteredData.length > 8 ? -45 : 0}
+              textAnchor={filteredData.length > 8 ? 'end' : 'middle'}
+              height={filteredData.length > 8 ? 80 : 30}
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
@@ -157,17 +180,15 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             />
             <Bar
               dataKey="income"
-              fill="#10b981"
+              fill={highContrast ? '#065f46' : '#10b981'}
               name="Поступления"
               radius={[2, 2, 0, 0]}
-              maxBarSize={maxBarSize}
             />
             <Bar
               dataKey="expense"
-              fill="#ef4444"
+              fill={highContrast ? '#7c2d12' : '#ef4444'}
               name="Списания"
               radius={[2, 2, 0, 0]}
-              maxBarSize={maxBarSize}
             />
           </BarChart>
         </ResponsiveContainer>

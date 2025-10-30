@@ -11,6 +11,9 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
+import { useHighContrast } from '../hooks/useHighContrast';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -64,6 +67,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   accounts = [],
   className = '',
 }) => {
+  const [highContrast] = useHighContrast();
   const formatTooltipValue = (
     value: number,
     name: string,
@@ -130,7 +134,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
 
   // Получаем цвета для счетов
   const getAccountColor = (index: number) => {
-    const colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
+    const colors = highContrast
+      ? ['#1f2937', '#000000', '#065f46', '#7c2d12', '#111827'] // high contrast dark tones
+      : ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
     return colors[index % colors.length];
   };
 
@@ -156,6 +162,24 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
 
   // Проверяем, есть ли данные для отображения
   const hasData = accountsWithBalance.length > 0;
+
+  const buildExportRows = (): ExportRow[] => {
+    const rows: ExportRow[] = [];
+    (data || []).forEach((point) => {
+      accountsWithBalance.forEach((accountName) => {
+        const value = point[accountName];
+        if (typeof value === 'number') {
+          rows.push({
+            date: point.date || point.label,
+            category: accountName,
+            amount: value,
+            type: 'balance',
+          });
+        }
+      });
+    });
+    return rows;
+  };
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -222,9 +246,16 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     <div
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Остаток денег на счетах
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Остаток денег на счетах
+        </h3>
+        <ExportMenu
+          filenameBase="account_balances"
+          buildRows={buildExportRows}
+          columns={['date', 'category', 'amount', 'type']}
+        />
+      </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -239,6 +270,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
+              tick={{ fontSize: 11 }}
+              angle={data.length > 8 ? -45 : 0}
+              textAnchor={data.length > 8 ? 'end' : 'middle'}
+              height={data.length > 8 ? 80 : 30}
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
@@ -270,7 +305,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 type="monotone"
                 dataKey={accountName}
                 stroke={getAccountColor(index)}
-                strokeWidth={2}
+                strokeWidth={highContrast ? 3 : 2}
                 dot={(props) => {
                   // Показываем точку только если есть операции в этот день
                   const dataPoint = data[props.index];
@@ -282,9 +317,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                     <circle
                       cx={props.cx}
                       cy={props.cy}
-                      r={4}
+                      r={highContrast ? 5 : 4}
                       fill={getAccountColor(index)}
-                      strokeWidth={2}
+                      strokeWidth={highContrast ? 2.5 : 2}
                       stroke={getAccountColor(index)}
                     />
                   );
