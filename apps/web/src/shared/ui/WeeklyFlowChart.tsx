@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { AggregatedDataPoint } from '../lib/dataAggregation';
+import { ChartLegend } from './ChartLegend';
 
 interface WeeklyFlowChartProps {
   data: AggregatedDataPoint[];
@@ -103,7 +104,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -128,7 +129,14 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               }}
             />
-            <Legend />
+            <Legend
+              verticalAlign="bottom"
+              align="center"
+              content={
+                <ChartLegend preferredOrder={['Поступления', 'Списания']} />
+              }
+              wrapperStyle={{ paddingTop: 8 }}
+            />
             <Bar
               dataKey="income"
               fill="#10b981"
