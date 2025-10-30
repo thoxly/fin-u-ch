@@ -14,8 +14,8 @@ import { AggregatedDataPoint } from '../lib/dataAggregation';
 import { ChartLegend } from './ChartLegend';
 import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
-import { useHighContrast } from '../hooks/useHighContrast';
 import { InfoHint } from './InfoHint';
+import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
 
 interface WeeklyFlowChartProps {
   data: AggregatedDataPoint[];
@@ -26,7 +26,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   data,
   className = '',
 }) => {
-  const [highContrast] = useHighContrast();
+  const isSmall = useIsSmallScreen();
   // Tooltip content overridden below via custom renderer
 
   // Показываем все данные
@@ -87,7 +87,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
           />
         </div>
 
-        <div className="h-80 relative">
+        <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data || []}
@@ -106,6 +106,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                 className="text-gray-600 dark:text-gray-400"
                 fontSize={12}
                 tickFormatter={(value) => formatMoney(value)}
+                domain={[
+                  (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                  (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+                ]}
               />
               <Tooltip
                 cursor={false}
@@ -192,7 +196,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
           columns={['date', 'category', 'amount', 'type']}
         />
       </div>
-      <div className="h-80">
+      <div className="chart-body">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
@@ -215,6 +219,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
               tickFormatter={(value) => formatMoney(value)}
+              domain={[
+                (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+              ]}
             />
             <Tooltip
               cursor={false}
@@ -253,23 +261,25 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                 );
               }}
             />
-            <Legend
-              verticalAlign="bottom"
-              align="center"
-              content={
-                <ChartLegend preferredOrder={['Поступления', 'Списания']} />
-              }
-              wrapperStyle={{ paddingTop: 8 }}
-            />
+            {!isSmall && (
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                content={
+                  <ChartLegend preferredOrder={['Поступления', 'Списания']} />
+                }
+                wrapperStyle={{ paddingTop: 8 }}
+              />
+            )}
             <Bar
               dataKey="income"
-              fill={highContrast ? '#065f46' : '#10b981'}
+              fill="#10b981"
               name="Поступления"
               radius={[2, 2, 0, 0]}
             />
             <Bar
               dataKey="expense"
-              fill={highContrast ? '#7c2d12' : '#ef4444'}
+              fill="#ef4444"
               name="Списания"
               radius={[2, 2, 0, 0]}
             />

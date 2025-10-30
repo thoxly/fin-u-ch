@@ -49,6 +49,8 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const { getIcon, updateIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
 
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
   const [iconPickerState, setIconPickerState] = useState<{
     isOpen: boolean;
     itemName: string;
@@ -200,7 +202,15 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
       <header className="bg-white shadow-sm dark:bg-gray-800 dark:shadow-gray-900/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div className="flex items-center gap-2">
+              {/* Mobile menu button */}
+              <button
+                aria-label="Открыть меню"
+                className="inline-flex items-center justify-center rounded-md p-2 text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-gray-300 dark:hover:bg-gray-700 lg:hidden"
+                onClick={() => setIsMobileNavOpen(true)}
+              >
+                <Icons.Menu size={22} />
+              </button>
               <Link to="/dashboard" className="flex items-center">
                 <img
                   src="/images/logo.png"
@@ -219,7 +229,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
 
       <div className="flex max-w-full mx-auto px-2 sm:px-4 lg:px-6 py-8">
         {/* Sidebar */}
-        <aside className="w-48 pr-4">
+        <aside className="hidden lg:block w-56 pr-4 flex-shrink-0">
           <nav className="space-y-1">
             {navigation.map((item) =>
               item.children ? (
@@ -285,7 +295,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0 pl-4">{children}</main>
+        <main className="flex-1 min-w-0 lg:pl-4">{children}</main>
       </div>
 
       {/* Icon Picker Popover */}
@@ -333,6 +343,60 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           title="Мой профиль"
         >
           <UserProfileForm onClose={() => setUserProfileOffCanvasOpen(false)} />
+        </OffCanvas>
+      )}
+
+      {/* Mobile navigation OffCanvas */}
+      {isMobileNavOpen && (
+        <OffCanvas
+          isOpen={isMobileNavOpen}
+          onClose={() => setIsMobileNavOpen(false)}
+          title="Навигация"
+        >
+          <div className="px-1 py-2">
+            <nav className="space-y-1">
+              {navigation.map((item) =>
+                item.children ? (
+                  <div key={item.name} className="">
+                    <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 px-2 py-1">
+                      {item.name}
+                    </div>
+                    <div className="ml-1 space-y-1">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          to={child.href || '/'}
+                          onClick={() => setIsMobileNavOpen(false)}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                            isActive(child.href || '/')
+                              ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400'
+                              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {renderIcon(child.name)}
+                          <span>{child.name}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    key={item.href}
+                    to={item.href || '/'}
+                    onClick={() => setIsMobileNavOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      isActive(item.href || '/')
+                        ? 'bg-primary-100 text-primary-700 font-medium dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {renderIcon(item.name)}
+                    <span>{item.name}</span>
+                  </Link>
+                )
+              )}
+            </nav>
+          </div>
         </OffCanvas>
       )}
     </div>

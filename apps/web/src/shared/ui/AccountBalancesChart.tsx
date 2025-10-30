@@ -11,13 +11,12 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
-import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
-import { useHighContrast } from '../hooks/useHighContrast';
 import { CustomTooltip } from './CustomTooltip';
 import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
 import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
+import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -71,7 +70,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   accounts = [],
   className = '',
 }) => {
-  const [highContrast] = useHighContrast();
+  const isSmall = useIsSmallScreen();
   const {
     isPanelOpen,
     hoveredOnce,
@@ -83,7 +82,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     hasData,
     getAccountColor,
     buildExportRows,
-  } = useAccountBalancesChart(data, highContrast);
+  } = useAccountBalancesChart(data, false);
   // Tooltip content moved to CustomTooltip with aggregated income/expense
 
   // data transformation and interactions are handled by hook
@@ -98,7 +97,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           Остаток денег на счетах
         </h3>
 
-        <div className="h-80 relative">
+        <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data || []}
@@ -117,6 +116,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 className="text-gray-600 dark:text-gray-400"
                 fontSize={12}
                 tickFormatter={(value) => formatMoney(value)}
+                domain={[
+                  (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                  (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+                ]}
               />
               <Tooltip
                 content={({ active, payload, label }) => (
@@ -176,7 +179,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           columns={['date', 'category', 'amount', 'type']}
         />
       </div>
-      <div className="h-80 relative" onMouseEnter={() => setHoveredOnce(true)}>
+      <div
+        className="chart-body relative"
+        onMouseEnter={() => setHoveredOnce(true)}
+      >
         {!hoveredOnce && hasData && (
           <div className="absolute top-2 right-2 bg-gray-700/80 text-gray-100 text-xs px-3 py-1.5 rounded-lg shadow-sm">
             💡 Наведите на точку, чтобы увидеть операции
@@ -204,6 +210,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
               tickFormatter={(value) => formatMoney(value)}
+              domain={[
+                (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
+                (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
+              ]}
             />
             <Tooltip
               cursor={false}
@@ -222,19 +232,21 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 );
               }}
             />
-            <Legend
-              verticalAlign="bottom"
-              align="center"
-              content={<ChartLegend />}
-              wrapperStyle={{ paddingTop: 8 }}
-            />
+            {!isSmall && (
+              <Legend
+                verticalAlign="bottom"
+                align="center"
+                content={<ChartLegend />}
+                wrapperStyle={{ paddingTop: 8 }}
+              />
+            )}
             {accountsWithBalance.map((accountName, index) => (
               <Line
                 key={accountName}
                 type="monotone"
                 dataKey={accountName}
                 stroke={getAccountColor(index)}
-                strokeWidth={highContrast ? 3 : 2}
+                strokeWidth={2}
                 activeDot={false}
                 dot={(props) => {
                   // Показываем точку только для счетов, по которым есть операции в этот день
@@ -263,9 +275,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                     <circle
                       cx={props.cx}
                       cy={props.cy}
-                      r={highContrast ? 5 : 4}
+                      r={4}
                       fill={getAccountColor(index)}
-                      strokeWidth={highContrast ? 2.5 : 2}
+                      strokeWidth={2}
                       stroke={getAccountColor(index)}
                       style={{ cursor: 'pointer' }}
                       onClick={() => handleOpenPanel(props.index)}
