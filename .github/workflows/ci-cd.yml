@@ -781,10 +781,15 @@ jobs:
           echo "Waiting for services to start (45 seconds)..."
           sleep 45
 
+          # Use IP address directly to avoid DNS propagation issues
+          # Once DNS is fully propagated, can switch back to domain name
+          SERVER_IP="${{ secrets.VPS_HOST }}"
+
           # Retry health check up to 5 times with 10 second intervals
           for i in {1..5}; do
             echo "Health check attempt $i/5..."
-            if curl -L --max-redirs 3 -f http://${{ secrets.SERVER_DOMAIN }}/api/health; then
+            echo "Checking: http://${SERVER_IP}/api/health"
+            if curl -L --max-redirs 3 -f http://${SERVER_IP}/api/health; then
               echo "✅ Health check passed!"
               exit 0
             fi
