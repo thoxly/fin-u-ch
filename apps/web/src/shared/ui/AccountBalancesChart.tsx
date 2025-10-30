@@ -11,6 +11,9 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
+import { ExportButton } from './ExportButton';
+import { downloadCsv, ExportRow } from '../lib/exportData';
+import { useHighContrast } from '../hooks/useHighContrast';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -64,6 +67,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   accounts = [],
   className = '',
 }) => {
+  const [highContrast] = useHighContrast();
   const formatTooltipValue = (
     value: number,
     name: string,
@@ -130,15 +134,13 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
 
   // Получаем цвета для счетов
   const getAccountColor = (index: number) => {
-    const isHighContrast =
-      document.documentElement.classList.contains('high-contrast');
-    const colors = isHighContrast
-      ? ['#0000FF', '#800080', '#008000', '#FF8C00', '#B22222']
+    const colors = highContrast
+      ? ['#1f2937', '#000000', '#065f46', '#7c2d12', '#111827'] // high contrast dark tones
       : ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444'];
     return colors[index % colors.length];
   };
 
-  // Получаем все ключи счетов (исключая служебные поля)
+  // Получаем все ключи счетов (исключая date, label, operations, hasOperations)
   const accountKeys =
     data && data.length > 0
       ? Object.keys(data[0]).filter(
@@ -150,45 +152,39 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         )
       : [];
 
-  // Построим быстрый поиск: accountName -> accountId
-  const accountNameToId: Record<string, string | undefined> =
-    Object.fromEntries(accounts.map((a) => [a.name, a.id]));
-
-  // Проверка наличия операций для конкретного счета в конкретной точке
-  const pointHasOpsForAccount = (
-    pointOperations:
-      | AccountBalancesChartProps['data'][number]['operations']
-      | undefined,
-    accountName: string
-  ): boolean => {
-    if (!pointOperations || pointOperations.length === 0) return false;
-    const accountId = accountNameToId[accountName];
-    if (!accountId) return false;
-    return pointOperations.some(
-      (op) =>
-        op.accountId === accountId ||
-        op.sourceAccountId === accountId ||
-        op.targetAccountId === accountId
-    );
-  };
-
-  // Выбираем счета для отображения:
-  // - Если на любом шаге баланс != 0
-  // - ИЛИ если есть хотя бы одна операция по этому счету за период
-  const accountsToShow = accountKeys.filter((accountName) => {
-    const hasNonZeroBalance = data.some((point) => {
-      const value = point[accountName];
-      return typeof value === 'number' && value !== 0;
+  // Фильтруем счета, которые имеют ненулевые остатки хотя бы в одной точке
+  const accountsWithBalance = accountKeys.filter((accountKey) => {
+    return data.some((point) => {
+      const value = point[accountKey];
+      return typeof value === 'number' && value > 0;
     });
-    if (hasNonZeroBalance) return true;
-    const hasAnyOps = data.some((point) =>
-      pointHasOpsForAccount(point.operations, accountName)
-    );
-    return hasAnyOps;
   });
 
   // Проверяем, есть ли данные для отображения
-  const hasData = accountsToShow.length > 0;
+  const hasData = accountsWithBalance.length > 0;
+
+  const handleExport = (): void => {
+    const rows: ExportRow[] = [];
+    (data || []).forEach((point) => {
+      accountsWithBalance.forEach((accountName) => {
+        const value = point[accountName];
+        if (typeof value === 'number') {
+          rows.push({
+            date: point.date || point.label,
+            category: accountName,
+            amount: value,
+            type: 'balance',
+          });
+        }
+      });
+    });
+    downloadCsv(rows, 'account_balances.csv', [
+      'date',
+      'category',
+      'amount',
+      'type',
+    ]);
+  };
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
@@ -255,9 +251,12 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     <div
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Остаток денег на счетах
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Остаток денег на счетах
+        </h3>
+        <ExportButton onClick={handleExport} title="Экспорт" />
+      </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
@@ -272,6 +271,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
+              tick={{ fontSize: 11 }}
+              angle={data.length > 8 ? -45 : 0}
+              textAnchor={data.length > 8 ? 'end' : 'middle'}
+              height={data.length > 8 ? 80 : 30}
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
@@ -297,28 +300,27 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               content={<ChartLegend />}
               wrapperStyle={{ paddingTop: 8 }}
             />
-            {accountsToShow.map((accountName, index) => (
+            {accountsWithBalance.map((accountName, index) => (
               <Line
                 key={accountName}
                 type="monotone"
                 dataKey={accountName}
                 stroke={getAccountColor(index)}
-                strokeWidth={2}
+                strokeWidth={highContrast ? 3 : 2}
                 dot={(props) => {
-                  // Показываем точку только если в этот день есть операции по этому счету
+                  // Показываем точку только если есть операции в этот день
                   const dataPoint = data[props.index];
-                  const hasOpsForThisAccount = pointHasOpsForAccount(
-                    dataPoint?.operations,
-                    accountName
-                  );
-                  if (!hasOpsForThisAccount) return null;
+                  const hasOperations = dataPoint?.hasOperations || false;
+                  if (!hasOperations) {
+                    return null;
+                  }
                   return (
                     <circle
                       cx={props.cx}
                       cy={props.cy}
-                      r={4}
+                      r={highContrast ? 5 : 4}
                       fill={getAccountColor(index)}
-                      strokeWidth={2}
+                      strokeWidth={highContrast ? 2.5 : 2}
                       stroke={getAccountColor(index)}
                     />
                   );

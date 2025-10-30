@@ -1,27 +1,36 @@
 import { useEffect, useState } from 'react';
 
-export function useHighContrast(): [boolean, (next: boolean) => void] {
+const STORAGE_KEY = 'highContrast';
+
+export function useHighContrast(): [boolean, (next?: boolean) => void] {
   const [enabled, setEnabled] = useState<boolean>(() => {
     try {
-      const v = localStorage.getItem('ui.highContrast');
-      return v === '1';
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw === '1' || raw === 'true';
     } catch {
+      // ignore storage errors (e.g., private mode)
       return false;
     }
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem('ui.highContrast', enabled ? '1' : '0');
+      localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0');
     } catch {
       // ignore storage errors
     }
+    // Reflect on document for CSS-based tweaks if needed
+    const root = document.documentElement;
     if (enabled) {
-      document.documentElement.classList.add('high-contrast');
+      root.classList.add('high-contrast');
     } else {
-      document.documentElement.classList.remove('high-contrast');
+      root.classList.remove('high-contrast');
     }
   }, [enabled]);
 
-  return [enabled, setEnabled];
+  const toggle = (next?: boolean): void => {
+    setEnabled((prev) => (typeof next === 'boolean' ? next : !prev));
+  };
+
+  return [enabled, toggle];
 }
