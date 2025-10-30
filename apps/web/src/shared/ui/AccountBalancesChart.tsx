@@ -119,7 +119,13 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 tickFormatter={(value) => formatMoney(value)}
               />
               <Tooltip
-                content={<CustomTooltip />}
+                content={({ active, payload, label }) => (
+                  <CustomTooltip
+                    active={active}
+                    payload={payload}
+                    label={label}
+                  />
+                )}
                 labelFormatter={(label) => `${label}`}
               />
               {/* Не отображаем легенду и линии, когда нет данных */}
