@@ -160,6 +160,7 @@ dev
 - [x] `VPS_USER` - SSH пользователь
 - [x] `VPS_SSH_KEY` - приватный SSH ключ
 - [x] `GHCR_TOKEN` - токен для GitHub Container Registry
+- [x] `SERVER_DOMAIN` - доменное имя сайта
 
 **Как проверить**: Просто убедитесь что они есть в списке. GitHub не показывает значения секретов.
 

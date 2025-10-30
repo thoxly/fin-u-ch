@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../shared/ui/Button';
+import { SmartLoginButton } from '../components/SmartLoginButton';
 
 export const LandingPage = () => {
   return (
@@ -16,11 +17,9 @@ export const LandingPage = () => {
             </span>
           </div>
           <div className="flex items-center space-x-4">
-            <Link to="/login">
-              <Button variant="secondary" size="md">
-                Войти
-              </Button>
-            </Link>
+            <SmartLoginButton variant="secondary" size="md">
+              Войти
+            </SmartLoginButton>
             <Link to="/register">
               <Button variant="primary" size="md">
                 Регистрация
@@ -70,11 +69,13 @@ export const LandingPage = () => {
                 Начать бесплатно
               </Button>
             </Link>
-            <Link to="/login">
-              <Button variant="secondary" size="lg" className="px-8 py-4">
-                Уже есть аккаунт
-              </Button>
-            </Link>
+            <SmartLoginButton
+              variant="secondary"
+              size="lg"
+              className="px-8 py-4"
+            >
+              Уже есть аккаунт
+            </SmartLoginButton>
           </div>
         </div>
       </section>

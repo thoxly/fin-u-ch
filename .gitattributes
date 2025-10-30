@@ -1,0 +1,4 @@
+# Ensure consistent LF endings in CI for markdown so Prettier checks are stable
+*.md text eol=lf
+
+

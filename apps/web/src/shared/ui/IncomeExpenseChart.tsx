@@ -11,6 +11,10 @@ import {
 } from 'recharts';
 import { formatMoney } from '../lib/money';
 import { CustomTooltip } from './CustomTooltip';
+import { ChartLegend } from './ChartLegend';
+import { ExportRow } from '../lib/exportData';
+import { ExportMenu } from './ExportMenu';
+import { useHighContrast } from '../hooks/useHighContrast';
 
 interface Operation {
   id: string;
@@ -42,8 +46,34 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   data,
   className = '',
 }) => {
+  const [highContrast] = useHighContrast();
   // Показываем все данные для оси X
   const filteredData = data;
+
+  const buildExportRows = (): ExportRow[] => {
+    const rows: ExportRow[] = [];
+    (filteredData || []).forEach((p) => {
+      rows.push({
+        date: p.date || p.label,
+        category: 'Доходы',
+        amount: p.cumulativeIncome,
+        type: 'income',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Расходы',
+        amount: p.cumulativeExpense,
+        type: 'expense',
+      });
+      rows.push({
+        date: p.date || p.label,
+        category: 'Чистый поток',
+        amount: p.cumulativeNetCashFlow,
+        type: 'net',
+      });
+    });
+    return rows;
+  };
 
   // Проверяем, есть ли данные для отображения
   const hasData = filteredData && filteredData.length > 0;
@@ -55,12 +85,21 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
       >
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-            Денежный поток
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Накопление доходов, расходов и чистого потока с начала периода
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                Денежный поток
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Накопление доходов, расходов и чистего потока с начала периода
+              </p>
+            </div>
+            <ExportMenu
+              filenameBase="income_expense"
+              buildRows={buildExportRows}
+              columns={['date', 'category', 'amount', 'type']}
+            />
+          </div>
         </div>
 
         <div className="h-80 relative">
@@ -112,19 +151,28 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
       className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
     >
       <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-          Денежный поток
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Накопление доходов, расходов и чистого потока с начала периода
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+              Денежный поток
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Накопление доходов, расходов и чистого потока с начала периода
+            </p>
+          </div>
+          <ExportMenu
+            filenameBase="income_expense"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+          />
+        </div>
       </div>
 
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -145,13 +193,22 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               tickFormatter={(value) => formatMoney(value)}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend />
+            <Legend
+              verticalAlign="bottom"
+              align="center"
+              content={
+                <ChartLegend
+                  preferredOrder={['Доходы', 'Расходы', 'Чистый поток']}
+                />
+              }
+              wrapperStyle={{ paddingTop: 8 }}
+            />
             <Line
               type="monotone"
               dataKey="cumulativeIncome"
-              stroke="#10b981"
-              strokeWidth={1.5}
-              strokeOpacity={0.6}
+              stroke={highContrast ? '#065f46' : '#10b981'}
+              strokeWidth={highContrast ? 3 : 1.5}
+              strokeOpacity={highContrast ? 0.9 : 0.6}
               dot={(props: {
                 payload?: CumulativeDataPoint;
                 cx?: number;
@@ -168,10 +225,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={3}
-                    fill="#10b981"
-                    strokeWidth={1.5}
-                    stroke="#10b981"
+                    r={highContrast ? 4 : 3}
+                    fill={highContrast ? '#065f46' : '#10b981'}
+                    strokeWidth={highContrast ? 2 : 1.5}
+                    stroke={highContrast ? '#065f46' : '#10b981'}
                   />
                 );
               }}
@@ -180,9 +237,9 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <Line
               type="monotone"
               dataKey="cumulativeExpense"
-              stroke="#ef4444"
-              strokeWidth={1.5}
-              strokeOpacity={0.6}
+              stroke={highContrast ? '#7c2d12' : '#ef4444'}
+              strokeWidth={highContrast ? 3 : 1.5}
+              strokeOpacity={highContrast ? 0.9 : 0.6}
               dot={(props: {
                 payload?: CumulativeDataPoint;
                 cx?: number;
@@ -199,10 +256,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                   <circle
                     cx={cx}
                     cy={cy}
-                    r={3}
-                    fill="#ef4444"
-                    strokeWidth={1.5}
-                    stroke="#ef4444"
+                    r={highContrast ? 4 : 3}
+                    fill={highContrast ? '#7c2d12' : '#ef4444'}
+                    strokeWidth={highContrast ? 2 : 1.5}
+                    stroke={highContrast ? '#7c2d12' : '#ef4444'}
                   />
                 );
               }}
@@ -211,9 +268,9 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <Line
               type="monotone"
               dataKey="cumulativeNetCashFlow"
-              stroke="#3b82f6"
-              strokeWidth={3}
-              strokeOpacity={0.8}
+              stroke={highContrast ? '#111827' : '#3b82f6'}
+              strokeWidth={highContrast ? 4 : 3}
+              strokeOpacity={highContrast ? 1 : 0.8}
               dot={false}
               name="Чистый поток"
             />

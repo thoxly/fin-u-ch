@@ -53,6 +53,10 @@ Thumbs.db
 .temp/
 .tmp/
 
+# SSL certificates (never commit private keys!)
+ops/nginx/ssl/*.pem
+!ops/nginx/ssl/README.md
+
 # Docker
 *.env.docker
 
