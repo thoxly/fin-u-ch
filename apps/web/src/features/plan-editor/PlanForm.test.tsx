@@ -121,6 +121,39 @@ describe('PlanForm', () => {
         expect(calledWith.amount).toBe(1000);
         expect(calledWith.type).toBe('expense');
       });
+
+      await waitFor(() => {
+        expect(mockUnwrap).toHaveBeenCalled();
+      });
+
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled();
+      });
+    });
+
+    it('includes budgetId when passed', async () => {
+      const mockUnwrap = jest.fn().mockResolvedValue({});
+      mockCreatePlan.mockReturnValue({ unwrap: mockUnwrap });
+
+      renderWithProvider(
+        <PlanForm
+          plan={null}
+          budgetId="test-budget-123"
+          onClose={mockOnClose}
+        />
+      );
+
+      const amountInput = screen.getByRole('spinbutton');
+      fireEvent.change(amountInput, { target: { value: '500' } });
+
+      const submitButton = screen.getByText('Создать');
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockCreatePlan).toHaveBeenCalledTimes(1);
+        const calledWith = mockCreatePlan.mock.calls[0][0];
+        expect(calledWith.budgetId).toBe('test-budget-123');
+      });
     });
   });
 
