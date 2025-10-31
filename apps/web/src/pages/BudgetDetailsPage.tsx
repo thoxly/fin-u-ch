@@ -20,18 +20,32 @@ import { formatMoney } from '../shared/lib/money';
 import type { PlanItem } from '@fin-u-ch/shared';
 import { skipToken } from '@reduxjs/toolkit/query';
 
+// RTK Query возвращает данные с датами как строки
+type PlanItemFromAPI = Omit<
+  PlanItem,
+  'startDate' | 'endDate' | 'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  startDate: string;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
+
 export const BudgetDetailsPage = () => {
   const { budgetId } = useParams<{ budgetId: string }>();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<PlanItem | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlanItemFromAPI | null>(null);
 
   const { data: budget, isLoading: isBudgetLoading } = useGetBudgetQuery(
     budgetId || skipToken
   );
-  const { data: plans = [], isLoading: isPlansLoading } = useGetPlansQuery(
+  const { data: plansData = [], isLoading: isPlansLoading } = useGetPlansQuery(
     budgetId ? { budgetId } : skipToken
   );
+  // RTK Query возвращает строки, но типы указывают Date - приводим к правильному типу
+  const plans = plansData as unknown as PlanItemFromAPI[];
 
   // Отладочная информация
   console.log('BudgetDetailsPage - plans:', plans);
@@ -69,7 +83,7 @@ export const BudgetDetailsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (plan: PlanItem) => {
+  const handleEdit = (plan: PlanItemFromAPI) => {
     console.log('BudgetDetailsPage - handleEdit called with plan:', plan);
     setEditingPlan(plan);
     setIsFormOpen(true);
@@ -120,38 +134,39 @@ export const BudgetDetailsPage = () => {
     {
       key: 'type',
       header: 'Тип',
-      render: (plan: PlanItem) => getTypeLabel(plan.type),
+      render: (plan: PlanItemFromAPI) => getTypeLabel(plan.type),
       width: '100px',
     },
     {
       key: 'startDate',
       header: 'Начало',
-      render: (plan: PlanItem) => formatDate(plan.startDate),
+      render: (plan: PlanItemFromAPI) => formatDate(plan.startDate),
       width: '110px',
     },
     {
       key: 'amount',
       header: 'Сумма',
-      render: (plan: PlanItem) => formatMoney(plan.amount, plan.currency),
+      render: (plan: PlanItemFromAPI) =>
+        formatMoney(plan.amount, plan.currency),
       width: '130px',
     },
     {
       key: 'articleName',
       header: 'Статья',
-      render: (plan: PlanItem) =>
-        (plan as PlanItem & { article?: { name: string } }).article?.name ||
-        '-',
+      render: (plan: PlanItemFromAPI) =>
+        (plan as PlanItemFromAPI & { article?: { name: string } }).article
+          ?.name || '-',
     },
     {
       key: 'repeat',
       header: 'Повтор',
-      render: (plan: PlanItem) => getRepeatLabel(plan.repeat),
+      render: (plan: PlanItemFromAPI) => getRepeatLabel(plan.repeat),
       width: '140px',
     },
     {
       key: 'actions',
       header: 'Действия',
-      render: (plan: PlanItem) => (
+      render: (plan: PlanItemFromAPI) => (
         <div className="flex gap-2">
           <Button
             variant="secondary"

@@ -12,9 +12,26 @@ import {
 } from '../../store/api/catalogsApi';
 import { toISODate } from '../../shared/lib/date';
 import type { PlanItem } from '@shared/types/operations';
+import {
+  OperationType,
+  Periodicity,
+  PlanStatus,
+} from '@shared/constants/enums';
+
+// API возвращает даты как строки, не как Date объекты
+type PlanItemFromAPI = Omit<
+  PlanItem,
+  'startDate' | 'endDate' | 'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  startDate: string;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
 
 interface PlanFormProps {
-  plan: PlanItem | null;
+  plan: PlanItemFromAPI | null;
   budgetId?: string;
   onClose: () => void;
 }
@@ -85,7 +102,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
     e.preventDefault();
 
     const planData = {
-      type,
+      type: type as OperationType,
       startDate: new Date(startDate).toISOString(),
       endDate: endDate ? new Date(endDate).toISOString() : undefined,
       amount: parseFloat(amount),
@@ -93,8 +110,8 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
       articleId: articleId || undefined,
       accountId: accountId || undefined,
       budgetId: budgetId || plan?.budgetId || undefined,
-      repeat,
-      status,
+      repeat: repeat as Periodicity,
+      status: status as PlanStatus,
     };
 
     try {
