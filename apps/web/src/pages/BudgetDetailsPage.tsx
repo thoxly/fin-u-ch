@@ -19,6 +19,8 @@ import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { PlanItem } from '@fin-u-ch/shared';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useNotification } from '../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 
 // RTK Query возвращает данные с датами как строки
 type PlanItemFromAPI = Omit<
@@ -47,12 +49,9 @@ export const BudgetDetailsPage = () => {
   // RTK Query возвращает строки, но типы указывают Date - приводим к правильному типу
   const plans = plansData as unknown as PlanItemFromAPI[];
 
-  // Отладочная информация
-  console.log('BudgetDetailsPage - plans:', plans);
-  console.log('BudgetDetailsPage - isPlansLoading:', isPlansLoading);
-  console.log('BudgetDetailsPage - editingPlan:', editingPlan);
   const [deletePlan] = useDeletePlanMutation();
   const [updateBudget] = useUpdateBudgetMutation();
+  const { showSuccess, showError } = useNotification();
 
   // Определяем период для отчета на основе дат бюджета
   const reportPeriod = useMemo(() => {
@@ -84,14 +83,19 @@ export const BudgetDetailsPage = () => {
   };
 
   const handleEdit = (plan: PlanItemFromAPI) => {
-    console.log('BudgetDetailsPage - handleEdit called with plan:', plan);
     setEditingPlan(plan);
     setIsFormOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Вы уверены, что хотите удалить эту плановую запись?')) {
-      await deletePlan(id);
+      try {
+        await deletePlan(id).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.PLAN.DELETE_SUCCESS);
+      } catch (error) {
+        console.error('Failed to delete plan:', error);
+        showError(NOTIFICATION_MESSAGES.PLAN.DELETE_ERROR);
+      }
     }
   };
 
