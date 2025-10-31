@@ -1,5 +1,11 @@
 {
-  "ExpandedNodes": ["", "\\apps\\api", "\\apps\\api\\src\\services"],
-  "SelectedNode": "\\apps",
+  "ExpandedNodes": [
+    "",
+    "\\apps",
+    "\\apps\\api",
+    "\\apps\\api\\src",
+    "\\apps\\api\\src\\config",
+    "\\apps\\api\\src\\services"
+  ],
   "PreviewInSolutionExplorer": false
 }
