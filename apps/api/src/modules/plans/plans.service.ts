@@ -86,11 +86,15 @@ export class PlansService {
     }
 
     // Проверяем и корректируем дату, если она не существует в месяце
-    const adjustedStartDate = new Date(data.startDate);
-    const originalDay = data.startDate.getDate();
+    const startDate =
+      data.startDate instanceof Date
+        ? data.startDate
+        : new Date(data.startDate);
+    const adjustedStartDate = new Date(startDate);
+    const originalDay = startDate.getDate();
     const testDate = new Date(
-      data.startDate.getFullYear(),
-      data.startDate.getMonth(),
+      startDate.getFullYear(),
+      startDate.getMonth(),
       originalDay
     );
 
@@ -99,10 +103,18 @@ export class PlansService {
       adjustedStartDate.setDate(0);
     }
 
+    // Конвертируем endDate если он передан
+    const endDate = data.endDate
+      ? data.endDate instanceof Date
+        ? data.endDate
+        : new Date(data.endDate)
+      : undefined;
+
     const result = await prisma.planItem.create({
       data: {
         ...data,
         startDate: adjustedStartDate,
+        endDate,
         companyId,
       },
     });
@@ -121,13 +133,18 @@ export class PlansService {
     await this.getById(id, companyId);
 
     // Если обновляется startDate, проверяем и корректируем дату
-    const updateData = { ...data };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = { ...data };
     if (data.startDate) {
-      const adjustedStartDate = new Date(data.startDate);
-      const originalDay = data.startDate.getDate();
+      const startDate =
+        data.startDate instanceof Date
+          ? data.startDate
+          : new Date(data.startDate);
+      const adjustedStartDate = new Date(startDate);
+      const originalDay = startDate.getDate();
       const testDate = new Date(
-        data.startDate.getFullYear(),
-        data.startDate.getMonth(),
+        startDate.getFullYear(),
+        startDate.getMonth(),
         originalDay
       );
 
@@ -135,7 +152,18 @@ export class PlansService {
         // День не существует в этом месяце, устанавливаем последний день месяца
         adjustedStartDate.setDate(0);
         updateData.startDate = adjustedStartDate;
+      } else {
+        updateData.startDate = adjustedStartDate;
       }
+    }
+
+    // Конвертируем endDate если он передан
+    if (data.endDate !== undefined) {
+      updateData.endDate = data.endDate
+        ? data.endDate instanceof Date
+          ? data.endDate
+          : new Date(data.endDate)
+        : null;
     }
 
     const result = await prisma.planItem.update({
