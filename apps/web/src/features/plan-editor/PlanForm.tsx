@@ -12,11 +12,7 @@ import {
 } from '../../store/api/catalogsApi';
 import { toISODate } from '../../shared/lib/date';
 import type { PlanItem } from '@shared/types/operations';
-import {
-  OperationType,
-  Periodicity,
-  PlanStatus,
-} from '@shared/constants/enums';
+import { OperationType, Periodicity, PlanStatus } from '@fin-u-ch/shared';
 
 // API возвращает даты как строки, не как Date объекты
 type PlanItemFromAPI = Omit<
