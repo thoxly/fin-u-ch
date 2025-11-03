@@ -226,13 +226,12 @@ export class PlansService {
     const normalizedPeriodStart = normalizeDate(periodStart);
     const normalizedPeriodEnd = normalizeDate(periodEnd);
     const normalizedEndDate = normalizeDate(endDate);
+    let normalizedCurrentDate = normalizeDate(currentDate);
 
     while (
-      currentDate <= normalizedEndDate &&
-      currentDate <= normalizedPeriodEnd
+      normalizedCurrentDate <= normalizedEndDate &&
+      normalizedCurrentDate <= normalizedPeriodEnd
     ) {
-      const normalizedCurrentDate = normalizeDate(currentDate);
-
       if (normalizedCurrentDate >= normalizedPeriodStart) {
         // Определяем месяц из текущей даты (до любых модификаций)
         // Используем напрямую год и месяц из currentDate для определения месяца
@@ -344,6 +343,9 @@ export class PlansService {
         default:
           return result;
       }
+
+      // Обновляем нормализованную дату после изменения currentDate
+      normalizedCurrentDate = normalizeDate(currentDate);
     }
 
     return result;
