@@ -13,7 +13,7 @@ export const formatMoney = (
 
 export const formatNumber = (value: number, decimals = 2): string => {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
 };
