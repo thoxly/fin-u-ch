@@ -30,6 +30,11 @@ export const getPeriodRange = (
   const formatDate = (date: Date) => format(date, 'yyyy-MM-dd');
 
   switch (periodFormat) {
+    case 'day':
+      return {
+        from: formatDate(date),
+        to: formatDate(date),
+      };
     case 'week':
       return {
         from: formatDate(startOfWeek(date, { weekStartsOn: 1 })), // Понедельник
@@ -65,6 +70,11 @@ export const getNextPeriod = (
   const fromDate = new Date(currentRange.from);
 
   switch (periodFormat) {
+    case 'day': {
+      const nextDay = new Date(fromDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      return getPeriodRange(nextDay, periodFormat);
+    }
     case 'week':
       return getPeriodRange(addWeeks(fromDate, 1), periodFormat);
     case 'month':
@@ -88,6 +98,11 @@ export const getPreviousPeriod = (
   const fromDate = new Date(currentRange.from);
 
   switch (periodFormat) {
+    case 'day': {
+      const prevDay = new Date(fromDate);
+      prevDay.setDate(prevDay.getDate() - 1);
+      return getPeriodRange(prevDay, periodFormat);
+    }
     case 'week':
       return getPeriodRange(subWeeks(fromDate, 1), periodFormat);
     case 'month':
@@ -112,6 +127,8 @@ export const formatPeriodDisplay = (
   const toDate = new Date(range.to);
 
   switch (periodFormat) {
+    case 'day':
+      return format(fromDate, 'dd MMM yyyy', { locale: ru });
     case 'week':
       return `${format(fromDate, 'dd MMM', { locale: ru })} - ${format(toDate, 'dd MMM yyyy', { locale: ru })}`;
     case 'month':
@@ -131,6 +148,7 @@ export const formatPeriodDisplay = (
  * Получить опции для селектора формата периода
  */
 export const getPeriodFormatOptions = () => [
+  { value: 'day', label: 'День' },
   { value: 'week', label: 'Неделя' },
   { value: 'month', label: 'Месяц' },
   { value: 'quarter', label: 'Квартал' },

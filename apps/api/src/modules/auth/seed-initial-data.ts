@@ -15,9 +15,9 @@ export async function seedInitialData(
       {
         companyId,
         name: 'Расчетный счет в банке',
-        number: '40702810000000000001',
+        number: null,
         currency: 'RUB',
-        openingBalance: 100000,
+        openingBalance: 0,
         isActive: true,
       },
       {
@@ -25,15 +25,7 @@ export async function seedInitialData(
         name: 'Касса',
         number: null,
         currency: 'RUB',
-        openingBalance: 10000,
-        isActive: true,
-      },
-      {
-        companyId,
-        name: 'Валютный счет',
-        number: '40702840000000000001',
-        currency: 'USD',
-        openingBalance: 5000,
+        openingBalance: 0,
         isActive: true,
       },
       {
@@ -41,7 +33,7 @@ export async function seedInitialData(
         name: 'Корпоративная карта',
         number: null,
         currency: 'RUB',
-        openingBalance: 20000,
+        openingBalance: 0,
         isActive: true,
       },
     ],
