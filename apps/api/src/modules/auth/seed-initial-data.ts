@@ -87,6 +87,55 @@ export async function seedInitialData(
     ],
   });
 
+  // 3. ПОДРАЗДЕЛЕНИЯ - минимальный набор
+  await tx.department.createMany({
+    data: [
+      {
+        companyId,
+        name: 'Основное подразделение',
+        description: null,
+      },
+    ],
+  });
+
+  // 4. КОНТРАГЕНТЫ - минимальный набор
+  await tx.counterparty.createMany({
+    data: [
+      {
+        companyId,
+        name: 'Общий контрагент',
+        category: 'other',
+        inn: null,
+        description: null,
+      },
+    ],
+  });
+
+  // 5. СДЕЛКИ - минимальный набор
+  const createdDepartments = await tx.department.findMany({
+    where: { companyId },
+    take: 1,
+  });
+  const createdCounterparties = await tx.counterparty.findMany({
+    where: { companyId },
+    take: 1,
+  });
+
+  if (createdDepartments.length > 0 && createdCounterparties.length > 0) {
+    await tx.deal.createMany({
+      data: [
+        {
+          companyId,
+          name: 'Общая сделка',
+          departmentId: createdDepartments[0].id,
+          counterpartyId: createdCounterparties[0].id,
+          amount: null,
+          description: null,
+        },
+      ],
+    });
+  }
+
   logger.info('Initial data seeded successfully', {
     companyId,
     accounts: accounts.count,

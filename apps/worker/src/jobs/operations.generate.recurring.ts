@@ -81,29 +81,46 @@ export async function generateRecurringOperations(
           continue;
         }
 
-        // Создаем новую операцию-копию
-        await prisma.operation.create({
-          data: {
-            companyId: template.companyId,
-            type: template.type,
-            operationDate: today,
-            amount: template.amount,
-            currency: template.currency,
-            accountId: template.accountId,
-            sourceAccountId: template.sourceAccountId,
-            targetAccountId: template.targetAccountId,
-            articleId: template.articleId,
-            counterpartyId: template.counterpartyId,
-            dealId: template.dealId,
-            departmentId: template.departmentId,
-            description: template.description
-              ? `${template.description} (автоматически)`
-              : 'Периодическая операция',
-            repeat: 'none', // Дочерняя операция не повторяется
-            recurrenceParentId: template.id,
-            recurrenceEndDate: null,
-            isConfirmed: false, // Требует подтверждения
-          },
+        // Создаем новую операцию-копию в транзакции для атомарности
+        await prisma.$transaction(async (tx) => {
+          // Дополнительная проверка на существование операции в транзакции
+          const existingInTx = await tx.operation.findFirst({
+            where: {
+              recurrenceParentId: template.id,
+              operationDate: today,
+            },
+          });
+
+          if (existingInTx) {
+            logger.debug(
+              `Operation already exists in transaction for template ${template.id} on ${today.toISOString()}`
+            );
+            return;
+          }
+
+          await tx.operation.create({
+            data: {
+              companyId: template.companyId,
+              type: template.type,
+              operationDate: today,
+              amount: template.amount,
+              currency: template.currency,
+              accountId: template.accountId,
+              sourceAccountId: template.sourceAccountId,
+              targetAccountId: template.targetAccountId,
+              articleId: template.articleId,
+              counterpartyId: template.counterpartyId,
+              dealId: template.dealId,
+              departmentId: template.departmentId,
+              description: template.description
+                ? `${template.description} (автоматически)`
+                : 'Периодическая операция',
+              repeat: 'none', // Дочерняя операция не повторяется
+              recurrenceParentId: template.id,
+              recurrenceEndDate: null,
+              isConfirmed: false, // Требует подтверждения
+            },
+          });
         });
 
         totalCreated++;
