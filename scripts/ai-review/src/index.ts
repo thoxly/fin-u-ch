@@ -170,15 +170,45 @@ These are optional improvements.`;
     // Dismiss previous REQUEST_CHANGES reviews from this bot
     await githubClient.dismissPreviousReviews(prNumber);
 
-    // Create review
+    // Create review (with safe fallback to summary-only comment on failure)
     const commitId = await githubClient.getLatestCommit(prNumber);
-    await githubClient.createReview(
-      prNumber,
-      commitId,
-      comments,
-      reviewEvent,
-      reviewBody
-    );
+    try {
+      await githubClient.createReview(
+        prNumber,
+        commitId,
+        comments,
+        reviewEvent,
+        reviewBody
+      );
+    } catch (err) {
+      console.warn(
+        '  ⚠ Failed to create review with inline comments. Falling back to summary-only comment.',
+        err
+      );
+      try {
+        await githubClient.createReview(
+          prNumber,
+          commitId,
+          [],
+          'COMMENT',
+          `${reviewBody}\n\n_(Inline comments unavailable due to diff mapping.)_`
+        );
+      } catch (fallbackErr) {
+        console.warn(
+          '  ⚠ Failed to create summary-only review comment as well.',
+          fallbackErr
+        );
+        // If only medium/low suggestions, do not fail the job because of a commenting error
+        if (criticalIssues.length === 0 && highIssues.length === 0) {
+          console.log(
+            'Continuing without publishing review since only minor suggestions were found.'
+          );
+          return;
+        }
+        // For critical/high issues, rethrow to fail the job
+        throw fallbackErr;
+      }
+    }
 
     console.log(`✅ Review completed!\n`);
     console.log(`Event: ${reviewEvent}`);

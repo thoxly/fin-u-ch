@@ -334,36 +334,48 @@ Begin your review:`;
     targetLine: number
   ): number | null {
     const lines = patch.split('\n');
-    let newFileLineNumber = 0;
+    // Position in the unified diff for this file. GitHub expects a 1-based index
+    // across the entire file patch, including hunk headers.
     let diffPosition = 0;
+    // Tracks the current line number in the NEW file (+ side) within the current hunk.
+    let newFileLineNumber = 0;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       diffPosition++;
 
-      // Parse hunk header: @@ -old_start,old_count +new_start,new_count @@
+      // Hunk header: @@ -old_start,old_count +new_start,new_count @@
       if (line.startsWith('@@')) {
         const match = line.match(/\+(\d+)/);
         if (match) {
           newFileLineNumber = parseInt(match[1], 10) - 1;
         }
+        // Continue; header counts toward position, but not a commentable line itself.
         continue;
       }
 
-      // Lines starting with + are additions
       if (line.startsWith('+')) {
+        // Added line exists in the new file; can be commented on.
         newFileLineNumber++;
         if (newFileLineNumber === targetLine) {
           return diffPosition;
         }
-      }
-      // Lines starting with space are context (unchanged)
-      else if (line.startsWith(' ')) {
+      } else if (line.startsWith(' ')) {
+        // Context (unchanged) line also exists in the new file; can be commented on.
         newFileLineNumber++;
+        if (newFileLineNumber === targetLine) {
+          return diffPosition;
+        }
+      } else if (line.startsWith('-')) {
+        // Deletion; does not advance new file line number and cannot be commented via position.
+        continue;
+      } else {
+        // Any other line (shouldn't normally occur) — treat conservatively.
+        continue;
       }
-      // Lines starting with - are deletions (don't increment new line number)
     }
 
+    // Target line not present in the diff for this file (likely unchanged outside hunks).
     return null;
   }
 }
