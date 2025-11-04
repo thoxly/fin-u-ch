@@ -4,7 +4,7 @@ import { validateRequired } from '../../utils/validation';
 
 export interface CreateOperationDTO {
   type: string;
-  operationDate: Date;
+  operationDate: Date | string;
   amount: number;
   currency?: string;
   accountId?: string;
@@ -16,7 +16,7 @@ export interface CreateOperationDTO {
   departmentId?: string;
   description?: string;
   repeat?: string;
-  recurrenceEndDate?: Date;
+  recurrenceEndDate?: Date | string;
 }
 
 export interface OperationFilters {
@@ -87,9 +87,32 @@ export class OperationsService {
   }
 
   async create(companyId: string, data: CreateOperationDTO) {
+    // Конвертируем operationDate из строки в Date если нужно
+    const operationDate =
+      data.operationDate instanceof Date
+        ? data.operationDate
+        : new Date(data.operationDate as string);
+
+    // Проверяем что дата валидна
+    if (isNaN(operationDate.getTime())) {
+      throw new AppError('Invalid operationDate format', 400);
+    }
+
+    // Конвертируем recurrenceEndDate из строки в Date если нужно
+    const recurrenceEndDate = data.recurrenceEndDate
+      ? data.recurrenceEndDate instanceof Date
+        ? data.recurrenceEndDate
+        : new Date(data.recurrenceEndDate as string)
+      : undefined;
+
+    // Проверяем что recurrenceEndDate валидна если указана
+    if (recurrenceEndDate && isNaN(recurrenceEndDate.getTime())) {
+      throw new AppError('Invalid recurrenceEndDate format', 400);
+    }
+
     validateRequired({
       type: data.type,
-      operationDate: data.operationDate,
+      operationDate,
       amount: data.amount,
     });
 
@@ -98,9 +121,25 @@ export class OperationsService {
       throw new AppError('Type must be income, expense, or transfer', 400);
     }
 
+    // Вспомогательная функция для очистки строк
+    const cleanString = (value: string | undefined | null): string | null => {
+      if (!value || typeof value !== 'string') return null;
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
+    // Валидируем и очищаем обязательные поля
+    let validatedAccountId: string | null = null;
+    let validatedArticleId: string | null = null;
+    let validatedSourceAccountId: string | null = null;
+    let validatedTargetAccountId: string | null = null;
+
     // Validate based on type
     if (data.type === 'income' || data.type === 'expense') {
-      if (!data.accountId || !data.articleId) {
+      // Проверяем что accountId и articleId не пустые строки или undefined
+      validatedAccountId = cleanString(data.accountId);
+      validatedArticleId = cleanString(data.articleId);
+      if (!validatedAccountId || !validatedArticleId) {
         throw new AppError(
           'accountId and articleId are required for income/expense operations',
           400
@@ -109,22 +148,48 @@ export class OperationsService {
     }
 
     if (data.type === 'transfer') {
-      if (!data.sourceAccountId || !data.targetAccountId) {
+      // Проверяем что sourceAccountId и targetAccountId не пустые строки или undefined
+      validatedSourceAccountId = cleanString(data.sourceAccountId);
+      validatedTargetAccountId = cleanString(data.targetAccountId);
+      if (!validatedSourceAccountId || !validatedTargetAccountId) {
         throw new AppError(
           'sourceAccountId and targetAccountId are required for transfer operations',
           400
         );
       }
-      if (data.sourceAccountId === data.targetAccountId) {
+      if (validatedSourceAccountId === validatedTargetAccountId) {
         throw new AppError('Source and target accounts must be different', 400);
       }
     }
 
+    // Очищаем пустые строки в опциональных полях и используем очищенные значения
+    const cleanData: any = {
+      type: data.type,
+      operationDate,
+      amount: data.amount,
+      currency: data.currency || 'RUB',
+      companyId,
+      repeat: data.repeat || 'none',
+      recurrenceEndDate,
+    };
+
+    // Добавляем поля в зависимости от типа операции (используем уже валидированные значения)
+    if (data.type === 'income' || data.type === 'expense') {
+      cleanData.accountId = validatedAccountId;
+      cleanData.articleId = validatedArticleId;
+    } else if (data.type === 'transfer') {
+      cleanData.sourceAccountId = validatedSourceAccountId;
+      cleanData.targetAccountId = validatedTargetAccountId;
+    }
+
+    // Опциональные поля
+    cleanData.counterpartyId = cleanString(data.counterpartyId);
+    cleanData.dealId = cleanString(data.dealId);
+    cleanData.departmentId = cleanString(data.departmentId);
+    cleanData.description = cleanString(data.description);
+
     return prisma.operation.create({
-      data: {
-        ...data,
-        companyId,
-      },
+      data: cleanData,
     });
   }
 

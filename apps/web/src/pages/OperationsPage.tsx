@@ -108,6 +108,20 @@ export const OperationsPage = () => {
     setIsFormOpen(true);
   };
 
+  const handleCancel = async (id: string) => {
+    if (
+      window.confirm('Отменить эту операцию? Она будет удалена из базы данных.')
+    ) {
+      try {
+        await deleteOperation(id).unwrap();
+        showSuccess('Операция отменена и удалена');
+      } catch (error) {
+        console.error('Failed to cancel operation:', error);
+        showError('Ошибка при отмене операции');
+      }
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Вы уверены, что хотите удалить эту операцию?')) {
       try {
@@ -221,47 +235,63 @@ export const OperationsPage = () => {
       render: (op: Operation) => (
         <div className="flex gap-2">
           {!op.isConfirmed && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirm(op.id);
-              }}
-              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-              title="Подтвердить"
-            >
-              <Check size={16} />
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConfirm(op.id);
+                }}
+                className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 p-1 rounded hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                title="Подтвердить"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCancel(op.id);
+                }}
+                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                title="Отменить"
+              >
+                <X size={16} />
+              </button>
+            </>
           )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(op);
-            }}
-            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
-            title="Изменить"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopy(op);
-            }}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-            title="Копировать"
-          >
-            <Copy size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(op.id);
-            }}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Удалить"
-          >
-            <Trash2 size={16} />
-          </button>
+          {op.isConfirmed && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEdit(op);
+                }}
+                className="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 p-1 rounded hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                title="Изменить"
+              >
+                <Pencil size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy(op);
+                }}
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                title="Копировать"
+              >
+                <Copy size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(op.id);
+                }}
+                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                title="Удалить"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
         </div>
       ),
       width: '180px',
@@ -389,7 +419,11 @@ export const OperationsPage = () => {
               columns={columns}
               data={operations}
               keyExtractor={(op) => op.id}
-              rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
+              rowClassName={(op) =>
+                !op.isConfirmed
+                  ? 'bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-400 dark:border-l-yellow-500'
+                  : ''
+              }
             />
           )}
         </Card>
