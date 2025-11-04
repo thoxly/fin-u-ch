@@ -153,7 +153,7 @@ export class OperationsService {
     await this.getById(id, companyId);
 
     return prisma.operation.update({
-      where: { id },
+      where: { id, companyId },
       data: { isConfirmed: true },
     });
   }
