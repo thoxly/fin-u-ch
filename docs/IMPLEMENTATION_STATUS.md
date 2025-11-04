@@ -23,7 +23,6 @@ This document provides a comprehensive analysis of the current implementation st
 - **Cashflow (ОДДС)**: Activity-based cash flow reporting ✅
 - **Budget (БДДС)**: Planned operations reporting ✅
 - **Plan-Fact Analysis**: Comparison of planned vs actual operations ✅
-- **Detailed Cash Flow (DDS)**: Detailed account balances and flows ✅
 
 **Note**: All report APIs are fully implemented and working. Frontend has some placeholder implementations.
 

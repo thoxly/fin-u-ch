@@ -56,7 +56,6 @@ packages/shared/
 - Dashboard report structure
 - Cash flow report types
 - Plan-fact analysis interfaces
-- DDS (Detailed Cash Flow) types
 
 ## Constants
 

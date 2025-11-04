@@ -42,14 +42,28 @@ export const ArticlesPage = () => {
     }
   };
 
+  const getActivityLabel = (activity: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      operating: 'Операционная',
+      investing: 'Инвестиционная',
+      financing: 'Финансовая',
+    };
+    return activity ? labels[activity] || activity : '-';
+  };
+
   const columns = [
     { key: 'name', header: 'Название' },
     {
       key: 'type',
       header: 'Тип',
-      render: (a: Article) => (a.type === 'income' ? 'Доход' : 'Расход'),
+      render: (a: Article) =>
+        a.type === 'income' ? 'Поступления' : 'Списания',
     },
-    { key: 'activity', header: 'Деятельность' },
+    {
+      key: 'activity',
+      header: 'Деятельность',
+      render: (a: Article) => getActivityLabel(a.activity),
+    },
     {
       key: 'isActive',
       header: 'Активна',

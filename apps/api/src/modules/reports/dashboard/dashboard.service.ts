@@ -17,7 +17,7 @@ export interface DashboardResponse {
     netProfit: number;
   };
 
-  // Серии для графика доходов/расходов
+  // Серии для графика поступлений/списаний
   incomeExpenseSeries: Array<{
     date: string;
     label: string;
@@ -62,7 +62,7 @@ export interface DashboardResponse {
 }
 
 export interface CumulativeCashFlowResponse {
-  // Накопительные данные для графика доходов/расходов/чистого потока
+  // Накопительные данные для графика поступлений/списаний/чистого потока
   cumulativeSeries: Array<{
     date: string;
     label: string;
@@ -158,7 +158,7 @@ export class DashboardService {
       params.periodTo
     );
 
-    // 1. Рассчитываем доходы/расходы по интервалам
+    // 1. Рассчитываем поступления/списания по интервалам
     const incomeExpenseSeries = intervals.map((interval) => {
       const intervalOps = operations.filter((op: PrismaOperation) => {
         const opDate = new Date(op.operationDate);
@@ -241,7 +241,7 @@ export class DashboardService {
   }
 
   /**
-   * Получает накопительные данные для графика доходов/расходов/чистого потока
+   * Получает накопительные данные для графика поступлений/списаний/чистого потока
    */
   async getCumulativeCashFlow(
     companyId: string,

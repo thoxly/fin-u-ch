@@ -65,8 +65,8 @@ export const OperationsPage = () => {
 
   const getOperationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      income: 'Доход',
-      expense: 'Расход',
+      income: 'Поступление',
+      expense: 'Списание',
       transfer: 'Перевод',
     };
     return labels[type] || type;

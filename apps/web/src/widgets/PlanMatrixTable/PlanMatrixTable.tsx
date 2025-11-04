@@ -209,7 +209,7 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
                 {/* Детали потока */}
                 {expandedSections[activity.activity] && (
                   <>
-                    {/* Доходы */}
+                    {/* Поступления */}
                     {activity.incomeGroups.map((group) => (
                       <tr
                         key={`${activity.activity}-income-${group.articleId}`}
@@ -244,7 +244,7 @@ export const PlanMatrixTable: React.FC<PlanMatrixTableProps> = ({
                       </tr>
                     ))}
 
-                    {/* Расходы */}
+                    {/* Списания */}
                     {activity.expenseGroups.map((group) => (
                       <tr
                         key={`${activity.activity}-expense-${group.articleId}`}

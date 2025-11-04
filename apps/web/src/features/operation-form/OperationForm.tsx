@@ -103,8 +103,8 @@ export const OperationForm = ({ operation, onClose }: OperationFormProps) => {
   };
 
   const typeOptions = [
-    { value: 'income', label: 'Доход' },
-    { value: 'expense', label: 'Расход' },
+    { value: 'income', label: 'Поступление' },
+    { value: 'expense', label: 'Списание' },
     { value: 'transfer', label: 'Перевод' },
   ];
 

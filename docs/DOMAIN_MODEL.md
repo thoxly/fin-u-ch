@@ -212,7 +212,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 - **Demo System**: Полностью функциональная система демо-данных
 - **Worker App**: Автоматическая генерация зарплатных операций
 - **Caching**: Redis кэширование для отчетов
-- **Reports API**: Все типы отчетов реализованы в API (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact, DDS)
+- **Reports API**: Все типы отчетов реализованы в API (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact)
 - **Multi-tenancy**: Полная изоляция данных по companyId
 - **Notifications System**: Полная система уведомлений с Redux store и UI компонентами
 - **UI Customization**: Настройка иконок навигации и тем компании

@@ -73,8 +73,8 @@ export const ArticleForm = ({
         value={type}
         onChange={(e) => setType(e.target.value)}
         options={[
-          { value: 'income', label: 'Доход' },
-          { value: 'expense', label: 'Расход' },
+          { value: 'income', label: 'Поступления' },
+          { value: 'expense', label: 'Списания' },
         ]}
         required
       />
@@ -84,8 +84,8 @@ export const ArticleForm = ({
         onChange={(e) => setActivity(e.target.value)}
         options={[
           { value: 'operating', label: 'Операционная' },
-          { value: 'investment', label: 'Инвестиционная' },
-          { value: 'financial', label: 'Финансовая' },
+          { value: 'investing', label: 'Инвестиционная' },
+          { value: 'financing', label: 'Финансовая' },
         ]}
         required
       />

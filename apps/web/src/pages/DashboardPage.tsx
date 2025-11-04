@@ -40,7 +40,7 @@ export const DashboardPage = () => {
     periodFormat: periodFilters.format, // Передаем формат периода
   });
 
-  // Получаем накопительные данные для графика доходов/расходов
+  // Получаем накопительные данные для графика поступлений/списаний
   const { data: cumulativeData, isLoading: cumulativeLoading } =
     useGetCumulativeCashFlowQuery({
       periodFrom: periodFilters.range.from,
@@ -139,7 +139,7 @@ export const DashboardPage = () => {
           <>
             {/* Карточки с показателями */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Доходы */}
+              {/* Поступления */}
               <Card className="bg-white dark:bg-gray-800 border-l-4 border-l-green-500 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -172,7 +172,7 @@ export const DashboardPage = () => {
                 </div>
               </Card>
 
-              {/* Расходы */}
+              {/* Списания */}
               <Card className="bg-white dark:bg-gray-800 border-l-4 border-l-red-500 shadow-sm">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -248,7 +248,7 @@ export const DashboardPage = () => {
 
             {/* Графики и таблицы */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* График доходов/расходов/чистого потока */}
+              {/* График поступлений/списаний/чистого потока */}
               <IncomeExpenseChart data={incomeExpenseData} />
 
               {/* График динамики поступлений и списаний */}

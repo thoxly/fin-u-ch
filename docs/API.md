@@ -621,42 +621,6 @@ Compare planned vs actual operations.
 ]
 ```
 
-### Detailed Cash Flow (DDS)
-
-#### GET /api/reports/dds
-
-Returns a detailed cash flow statement with account balances and flows.
-
-**Query Parameters:**
-
-- `periodFrom`: date
-- `periodTo`: date
-- `accountId`: string (optional)
-- `limit`: number (optional, default 10000)
-- `offset`: number (optional, default 0)
-
-**Response:**
-
-```json
-{
-  "accounts": [
-    {
-      "accountId": "string",
-      "accountName": "string",
-      "openingBalance": "number",
-      "closingBalance": "number"
-    }
-  ],
-  "inflows": [...],
-  "outflows": [...],
-  "summary": {
-    "totalInflow": "number",
-    "totalOutflow": "number",
-    "netCashflow": "number"
-  }
-}
-```
-
 ---
 
 ### Company UI Settings
@@ -729,7 +693,7 @@ Defined in `apps/api/src/app.ts`:
 - `/api/operations` - Financial operations
 - `/api/budgets` - Budget management (new)
 - `/api/plans` - Budget planning (enhanced with budgetId support)
-- `/api/reports` - Financial reports (dashboard, cashflow, bdds, dds, planfact)
+- `/api/reports` - Financial reports (dashboard, cashflow, bdds, planfact)
 - `/api/demo` - Demo system (credentials, create, info, exists, delete)
 
 Use Swagger UI at `/api-docs` for the authoritative, up-to-date contract.
