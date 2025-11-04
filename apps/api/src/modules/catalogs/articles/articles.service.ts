@@ -81,7 +81,7 @@ export class ArticlesService {
     await this.getById(id, companyId);
 
     return prisma.article.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -91,7 +91,7 @@ export class ArticlesService {
 
     // Soft delete
     return prisma.article.update({
-      where: { id },
+      where: { id, companyId },
       data: { isActive: false },
     });
   }
@@ -100,7 +100,7 @@ export class ArticlesService {
     await this.getById(id, companyId);
 
     return prisma.article.update({
-      where: { id },
+      where: { id, companyId },
       data: { isActive: false },
     });
   }
@@ -109,7 +109,7 @@ export class ArticlesService {
     await this.getById(id, companyId);
 
     return prisma.article.update({
-      where: { id },
+      where: { id, companyId },
       data: { isActive: true },
     });
   }
