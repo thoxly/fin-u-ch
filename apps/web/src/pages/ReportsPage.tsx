@@ -8,7 +8,6 @@ import { Select } from '../shared/ui/Select';
 import {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
-  useGetDdsReportQuery,
 } from '../store/api/reportsApi';
 import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
@@ -19,7 +18,7 @@ import { PeriodFiltersState } from '@fin-u-ch/shared';
 import { getPeriodRange } from '../shared/lib/period';
 import { skipToken } from '@reduxjs/toolkit/query';
 
-type ReportType = 'cashflow' | 'dds';
+type ReportType = 'cashflow';
 
 type ReportMode = 'fact' | 'plan' | 'both';
 
@@ -239,21 +238,13 @@ export const ReportsPage = () => {
         </Card>
 
         {/* Контент отчетов */}
-        {reportType === 'cashflow' && (
-          <CashflowTab
-            periodFrom={periodFilters.range.from}
-            periodTo={periodFilters.range.to}
-            periodFormat={periodFilters.format}
-            reportMode={reportMode}
-            selectedBudget={selectedBudget}
-          />
-        )}
-        {reportType === 'dds' && (
-          <DDSTab
-            periodFrom={periodFilters.range.from}
-            periodTo={periodFilters.range.to}
-          />
-        )}
+        <CashflowTab
+          periodFrom={periodFilters.range.from}
+          periodTo={periodFilters.range.to}
+          periodFormat={periodFilters.format}
+          reportMode={reportMode}
+          selectedBudget={selectedBudget}
+        />
       </div>
     </Layout>
   );
@@ -386,107 +377,5 @@ const CashflowTab = ({
       periodFrom={periodFrom}
       periodTo={periodTo}
     />
-  );
-};
-
-// ДДС детально
-const DDSTab = ({
-  periodFrom,
-  periodTo,
-}: {
-  periodFrom: string;
-  periodTo: string;
-}) => {
-  const { data, isLoading, error } = useGetDdsReportQuery({
-    periodFrom,
-    periodTo,
-  });
-
-  if (isLoading) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          Загрузка...
-        </div>
-      </Card>
-    );
-  }
-
-  if (error) {
-    return (
-      <Card>
-        <div className="text-red-600 dark:text-red-400">
-          Ошибка загрузки отчета
-        </div>
-      </Card>
-    );
-  }
-
-  if (!data) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          Нет данных
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Детальный денежный поток
-        </h2>
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Период: {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
-          {new Date(periodTo).toLocaleDateString('ru-RU')}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800">
-                <th className="px-4 py-2 text-left border-b">Счет</th>
-                <th className="px-4 py-2 text-right border-b">
-                  Начальный остаток
-                </th>
-                <th className="px-4 py-2 text-right border-b">Поступления</th>
-                <th className="px-4 py-2 text-right border-b">Списания</th>
-                <th className="px-4 py-2 text-right border-b">
-                  Конечный остаток
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.accounts.map((account) => {
-                const balanceChange =
-                  account.closingBalance - account.openingBalance;
-                const totalIncome = balanceChange > 0 ? balanceChange : 0;
-                const totalExpense =
-                  balanceChange < 0 ? Math.abs(balanceChange) : 0;
-
-                return (
-                  <tr key={account.accountId} className="border-b">
-                    <td className="px-4 py-2">{account.accountName}</td>
-                    <td className="px-4 py-2 text-right">
-                      {formatNumber(account.openingBalance)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-green-600 dark:text-green-400">
-                      {formatNumber(totalIncome)}
-                    </td>
-                    <td className="px-4 py-2 text-right text-red-600 dark:text-red-400">
-                      {formatNumber(totalExpense)}
-                    </td>
-                    <td className="px-4 py-2 text-right font-semibold">
-                      {formatNumber(account.closingBalance)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </Card>
   );
 };
