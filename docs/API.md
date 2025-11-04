@@ -138,7 +138,8 @@ Refresh access token using refresh token.
   "type": "string",
   "activity": "string",
   "indicator": "string",
-  "isActive": "boolean"
+  "isActive": "boolean",
+  "counterpartyId": "string (optional)"
 }
 ```
 
@@ -253,6 +254,7 @@ Get operations with filtering options.
 - `dealId`: string (optional)
 - `departmentId`: string (optional)
 - `counterpartyId`: string (optional)
+- `isConfirmed`: boolean (optional) - Filter by confirmation status
 
 #### POST /api/operations
 
@@ -267,7 +269,9 @@ Create a new operation.
   "amount": "number",
   "currency": "string",
   "accountId": "string",
-  "articleId": "string"
+  "articleId": "string",
+  "repeat": "string (optional)",
+  "recurrenceEndDate": "date (optional)"
 }
 ```
 
@@ -280,7 +284,35 @@ Create a new operation.
   "amount": "number",
   "currency": "string",
   "sourceAccountId": "string",
-  "targetAccountId": "string"
+  "targetAccountId": "string",
+  "repeat": "string (optional)",
+  "recurrenceEndDate": "date (optional)"
+}
+```
+
+**Recurring Operations Fields:**
+
+- `repeat`: Periodicity of recurring operations
+  - Possible values: `none` (default), `daily`, `weekly`, `monthly`, `quarterly`, `semiannual`, `annual`
+- `recurrenceEndDate`: Optional end date for recurring operations. If not specified, operations repeat indefinitely.
+
+**Recurring Operations Behavior:**
+
+- When `repeat` is set to value other than `none`, the operation becomes a template for generating recurring operations
+- A worker job runs daily at 00:01 and creates new operations based on templates
+- Generated operations are marked as unconfirmed (`isConfirmed: false`) and require manual confirmation
+- Unconfirmed operations appear in the list but are not included in reports
+
+#### PATCH /api/operations/:id/confirm
+
+Confirm a pending operation. This marks the operation as confirmed and includes it in all reports.
+
+**Response:**
+
+```json
+{
+  "id": "string",
+  "isConfirmed": true
 }
 ```
 
@@ -621,42 +653,6 @@ Compare planned vs actual operations.
 ]
 ```
 
-### Detailed Cash Flow (DDS)
-
-#### GET /api/reports/dds
-
-Returns a detailed cash flow statement with account balances and flows.
-
-**Query Parameters:**
-
-- `periodFrom`: date
-- `periodTo`: date
-- `accountId`: string (optional)
-- `limit`: number (optional, default 10000)
-- `offset`: number (optional, default 0)
-
-**Response:**
-
-```json
-{
-  "accounts": [
-    {
-      "accountId": "string",
-      "accountName": "string",
-      "openingBalance": "number",
-      "closingBalance": "number"
-    }
-  ],
-  "inflows": [...],
-  "outflows": [...],
-  "summary": {
-    "totalInflow": "number",
-    "totalOutflow": "number",
-    "netCashflow": "number"
-  }
-}
-```
-
 ---
 
 ### Company UI Settings
@@ -729,7 +725,7 @@ Defined in `apps/api/src/app.ts`:
 - `/api/operations` - Financial operations
 - `/api/budgets` - Budget management (new)
 - `/api/plans` - Budget planning (enhanced with budgetId support)
-- `/api/reports` - Financial reports (dashboard, cashflow, bdds, dds, planfact)
+- `/api/reports` - Financial reports (dashboard, cashflow, bdds, planfact)
 - `/api/demo` - Demo system (credentials, create, info, exists, delete)
 
 Use Swagger UI at `/api-docs` for the authoritative, up-to-date contract.

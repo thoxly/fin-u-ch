@@ -4,7 +4,6 @@ import type {
   CashflowReport,
   BDDSReport,
   PlanFactReport,
-  DDSReport,
 } from '@shared/types/reports';
 
 interface DashboardParams {
@@ -92,13 +91,6 @@ export const reportsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Report'],
     }),
-    getDdsReport: builder.query<DDSReport, ReportParams>({
-      query: (params) => ({
-        url: '/reports/dds',
-        params,
-      }),
-      providesTags: ['Report'],
-    }),
   }),
 });
 
@@ -108,5 +100,4 @@ export const {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
   useGetPlanFactReportQuery,
-  useGetDdsReportQuery,
 } = reportsApi;

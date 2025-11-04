@@ -9,6 +9,7 @@ interface GetOperationsParams {
   dealId?: string;
   departmentId?: string;
   counterpartyId?: string;
+  isConfirmed?: boolean;
 }
 
 export const operationsApi = apiSlice.injectEndpoints({
@@ -53,6 +54,13 @@ export const operationsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
+    confirmOperation: builder.mutation<Operation, string>({
+      query: (id) => ({
+        url: `/operations/${id}/confirm`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+    }),
   }),
 });
 
@@ -62,4 +70,5 @@ export const {
   useCreateOperationMutation,
   useUpdateOperationMutation,
   useDeleteOperationMutation,
+  useConfirmOperationMutation,
 } = operationsApi;

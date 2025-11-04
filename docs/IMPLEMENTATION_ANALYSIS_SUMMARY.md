@@ -22,7 +22,6 @@ This document provides a comprehensive analysis of the current implementation st
 - **Cashflow API (ОДДС)**: Activity-based cash flow reporting
 - **Budget API (БДДС)**: Planned operations reporting
 - **Plan-Fact Analysis API**: Comparison of planned vs actual operations
-- **Detailed Cash Flow API (DDS)**: Detailed account balances and flows
 
 #### Business Logic
 

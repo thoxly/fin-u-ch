@@ -11,8 +11,23 @@ import type {
 export const catalogsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Articles
-    getArticles: builder.query<Article[], void>({
-      query: () => '/articles',
+    getArticles: builder.query<
+      Article[],
+      {
+        type?: 'income' | 'expense';
+        activity?: 'operating' | 'investing' | 'financing';
+        isActive?: boolean;
+      } | void
+    >({
+      query: (filters) => {
+        const params = new URLSearchParams();
+        if (filters?.type) params.append('type', filters.type);
+        if (filters?.activity) params.append('activity', filters.activity);
+        if (filters?.isActive !== undefined)
+          params.append('isActive', String(filters.isActive));
+        const queryString = params.toString();
+        return `/articles${queryString ? `?${queryString}` : ''}`;
+      },
       providesTags: ['Article'],
     }),
     createArticle: builder.mutation<Article, Partial<Article>>({
@@ -38,6 +53,20 @@ export const catalogsApi = apiSlice.injectEndpoints({
       query: (id) => ({
         url: `/articles/${id}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: ['Article'],
+    }),
+    archiveArticle: builder.mutation<Article, string>({
+      query: (id) => ({
+        url: `/articles/${id}/archive`,
+        method: 'POST',
+      }),
+      invalidatesTags: ['Article'],
+    }),
+    unarchiveArticle: builder.mutation<Article, string>({
+      query: (id) => ({
+        url: `/articles/${id}/unarchive`,
+        method: 'POST',
       }),
       invalidatesTags: ['Article'],
     }),
@@ -206,6 +235,8 @@ export const {
   useCreateArticleMutation,
   useUpdateArticleMutation,
   useDeleteArticleMutation,
+  useArchiveArticleMutation,
+  useUnarchiveArticleMutation,
   useGetAccountsQuery,
   useCreateAccountMutation,
   useUpdateAccountMutation,

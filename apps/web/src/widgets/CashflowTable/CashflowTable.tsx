@@ -63,7 +63,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     if (!planData || !planData.activities) return 0;
 
     for (const activity of planData.activities) {
-      // Ищем в доходах
+      // Ищем в поступлениях
       const incomeRow = activity.incomeGroups.find(
         (row) => row.articleId === articleId
       );
@@ -72,7 +72,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
         return monthData?.amount || 0;
       }
 
-      // Ищем в расходах
+      // Ищем в списаниях
       const expenseRow = activity.expenseGroups.find(
         (row) => row.articleId === articleId
       );
@@ -304,10 +304,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                       </td>
                     </tr>
 
-                    {/* Детализация (доходы и расходы) */}
+                    {/* Детализация (поступления и списания) */}
                     {expandedSections[activity.activity] && (
                       <>
-                        {/* Доходы */}
+                        {/* Поступления */}
                         {activity.incomeGroups.map((group) => (
                           <tr
                             key={`income-${group.articleId}`}
@@ -520,7 +520,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                     {/* Детали потока */}
                     {expandedSections[activity.activity] && (
                       <>
-                        {/* Доходы */}
+                        {/* Поступления */}
                         {activity.incomeGroups.map((group) => (
                           <tr
                             key={`${activity.activity}-income-${group.articleId}`}
@@ -583,7 +583,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           </tr>
                         ))}
 
-                        {/* Расходы */}
+                        {/* Списания */}
                         {activity.expenseGroups.map((group) => (
                           <tr
                             key={`${activity.activity}-expense-${group.articleId}`}

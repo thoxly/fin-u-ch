@@ -98,4 +98,44 @@ router.patch('/:id', articlesController.update);
  */
 router.delete('/:id', articlesController.delete);
 
+/**
+ * @swagger
+ * /api/articles/{id}/archive:
+ *   post:
+ *     summary: Archive article
+ *     tags: [Articles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Article archived
+ */
+router.post('/:id/archive', articlesController.archive);
+
+/**
+ * @swagger
+ * /api/articles/{id}/unarchive:
+ *   post:
+ *     summary: Unarchive article
+ *     tags: [Articles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Article unarchived
+ */
+router.post('/:id/unarchive', articlesController.unarchive);
+
 export default router;

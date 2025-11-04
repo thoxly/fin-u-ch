@@ -12,7 +12,7 @@ export interface DashboardReport {
     netProfit: number;
   };
 
-  // Серии для графика доходов/расходов
+  // Серии для графика поступлений/списаний
   incomeExpenseSeries: Array<{
     date: string;
     label: string;
@@ -124,34 +124,6 @@ export interface PlanFactRow {
   fact: number;
   delta: number;
   deltaPercent: number;
-}
-
-export interface DDSReport {
-  accounts: DDSAccountBalance[];
-  inflows: DDSFlow[];
-  outflows: DDSFlow[];
-  summary: DDSSummary;
-}
-
-export interface DDSAccountBalance {
-  accountId: string;
-  accountName: string;
-  openingBalance: number;
-  closingBalance: number;
-}
-
-export interface DDSFlow {
-  articleId: string;
-  articleName: string;
-  type: 'income' | 'expense';
-  months: Record<string, number>;
-  total: number;
-}
-
-export interface DDSSummary {
-  totalInflow: number;
-  totalOutflow: number;
-  netCashflow: number;
 }
 
 export interface ReportFilters {

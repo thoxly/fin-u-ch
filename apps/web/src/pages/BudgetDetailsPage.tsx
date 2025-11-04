@@ -115,9 +115,9 @@ export const BudgetDetailsPage = () => {
 
   const getTypeLabel = (type: string) => {
     return type === 'income'
-      ? 'Доход'
+      ? 'Поступление'
       : type === 'expense'
-        ? 'Расход'
+        ? 'Списание'
         : 'Перевод';
   };
 

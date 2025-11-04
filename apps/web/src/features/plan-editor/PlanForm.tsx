@@ -118,8 +118,8 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   };
 
   const typeOptions = [
-    { value: 'income', label: 'Доход' },
-    { value: 'expense', label: 'Расход' },
+    { value: 'income', label: 'Поступления' },
+    { value: 'expense', label: 'Списания' },
   ];
 
   const currencyOptions = [

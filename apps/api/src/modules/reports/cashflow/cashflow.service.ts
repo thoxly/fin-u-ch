@@ -65,6 +65,7 @@ export class CashflowService {
           lte: params.periodTo,
         },
         type: { in: ['income', 'expense'] },
+        isConfirmed: true,
       },
       include: {
         article: {
