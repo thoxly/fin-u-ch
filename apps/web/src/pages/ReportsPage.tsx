@@ -10,7 +10,7 @@ import {
   useGetDdsReportQuery,
 } from '../store/api/reportsApi';
 import { useGetBudgetsQuery } from '../store/api/budgetsApi';
-import { formatMoney } from '../shared/lib/money';
+import { formatMoney, formatNumber } from '../shared/lib/money';
 import { toISODate } from '../shared/lib/date';
 import { subMonths, startOfMonth } from 'date-fns';
 import { CashflowTable } from '../widgets/CashflowTable';
@@ -340,7 +340,7 @@ const DDSTab = ({
           {new Date(periodTo).toLocaleDateString('ru-RU')}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-50 dark:bg-gray-800">
                 <th className="px-4 py-2 text-left border-b">Счет</th>
@@ -359,16 +359,16 @@ const DDSTab = ({
                 <tr key={account.accountId} className="border-b">
                   <td className="px-4 py-2">{account.accountName}</td>
                   <td className="px-4 py-2 text-right">
-                    {formatMoney(account.openingBalance, account.currency)}
+                    {formatNumber(account.openingBalance)}
                   </td>
                   <td className="px-4 py-2 text-right text-green-600 dark:text-green-400">
-                    {formatMoney(account.totalIncome, account.currency)}
+                    {formatNumber(account.totalIncome)}
                   </td>
                   <td className="px-4 py-2 text-right text-red-600 dark:text-red-400">
-                    {formatMoney(account.totalExpense, account.currency)}
+                    {formatNumber(account.totalExpense)}
                   </td>
                   <td className="px-4 py-2 text-right font-semibold">
-                    {formatMoney(account.closingBalance, account.currency)}
+                    {formatNumber(account.closingBalance)}
                   </td>
                 </tr>
               ))}

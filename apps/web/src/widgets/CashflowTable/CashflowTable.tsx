@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { formatMoney } from '../../shared/lib/money';
+import { formatNumber } from '../../shared/lib/money';
 import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 
 interface CashflowTableProps {
@@ -96,9 +96,12 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     // const totalColumns = allMonths.length + 2; // месяцы + статья + итого
     const articleColumnWidth = 240; // фиксированная ширина для колонки "Статья"
     const totalColumnWidth = 120; // фиксированная ширина для колонки "Итого"
+    // Если showPlan включен, нужно вдвое больше места на каждую колонку месяца
+    const monthMultiplier = showPlan ? 2 : 1;
     const monthColumnWidth = Math.max(
-      100,
-      (1000 - articleColumnWidth - totalColumnWidth) / allMonths.length
+      showPlan ? 200 : 100, // минимальная ширина для двух подколонок (План+Факт)
+      ((1000 - articleColumnWidth - totalColumnWidth) / allMonths.length) *
+        monthMultiplier
     );
 
     return {
@@ -106,7 +109,12 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       month: monthColumnWidth,
       total: totalColumnWidth,
     };
-  }, [allMonths.length]);
+  }, [allMonths.length, showPlan]);
+
+  // Ширина одной подколонки (План или Факт) - половина от ширины месяца
+  const subColumnWidth = useMemo(() => {
+    return showPlan ? columnWidths.month / 2 : columnWidths.month;
+  }, [columnWidths.month, showPlan]);
 
   // Вычисляем остаток на конец периода (кумулятивно)
   const cumulativeBalances = useMemo(() => {
@@ -153,7 +161,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       </div>
 
       {/* Таблица с freeze и скроллом */}
-      <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
+      <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]">
         <table className="w-full border-collapse relative table-fixed">
           <thead className="sticky top-0 z-30">
             <tr className="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-b-2 border-gray-300 dark:border-gray-950">
@@ -190,10 +198,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 <th className="sticky left-0 bg-gradient-to-b from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"></th>
                 {allMonths.map((month) => (
                   <React.Fragment key={month}>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 min-w-[50px] border-l border-gray-300 dark:border-gray-700">
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 min-w-[50px] md:min-w-[100px] border-l border-gray-300 dark:border-gray-700">
                       План
                     </th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 min-w-[50px] border-l border-gray-300 dark:border-gray-700">
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 min-w-[50px] md:min-w-[100px] border-l border-gray-300 dark:border-gray-700">
                       Факт
                     </th>
                   </React.Fragment>
@@ -202,7 +210,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               </tr>
             )}
           </thead>
-          <tbody className="text-xs">
+          <tbody className="text-[9px]">
             {/* Если нет фактических данных, но есть план - показываем план */}
             {data.activities.length === 0 &&
             planData &&
@@ -258,15 +266,15 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             <React.Fragment key={month}>
                               <td
                                 className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700"
-                                style={{ width: `${columnWidths.month}px` }}
+                                style={{ width: `${subColumnWidth}px` }}
                               >
-                                {formatMoney(monthNetPlan)}
+                                {formatNumber(monthNetPlan)}
                               </td>
                               <td
                                 className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
-                                style={{ width: `${columnWidths.month}px` }}
+                                style={{ width: `${subColumnWidth}px` }}
                               >
-                                {formatMoney(monthNet)}
+                                {formatNumber(monthNet)}
                               </td>
                             </React.Fragment>
                           );
@@ -277,7 +285,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                               className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
                               style={{ width: `${columnWidths.month}px` }}
                             >
-                              {formatMoney(monthNet)}
+                              {formatNumber(monthNet)}
                             </td>
                           );
                         }
@@ -286,7 +294,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700"
                         style={{ width: `${columnWidths.total}px` }}
                       >
-                        {formatMoney(activity.netCashflow)}
+                        {formatNumber(activity.netCashflow)}
                       </td>
                     </tr>
 
@@ -300,7 +308,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             className="bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
                           >
                             <td
-                              className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                              className="px-4 py-2.5 pl-10 text-xs text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                               style={{ width: `${columnWidths.article}px` }}
                             >
                               <span className="flex items-center">
@@ -318,16 +326,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 );
                                 return (
                                   <React.Fragment key={monthData.month}>
-                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                      {formatMoney(planAmount)}
+                                    <td
+                                      className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{ width: `${subColumnWidth}px` }}
+                                    >
+                                      {formatNumber(planAmount)}
                                     </td>
                                     <td
-                                      className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                       style={{
-                                        width: `${columnWidths.month}px`,
+                                        width: `${subColumnWidth}px`,
                                       }}
                                     >
-                                      {formatMoney(monthData.amount)}
+                                      {formatNumber(monthData.amount)}
                                     </td>
                                   </React.Fragment>
                                 );
@@ -335,19 +346,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 return (
                                   <td
                                     key={monthData.month}
-                                    className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                     style={{ width: `${columnWidths.month}px` }}
                                   >
-                                    {formatMoney(monthData.amount)}
+                                    {formatNumber(monthData.amount)}
                                   </td>
                                 );
                               }
                             })}
                             <td
-                              className="px-4 py-2.5 text-right text-sm font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-l-2 border-gray-300 dark:border-gray-700"
+                              className="px-4 py-2.5 text-right text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-l-2 border-gray-300 dark:border-gray-700"
                               style={{ width: `${columnWidths.total}px` }}
                             >
-                              {formatMoney(group.total)}
+                              {formatNumber(group.total)}
                             </td>
                           </tr>
                         ))}
@@ -358,7 +369,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             key={`expense-${group.articleId}`}
                             className="bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
                           >
-                            <td className="px-4 py-2.5 pl-10 text-sm text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
+                            <td className="px-4 py-2.5 pl-10 text-xs text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]">
                               <span className="flex items-center">
                                 <span className="text-red-600 dark:text-red-400 mr-2">
                                   ↓
@@ -374,16 +385,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 );
                                 return (
                                   <React.Fragment key={monthData.month}>
-                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                      {formatMoney(planAmount)}
+                                    <td
+                                      className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{ width: `${subColumnWidth}px` }}
+                                    >
+                                      {formatNumber(planAmount)}
                                     </td>
                                     <td
-                                      className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                       style={{
-                                        width: `${columnWidths.month}px`,
+                                        width: `${subColumnWidth}px`,
                                       }}
                                     >
-                                      {formatMoney(monthData.amount)}
+                                      {formatNumber(monthData.amount)}
                                     </td>
                                   </React.Fragment>
                                 );
@@ -391,19 +405,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 return (
                                   <td
                                     key={monthData.month}
-                                    className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                     style={{ width: `${columnWidths.month}px` }}
                                   >
-                                    {formatMoney(monthData.amount)}
+                                    {formatNumber(monthData.amount)}
                                   </td>
                                 );
                               }
                             })}
                             <td
-                              className="px-4 py-2.5 text-right text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-l-2 border-gray-300 dark:border-gray-700"
+                              className="px-4 py-2.5 text-right text-xs font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-l-2 border-gray-300 dark:border-gray-700"
                               style={{ width: `${columnWidths.total}px` }}
                             >
-                              {formatMoney(group.total)}
+                              {formatNumber(group.total)}
                             </td>
                           </tr>
                         ))}
@@ -457,15 +471,15 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             <React.Fragment key={month}>
                               <td
                                 className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700"
-                                style={{ width: `${columnWidths.month}px` }}
+                                style={{ width: `${subColumnWidth}px` }}
                               >
-                                {formatMoney(monthNetPlan)}
+                                {formatNumber(monthNetPlan)}
                               </td>
                               <td
                                 className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
-                                style={{ width: `${columnWidths.month}px` }}
+                                style={{ width: `${subColumnWidth}px` }}
                               >
-                                {formatMoney(monthNet)}
+                                {formatNumber(monthNet)}
                               </td>
                             </React.Fragment>
                           );
@@ -476,7 +490,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                               className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700"
                               style={{ width: `${columnWidths.month}px` }}
                             >
-                              {formatMoney(monthNet)}
+                              {formatNumber(monthNet)}
                             </td>
                           );
                         }
@@ -485,7 +499,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700"
                         style={{ width: `${columnWidths.total}px` }}
                       >
-                        {formatMoney(activity.netCashflow)}
+                        {formatNumber(activity.netCashflow)}
                       </td>
                     </tr>
 
@@ -511,16 +525,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 );
                                 return (
                                   <React.Fragment key={monthData.month}>
-                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                      {formatMoney(planAmount)}
+                                    <td
+                                      className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{ width: `${subColumnWidth}px` }}
+                                    >
+                                      {formatNumber(planAmount)}
                                     </td>
                                     <td
-                                      className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                       style={{
-                                        width: `${columnWidths.month}px`,
+                                        width: `${subColumnWidth}px`,
                                       }}
                                     >
-                                      {formatMoney(monthData.amount)}
+                                      {formatNumber(monthData.amount)}
                                     </td>
                                   </React.Fragment>
                                 );
@@ -528,16 +545,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 return (
                                   <td
                                     key={monthData.month}
-                                    className="px-3 py-2.5 text-right text-sm text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                     style={{ width: `${columnWidths.month}px` }}
                                   >
-                                    {formatMoney(monthData.amount)}
+                                    {formatNumber(monthData.amount)}
                                   </td>
                                 );
                               }
                             })}
-                            <td className="px-4 py-2.5 text-right text-sm font-bold text-green-700 dark:text-green-400 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-900 dark:to-green-800 dark:hover:from-green-800 dark:hover:to-green-700 border-l-2 border-green-200 dark:border-gray-700">
-                              {formatMoney(group.total)}
+                            <td className="px-4 py-2.5 text-right text-xs font-bold text-green-700 dark:text-green-400 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-900 dark:to-green-800 dark:hover:from-green-800 dark:hover:to-green-700 border-l-2 border-green-200 dark:border-gray-700">
+                              {formatNumber(group.total)}
                             </td>
                           </tr>
                         ))}
@@ -561,16 +578,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 );
                                 return (
                                   <React.Fragment key={monthData.month}>
-                                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 border-l border-gray-200 dark:border-gray-700/50">
-                                      {formatMoney(planAmount)}
+                                    <td
+                                      className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50"
+                                      style={{ width: `${subColumnWidth}px` }}
+                                    >
+                                      {formatNumber(planAmount)}
                                     </td>
                                     <td
-                                      className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                      className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                       style={{
-                                        width: `${columnWidths.month}px`,
+                                        width: `${subColumnWidth}px`,
                                       }}
                                     >
-                                      {formatMoney(monthData.amount)}
+                                      {formatNumber(monthData.amount)}
                                     </td>
                                   </React.Fragment>
                                 );
@@ -578,16 +598,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                 return (
                                   <td
                                     key={monthData.month}
-                                    className="px-3 py-2.5 text-right text-sm text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
+                                    className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50"
                                     style={{ width: `${columnWidths.month}px` }}
                                   >
-                                    {formatMoney(monthData.amount)}
+                                    {formatNumber(monthData.amount)}
                                   </td>
                                 );
                               }
                             })}
-                            <td className="px-4 py-2.5 text-right text-sm font-bold text-red-700 dark:text-red-400 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 dark:from-red-900 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-700 border-l-2 border-red-200 dark:border-gray-700">
-                              {formatMoney(group.total)}
+                            <td className="px-4 py-2.5 text-right text-xs font-bold text-red-700 dark:text-red-400 bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-200 dark:from-red-900 dark:to-red-800 dark:hover:from-red-800 dark:hover:to-red-700 border-l-2 border-red-200 dark:border-gray-700">
+                              {formatNumber(group.total)}
                             </td>
                           </tr>
                         ))}
@@ -599,7 +619,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             {/* Итоговые строки */}
             <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
               <td
-                className="px-4 py-4 font-bold text-sm text-gray-900 dark:text-gray-100 uppercase tracking-wide sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                className="px-4 py-4 font-bold text-xs text-gray-900 dark:text-gray-100 uppercase tracking-wide sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                 style={{ width: `${columnWidths.article}px` }}
               >
                 Общий денежный поток
@@ -633,14 +653,17 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 if (showPlan) {
                   return (
                     <React.Fragment key={month}>
-                      <td className="px-3 py-4 text-right text-sm font-bold text-gray-600 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600">
-                        {formatMoney(monthTotalPlan)}
+                      <td
+                        className="px-3 py-4 text-right text-xs font-bold text-gray-600 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600"
+                        style={{ width: `${subColumnWidth}px` }}
+                      >
+                        {formatNumber(monthTotalPlan)}
                       </td>
                       <td
-                        className="px-3 py-4 text-right text-sm font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
-                        style={{ width: `${columnWidths.month}px` }}
+                        className="px-3 py-4 text-right text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
+                        style={{ width: `${subColumnWidth}px` }}
                       >
-                        {formatMoney(monthTotal)}
+                        {formatNumber(monthTotal)}
                       </td>
                     </React.Fragment>
                   );
@@ -648,25 +671,25 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   return (
                     <td
                       key={month}
-                      className="px-3 py-4 text-right text-sm font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
+                      className="px-3 py-4 text-right text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600"
                       style={{ width: `${columnWidths.month}px` }}
                     >
-                      {formatMoney(monthTotal)}
+                      {formatNumber(monthTotal)}
                     </td>
                   );
                 }
               })}
               <td
-                className="px-4 py-4 text-right text-base font-extrabold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-l-2 border-gray-300 dark:border-gray-600"
+                className="px-4 py-4 text-right text-xs font-extrabold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-l-2 border-gray-300 dark:border-gray-600"
                 style={{ width: `${columnWidths.total}px` }}
               >
-                {formatMoney(totalNetCashflow)}
+                {formatNumber(totalNetCashflow)}
               </td>
             </tr>
 
             <tr className="bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 border-t border-indigo-300 dark:border-gray-700">
               <td
-                className="px-4 py-3 font-bold text-sm text-indigo-900 dark:text-indigo-300 sticky left-0 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                className="px-4 py-3 font-bold text-xs text-indigo-900 dark:text-indigo-300 sticky left-0 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                 style={{ width: `${columnWidths.article}px` }}
               >
                 Остаток на конец периода
@@ -677,16 +700,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   return (
                     <React.Fragment key={month}>
                       <td
-                        className="px-3 py-3 text-right text-sm text-gray-500 border-l border-indigo-300 dark:border-gray-700"
-                        style={{ width: `${columnWidths.month}px` }}
+                        className="px-3 py-3 text-right text-xs text-gray-500 border-l border-indigo-300 dark:border-gray-700"
+                        style={{ width: `${subColumnWidth}px` }}
                       >
-                        {formatMoney(balance)}
+                        {formatNumber(balance)}
                       </td>
                       <td
-                        className={`px-3 py-3 text-right text-sm font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
-                        style={{ width: `${columnWidths.month}px` }}
+                        className={`px-3 py-3 text-right text-xs font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                        style={{ width: `${subColumnWidth}px` }}
                       >
-                        {formatMoney(balance)}
+                        {formatNumber(balance)}
                       </td>
                     </React.Fragment>
                   );
@@ -694,23 +717,23 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   return (
                     <td
                       key={month}
-                      className={`px-3 py-3 text-right text-sm font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                      className={`px-3 py-3 text-right text-xs font-semibold border-l border-indigo-300 dark:border-gray-700 ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
                       style={{ width: `${columnWidths.month}px` }}
                     >
-                      {formatMoney(balance)}
+                      {formatNumber(balance)}
                     </td>
                   );
                 }
               })}
               <td
-                className={`px-4 py-3 text-right text-base font-bold border-l-2 border-indigo-300 dark:border-gray-700 ${
+                className={`px-4 py-3 text-right text-xs font-bold border-l-2 border-indigo-300 dark:border-gray-700 ${
                   (cumulativeBalances[cumulativeBalances.length - 1]?.balance ||
                     0) >= 0
                     ? 'text-indigo-900 dark:text-indigo-300 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800'
                     : 'text-red-900 dark:text-red-300 bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900 dark:to-red-800'
                 }`}
               >
-                {formatMoney(
+                {formatNumber(
                   cumulativeBalances[cumulativeBalances.length - 1]?.balance ||
                     0
                 )}

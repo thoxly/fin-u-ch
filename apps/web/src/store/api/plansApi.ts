@@ -1,5 +1,5 @@
 import { apiSlice } from './apiSlice';
-import type { PlanItem } from '@shared/types/operations';
+import type { PlanItem, CreatePlanItemDTO } from '@shared/types/operations';
 
 interface GetPlansParams {
   budgetId?: string;
@@ -18,7 +18,7 @@ export const plansApi = apiSlice.injectEndpoints({
       query: (id) => `/plans/${id}`,
       providesTags: ['Plan'],
     }),
-    createPlan: builder.mutation<PlanItem, Partial<PlanItem>>({
+    createPlan: builder.mutation<PlanItem, Partial<CreatePlanItemDTO>>({
       query: (data) => ({
         url: '/plans',
         method: 'POST',
@@ -28,7 +28,7 @@ export const plansApi = apiSlice.injectEndpoints({
     }),
     updatePlan: builder.mutation<
       PlanItem,
-      { id: string; data: Partial<PlanItem> }
+      { id: string; data: Partial<CreatePlanItemDTO> }
     >({
       query: ({ id, data }) => ({
         url: `/plans/${id}`,
