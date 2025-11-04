@@ -76,13 +76,41 @@ async function setupDemoUser() {
 async function createInitialCatalogs(companyId: string) {
   // Статьи доходов и расходов
   const articles = [
-    { name: 'Выручка от продаж', type: 'INCOME' as const },
-    { name: 'Прочие доходы', type: 'INCOME' as const },
-    { name: 'Материальные расходы', type: 'EXPENSE' as const },
-    { name: 'Зарплата', type: 'EXPENSE' as const },
-    { name: 'Аренда', type: 'EXPENSE' as const },
-    { name: 'Коммунальные услуги', type: 'EXPENSE' as const },
-    { name: 'Прочие расходы', type: 'EXPENSE' as const },
+    {
+      name: 'Выручка от продаж',
+      type: 'income' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Прочие доходы',
+      type: 'income' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Материальные расходы',
+      type: 'expense' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Зарплата',
+      type: 'expense' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Аренда',
+      type: 'expense' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Коммунальные услуги',
+      type: 'expense' as const,
+      activity: 'operating' as const,
+    },
+    {
+      name: 'Прочие расходы',
+      type: 'expense' as const,
+      activity: 'operating' as const,
+    },
   ];
 
   for (const article of articles) {
@@ -99,6 +127,7 @@ async function createInitialCatalogs(companyId: string) {
           companyId,
           name: article.name,
           type: article.type,
+          activity: article.activity,
         },
       });
     }

@@ -9,6 +9,8 @@ export interface NavigationItem {
   href?: string;
   icon?: string;
   children?: NavigationItem[];
+  disabled?: boolean;
+  tooltip?: string;
 }
 
 const DEFAULT_ICONS: Record<string, string> = {

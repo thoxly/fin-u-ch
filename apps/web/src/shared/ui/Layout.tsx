@@ -18,6 +18,8 @@ interface NavigationItem {
   name: string;
   href?: string;
   children?: NavigationItem[];
+  disabled?: boolean;
+  tooltip?: string;
 }
 
 const navigation: NavigationItem[] = [
@@ -28,7 +30,7 @@ const navigation: NavigationItem[] = [
     name: 'Отчеты',
     children: [
       { name: 'ДДС', href: '/reports?type=cashflow' },
-      { name: 'ДДС детально', href: '/reports?type=dds' },
+      { name: 'ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
     ],
   },
   {
@@ -154,6 +156,8 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             onClick: () => handleCreateCatalog(child.name),
           }
         : undefined,
+      disabled: child.disabled,
+      tooltip: child.tooltip,
     }));
 
     setMenuPopoverState({
