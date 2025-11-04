@@ -12,7 +12,7 @@ import { EmptyState } from '../shared/ui/EmptyState';
 import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
-import { RecurringOperations } from '../components/RecurringOperations';
+import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import {
   useGetOperationsQuery,
   useDeleteOperationMutation,
