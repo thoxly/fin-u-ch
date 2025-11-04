@@ -133,6 +133,7 @@ export class DashboardService {
           gte: params.periodFrom,
           lte: params.periodTo,
         },
+        isConfirmed: true,
       },
       include: {
         account: { select: { id: true, name: true } },
@@ -266,6 +267,7 @@ export class DashboardService {
           gte: params.periodFrom,
           lte: params.periodTo,
         },
+        isConfirmed: true,
       },
       include: {
         article: {
@@ -403,6 +405,7 @@ export class DashboardService {
         operationDate: {
           lt: intervals[0].start, // До начала периода
         },
+        isConfirmed: true,
       },
       orderBy: {
         operationDate: 'asc',

@@ -2,6 +2,7 @@ import { Input, Select, Button } from '@/shared/ui';
 import {
   useCreateArticleMutation,
   useUpdateArticleMutation,
+  useGetCounterpartiesQuery,
 } from '@/store/api/catalogsApi';
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
@@ -16,8 +17,11 @@ export const ArticleForm = ({
   const [name, setName] = useState(article?.name || '');
   const [type, setType] = useState(article?.type || 'expense');
   const [activity, setActivity] = useState(article?.activity || 'operating');
-  const [isActive, setIsActive] = useState(article?.isActive ?? true);
+  const [counterpartyId, setCounterpartyId] = useState(
+    article?.counterpartyId || ''
+  );
 
+  const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
   useEffect(() => {
@@ -27,19 +31,18 @@ export const ArticleForm = ({
         name: article.name,
         type: article.type,
         activity: article.activity,
-        isActive: article.isActive,
       });
       setName(article.name || '');
       setType(article.type || 'expense');
       setActivity(article.activity || 'operating');
-      setIsActive(article.isActive ?? true);
+      setCounterpartyId(article.counterpartyId || '');
     } else {
       console.log('ArticleForm - resetting form for new article');
       // Сброс при создании новой статьи
       setName('');
       setType('expense');
       setActivity('operating');
-      setIsActive(true);
+      setCounterpartyId('');
     }
   }, [article]);
 
@@ -49,10 +52,21 @@ export const ArticleForm = ({
       if (article) {
         await update({
           id: article.id,
-          data: { name, type, activity, isActive },
+          data: {
+            name,
+            type,
+            activity,
+            counterpartyId: counterpartyId || undefined,
+          },
         }).unwrap();
       } else {
-        await create({ name, type, activity, isActive }).unwrap();
+        await create({
+          name,
+          type,
+          activity,
+          isActive: true,
+          counterpartyId: counterpartyId || undefined,
+        }).unwrap();
       }
       onClose();
     } catch (error) {
@@ -89,14 +103,13 @@ export const ArticleForm = ({
         ]}
         required
       />
-      <label className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(e) => setIsActive(e.target.checked)}
-        />
-        <span className="text-sm">Активна</span>
-      </label>
+      <Select
+        label="Контрагент"
+        value={counterpartyId}
+        onChange={(e) => setCounterpartyId(e.target.value)}
+        options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
+        placeholder="Не выбран"
+      />
       <div className="flex gap-4 pt-4">
         <Button type="submit" disabled={isCreating || isUpdating}>
           {article ? 'Сохранить' : 'Создать'}

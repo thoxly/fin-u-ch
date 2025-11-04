@@ -15,6 +15,8 @@ export interface CreateOperationDTO {
   dealId?: string;
   departmentId?: string;
   description?: string;
+  repeat?: string;
+  recurrenceEndDate?: Date;
 }
 
 export interface OperationFilters {
@@ -25,6 +27,7 @@ export interface OperationFilters {
   dealId?: string;
   departmentId?: string;
   counterpartyId?: string;
+  isConfirmed?: boolean;
 }
 
 export class OperationsService {
@@ -36,6 +39,8 @@ export class OperationsService {
     if (filters.dealId) where.dealId = filters.dealId;
     if (filters.departmentId) where.departmentId = filters.departmentId;
     if (filters.counterpartyId) where.counterpartyId = filters.counterpartyId;
+    if (filters.isConfirmed !== undefined)
+      where.isConfirmed = filters.isConfirmed;
 
     if (filters.dateFrom || filters.dateTo) {
       where.operationDate = {};
@@ -141,6 +146,15 @@ export class OperationsService {
 
     return prisma.operation.delete({
       where: { id },
+    });
+  }
+
+  async confirmOperation(id: string, companyId: string) {
+    await this.getById(id, companyId);
+
+    return prisma.operation.update({
+      where: { id },
+      data: { isConfirmed: true },
     });
   }
 }

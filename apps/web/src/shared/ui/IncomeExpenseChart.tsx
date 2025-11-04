@@ -257,8 +257,9 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 payload?: CumulativeDataPoint;
                 cx?: number;
                 cy?: number;
+                index?: number;
               }) => {
-                const { payload, cx, cy } = props;
+                const { payload, cx, cy, index } = props;
                 // Проверяем, есть ли операции поступления в этот период
                 const operations = payload?.operations || [];
                 const hasIncome = operations.some(
@@ -267,6 +268,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 if (!hasIncome) return null;
                 return (
                   <circle
+                    key={`income-${index}-${cx}-${cy}`}
                     cx={cx}
                     cy={cy}
                     r={3}
@@ -288,8 +290,9 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 payload?: CumulativeDataPoint;
                 cx?: number;
                 cy?: number;
+                index?: number;
               }) => {
-                const { payload, cx, cy } = props;
+                const { payload, cx, cy, index } = props;
                 // Проверяем, есть ли операции списания в этот период
                 const operations = payload?.operations || [];
                 const hasExpense = operations.some(
@@ -298,6 +301,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 if (!hasExpense) return null;
                 return (
                   <circle
+                    key={`expense-${index}-${cx}-${cy}`}
                     cx={cx}
                     cy={cy}
                     r={3}

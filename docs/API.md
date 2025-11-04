@@ -138,7 +138,8 @@ Refresh access token using refresh token.
   "type": "string",
   "activity": "string",
   "indicator": "string",
-  "isActive": "boolean"
+  "isActive": "boolean",
+  "counterpartyId": "string (optional)"
 }
 ```
 
@@ -253,6 +254,7 @@ Get operations with filtering options.
 - `dealId`: string (optional)
 - `departmentId`: string (optional)
 - `counterpartyId`: string (optional)
+- `isConfirmed`: boolean (optional) - Filter by confirmation status
 
 #### POST /api/operations
 
@@ -267,7 +269,9 @@ Create a new operation.
   "amount": "number",
   "currency": "string",
   "accountId": "string",
-  "articleId": "string"
+  "articleId": "string",
+  "repeat": "string (optional)",
+  "recurrenceEndDate": "date (optional)"
 }
 ```
 
@@ -280,7 +284,35 @@ Create a new operation.
   "amount": "number",
   "currency": "string",
   "sourceAccountId": "string",
-  "targetAccountId": "string"
+  "targetAccountId": "string",
+  "repeat": "string (optional)",
+  "recurrenceEndDate": "date (optional)"
+}
+```
+
+**Recurring Operations Fields:**
+
+- `repeat`: Periodicity of recurring operations
+  - Possible values: `none` (default), `daily`, `weekly`, `monthly`, `quarterly`, `semiannual`, `annual`
+- `recurrenceEndDate`: Optional end date for recurring operations. If not specified, operations repeat indefinitely.
+
+**Recurring Operations Behavior:**
+
+- When `repeat` is set to value other than `none`, the operation becomes a template for generating recurring operations
+- A worker job runs daily at 00:01 and creates new operations based on templates
+- Generated operations are marked as unconfirmed (`isConfirmed: false`) and require manual confirmation
+- Unconfirmed operations appear in the list but are not included in reports
+
+#### PATCH /api/operations/:id/confirm
+
+Confirm a pending operation. This marks the operation as confirmed and includes it in all reports.
+
+**Response:**
+
+```json
+{
+  "id": "string",
+  "isConfirmed": true
 }
 ```
 

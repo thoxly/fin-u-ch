@@ -14,6 +14,7 @@ interface TableProps<T> {
   onRowClick?: (item: T) => void;
   loading?: boolean;
   emptyMessage?: string;
+  rowClassName?: (item: T) => string;
 }
 
 export function Table<T>({
@@ -23,6 +24,7 @@ export function Table<T>({
   onRowClick,
   loading,
   emptyMessage = 'Нет данных',
+  rowClassName,
 }: TableProps<T>) {
   if (loading) {
     return (
@@ -56,23 +58,31 @@ export function Table<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((item) => (
-            <tr
-              key={keyExtractor(item)}
-              onClick={() => onRowClick?.(item)}
-              className={onRowClick ? 'cursor-pointer' : ''}
-            >
-              {columns.map((column) => (
-                <td key={column.key}>
-                  {column.render
-                    ? column.render(item)
-                    : String(
-                        (item as Record<string, unknown>)[column.key] ?? ''
-                      )}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {data.map((item) => {
+            const baseClassName = onRowClick ? 'cursor-pointer' : '';
+            const customClassName = rowClassName ? rowClassName(item) : '';
+            const className = [baseClassName, customClassName]
+              .filter(Boolean)
+              .join(' ');
+
+            return (
+              <tr
+                key={keyExtractor(item)}
+                onClick={() => onRowClick?.(item)}
+                className={className}
+              >
+                {columns.map((column) => (
+                  <td key={column.key}>
+                    {column.render
+                      ? column.render(item)
+                      : String(
+                          (item as Record<string, unknown>)[column.key] ?? ''
+                        )}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

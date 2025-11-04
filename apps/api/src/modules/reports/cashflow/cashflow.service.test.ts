@@ -47,6 +47,7 @@ describe('CashflowService', () => {
             lte: new Date('2025-01-31'),
           },
           type: { in: ['income', 'expense'] },
+          isConfirmed: true,
         },
         include: {
           article: {

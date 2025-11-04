@@ -39,6 +39,7 @@ router.get('/', operationsController.getAll);
 
 router.get('/:id', operationsController.getById);
 router.post('/', operationsController.create);
+router.patch('/:id/confirm', operationsController.confirm);
 router.patch('/:id', operationsController.update);
 router.delete('/:id', operationsController.delete);
 

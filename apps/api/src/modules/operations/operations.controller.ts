@@ -17,6 +17,9 @@ export class OperationsController {
         dealId: req.query.dealId as string,
         departmentId: req.query.departmentId as string,
         counterpartyId: req.query.counterpartyId as string,
+        isConfirmed: req.query.isConfirmed
+          ? req.query.isConfirmed === 'true'
+          : undefined,
       };
 
       const result = await operationsService.getAll(req.companyId!, filters);
@@ -63,6 +66,18 @@ export class OperationsController {
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const result = await operationsService.delete(
+        req.params.id,
+        req.companyId!
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirm(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await operationsService.confirmOperation(
         req.params.id,
         req.companyId!
       );

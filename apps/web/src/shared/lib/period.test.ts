@@ -158,8 +158,9 @@ describe('period utilities', () => {
     it('should return correct format options', () => {
       const options = getPeriodFormatOptions();
 
-      expect(options).toHaveLength(4);
+      expect(options).toHaveLength(5);
       expect(options).toEqual([
+        { value: 'day', label: 'День' },
         { value: 'week', label: 'Неделя' },
         { value: 'month', label: 'Месяц' },
         { value: 'quarter', label: 'Квартал' },
