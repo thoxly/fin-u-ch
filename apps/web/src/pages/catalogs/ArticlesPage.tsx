@@ -12,6 +12,7 @@ import {
   useArchiveArticleMutation,
   useUnarchiveArticleMutation,
 } from '../../store/api/catalogsApi';
+import { useBulkArchiveArticlesMutation } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
 import { ArticleForm } from '@/features/catalog-forms/index';
@@ -47,6 +48,14 @@ export const ArticlesPage = () => {
   const [deleteArticle] = useDeleteArticleMutation();
   const [archiveArticle] = useArchiveArticleMutation();
   const [unarchiveArticle] = useUnarchiveArticleMutation();
+  const [bulkArchiveArticles] = useBulkArchiveArticlesMutation();
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   // Отладочная информация
   console.log('ArticlesPage - articles:', articles);
@@ -99,6 +108,22 @@ export const ArticlesPage = () => {
     typeFilter || activityFilter || isActiveFilter !== undefined;
 
   const columns = [
+    {
+      key: 'select',
+      header: '',
+      render: (a: Article) => (
+        <input
+          type="checkbox"
+          aria-label="Выбрать статью"
+          checked={selectedIds.includes(a.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectOne(a.id);
+          }}
+        />
+      ),
+      width: '40px',
+    },
     { key: 'name', header: 'Название' },
     {
       key: 'type',
@@ -252,12 +277,38 @@ export const ArticlesPage = () => {
             </div>
           </div>
 
-          <Table
-            columns={columns}
-            data={articles}
-            keyExtractor={(a) => a.id}
-            loading={isLoading}
-          />
+          <>
+            <Table
+              columns={columns}
+              data={articles}
+              keyExtractor={(a) => a.id}
+              loading={isLoading}
+            />
+            {selectedIds.length > 0 && (
+              <div className="mt-4 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Выбрано: {selectedIds.length}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    className="btn-warning"
+                    onClick={async () => {
+                      if (
+                        window.confirm(
+                          `Отправить в архив выбранные статьи (${selectedIds.length})?`
+                        )
+                      ) {
+                        await bulkArchiveArticles(selectedIds);
+                        setSelectedIds([]);
+                      }
+                    }}
+                  >
+                    В архив выбранные
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         </Card>
       </div>
       <OffCanvas

@@ -28,6 +28,8 @@ export interface OperationFilters {
   departmentId?: string;
   counterpartyId?: string;
   isConfirmed?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export class OperationsService {
@@ -50,6 +52,9 @@ export class OperationsService {
         (where.operationDate as Record<string, unknown>).lte = filters.dateTo;
     }
 
+    const take = filters.limit;
+    const skip = filters.offset;
+
     return prisma.operation.findMany({
       where,
       include: {
@@ -62,6 +67,8 @@ export class OperationsService {
         department: { select: { id: true, name: true } },
       },
       orderBy: { operationDate: 'desc' },
+      take,
+      skip,
     });
   }
 
@@ -155,6 +162,16 @@ export class OperationsService {
     return prisma.operation.update({
       where: { id, companyId },
       data: { isConfirmed: true },
+    });
+  }
+
+  async bulkDelete(companyId: string, ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('ids must be a non-empty array', 400);
+    }
+
+    return prisma.operation.deleteMany({
+      where: { companyId, id: { in: ids } },
     });
   }
 }

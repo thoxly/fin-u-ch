@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
@@ -14,9 +14,10 @@ import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import {
-  useGetOperationsQuery,
+  useLazyGetOperationsQuery,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
+  useBulkDeleteOperationsMutation,
 } from '../store/api/operationsApi';
 import {
   useGetArticlesQuery,
@@ -81,12 +82,102 @@ export const OperationsPage = () => {
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
-  const { data: operations = [], isLoading } = useGetOperationsQuery(
-    hasActiveFilters ? filters : undefined
-  );
+  const PAGE_SIZE = 50;
+  const [items, setItems] = useState<OperationWithRelations[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [trigger, { isFetching }] = useLazyGetOperationsQuery();
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
+  const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
   const { showSuccess, showError } = useNotification();
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  // Initial and filters-changed load
+  useEffect(() => {
+    let cancelled = false;
+    type OpsQuery = {
+      type?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      articleId?: string;
+      counterpartyId?: string;
+      dealId?: string;
+      departmentId?: string;
+      limit?: number;
+      offset?: number;
+    };
+
+    const load = async () => {
+      setItems([]);
+      setOffset(0);
+      setHasMore(true);
+      setSelectedIds([]);
+      const params: OpsQuery = {
+        ...(hasActiveFilters ? filters : {}),
+        limit: PAGE_SIZE,
+        offset: 0,
+      };
+      const result = await trigger(params).unwrap();
+      if (!cancelled) {
+        setItems(result as OperationWithRelations[]);
+        setHasMore(result.length === PAGE_SIZE);
+        setOffset(result.length);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    typeFilter,
+    dateFromFilter,
+    dateToFilter,
+    articleIdFilter,
+    counterpartyIdFilter,
+    dealIdFilter,
+    departmentIdFilter,
+  ]);
+
+  const loadMore = async () => {
+    if (isFetching || !hasMore) return;
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset,
+    };
+    const result = await trigger(params).unwrap();
+    const page = result || [];
+    setItems((prev) => [...prev, ...page]);
+    setOffset(offset + page.length);
+    setHasMore(page.length === PAGE_SIZE);
+  };
+
+  // Observe bottom sentinel for infinite scroll
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sentinelRef.current, isFetching, hasMore, offset, hasActiveFilters]);
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -102,7 +193,12 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем копию операции без id для создания новой
-    const { id, createdAt, updatedAt, ...operationCopy } = operation;
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...operationCopy
+    } = operation;
     setEditingOperation(operationCopy as Operation);
     setIsCopying(true);
     setIsFormOpen(true);
@@ -169,6 +265,22 @@ export const OperationsPage = () => {
   };
 
   const columns = [
+    {
+      key: 'select',
+      header: '',
+      render: (op: Operation) => (
+        <input
+          type="checkbox"
+          aria-label="Выбрать операцию"
+          checked={selectedIds.includes(op.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectOne(op.id);
+          }}
+        />
+      ),
+      width: '40px',
+    },
     {
       key: 'operationDate',
       header: 'Дата',
@@ -278,6 +390,41 @@ export const OperationsPage = () => {
           <div className="flex items-center gap-3">
             <RecurringOperations onEdit={handleEdit} />
             <Button onClick={handleCreate}>Создать операцию</Button>
+            {selectedIds.length > 0 && (
+              <Button
+                className="btn-danger"
+                onClick={async () => {
+                  if (
+                    window.confirm(
+                      `Удалить выбранные операции (${selectedIds.length})?`
+                    )
+                  ) {
+                    try {
+                      await bulkDeleteOperations(selectedIds).unwrap();
+                      setSelectedIds([]);
+                      // After delete, reload from scratch to keep list consistent
+                      const params: OpsQuery = {
+                        ...(hasActiveFilters ? filters : {}),
+                        limit: PAGE_SIZE,
+                        offset: 0,
+                      };
+                      const result = await trigger(params).unwrap();
+                      setItems(result as OperationWithRelations[]);
+                      setHasMore(result.length === PAGE_SIZE);
+                      setOffset(result.length);
+                      showSuccess(
+                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
+                      );
+                    } catch (error) {
+                      console.error('Failed to bulk delete operations:', error);
+                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+                    }
+                  }
+                }}
+              >
+                Удалить выбранные
+              </Button>
+            )}
           </div>
         </div>
 
@@ -376,9 +523,9 @@ export const OperationsPage = () => {
             </div>
           </div>
 
-          {isLoading ? (
+          {items.length === 0 && isFetching ? (
             <TableSkeleton rows={5} columns={6} />
-          ) : operations.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="Нет операций"
@@ -387,11 +534,12 @@ export const OperationsPage = () => {
           ) : (
             <Table
               columns={columns}
-              data={operations}
+              data={items}
               keyExtractor={(op) => op.id}
               rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
             />
           )}
+          <div ref={sentinelRef} />
         </Card>
 
         <Modal

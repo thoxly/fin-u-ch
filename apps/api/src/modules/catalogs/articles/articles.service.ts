@@ -113,6 +113,17 @@ export class ArticlesService {
       data: { isActive: true },
     });
   }
+
+  async bulkArchive(companyId: string, ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('ids must be a non-empty array', 400);
+    }
+
+    return prisma.article.updateMany({
+      where: { companyId, id: { in: ids } },
+      data: { isActive: false },
+    });
+  }
 }
 
 export default new ArticlesService();

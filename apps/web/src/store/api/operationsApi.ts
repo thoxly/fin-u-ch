@@ -10,6 +10,8 @@ interface GetOperationsParams {
   departmentId?: string;
   counterpartyId?: string;
   isConfirmed?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export const operationsApi = apiSlice.injectEndpoints({
@@ -28,7 +30,7 @@ export const operationsApi = apiSlice.injectEndpoints({
       query: (id) => `/operations/${id}`,
       providesTags: ['Operation'],
     }),
-    createOperation: builder.mutation<Operation, Partial<Operation>>({
+    createOperation: builder.mutation<Operation, unknown>({
       query: (data) => ({
         url: '/operations',
         method: 'POST',
@@ -36,17 +38,16 @@ export const operationsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
-    updateOperation: builder.mutation<
-      Operation,
-      { id: string; data: Partial<Operation> }
-    >({
-      query: ({ id, data }) => ({
-        url: `/operations/${id}`,
-        method: 'PATCH',
-        body: data,
-      }),
-      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
-    }),
+    updateOperation: builder.mutation<Operation, { id: string; data: unknown }>(
+      {
+        query: ({ id, data }) => ({
+          url: `/operations/${id}`,
+          method: 'PATCH',
+          body: data,
+        }),
+        invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+      }
+    ),
     deleteOperation: builder.mutation<void, string>({
       query: (id) => ({
         url: `/operations/${id}`,
@@ -61,14 +62,24 @@ export const operationsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
+    bulkDeleteOperations: builder.mutation<{ count: number }, string[]>({
+      query: (ids) => ({
+        url: '/operations/bulk-delete',
+        method: 'POST',
+        body: { ids },
+      }),
+      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+    }),
   }),
 });
 
 export const {
   useGetOperationsQuery,
+  useLazyGetOperationsQuery,
   useGetOperationQuery,
   useCreateOperationMutation,
   useUpdateOperationMutation,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
+  useBulkDeleteOperationsMutation,
 } = operationsApi;

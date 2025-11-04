@@ -106,6 +106,16 @@ export class ArticlesController {
       next(error);
     }
   }
+
+  async bulkArchive(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body as { ids: string[] };
+      const result = await articlesService.bulkArchive(req.companyId!, ids);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new ArticlesController();
