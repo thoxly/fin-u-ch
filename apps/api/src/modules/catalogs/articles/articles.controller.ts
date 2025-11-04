@@ -23,8 +23,11 @@ export class ArticlesController {
       }
 
       if (req.query.isActive !== undefined) {
+        const isActiveValue = req.query.isActive;
         filters.isActive =
-          req.query.isActive === 'true' || req.query.isActive === true;
+          isActiveValue === 'true' ||
+          (typeof isActiveValue === 'string' &&
+            isActiveValue.toLowerCase() === 'true');
       }
 
       const result = await articlesService.getAll(req.companyId!, filters);
