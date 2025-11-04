@@ -4,12 +4,12 @@ import {
   useGetOperationsQuery,
   useUpdateOperationMutation,
   useDeleteOperationMutation,
-} from '../store/api/operationsApi';
-import { formatDate } from '../shared/lib/date';
-import { formatMoney } from '../shared/lib/money';
+} from '../../store/api/operationsApi';
+import { formatDate } from '../../shared/lib/date';
+import { formatMoney } from '../../shared/lib/money';
 import type { Operation } from '@fin-u-ch/shared';
 import { Periodicity } from '@fin-u-ch/shared';
-import { useNotification } from '../shared/hooks/useNotification';
+import { useNotification } from '../../shared/hooks/useNotification';
 
 interface RecurringOperationsProps {
   onEdit: (operation: Operation) => void;
