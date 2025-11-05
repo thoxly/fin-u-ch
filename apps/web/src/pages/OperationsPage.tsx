@@ -30,6 +30,7 @@ import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
+import { useBulkSelection } from '../shared/hooks/useBulkSelection';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -106,12 +107,7 @@ export const OperationsPage = () => {
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
   const { showSuccess, showError } = useNotification();
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
 
   // Initial and filters-changed load
   useEffect(() => {
@@ -121,7 +117,7 @@ export const OperationsPage = () => {
       setItems([]);
       setOffset(0);
       setHasMore(true);
-      setSelectedIds([]);
+      clearSelection();
       const params: OpsQuery = {
         ...(hasActiveFilters ? filters : {}),
         limit: PAGE_SIZE,
@@ -259,7 +255,7 @@ export const OperationsPage = () => {
     setItems([]);
     setOffset(0);
     setHasMore(true);
-    setSelectedIds([]);
+    clearSelection();
     const params: OpsQuery = {
       ...(hasActiveFilters ? filters : {}),
       limit: PAGE_SIZE,
@@ -444,7 +440,7 @@ export const OperationsPage = () => {
                   ) {
                     try {
                       await bulkDeleteOperations(selectedIds).unwrap();
-                      setSelectedIds([]);
+                      clearSelection();
                       // After delete, reload from scratch to keep list consistent
                       const params: OpsQuery = {
                         ...(hasActiveFilters ? filters : {}),

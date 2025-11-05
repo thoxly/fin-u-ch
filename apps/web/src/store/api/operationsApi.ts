@@ -24,17 +24,7 @@ export const operationsApi = apiSlice.injectEndpoints({
               params,
             }
           : '/operations',
-      providesTags: (result, error, params) => {
-        // Если есть параметры limit/offset, это пагинация - не инвалидируем автоматически
-        if (
-          params &&
-          (params.limit !== undefined || params.offset !== undefined)
-        ) {
-          return [{ type: 'Operation', id: 'PAGINATED' }];
-        }
-        // Для обычных запросов используем стандартный тег
-        return ['Operation'];
-      },
+      providesTags: ['Operation'],
     }),
     getOperation: builder.query<Operation, string>({
       query: (id) => `/operations/${id}`,
@@ -46,9 +36,7 @@ export const operationsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
-      // Инвалидируем только не-пагинированные запросы
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
-      // Оптимистичное обновление не применяем для пагинированных запросов
     }),
     updateOperation: builder.mutation<Operation, { id: string; data: unknown }>(
       {

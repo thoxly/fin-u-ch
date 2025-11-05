@@ -109,7 +109,7 @@ describe('PlanForm', () => {
 
       renderWithProvider(<PlanForm plan={null} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByRole('spinbutton');
+      const amountInput = screen.getByLabelText('Сумма');
       fireEvent.change(amountInput, { target: { value: '1000' } });
 
       const submitButton = screen.getByText('Создать');
@@ -143,7 +143,7 @@ describe('PlanForm', () => {
         />
       );
 
-      const amountInput = screen.getByRole('spinbutton');
+      const amountInput = screen.getByLabelText('Сумма');
       fireEvent.change(amountInput, { target: { value: '500' } });
 
       const submitButton = screen.getByText('Создать');
@@ -188,7 +188,7 @@ describe('PlanForm', () => {
 
       renderWithProvider(<PlanForm plan={mockPlan} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByRole('spinbutton');
+      const amountInput = screen.getByLabelText('Сумма');
       fireEvent.change(amountInput, { target: { value: '6000' } });
 
       const submitButton = screen.getByText('Сохранить');
@@ -257,10 +257,11 @@ describe('PlanForm', () => {
     it('updates form fields when user types', async () => {
       renderWithProvider(<PlanForm plan={null} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByRole('spinbutton');
+      const amountInput = screen.getByLabelText('Сумма');
       fireEvent.change(amountInput, { target: { value: '2500.50' } });
 
-      expect(amountInput).toHaveValue(2500.5);
+      // formatAmountInput formats with spaces for thousands
+      expect(amountInput).toHaveValue('2 500,50');
     });
 
     it('populates article and account selects', () => {

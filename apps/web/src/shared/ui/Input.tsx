@@ -1,4 +1,4 @@
-import { InputHTMLAttributes, forwardRef, ReactNode } from 'react';
+import { InputHTMLAttributes, forwardRef, ReactNode, useId } from 'react';
 import { classNames } from '../lib/utils';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -9,10 +9,17 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, fullWidth = true, className, icon, ...props }, ref) => {
+  ({ label, error, fullWidth = true, className, icon, id, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = id || generatedId;
+
     return (
       <div className={classNames(fullWidth && 'w-full')}>
-        {label && <label className="label">{label}</label>}
+        {label && (
+          <label htmlFor={inputId} className="label">
+            {label}
+          </label>
+        )}
         <div className="relative">
           {icon && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -21,6 +28,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             ref={ref}
+            id={inputId}
             className={classNames(
               'input',
               error && 'input-error',

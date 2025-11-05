@@ -16,6 +16,7 @@ import { useBulkArchiveArticlesMutation } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
 import { ArticleForm } from '@/features/catalog-forms/index';
+import { useBulkSelection } from '../../shared/hooks/useBulkSelection';
 
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -50,12 +51,7 @@ export const ArticlesPage = () => {
   const [unarchiveArticle] = useUnarchiveArticleMutation();
   const [bulkArchiveArticles] = useBulkArchiveArticlesMutation();
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const toggleSelectOne = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
 
   // Отладочная информация
   console.log('ArticlesPage - articles:', articles);
@@ -299,7 +295,7 @@ export const ArticlesPage = () => {
                         )
                       ) {
                         await bulkArchiveArticles(selectedIds);
-                        setSelectedIds([]);
+                        clearSelection();
                       }
                     }}
                   >

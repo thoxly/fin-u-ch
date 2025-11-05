@@ -43,12 +43,13 @@ export const formatAmountInput = (
 };
 
 export const parseAmountInputToNumber = (displayValue: string): number => {
-  if (!displayValue) return NaN;
+  if (!displayValue || displayValue.trim() === '') return 0;
   const normalized = displayValue
     .toString()
     .replace(/\s+/g, '') // remove spaces
     .replace(/,/g, '.') // comma to dot
     .replace(/(?!^)-/g, ''); // keep only leading minus
   const parsed = parseFloat(normalized);
-  return isNaN(parsed) ? NaN : parsed;
+  // Return 0 instead of NaN for invalid input
+  return isNaN(parsed) ? 0 : parsed;
 };

@@ -52,8 +52,21 @@ export class OperationsService {
         (where.operationDate as Record<string, unknown>).lte = filters.dateTo;
     }
 
+    // Validate pagination parameters
     const take = filters.limit;
     const skip = filters.offset;
+
+    if (take !== undefined) {
+      if (take < 1 || take > 1000) {
+        throw new AppError('limit must be between 1 and 1000', 400);
+      }
+    }
+
+    if (skip !== undefined) {
+      if (skip < 0) {
+        throw new AppError('offset must be non-negative', 400);
+      }
+    }
 
     return prisma.operation.findMany({
       where,
@@ -170,8 +183,21 @@ export class OperationsService {
       throw new AppError('ids must be a non-empty array', 400);
     }
 
+    // Validate that all IDs are strings and not empty
+    const validIds = ids.filter(
+      (id) => typeof id === 'string' && id.length > 0
+    );
+    if (validIds.length !== ids.length) {
+      throw new AppError('All ids must be non-empty strings', 400);
+    }
+
+    // Critical security: Ensure companyId is validated and included in the query
+    // This prevents data leakage between tenants
     return prisma.operation.deleteMany({
-      where: { companyId, id: { in: ids } },
+      where: {
+        companyId,
+        id: { in: validIds },
+      },
     });
   }
 }
