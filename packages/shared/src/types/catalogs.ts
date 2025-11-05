@@ -68,6 +68,7 @@ export interface Article {
   activity: Activity;
   indicator: ArticleIndicator;
   isActive: boolean;
+  counterpartyId?: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;

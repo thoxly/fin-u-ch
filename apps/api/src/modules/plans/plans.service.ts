@@ -21,6 +21,7 @@ export interface CreatePlanItemDTO {
 export interface MonthlyAmount {
   month: string;
   amount: number;
+  planItemId?: string; // Optional to maintain backward compatibility
 }
 
 export class PlansService {
@@ -86,11 +87,15 @@ export class PlansService {
     }
 
     // Проверяем и корректируем дату, если она не существует в месяце
-    const adjustedStartDate = new Date(data.startDate);
-    const originalDay = data.startDate.getDate();
+    const startDate =
+      data.startDate instanceof Date
+        ? data.startDate
+        : new Date(data.startDate);
+    const adjustedStartDate = new Date(startDate);
+    const originalDay = startDate.getDate();
     const testDate = new Date(
-      data.startDate.getFullYear(),
-      data.startDate.getMonth(),
+      startDate.getFullYear(),
+      startDate.getMonth(),
       originalDay
     );
 
@@ -99,10 +104,18 @@ export class PlansService {
       adjustedStartDate.setDate(0);
     }
 
+    // Конвертируем endDate если он передан
+    const endDate = data.endDate
+      ? data.endDate instanceof Date
+        ? data.endDate
+        : new Date(data.endDate)
+      : undefined;
+
     const result = await prisma.planItem.create({
       data: {
         ...data,
         startDate: adjustedStartDate,
+        endDate,
         companyId,
       },
     });
@@ -121,13 +134,18 @@ export class PlansService {
     await this.getById(id, companyId);
 
     // Если обновляется startDate, проверяем и корректируем дату
-    const updateData = { ...data };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updateData: any = { ...data };
     if (data.startDate) {
-      const adjustedStartDate = new Date(data.startDate);
-      const originalDay = data.startDate.getDate();
+      const startDate =
+        data.startDate instanceof Date
+          ? data.startDate
+          : new Date(data.startDate);
+      const adjustedStartDate = new Date(startDate);
+      const originalDay = startDate.getDate();
       const testDate = new Date(
-        data.startDate.getFullYear(),
-        data.startDate.getMonth(),
+        startDate.getFullYear(),
+        startDate.getMonth(),
         originalDay
       );
 
@@ -135,7 +153,18 @@ export class PlansService {
         // День не существует в этом месяце, устанавливаем последний день месяца
         adjustedStartDate.setDate(0);
         updateData.startDate = adjustedStartDate;
+      } else {
+        updateData.startDate = adjustedStartDate;
       }
+    }
+
+    // Конвертируем endDate если он передан
+    if (data.endDate !== undefined) {
+      updateData.endDate = data.endDate
+        ? data.endDate instanceof Date
+          ? data.endDate
+          : new Date(data.endDate)
+        : null;
     }
 
     const result = await prisma.planItem.update({
@@ -167,6 +196,7 @@ export class PlansService {
    */
   expandPlan(
     planItem: {
+      id?: string;
       startDate: Date;
       endDate?: Date | null;
       amount: number;
@@ -179,7 +209,7 @@ export class PlansService {
 
     if (planItem.repeat === 'none') {
       const month = `${planItem.startDate.getFullYear()}-${String(planItem.startDate.getMonth() + 1).padStart(2, '0')}`;
-      result.push({ month, amount: planItem.amount });
+      result.push({ month, amount: planItem.amount, planItemId: planItem.id });
       return result;
     }
 
@@ -188,23 +218,44 @@ export class PlansService {
     let currentDate = new Date(planItem.startDate);
     const endDate = planItem.endDate ? new Date(planItem.endDate) : periodEnd;
 
-    while (currentDate <= endDate && currentDate <= periodEnd) {
-      if (currentDate >= periodStart) {
-        // Проверяем, что дата корректна для текущего месяца
-        // Если день не существует в месяце, устанавливаем последний день месяца
-        const originalDay = currentDate.getDate();
-        const testDate = new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-          originalDay
-        );
-        if (testDate.getDate() !== originalDay) {
-          // День не существует в этом месяце, устанавливаем последний день месяца
-          currentDate.setDate(0);
-        }
+    // Нормализуем даты для корректного сравнения (без времени)
+    const normalizeDate = (date: Date): Date => {
+      const normalized = new Date(date);
+      normalized.setHours(0, 0, 0, 0);
+      return normalized;
+    };
 
+    const normalizedPeriodStart = normalizeDate(periodStart);
+    const normalizedPeriodEnd = normalizeDate(periodEnd);
+    const normalizedEndDate = normalizeDate(endDate);
+    let normalizedCurrentDate = normalizeDate(currentDate);
+
+    while (
+      normalizedCurrentDate <= normalizedEndDate &&
+      normalizedCurrentDate <= normalizedPeriodEnd
+    ) {
+      // Проверяем, попадает ли текущая дата в период
+      // Используем >= чтобы включить первую дату, если она попадает в период
+      if (normalizedCurrentDate >= normalizedPeriodStart) {
+        // Определяем месяц из текущей даты (до любых модификаций)
+        // Важно: используем currentDate ДО того, как он будет изменен в switch ниже
         const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-        result.push({ month, amount: planItem.amount });
+
+        // Проверяем, нет ли уже этого месяца для этого плана в результате
+        // Используем комбинацию month и planItem.id для правильной обработки нескольких планов на одну статью
+        const existingMonth = result.find(
+          (r) => r.month === month && r.planItemId === planItem.id
+        );
+        if (!existingMonth) {
+          result.push({
+            month,
+            amount: planItem.amount,
+            planItemId: planItem.id,
+          });
+        } else {
+          // Если месяц уже есть для этого плана, добавляем сумму
+          existingMonth.amount += planItem.amount;
+        }
       }
 
       // Advance to next occurrence
@@ -218,49 +269,102 @@ export class PlansService {
         case 'monthly': {
           // Для ежемесячного повтора учитываем последний день месяца
           const originalDay = currentDate.getDate();
-          currentDate.setMonth(currentDate.getMonth() + 1);
+          const currentMonth = currentDate.getMonth();
+          const currentYear = currentDate.getFullYear();
 
-          // Если день месяца изменился (например, 31 января -> 3 марта),
-          // значит мы "перекатились" на следующий месяц
-          if (currentDate.getDate() !== originalDay) {
-            // Устанавливаем последний день предыдущего месяца
-            currentDate.setDate(0); // Это устанавливает последний день предыдущего месяца
+          // Переходим на следующий месяц, сохраняя день
+          const nextMonth = currentMonth + 1;
+          const nextYear = nextMonth === 12 ? currentYear + 1 : currentYear;
+          const normalizedNextMonth = nextMonth === 12 ? 0 : nextMonth;
+
+          // Создаем дату следующего месяца с тем же днем
+          const nextDate = new Date(nextYear, normalizedNextMonth, originalDay);
+
+          // Если день не существует в следующем месяце (например, 31 января -> нет 31 февраля),
+          // устанавливаем последний день следующего месяца
+          if (nextDate.getDate() !== originalDay) {
+            // Устанавливаем на 1-е число следующего месяца, затем откатываемся на 1 день назад
+            nextDate.setDate(0); // Это устанавливает последний день предыдущего месяца (нужного нам)
           }
+
+          currentDate = nextDate;
           break;
         }
         case 'quarterly': {
           // Для квартального повтора также учитываем последний день месяца
           const originalDayQuarterly = currentDate.getDate();
-          currentDate.setMonth(currentDate.getMonth() + 3);
+          const currentMonth = currentDate.getMonth();
+          const currentYear = currentDate.getFullYear();
 
-          if (currentDate.getDate() !== originalDayQuarterly) {
-            currentDate.setDate(0);
+          // Переходим на 3 месяца вперед
+          const nextMonth = currentMonth + 3;
+          const nextYear =
+            nextMonth >= 12
+              ? currentYear + Math.floor(nextMonth / 12)
+              : currentYear;
+          const normalizedNextMonth = nextMonth % 12;
+
+          const nextDate = new Date(
+            nextYear,
+            normalizedNextMonth,
+            originalDayQuarterly
+          );
+
+          if (nextDate.getDate() !== originalDayQuarterly) {
+            nextDate.setDate(0);
           }
+
+          currentDate = nextDate;
           break;
         }
         case 'semiannual': {
           // Для полугодового повтора также учитываем последний день месяца
           const originalDaySemiannual = currentDate.getDate();
-          currentDate.setMonth(currentDate.getMonth() + 6);
+          const currentMonth = currentDate.getMonth();
+          const currentYear = currentDate.getFullYear();
 
-          if (currentDate.getDate() !== originalDaySemiannual) {
-            currentDate.setDate(0);
+          // Переходим на 6 месяцев вперед
+          const nextMonth = currentMonth + 6;
+          const nextYear =
+            nextMonth >= 12
+              ? currentYear + Math.floor(nextMonth / 12)
+              : currentYear;
+          const normalizedNextMonth = nextMonth % 12;
+
+          const nextDate = new Date(
+            nextYear,
+            normalizedNextMonth,
+            originalDaySemiannual
+          );
+
+          if (nextDate.getDate() !== originalDaySemiannual) {
+            nextDate.setDate(0);
           }
+
+          currentDate = nextDate;
           break;
         }
         case 'annual': {
           // Для годового повтора также учитываем последний день месяца
           const originalDayAnnual = currentDate.getDate();
-          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          const nextYear = currentDate.getFullYear() + 1;
+          const currentMonth = currentDate.getMonth();
 
-          if (currentDate.getDate() !== originalDayAnnual) {
-            currentDate.setDate(0);
+          const nextDate = new Date(nextYear, currentMonth, originalDayAnnual);
+
+          if (nextDate.getDate() !== originalDayAnnual) {
+            nextDate.setDate(0);
           }
+
+          currentDate = nextDate;
           break;
         }
         default:
           return result;
       }
+
+      // Обновляем нормализованную дату после изменения currentDate
+      normalizedCurrentDate = normalizeDate(currentDate);
     }
 
     return result;

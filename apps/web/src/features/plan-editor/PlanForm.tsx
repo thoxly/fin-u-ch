@@ -12,17 +12,33 @@ import {
 } from '../../store/api/catalogsApi';
 import { toISODate } from '../../shared/lib/date';
 import type { PlanItem } from '@shared/types/operations';
+import { OperationType, Periodicity, PlanStatus } from '@fin-u-ch/shared';
+import { useNotification } from '../../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
+import {
+  formatAmountInput,
+  parseAmountInputToNumber,
+} from '../../shared/lib/numberInput';
+
+// API возвращает даты как строки, не как Date объекты
+type PlanItemFromAPI = Omit<
+  PlanItem,
+  'startDate' | 'endDate' | 'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  startDate: string;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
 
 interface PlanFormProps {
-  plan: PlanItem | null;
+  plan: PlanItemFromAPI | null;
   budgetId?: string;
   onClose: () => void;
 }
 
 export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
-  console.log('PlanForm - plan prop:', plan);
-  console.log('PlanForm - budgetId prop:', budgetId);
-
   const [type, setType] = useState(plan?.type || 'expense');
   const [startDate, setStartDate] = useState(
     plan?.startDate.split('T')[0] || toISODate(new Date())
@@ -30,7 +46,9 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [endDate, setEndDate] = useState(
     plan?.endDate ? plan.endDate.split('T')[0] : ''
   );
-  const [amount, setAmount] = useState(plan?.amount.toString() || '');
+  const [amount, setAmount] = useState(
+    plan?.amount != null ? formatAmountInput(String(plan.amount)) : ''
+  );
   const [currency, setCurrency] = useState(plan?.currency || 'RUB');
   const [articleId, setArticleId] = useState(plan?.articleId || '');
   const [accountId, setAccountId] = useState(plan?.accountId || '');
@@ -43,21 +61,11 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [createPlan, { isLoading: isCreating }] = useCreatePlanMutation();
   const [updatePlan, { isLoading: isUpdating }] = useUpdatePlanMutation();
 
+  const { showSuccess, showError } = useNotification();
+
   // Отслеживаем изменения в пропе plan
   useEffect(() => {
-    console.log('PlanForm - plan prop changed:', plan);
     if (plan) {
-      console.log('PlanForm - setting form values from plan:', {
-        type: plan.type,
-        startDate: plan.startDate,
-        endDate: plan.endDate,
-        amount: plan.amount,
-        currency: plan.currency,
-        articleId: plan.articleId,
-        accountId: plan.accountId,
-        repeat: plan.repeat,
-        status: plan.status,
-      });
       setType(plan.type || 'expense');
       setStartDate(plan.startDate.split('T')[0] || toISODate(new Date()));
       setEndDate(plan.endDate ? plan.endDate.split('T')[0] : '');
@@ -68,7 +76,6 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
       setRepeat(plan.repeat || 'monthly');
       setStatus(plan.status || 'active');
     } else {
-      console.log('PlanForm - resetting form for new plan');
       setType('expense');
       setStartDate(toISODate(new Date()));
       setEndDate('');
@@ -85,33 +92,40 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
     e.preventDefault();
 
     const planData = {
-      type,
+      type: type as OperationType,
       startDate: new Date(startDate).toISOString(),
       endDate: endDate ? new Date(endDate).toISOString() : undefined,
-      amount: parseFloat(amount),
+      amount: parseAmountInputToNumber(amount),
       currency,
       articleId: articleId || undefined,
       accountId: accountId || undefined,
       budgetId: budgetId || plan?.budgetId || undefined,
-      repeat,
-      status,
+      repeat: repeat as Periodicity,
+      status: status as PlanStatus,
     };
 
     try {
       if (plan) {
         await updatePlan({ id: plan.id, data: planData }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.PLAN.UPDATE_SUCCESS);
       } else {
         await createPlan(planData).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.PLAN.CREATE_SUCCESS);
       }
       onClose();
     } catch (error) {
       console.error('Failed to save plan:', error);
+      showError(
+        plan
+          ? NOTIFICATION_MESSAGES.PLAN.UPDATE_ERROR
+          : NOTIFICATION_MESSAGES.PLAN.CREATE_ERROR
+      );
     }
   };
 
   const typeOptions = [
-    { value: 'income', label: 'Доход' },
-    { value: 'expense', label: 'Расход' },
+    { value: 'income', label: 'Поступления' },
+    { value: 'expense', label: 'Списания' },
   ];
 
   const currencyOptions = [
@@ -172,10 +186,11 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
 
         <Input
           label="Сумма"
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(formatAmountInput(e.target.value))}
+          placeholder="0"
           required
         />
 

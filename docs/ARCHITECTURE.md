@@ -128,7 +128,6 @@
    │     │  │  ├─ dashboard/
    │     │  │  ├─ cashflow/
    │     │  │  ├─ bdds/
-   │     │  │  ├─ dds/
    │     │  │  ├─ planfact/
    │     │  │  └─ utils/
    │     │  ├─ demo/            # демо-система
@@ -176,7 +175,7 @@
 - **operations** (факт).
 - **budgets** (управление бюджетами, группировка плановых записей).
 - **plans** (PlanItem с поддержкой budgetId).
-- **reports** (dashboard, cashflow/ODDS, plan-vs-fact BDDs, DDS).
+- **reports** (dashboard, cashflow/ODDS, plan-vs-fact BDDs).
 - **demo** (автоматическое создание демо-пользователя с тестовыми данными).
 - **permissions** (минимум: в рамках companyId).
 
@@ -357,7 +356,7 @@ pnpm start  # запуск production версии
 
 - **API**: Все основные endpoints работают
 - **Demo System**: Полная система демо-данных
-- **Reports API**: Все типы отчетов реализованы в backend (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact, DDS)
+- **Reports API**: Все типы отчетов реализованы в backend (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact)
 - **Worker App**: Автоматическая генерация зарплатных операций
 - **Caching**: Redis кэширование для отчетов
 - **Multi-tenancy**: Полная изоляция данных по companyId

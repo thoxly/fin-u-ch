@@ -97,6 +97,7 @@ model Counterparty {
   deals        Deal[]
   operations   Operation[]
   salaries     Salary[]
+  articles     Article[]
 
   @@index([companyId])
   @@map("counterparties")
@@ -124,23 +125,25 @@ model Deal {
 }
 
 model Article {
-  id          String   @id @default(uuid())
-  companyId   String
-  name        String
-  parentId    String?
-  type        String   // income|expense
-  activity    String?  // operating|investing|financing
-  indicator   String?  // cash|accrual
-  isActive    Boolean  @default(true)
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  companyId     String
+  name          String
+  parentId      String?
+  type          String   // income|expense
+  activity      String?  // operating|investing|financing
+  indicator     String?  // cash|accrual
+  isActive      Boolean  @default(true)
+  description   String?
+  counterpartyId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent     Article?    @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children   Article[]   @relation("ArticleHierarchy")
-  operations Operation[]
-  planItems  PlanItem[]
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent       Article?      @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Article[]     @relation("ArticleHierarchy")
+  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  operations   Operation[]
+  planItems    PlanItem[]
 
   @@index([companyId])
   @@index([companyId, parentId])
@@ -148,12 +151,12 @@ model Article {
 }
 
 model Operation {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   companyId         String
-  type              String   // income|expense|transfer
+  type              String    // income|expense|transfer
   operationDate     DateTime
   amount            Float
-  currency          String   @default("RUB")
+  currency          String    @default("RUB")
   accountId         String?
   sourceAccountId   String?
   targetAccountId   String?
@@ -162,21 +165,29 @@ model Operation {
   dealId            String?
   departmentId      String?
   description       String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  repeat            String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
+  recurrenceParentId String?
+  recurrenceEndDate DateTime?
+  isConfirmed       Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  account       Account?      @relation("AccountOperations", fields: [accountId], references: [id], onDelete: SetNull)
-  sourceAccount Account?      @relation("SourceAccountOperations", fields: [sourceAccountId], references: [id], onDelete: SetNull)
-  targetAccount Account?      @relation("TargetAccountOperations", fields: [targetAccountId], references: [id], onDelete: SetNull)
-  article       Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
-  counterparty  Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
-  deal          Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  department    Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  company            Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account            Account?      @relation("AccountOperations", fields: [accountId], references: [id], onDelete: SetNull)
+  sourceAccount      Account?      @relation("SourceAccountOperations", fields: [sourceAccountId], references: [id], onDelete: SetNull)
+  targetAccount      Account?      @relation("TargetAccountOperations", fields: [targetAccountId], references: [id], onDelete: SetNull)
+  article            Article?      @relation(fields: [articleId], references: [id], onDelete: SetNull)
+  counterparty       Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  deal               Deal?         @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  department         Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  recurrenceParent   Operation?    @relation("RecurringOperations", fields: [recurrenceParentId], references: [id], onDelete: Cascade)
+  recurrenceChildren Operation[]   @relation("RecurringOperations")
 
   @@index([companyId, operationDate])
   @@index([companyId, articleId, operationDate])
   @@index([companyId, accountId, operationDate])
+  @@index([companyId, repeat, isConfirmed])
+  @@index([recurrenceParentId, operationDate])
   @@map("operations")
 }
 

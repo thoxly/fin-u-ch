@@ -39,7 +39,33 @@ router.get('/', operationsController.getAll);
 
 router.get('/:id', operationsController.getById);
 router.post('/', operationsController.create);
+router.patch('/:id/confirm', operationsController.confirm);
 router.patch('/:id', operationsController.update);
 router.delete('/:id', operationsController.delete);
+
+/**
+ * @swagger
+ * /api/operations/bulk-delete:
+ *   post:
+ *     summary: Bulk delete operations
+ *     tags: [Operations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: DeleteMany result
+ */
+router.post('/bulk-delete', operationsController.bulkDelete);
 
 export default router;

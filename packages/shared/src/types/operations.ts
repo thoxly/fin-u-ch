@@ -19,8 +19,10 @@ export interface Operation {
   dealId?: string | null;
   departmentId?: string | null;
   description?: string | null;
-  recurrenceId?: string | null;
-  createdBy: string;
+  repeat: Periodicity;
+  recurrenceParentId?: string | null;
+  recurrenceEndDate?: Date | null;
+  isConfirmed: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -63,6 +65,8 @@ export interface CreateOperationDTO {
   dealId?: string;
   departmentId?: string;
   description?: string;
+  repeat?: Periodicity;
+  recurrenceEndDate?: Date | string;
 }
 
 export interface CreatePlanItemDTO {
@@ -111,4 +115,8 @@ export interface UpdateBudgetDTO {
   startDate?: Date | string;
   endDate?: Date | string;
   status?: string;
+}
+
+export interface ConfirmOperationDTO {
+  isConfirmed: boolean;
 }

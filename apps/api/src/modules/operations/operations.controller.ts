@@ -17,6 +17,15 @@ export class OperationsController {
         dealId: req.query.dealId as string,
         departmentId: req.query.departmentId as string,
         counterpartyId: req.query.counterpartyId as string,
+        isConfirmed: req.query.isConfirmed
+          ? req.query.isConfirmed === 'true'
+          : undefined,
+        limit: req.query.limit
+          ? parseInt(req.query.limit as string, 10)
+          : undefined,
+        offset: req.query.offset
+          ? parseInt(req.query.offset as string, 10)
+          : undefined,
       };
 
       const result = await operationsService.getAll(req.companyId!, filters);
@@ -66,6 +75,28 @@ export class OperationsController {
         req.params.id,
         req.companyId!
       );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirm(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await operationsService.confirmOperation(
+        req.params.id,
+        req.companyId!
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async bulkDelete(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const { ids } = req.body as { ids: string[] };
+      const result = await operationsService.bulkDelete(req.companyId!, ids);
       res.json(result);
     } catch (error) {
       next(error);

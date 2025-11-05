@@ -15,6 +15,8 @@ export interface CreateOperationDTO {
   dealId?: string;
   departmentId?: string;
   description?: string;
+  repeat?: string;
+  recurrenceEndDate?: Date;
 }
 
 export interface OperationFilters {
@@ -25,6 +27,9 @@ export interface OperationFilters {
   dealId?: string;
   departmentId?: string;
   counterpartyId?: string;
+  isConfirmed?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export class OperationsService {
@@ -36,6 +41,8 @@ export class OperationsService {
     if (filters.dealId) where.dealId = filters.dealId;
     if (filters.departmentId) where.departmentId = filters.departmentId;
     if (filters.counterpartyId) where.counterpartyId = filters.counterpartyId;
+    if (filters.isConfirmed !== undefined)
+      where.isConfirmed = filters.isConfirmed;
 
     if (filters.dateFrom || filters.dateTo) {
       where.operationDate = {};
@@ -43,6 +50,18 @@ export class OperationsService {
         (where.operationDate as Record<string, unknown>).gte = filters.dateFrom;
       if (filters.dateTo)
         (where.operationDate as Record<string, unknown>).lte = filters.dateTo;
+    }
+
+    // Validate pagination parameters and set defaults
+    const take = filters.limit ?? 50; // Default limit
+    const skip = filters.offset ?? 0; // Default offset
+
+    if (take < 1 || take > 200) {
+      throw new AppError('limit must be between 1 and 200', 400);
+    }
+
+    if (skip < 0) {
+      throw new AppError('offset must be non-negative', 400);
     }
 
     return prisma.operation.findMany({
@@ -57,6 +76,8 @@ export class OperationsService {
         department: { select: { id: true, name: true } },
       },
       orderBy: { operationDate: 'desc' },
+      take,
+      skip,
     });
   }
 
@@ -141,6 +162,56 @@ export class OperationsService {
 
     return prisma.operation.delete({
       where: { id },
+    });
+  }
+
+  async confirmOperation(id: string, companyId: string) {
+    await this.getById(id, companyId);
+
+    return prisma.operation.update({
+      where: { id, companyId },
+      data: { isConfirmed: true },
+    });
+  }
+
+  async bulkDelete(companyId: string, ids: string[]) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('ids must be a non-empty array', 400);
+    }
+
+    // Validate that all IDs are strings and not empty
+    const validIds = ids.filter(
+      (id) => typeof id === 'string' && id.length > 0
+    );
+    if (validIds.length !== ids.length) {
+      throw new AppError('All ids must be non-empty strings', 400);
+    }
+
+    // Critical security: Validate that all operations belong to the user's company
+    // This prevents data leakage between tenants
+    const operations = await prisma.operation.findMany({
+      where: {
+        id: { in: validIds },
+      },
+      select: { id: true, companyId: true },
+    });
+
+    // Check if all operations belong to the company
+    const invalidOperations = operations.filter(
+      (op) => op.companyId !== companyId
+    );
+    if (invalidOperations.length > 0) {
+      throw new AppError('Some operations do not belong to your company', 403);
+    }
+
+    // Use transaction to ensure atomicity - all deletes succeed or none
+    return prisma.$transaction(async (tx) => {
+      return tx.operation.deleteMany({
+        where: {
+          companyId,
+          id: { in: validIds },
+        },
+      });
     });
   }
 }

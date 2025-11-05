@@ -83,6 +83,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 - indicator (enum: cash|accrual)
 - description?
 - isActive
+- counterpartyId?
 - createdAt
 - updatedAt
 
@@ -102,8 +103,20 @@ Below is a concise entity overview aligned with current code. All entities are m
 - dealId?
 - departmentId?
 - description?
+- **repeat** (enum: none|daily|weekly|monthly|quarterly|semiannual|annual) - периодичность повтора операции
+- **recurrenceParentId?** - ссылка на родительскую операцию-шаблон для периодических операций
+- **recurrenceEndDate?** - дата окончания повторов (если не указана, повторяется бесконечно)
+- **isConfirmed** (boolean, default: true) - флаг подтверждения операции
 - createdAt
 - updatedAt
+
+**Бизнес-логика периодических операций:**
+
+- Операция с `repeat !== 'none'` и `recurrenceParentId === null` является шаблоном для генерации периодических операций
+- Worker job запускается ежедневно в 00:01 и создает новые операции на основе шаблонов
+- Сгенерированные операции имеют `isConfirmed = false` и требуют ручного подтверждения
+- Неподтвержденные операции отображаются в списке (с желтым фоном), но не учитываются в отчетах
+- При подтверждении через endpoint `PATCH /api/operations/:id/confirm` операция становится видимой в отчетах
 
 ### Budget (Бюджет)
 
@@ -212,7 +225,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 - **Demo System**: Полностью функциональная система демо-данных
 - **Worker App**: Автоматическая генерация зарплатных операций
 - **Caching**: Redis кэширование для отчетов
-- **Reports API**: Все типы отчетов реализованы в API (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact, DDS)
+- **Reports API**: Все типы отчетов реализованы в API (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact)
 - **Multi-tenancy**: Полная изоляция данных по companyId
 - **Notifications System**: Полная система уведомлений с Redux store и UI компонентами
 - **UI Customization**: Настройка иконок навигации и тем компании

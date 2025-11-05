@@ -9,6 +9,9 @@ interface GetOperationsParams {
   dealId?: string;
   departmentId?: string;
   counterpartyId?: string;
+  isConfirmed?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export const operationsApi = apiSlice.injectEndpoints({
@@ -21,13 +24,27 @@ export const operationsApi = apiSlice.injectEndpoints({
               params,
             }
           : '/operations',
-      providesTags: ['Operation'],
+      providesTags: (result, error, params) => {
+        // For paginated queries, provide specific tags to prevent cache invalidation issues
+        if (
+          params &&
+          (params.limit !== undefined || params.offset !== undefined)
+        ) {
+          // Create efficient cache key from query parameters
+          const cacheKey = Object.entries(params)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}:${value}`)
+            .join('|');
+          return [{ type: 'Operation', id: `LIST-${cacheKey}` }, 'Operation'];
+        }
+        return ['Operation'];
+      },
     }),
     getOperation: builder.query<Operation, string>({
       query: (id) => `/operations/${id}`,
-      providesTags: ['Operation'],
+      providesTags: (result, error, id) => [{ type: 'Operation', id }],
     }),
-    createOperation: builder.mutation<Operation, Partial<Operation>>({
+    createOperation: builder.mutation<Operation, unknown>({
       query: (data) => ({
         url: '/operations',
         method: 'POST',
@@ -35,21 +52,50 @@ export const operationsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
-    updateOperation: builder.mutation<
-      Operation,
-      { id: string; data: Partial<Operation> }
-    >({
-      query: ({ id, data }) => ({
-        url: `/operations/${id}`,
-        method: 'PATCH',
-        body: data,
-      }),
-      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
-    }),
+    updateOperation: builder.mutation<Operation, { id: string; data: unknown }>(
+      {
+        query: ({ id, data }) => ({
+          url: `/operations/${id}`,
+          method: 'PATCH',
+          body: data,
+        }),
+        invalidatesTags: (result, error, { id }) => [
+          'Operation',
+          { type: 'Operation', id },
+          'Dashboard',
+          'Report',
+        ],
+      }
+    ),
     deleteOperation: builder.mutation<void, string>({
       query: (id) => ({
         url: `/operations/${id}`,
         method: 'DELETE',
+      }),
+      invalidatesTags: (result, error, id) => [
+        'Operation',
+        { type: 'Operation', id },
+        'Dashboard',
+        'Report',
+      ],
+    }),
+    confirmOperation: builder.mutation<Operation, string>({
+      query: (id) => ({
+        url: `/operations/${id}/confirm`,
+        method: 'PATCH',
+      }),
+      invalidatesTags: (result, error, id) => [
+        'Operation',
+        { type: 'Operation', id },
+        'Dashboard',
+        'Report',
+      ],
+    }),
+    bulkDeleteOperations: builder.mutation<{ count: number }, string[]>({
+      query: (ids) => ({
+        url: '/operations/bulk-delete',
+        method: 'POST',
+        body: { ids },
       }),
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
     }),
@@ -58,8 +104,11 @@ export const operationsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetOperationsQuery,
+  useLazyGetOperationsQuery,
   useGetOperationQuery,
   useCreateOperationMutation,
   useUpdateOperationMutation,
   useDeleteOperationMutation,
+  useConfirmOperationMutation,
+  useBulkDeleteOperationsMutation,
 } = operationsApi;

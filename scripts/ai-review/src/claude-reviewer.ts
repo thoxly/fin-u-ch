@@ -305,11 +305,19 @@ Begin your review:`;
       }
 
       // Calculate position in the diff
-      const position = this.calculateDiffPosition(file.patch, issue.line);
+      const position = this.calculateDiffPosition(
+        file.patch,
+        issue.line,
+        issue.file
+      );
 
       if (position === null) {
         console.warn(
-          `  ⚠ Skipping issue at ${issue.file}:${issue.line}: line not in diff`
+          `  ⚠ Skipping issue at ${issue.file}:${issue.line}: line not found in diff (may be already fixed or outside changed blocks)`
+        );
+        // Log the issue details for debugging
+        console.warn(
+          `    Issue: ${issue.category} - ${issue.message.substring(0, 100)}...`
         );
         continue;
       }
@@ -331,39 +339,89 @@ Begin your review:`;
 
   private calculateDiffPosition(
     patch: string,
-    targetLine: number
+    targetLine: number,
+    filename: string
   ): number | null {
     const lines = patch.split('\n');
-    let newFileLineNumber = 0;
+    // Position in the unified diff for this file. GitHub expects a 1-based index
+    // across the entire file patch, including hunk headers.
     let diffPosition = 0;
+    // Tracks the current line number in the NEW file (+ side) across all hunks.
+    let newFileLineNumber = 0;
+    // Track if we're inside a hunk (to skip lines before first hunk)
+    let insideHunk = false;
+    // Track hunk ranges for debugging
+    const hunkRanges: Array<{ start: number; end: number; diffStart: number }> =
+      [];
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       diffPosition++;
 
-      // Parse hunk header: @@ -old_start,old_count +new_start,new_count @@
+      // Hunk header: @@ -old_start,old_count +new_start,new_count @@
       if (line.startsWith('@@')) {
-        const match = line.match(/\+(\d+)/);
+        insideHunk = true;
+        const match = line.match(/\+(\d+),?(\d*)/);
         if (match) {
-          newFileLineNumber = parseInt(match[1], 10) - 1;
+          const hunkStart = parseInt(match[1], 10);
+          const hunkCount = match[2] ? parseInt(match[2], 10) : 1;
+          // Reset to the starting line number of this hunk (minus 1, will be incremented)
+          newFileLineNumber = hunkStart - 1;
+          hunkRanges.push({
+            start: hunkStart,
+            end: hunkStart + hunkCount - 1,
+            diffStart: diffPosition,
+          });
         }
+        // Continue; header counts toward position, but not a commentable line itself.
         continue;
       }
 
-      // Lines starting with + are additions
+      // Only process lines inside hunks
+      if (!insideHunk) {
+        continue;
+      }
+
       if (line.startsWith('+')) {
+        // Added line exists in the new file; can be commented on.
         newFileLineNumber++;
         if (newFileLineNumber === targetLine) {
           return diffPosition;
         }
-      }
-      // Lines starting with space are context (unchanged)
-      else if (line.startsWith(' ')) {
+      } else if (line.startsWith(' ')) {
+        // Context (unchanged) line also exists in the new file; can be commented on.
         newFileLineNumber++;
+        if (newFileLineNumber === targetLine) {
+          return diffPosition;
+        }
+      } else if (line.startsWith('-')) {
+        // Deletion; does not advance new file line number and cannot be commented via position.
+        // But we still need to track diffPosition for it.
+        continue;
+      } else {
+        // Any other line (shouldn't normally occur) — treat conservatively.
+        continue;
       }
-      // Lines starting with - are deletions (don't increment new line number)
     }
 
+    // Target line not present in the diff for this file (likely unchanged outside hunks).
+    // Log warning for debugging with more context
+    console.warn(
+      `  ⚠ Could not find line ${targetLine} in ${filename}. Last tracked line was ${newFileLineNumber}`
+    );
+    if (hunkRanges.length > 0) {
+      console.warn(
+        `    Hunk ranges in diff: ${hunkRanges.map((r) => `${r.start}-${r.end}`).join(', ')}`
+      );
+      const isInRange = hunkRanges.some(
+        (r) => targetLine >= r.start && targetLine <= r.end
+      );
+      if (!isInRange) {
+        console.warn(
+          `    Line ${targetLine} is outside all hunk ranges - may indicate issue was already fixed or AI is referencing old code`
+        );
+      }
+    }
     return null;
   }
 }

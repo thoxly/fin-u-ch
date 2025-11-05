@@ -57,13 +57,13 @@ export const CustomTooltip: React.FC<CustomTooltipProps> = ({
       </div>
       <div className="space-y-0.5">
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-gray-600 dark:text-gray-400">Доход</span>
+          <span className="text-gray-600 dark:text-gray-400">Поступление</span>
           <span className="font-semibold text-green-600 dark:text-green-400">
             {formatMoney(incomeTotal)}
           </span>
         </div>
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-gray-600 dark:text-gray-400">Расход</span>
+          <span className="text-gray-600 dark:text-gray-400">Списание</span>
           <span className="font-semibold text-red-600 dark:text-red-400">
             {formatMoney(expenseTotal)}
           </span>

@@ -56,13 +56,13 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
     (filteredData || []).forEach((p) => {
       rows.push({
         date: p.date || p.label,
-        category: 'Доходы',
+        category: 'Поступления',
         amount: p.cumulativeIncome,
         type: 'income',
       });
       rows.push({
         date: p.date || p.label,
-        category: 'Расходы',
+        category: 'Списания',
         amount: p.cumulativeExpense,
         type: 'expense',
       });
@@ -99,7 +99,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                         Денежный поток
                       </div>
                       <div>
-                        Показывает, как меняются доходы, расходы и чистый
+                        Показывает, как меняются поступления, списания и чистый
                         результат во времени. Помогает понять, положительный ли
                         поток и когда происходят основные движения средств.
                       </div>
@@ -108,7 +108,8 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 />
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Накопление доходов, расходов и чистего потока с начала периода
+                Накопление поступлений, списаний и чистого потока с начала
+                периода
               </p>
             </div>
             <ExportMenu
@@ -185,7 +186,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                       Денежный поток
                     </div>
                     <div>
-                      Показывает, как меняются доходы, расходы и чистый
+                      Показывает, как меняются поступления, списания и чистый
                       результат во времени. Помогает понять, положительный ли
                       поток и когда происходят основные движения средств.
                     </div>
@@ -194,7 +195,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               />
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Накопление доходов, расходов и чистого потока с начала периода
+              Накопление поступлений, списаний и чистого потока с начала периода
             </p>
           </div>
           <ExportMenu
@@ -240,7 +241,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 align="center"
                 content={
                   <ChartLegend
-                    preferredOrder={['Доходы', 'Расходы', 'Чистый поток']}
+                    preferredOrder={['Поступления', 'Списания', 'Чистый поток']}
                   />
                 }
                 wrapperStyle={{ paddingTop: 8 }}
@@ -256,9 +257,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 payload?: CumulativeDataPoint;
                 cx?: number;
                 cy?: number;
+                index?: number;
               }) => {
-                const { payload, cx, cy } = props;
-                // Проверяем, есть ли операции дохода в этот период
+                const { payload, cx, cy, index } = props;
+                // Проверяем, есть ли операции поступления в этот период
                 const operations = payload?.operations || [];
                 const hasIncome = operations.some(
                   (op: Operation) => op.type === 'income'
@@ -266,6 +268,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 if (!hasIncome) return null;
                 return (
                   <circle
+                    key={`income-${index}-${cx}-${cy}`}
                     cx={cx}
                     cy={cy}
                     r={3}
@@ -275,7 +278,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                   />
                 );
               }}
-              name="Доходы"
+              name="Поступления"
             />
             <Line
               type="monotone"
@@ -287,9 +290,10 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 payload?: CumulativeDataPoint;
                 cx?: number;
                 cy?: number;
+                index?: number;
               }) => {
-                const { payload, cx, cy } = props;
-                // Проверяем, есть ли операции расхода в этот период
+                const { payload, cx, cy, index } = props;
+                // Проверяем, есть ли операции списания в этот период
                 const operations = payload?.operations || [];
                 const hasExpense = operations.some(
                   (op: Operation) => op.type === 'expense'
@@ -297,6 +301,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 if (!hasExpense) return null;
                 return (
                   <circle
+                    key={`expense-${index}-${cx}-${cy}`}
                     cx={cx}
                     cy={cy}
                     r={3}
@@ -306,7 +311,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                   />
                 );
               }}
-              name="Расходы"
+              name="Списания"
             />
             <Line
               type="monotone"

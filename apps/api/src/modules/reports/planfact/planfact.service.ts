@@ -92,6 +92,7 @@ export class PlanFactService {
           lte: params.periodTo,
         },
         type: { in: ['income', 'expense'] },
+        isConfirmed: true,
       },
       include: {
         article: { select: { id: true, name: true } },

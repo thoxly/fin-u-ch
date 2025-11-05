@@ -8,7 +8,7 @@ import { Button } from '../shared/ui/Button';
 import { OffCanvas } from '../shared/ui/OffCanvas';
 import { Table } from '../shared/ui/Table';
 import { PlanForm } from '../features/plan-editor/PlanForm';
-import { PlanMatrixTable } from '../widgets/PlanMatrixTable';
+import { CashflowTable } from '../widgets/CashflowTable';
 import {
   useGetBudgetQuery,
   useUpdateBudgetMutation,
@@ -19,26 +19,39 @@ import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { PlanItem } from '@fin-u-ch/shared';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useNotification } from '../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
+
+// RTK Query возвращает данные с датами как строки
+type PlanItemFromAPI = Omit<
+  PlanItem,
+  'startDate' | 'endDate' | 'createdAt' | 'updatedAt' | 'deletedAt'
+> & {
+  startDate: string;
+  endDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+};
 
 export const BudgetDetailsPage = () => {
   const { budgetId } = useParams<{ budgetId: string }>();
   const navigate = useNavigate();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingPlan, setEditingPlan] = useState<PlanItem | null>(null);
+  const [editingPlan, setEditingPlan] = useState<PlanItemFromAPI | null>(null);
 
   const { data: budget, isLoading: isBudgetLoading } = useGetBudgetQuery(
     budgetId || skipToken
   );
-  const { data: plans = [], isLoading: isPlansLoading } = useGetPlansQuery(
+  const { data: plansData = [], isLoading: isPlansLoading } = useGetPlansQuery(
     budgetId ? { budgetId } : skipToken
   );
+  // RTK Query возвращает строки, но типы указывают Date - приводим к правильному типу
+  const plans = plansData as unknown as PlanItemFromAPI[];
 
-  // Отладочная информация
-  console.log('BudgetDetailsPage - plans:', plans);
-  console.log('BudgetDetailsPage - isPlansLoading:', isPlansLoading);
-  console.log('BudgetDetailsPage - editingPlan:', editingPlan);
   const [deletePlan] = useDeletePlanMutation();
   const [updateBudget] = useUpdateBudgetMutation();
+  const { showSuccess, showError } = useNotification();
 
   // Определяем период для отчета на основе дат бюджета
   const reportPeriod = useMemo(() => {
@@ -69,15 +82,20 @@ export const BudgetDetailsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleEdit = (plan: PlanItem) => {
-    console.log('BudgetDetailsPage - handleEdit called with plan:', plan);
+  const handleEdit = (plan: PlanItemFromAPI) => {
     setEditingPlan(plan);
     setIsFormOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Вы уверены, что хотите удалить эту плановую запись?')) {
-      await deletePlan(id);
+      try {
+        await deletePlan(id).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.PLAN.DELETE_SUCCESS);
+      } catch (error) {
+        console.error('Failed to delete plan:', error);
+        showError(NOTIFICATION_MESSAGES.PLAN.DELETE_ERROR);
+      }
     }
   };
 
@@ -97,9 +115,9 @@ export const BudgetDetailsPage = () => {
 
   const getTypeLabel = (type: string) => {
     return type === 'income'
-      ? 'Доход'
+      ? 'Поступление'
       : type === 'expense'
-        ? 'Расход'
+        ? 'Списание'
         : 'Перевод';
   };
 
@@ -120,38 +138,39 @@ export const BudgetDetailsPage = () => {
     {
       key: 'type',
       header: 'Тип',
-      render: (plan: PlanItem) => getTypeLabel(plan.type),
+      render: (plan: PlanItemFromAPI) => getTypeLabel(plan.type),
       width: '100px',
     },
     {
       key: 'startDate',
       header: 'Начало',
-      render: (plan: PlanItem) => formatDate(plan.startDate),
+      render: (plan: PlanItemFromAPI) => formatDate(plan.startDate),
       width: '110px',
     },
     {
       key: 'amount',
       header: 'Сумма',
-      render: (plan: PlanItem) => formatMoney(plan.amount, plan.currency),
+      render: (plan: PlanItemFromAPI) =>
+        formatMoney(plan.amount, plan.currency),
       width: '130px',
     },
     {
       key: 'articleName',
       header: 'Статья',
-      render: (plan: PlanItem) =>
-        (plan as PlanItem & { article?: { name: string } }).article?.name ||
-        '-',
+      render: (plan: PlanItemFromAPI) =>
+        (plan as PlanItemFromAPI & { article?: { name: string } }).article
+          ?.name || '-',
     },
     {
       key: 'repeat',
       header: 'Повтор',
-      render: (plan: PlanItem) => getRepeatLabel(plan.repeat),
+      render: (plan: PlanItemFromAPI) => getRepeatLabel(plan.repeat),
       width: '140px',
     },
     {
       key: 'actions',
       header: 'Действия',
-      render: (plan: PlanItem) => (
+      render: (plan: PlanItemFromAPI) => (
         <div className="flex gap-2">
           <Button
             variant="secondary"
@@ -241,10 +260,12 @@ export const BudgetDetailsPage = () => {
             <div className="text-center py-8">Загрузка данных...</div>
           </Card>
         ) : bddsData ? (
-          <PlanMatrixTable
+          <CashflowTable
             data={bddsData}
             periodFrom={reportPeriod!.periodFrom}
             periodTo={reportPeriod!.periodTo}
+            title="Бюджет движения денежных средств"
+            showPlan={false}
           />
         ) : (
           <Card>
