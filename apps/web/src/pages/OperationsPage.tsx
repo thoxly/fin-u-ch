@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
@@ -31,6 +31,8 @@ import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 import { useBulkSelection } from '../shared/hooks/useBulkSelection';
+import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
+import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -75,24 +77,36 @@ export const OperationsPage = () => {
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
 
-  // Формируем объект фильтров
-  const filters: {
-    type?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    articleId?: string;
-    counterpartyId?: string;
-    dealId?: string;
-    departmentId?: string;
-  } = {};
+  // Формируем объект фильтров с useMemo для избежания ненужных пересозданий
+  const filters = useMemo(() => {
+    const result: {
+      type?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      articleId?: string;
+      counterpartyId?: string;
+      dealId?: string;
+      departmentId?: string;
+    } = {};
 
-  if (typeFilter) filters.type = typeFilter;
-  if (dateFromFilter) filters.dateFrom = dateFromFilter;
-  if (dateToFilter) filters.dateTo = dateToFilter;
-  if (articleIdFilter) filters.articleId = articleIdFilter;
-  if (counterpartyIdFilter) filters.counterpartyId = counterpartyIdFilter;
-  if (dealIdFilter) filters.dealId = dealIdFilter;
-  if (departmentIdFilter) filters.departmentId = departmentIdFilter;
+    if (typeFilter) result.type = typeFilter;
+    if (dateFromFilter) result.dateFrom = dateFromFilter;
+    if (dateToFilter) result.dateTo = dateToFilter;
+    if (articleIdFilter) result.articleId = articleIdFilter;
+    if (counterpartyIdFilter) result.counterpartyId = counterpartyIdFilter;
+    if (dealIdFilter) result.dealId = dealIdFilter;
+    if (departmentIdFilter) result.departmentId = departmentIdFilter;
+
+    return result;
+  }, [
+    typeFilter,
+    dateFromFilter,
+    dateToFilter,
+    articleIdFilter,
+    counterpartyIdFilter,
+    dealIdFilter,
+    departmentIdFilter,
+  ]);
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
@@ -101,7 +115,6 @@ export const OperationsPage = () => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [trigger, { isFetching }] = useLazyGetOperationsQuery();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
@@ -109,7 +122,22 @@ export const OperationsPage = () => {
 
   const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
 
-  // Initial and filters-changed load
+  // Memoize loadMore callback to prevent unnecessary re-renders
+  const loadMore = useCallback(async () => {
+    if (isFetching || !hasMore) return;
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset,
+    };
+    const result = await trigger(params).unwrap();
+    const page = result || [];
+    setItems((prev) => [...prev, ...page]);
+    setOffset((prevOffset) => prevOffset + page.length);
+    setHasMore(page.length === PAGE_SIZE);
+  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
+
+  // Initial and filters-changed load with proper dependencies
   useEffect(() => {
     let cancelled = false;
 
@@ -134,48 +162,20 @@ export const OperationsPage = () => {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    typeFilter,
-    dateFromFilter,
-    dateToFilter,
-    articleIdFilter,
-    counterpartyIdFilter,
-    dealIdFilter,
-    departmentIdFilter,
-  ]);
+  }, [filters, hasActiveFilters, trigger, clearSelection]);
 
-  const loadMore = async () => {
-    if (isFetching || !hasMore) return;
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset,
-    };
-    const result = await trigger(params).unwrap();
-    const page = result || [];
-    setItems((prev) => [...prev, ...page]);
-    setOffset(offset + page.length);
-    setHasMore(page.length === PAGE_SIZE);
-  };
-
-  // Observe bottom sentinel for infinite scroll
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0];
-        if (entry.isIntersecting) {
+  // Use IntersectionObserver hook for infinite scroll
+  const sentinelRef = useIntersectionObserver(
+    useCallback(
+      (entry) => {
+        if (entry.isIntersecting && !isFetching && hasMore) {
           loadMore();
         }
       },
-      { rootMargin: '200px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sentinelRef.current, isFetching, hasMore, offset, hasActiveFilters]);
+      [isFetching, hasMore, loadMore]
+    ),
+    { rootMargin: '200px', enabled: hasMore && !isFetching }
+  );
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -429,41 +429,6 @@ export const OperationsPage = () => {
           <div className="flex items-center gap-3">
             <RecurringOperations onEdit={handleEdit} />
             <Button onClick={handleCreate}>Создать операцию</Button>
-            {selectedIds.length > 0 && (
-              <Button
-                className="btn-danger"
-                onClick={async () => {
-                  if (
-                    window.confirm(
-                      `Удалить выбранные операции (${selectedIds.length})?`
-                    )
-                  ) {
-                    try {
-                      await bulkDeleteOperations(selectedIds).unwrap();
-                      clearSelection();
-                      // After delete, reload from scratch to keep list consistent
-                      const params: OpsQuery = {
-                        ...(hasActiveFilters ? filters : {}),
-                        limit: PAGE_SIZE,
-                        offset: 0,
-                      };
-                      const result = await trigger(params).unwrap();
-                      setItems(result as OperationWithRelations[]);
-                      setHasMore(result.length === PAGE_SIZE);
-                      setOffset(result.length);
-                      showSuccess(
-                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
-                      );
-                    } catch (error) {
-                      console.error('Failed to bulk delete operations:', error);
-                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
-                    }
-                  }
-                }}
-              >
-                Удалить выбранные
-              </Button>
-            )}
           </div>
         </div>
 
@@ -578,7 +543,45 @@ export const OperationsPage = () => {
               rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
             />
           )}
-          <div ref={sentinelRef} />
+          <BulkActionsBar
+            selectedCount={selectedIds.length}
+            onClear={clearSelection}
+            actions={[
+              {
+                label: `Удалить выбранные (${selectedIds.length})`,
+                variant: 'danger',
+                onClick: async () => {
+                  if (
+                    window.confirm(
+                      `Удалить выбранные операции (${selectedIds.length})?`
+                    )
+                  ) {
+                    try {
+                      await bulkDeleteOperations(selectedIds).unwrap();
+                      clearSelection();
+                      // After delete, reload from scratch to keep list consistent
+                      const params: OpsQuery = {
+                        ...(hasActiveFilters ? filters : {}),
+                        limit: PAGE_SIZE,
+                        offset: 0,
+                      };
+                      const result = await trigger(params).unwrap();
+                      setItems(result as OperationWithRelations[]);
+                      setHasMore(result.length === PAGE_SIZE);
+                      setOffset(result.length);
+                      showSuccess(
+                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
+                      );
+                    } catch (error) {
+                      console.error('Failed to bulk delete operations:', error);
+                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+                    }
+                  }
+                },
+              },
+            ]}
+          />
+          <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
         <Modal

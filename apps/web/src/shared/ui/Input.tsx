@@ -12,6 +12,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, fullWidth = true, className, icon, id, ...props }, ref) => {
     const generatedId = useId();
     const inputId = id || generatedId;
+    const errorId = error ? `${inputId}-error` : undefined;
 
     return (
       <div className={classNames(fullWidth && 'w-full')}>
@@ -29,6 +30,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
+            aria-describedby={errorId}
+            aria-invalid={error ? 'true' : undefined}
             className={classNames(
               'input',
               error && 'input-error',
@@ -38,7 +41,11 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
         </div>
-        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        {error && (
+          <p id={errorId} className="mt-1 text-sm text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     );
   }

@@ -17,6 +17,7 @@ import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
 import { ArticleForm } from '@/features/catalog-forms/index';
 import { useBulkSelection } from '../../shared/hooks/useBulkSelection';
+import { BulkActionsBar } from '../../shared/ui/BulkActionsBar';
 
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -280,30 +281,26 @@ export const ArticlesPage = () => {
               keyExtractor={(a) => a.id}
               loading={isLoading}
             />
-            {selectedIds.length > 0 && (
-              <div className="mt-4 flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  Выбрано: {selectedIds.length}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    className="btn-warning"
-                    onClick={async () => {
-                      if (
-                        window.confirm(
-                          `Отправить в архив выбранные статьи (${selectedIds.length})?`
-                        )
-                      ) {
-                        await bulkArchiveArticles(selectedIds);
-                        clearSelection();
-                      }
-                    }}
-                  >
-                    В архив выбранные
-                  </Button>
-                </div>
-              </div>
-            )}
+            <BulkActionsBar
+              selectedCount={selectedIds.length}
+              onClear={clearSelection}
+              actions={[
+                {
+                  label: `В архив выбранные (${selectedIds.length})`,
+                  variant: 'warning',
+                  onClick: async () => {
+                    if (
+                      window.confirm(
+                        `Отправить в архив выбранные статьи (${selectedIds.length})?`
+                      )
+                    ) {
+                      await bulkArchiveArticles(selectedIds);
+                      clearSelection();
+                    }
+                  },
+                },
+              ]}
+            />
           </>
         </Card>
       </div>

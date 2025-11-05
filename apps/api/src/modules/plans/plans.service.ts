@@ -21,6 +21,7 @@ export interface CreatePlanItemDTO {
 export interface MonthlyAmount {
   month: string;
   amount: number;
+  planItemId?: string; // Optional to maintain backward compatibility
 }
 
 export class PlansService {
@@ -207,7 +208,7 @@ export class PlansService {
 
     if (planItem.repeat === 'none') {
       const month = `${planItem.startDate.getFullYear()}-${String(planItem.startDate.getMonth() + 1).padStart(2, '0')}`;
-      result.push({ month, amount: planItem.amount });
+      result.push({ month, amount: planItem.amount, planItemId: planItem.id });
       return result;
     }
 
@@ -239,12 +240,19 @@ export class PlansService {
         // Важно: используем currentDate ДО того, как он будет изменен в switch ниже
         const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
 
-        // Проверяем, нет ли уже этого месяца в результате (защита от дубликатов)
-        const existingMonth = result.find((r) => r.month === month);
+        // Проверяем, нет ли уже этого месяца для этого плана в результате
+        // Используем комбинацию month и planItem.id для правильной обработки нескольких планов на одну статью
+        const existingMonth = result.find(
+          (r) => r.month === month && r.planItemId === planItem.id
+        );
         if (!existingMonth) {
-          result.push({ month, amount: planItem.amount });
+          result.push({
+            month,
+            amount: planItem.amount,
+            planItemId: planItem.id,
+          });
         } else {
-          // Если месяц уже есть, добавляем сумму (для случаев нескольких планов на одну статью)
+          // Если месяц уже есть для этого плана, добавляем сумму
           existingMonth.amount += planItem.amount;
         }
       }

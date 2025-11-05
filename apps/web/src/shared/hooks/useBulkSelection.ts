@@ -5,17 +5,19 @@ import { useState, useCallback } from 'react';
  * @param initialSelectedIds - Initial array of selected IDs
  * @returns Object with selectedIds, toggleSelectOne, toggleSelectAll, clearSelection, and isSelected
  */
-export const useBulkSelection = (initialSelectedIds: string[] = []) => {
-  const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
+export const useBulkSelection = <T extends string = string>(
+  initialSelectedIds: T[] = []
+) => {
+  const [selectedIds, setSelectedIds] = useState<T[]>(initialSelectedIds);
 
-  const toggleSelectOne = useCallback((id: string) => {
+  const toggleSelectOne = useCallback((id: T) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }, []);
 
   const toggleSelectAll = useCallback(
-    (allIds: string[]) => {
+    (allIds: T[]) => {
       const allSelected = allIds.every((id) => selectedIds.includes(id));
       if (allSelected) {
         setSelectedIds((prev) => prev.filter((id) => !allIds.includes(id)));
@@ -34,7 +36,7 @@ export const useBulkSelection = (initialSelectedIds: string[] = []) => {
   }, []);
 
   const isSelected = useCallback(
-    (id: string) => selectedIds.includes(id),
+    (id: T) => selectedIds.includes(id),
     [selectedIds]
   );
 

@@ -24,7 +24,18 @@ export const operationsApi = apiSlice.injectEndpoints({
               params,
             }
           : '/operations',
-      providesTags: ['Operation'],
+      providesTags: (result, error, params) => {
+        // For paginated queries, provide specific tags to prevent cache invalidation issues
+        if (
+          params &&
+          (params.limit !== undefined || params.offset !== undefined)
+        ) {
+          // Create cache key based on query parameters
+          const cacheKey = JSON.stringify(params);
+          return [{ type: 'Operation', id: `LIST-${cacheKey}` }, 'Operation'];
+        }
+        return ['Operation'];
+      },
     }),
     getOperation: builder.query<Operation, string>({
       query: (id) => `/operations/${id}`,

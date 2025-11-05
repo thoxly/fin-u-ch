@@ -57,8 +57,8 @@ export class OperationsService {
     const skip = filters.offset;
 
     if (take !== undefined) {
-      if (take < 1 || take > 1000) {
-        throw new AppError('limit must be between 1 and 1000', 400);
+      if (take < 1 || take > 200) {
+        throw new AppError('limit must be between 1 and 200', 400);
       }
     }
 
@@ -193,11 +193,14 @@ export class OperationsService {
 
     // Critical security: Ensure companyId is validated and included in the query
     // This prevents data leakage between tenants
-    return prisma.operation.deleteMany({
-      where: {
-        companyId,
-        id: { in: validIds },
-      },
+    // Use transaction to ensure atomicity - all deletes succeed or none
+    return prisma.$transaction(async (tx) => {
+      return tx.operation.deleteMany({
+        where: {
+          companyId,
+          id: { in: validIds },
+        },
+      });
     });
   }
 }
