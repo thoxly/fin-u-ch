@@ -30,7 +30,7 @@ const navigation: NavigationItem[] = [
     name: 'Отчеты',
     children: [
       { name: 'ДДС', href: '/reports?type=cashflow' },
-      { name: 'ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
+      { name: '🔒ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
     ],
   },
   {

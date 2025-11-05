@@ -38,6 +38,19 @@ export const OperationsPage = () => {
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
   };
+
+  type OpsQuery = {
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    articleId?: string;
+    counterpartyId?: string;
+    dealId?: string;
+    departmentId?: string;
+    limit?: number;
+    offset?: number;
+  };
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
     null
@@ -103,17 +116,6 @@ export const OperationsPage = () => {
   // Initial and filters-changed load
   useEffect(() => {
     let cancelled = false;
-    type OpsQuery = {
-      type?: string;
-      dateFrom?: string;
-      dateTo?: string;
-      articleId?: string;
-      counterpartyId?: string;
-      dealId?: string;
-      departmentId?: string;
-      limit?: number;
-      offset?: number;
-    };
 
     const load = async () => {
       setItems([]);
@@ -209,6 +211,17 @@ export const OperationsPage = () => {
       try {
         await deleteOperation(id).unwrap();
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
+
+        // Перезагружаем данные после удаления
+        const params: OpsQuery = {
+          ...(hasActiveFilters ? filters : {}),
+          limit: PAGE_SIZE,
+          offset: 0,
+        };
+        const result = await trigger(params).unwrap();
+        setItems(result as OperationWithRelations[]);
+        setHasMore(result.length === PAGE_SIZE);
+        setOffset(result.length);
       } catch (error) {
         console.error('Failed to delete operation:', error);
         showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
@@ -220,16 +233,46 @@ export const OperationsPage = () => {
     try {
       await confirmOperation(id).unwrap();
       showSuccess('Операция успешно подтверждена');
+
+      // Перезагружаем данные после подтверждения
+      const params: OpsQuery = {
+        ...(hasActiveFilters ? filters : {}),
+        limit: PAGE_SIZE,
+        offset: 0,
+      };
+      const result = await trigger(params).unwrap();
+      setItems(result as OperationWithRelations[]);
+      setHasMore(result.length === PAGE_SIZE);
+      setOffset(result.length);
     } catch (error) {
       console.error('Failed to confirm operation:', error);
       showError('Ошибка при подтверждении операции');
     }
   };
 
-  const handleCloseForm = () => {
+  const handleCloseForm = async () => {
     setIsFormOpen(false);
     setEditingOperation(null);
     setIsCopying(false);
+
+    // Перезагружаем данные после закрытия формы (операция была создана/обновлена)
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+    setSelectedIds([]);
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset: 0,
+    };
+    try {
+      const result = await trigger(params).unwrap();
+      setItems(result as OperationWithRelations[]);
+      setHasMore(result.length === PAGE_SIZE);
+      setOffset(result.length);
+    } catch (error) {
+      console.error('Failed to reload operations after form close:', error);
+    }
   };
 
   const getOperationTypeLabel = (type: string) => {

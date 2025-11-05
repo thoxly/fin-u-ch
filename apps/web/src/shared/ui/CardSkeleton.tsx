@@ -39,13 +39,13 @@ const CardSkeleton: React.FC<CardSkeletonProps> = ({
 
   return (
     <div
-      className={`bg-white rounded-lg shadow-md border border-gray-200 ${sizeClasses[size]} animate-pulse`}
+      className={`bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 ${sizeClasses[size]} animate-pulse`}
       data-testid="card-skeleton"
     >
       {/* Заголовок карточки */}
       <div className="mb-4">
         <div
-          className={`bg-gray-300 rounded ${titleSizes[size]}`}
+          className={`bg-gray-300 dark:bg-gray-600 rounded ${titleSizes[size]}`}
           style={{ animationDelay: '0.1s' }}
         />
       </div>
@@ -55,7 +55,7 @@ const CardSkeleton: React.FC<CardSkeletonProps> = ({
         {Array.from({ length: lines }).map((_, index) => (
           <div
             key={`line-${index}`}
-            className={`bg-gray-200 rounded ${lineSizes[size]}`}
+            className={`bg-gray-200 dark:bg-gray-700 rounded ${lineSizes[size]}`}
             style={{
               width: `${getLineWidth(index)}%`,
               animationDelay: `${(index + 1) * 0.1}s`,

@@ -21,11 +21,14 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
   // Создаем массив строк
   const renderRows = () => {
     return Array.from({ length: rows }, (_, rowIndex) => (
-      <tr key={rowIndex} className="border-b border-gray-200">
+      <tr
+        key={rowIndex}
+        className="border-b border-gray-200 dark:border-gray-700"
+      >
         {Array.from({ length: columns }, (_, colIndex) => (
           <td key={colIndex} className="px-4 py-3">
             <div
-              className="h-4 bg-gray-200 rounded animate-pulse"
+              className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"
               style={{
                 width: `${getColumnWidth(colIndex)}%`,
                 animationDelay: `${rowIndex * 0.1}s`,
@@ -42,12 +45,12 @@ const TableSkeleton: React.FC<TableSkeletonProps> = ({
     if (!showHeader) return null;
 
     return (
-      <thead className="bg-gray-50">
+      <thead className="bg-gray-50 dark:bg-gray-800">
         <tr>
           {Array.from({ length: columns }, (_, colIndex) => (
             <th key={colIndex} className="px-4 py-3 text-left">
               <div
-                className="h-5 bg-gray-300 rounded animate-pulse"
+                className="h-5 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"
                 style={{
                   width: `${getColumnWidth(colIndex)}%`,
                   animationDelay: `${colIndex * 0.1}s`,

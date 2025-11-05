@@ -8,7 +8,7 @@ import { Button } from '../shared/ui/Button';
 import { OffCanvas } from '../shared/ui/OffCanvas';
 import { Table } from '../shared/ui/Table';
 import { PlanForm } from '../features/plan-editor/PlanForm';
-import { PlanMatrixTable } from '../widgets/PlanMatrixTable';
+import { CashflowTable } from '../widgets/CashflowTable';
 import {
   useGetBudgetQuery,
   useUpdateBudgetMutation,
@@ -260,10 +260,12 @@ export const BudgetDetailsPage = () => {
             <div className="text-center py-8">Загрузка данных...</div>
           </Card>
         ) : bddsData ? (
-          <PlanMatrixTable
+          <CashflowTable
             data={bddsData}
             periodFrom={reportPeriod!.periodFrom}
             periodTo={reportPeriod!.periodTo}
+            title="Бюджет движения денежных средств"
+            showPlan={false}
           />
         ) : (
           <Card>

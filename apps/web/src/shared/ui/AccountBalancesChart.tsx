@@ -273,6 +273,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                   if (!hasAccountOperation) return null;
                   return (
                     <circle
+                      key={`${accountName}-${props.index}`}
                       cx={props.cx}
                       cy={props.cy}
                       r={4}

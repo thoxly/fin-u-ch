@@ -24,11 +24,21 @@ export const operationsApi = apiSlice.injectEndpoints({
               params,
             }
           : '/operations',
-      providesTags: ['Operation'],
+      providesTags: (result, error, params) => {
+        // Если есть параметры limit/offset, это пагинация - не инвалидируем автоматически
+        if (
+          params &&
+          (params.limit !== undefined || params.offset !== undefined)
+        ) {
+          return [{ type: 'Operation', id: 'PAGINATED' }];
+        }
+        // Для обычных запросов используем стандартный тег
+        return ['Operation'];
+      },
     }),
     getOperation: builder.query<Operation, string>({
       query: (id) => `/operations/${id}`,
-      providesTags: ['Operation'],
+      providesTags: (result, error, id) => [{ type: 'Operation', id }],
     }),
     createOperation: builder.mutation<Operation, unknown>({
       query: (data) => ({
@@ -36,7 +46,9 @@ export const operationsApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      // Инвалидируем только не-пагинированные запросы
       invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+      // Оптимистичное обновление не применяем для пагинированных запросов
     }),
     updateOperation: builder.mutation<Operation, { id: string; data: unknown }>(
       {
@@ -45,7 +57,12 @@ export const operationsApi = apiSlice.injectEndpoints({
           method: 'PATCH',
           body: data,
         }),
-        invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+        invalidatesTags: (result, error, { id }) => [
+          'Operation',
+          { type: 'Operation', id },
+          'Dashboard',
+          'Report',
+        ],
       }
     ),
     deleteOperation: builder.mutation<void, string>({
@@ -53,14 +70,24 @@ export const operationsApi = apiSlice.injectEndpoints({
         url: `/operations/${id}`,
         method: 'DELETE',
       }),
-      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+      invalidatesTags: (result, error, id) => [
+        'Operation',
+        { type: 'Operation', id },
+        'Dashboard',
+        'Report',
+      ],
     }),
     confirmOperation: builder.mutation<Operation, string>({
       query: (id) => ({
         url: `/operations/${id}/confirm`,
         method: 'PATCH',
       }),
-      invalidatesTags: ['Operation', 'Dashboard', 'Report'],
+      invalidatesTags: (result, error, id) => [
+        'Operation',
+        { type: 'Operation', id },
+        'Dashboard',
+        'Report',
+      ],
     }),
     bulkDeleteOperations: builder.mutation<{ count: number }, string[]>({
       query: (ids) => ({

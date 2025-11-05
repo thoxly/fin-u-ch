@@ -232,11 +232,21 @@ export class PlansService {
       normalizedCurrentDate <= normalizedEndDate &&
       normalizedCurrentDate <= normalizedPeriodEnd
     ) {
+      // Проверяем, попадает ли текущая дата в период
+      // Используем >= чтобы включить первую дату, если она попадает в период
       if (normalizedCurrentDate >= normalizedPeriodStart) {
         // Определяем месяц из текущей даты (до любых модификаций)
-        // Используем напрямую год и месяц из currentDate для определения месяца
+        // Важно: используем currentDate ДО того, как он будет изменен в switch ниже
         const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-        result.push({ month, amount: planItem.amount });
+
+        // Проверяем, нет ли уже этого месяца в результате (защита от дубликатов)
+        const existingMonth = result.find((r) => r.month === month);
+        if (!existingMonth) {
+          result.push({ month, amount: planItem.amount });
+        } else {
+          // Если месяц уже есть, добавляем сумму (для случаев нескольких планов на одну статью)
+          existingMonth.amount += planItem.amount;
+        }
       }
 
       // Advance to next occurrence
