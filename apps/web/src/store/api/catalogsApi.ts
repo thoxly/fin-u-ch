@@ -70,6 +70,14 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Article'],
     }),
+    bulkArchiveArticles: builder.mutation<{ count: number }, string[]>({
+      query: (ids) => ({
+        url: '/articles/bulk-archive',
+        method: 'POST',
+        body: { ids },
+      }),
+      invalidatesTags: ['Article'],
+    }),
 
     // Accounts
     getAccounts: builder.query<Account[], void>({
@@ -237,6 +245,7 @@ export const {
   useDeleteArticleMutation,
   useArchiveArticleMutation,
   useUnarchiveArticleMutation,
+  useBulkArchiveArticlesMutation,
   useGetAccountsQuery,
   useCreateAccountMutation,
   useUpdateAccountMutation,

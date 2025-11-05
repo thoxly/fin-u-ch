@@ -21,6 +21,7 @@ export interface CreatePlanItemDTO {
 export interface MonthlyAmount {
   month: string;
   amount: number;
+  planItemId?: string; // Optional to maintain backward compatibility
 }
 
 export class PlansService {
@@ -195,6 +196,7 @@ export class PlansService {
    */
   expandPlan(
     planItem: {
+      id?: string;
       startDate: Date;
       endDate?: Date | null;
       amount: number;
@@ -207,7 +209,7 @@ export class PlansService {
 
     if (planItem.repeat === 'none') {
       const month = `${planItem.startDate.getFullYear()}-${String(planItem.startDate.getMonth() + 1).padStart(2, '0')}`;
-      result.push({ month, amount: planItem.amount });
+      result.push({ month, amount: planItem.amount, planItemId: planItem.id });
       return result;
     }
 
@@ -232,11 +234,28 @@ export class PlansService {
       normalizedCurrentDate <= normalizedEndDate &&
       normalizedCurrentDate <= normalizedPeriodEnd
     ) {
+      // Проверяем, попадает ли текущая дата в период
+      // Используем >= чтобы включить первую дату, если она попадает в период
       if (normalizedCurrentDate >= normalizedPeriodStart) {
         // Определяем месяц из текущей даты (до любых модификаций)
-        // Используем напрямую год и месяц из currentDate для определения месяца
+        // Важно: используем currentDate ДО того, как он будет изменен в switch ниже
         const month = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-        result.push({ month, amount: planItem.amount });
+
+        // Проверяем, нет ли уже этого месяца для этого плана в результате
+        // Используем комбинацию month и planItem.id для правильной обработки нескольких планов на одну статью
+        const existingMonth = result.find(
+          (r) => r.month === month && r.planItemId === planItem.id
+        );
+        if (!existingMonth) {
+          result.push({
+            month,
+            amount: planItem.amount,
+            planItemId: planItem.id,
+          });
+        } else {
+          // Если месяц уже есть для этого плана, добавляем сумму
+          existingMonth.amount += planItem.amount;
+        }
       }
 
       // Advance to next occurrence

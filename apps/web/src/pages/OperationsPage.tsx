@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
@@ -14,9 +14,10 @@ import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import {
-  useGetOperationsQuery,
+  useLazyGetOperationsQuery,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
+  useBulkDeleteOperationsMutation,
 } from '../store/api/operationsApi';
 import {
   useGetArticlesQuery,
@@ -29,6 +30,9 @@ import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
+import { useBulkSelection } from '../shared/hooks/useBulkSelection';
+import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
+import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -37,6 +41,19 @@ export const OperationsPage = () => {
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
   };
+
+  type OpsQuery = {
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    articleId?: string;
+    counterpartyId?: string;
+    dealId?: string;
+    departmentId?: string;
+    limit?: number;
+    offset?: number;
+  };
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
     null
@@ -60,33 +77,114 @@ export const OperationsPage = () => {
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
 
-  // Формируем объект фильтров
-  const filters: {
-    type?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    articleId?: string;
-    counterpartyId?: string;
-    dealId?: string;
-    departmentId?: string;
-  } = {};
+  // Формируем объект фильтров с useMemo для избежания ненужных пересозданий
+  const filters = useMemo(() => {
+    const result: {
+      type?: string;
+      dateFrom?: string;
+      dateTo?: string;
+      articleId?: string;
+      counterpartyId?: string;
+      dealId?: string;
+      departmentId?: string;
+    } = {};
 
-  if (typeFilter) filters.type = typeFilter;
-  if (dateFromFilter) filters.dateFrom = dateFromFilter;
-  if (dateToFilter) filters.dateTo = dateToFilter;
-  if (articleIdFilter) filters.articleId = articleIdFilter;
-  if (counterpartyIdFilter) filters.counterpartyId = counterpartyIdFilter;
-  if (dealIdFilter) filters.dealId = dealIdFilter;
-  if (departmentIdFilter) filters.departmentId = departmentIdFilter;
+    if (typeFilter) result.type = typeFilter;
+    if (dateFromFilter) result.dateFrom = dateFromFilter;
+    if (dateToFilter) result.dateTo = dateToFilter;
+    if (articleIdFilter) result.articleId = articleIdFilter;
+    if (counterpartyIdFilter) result.counterpartyId = counterpartyIdFilter;
+    if (dealIdFilter) result.dealId = dealIdFilter;
+    if (departmentIdFilter) result.departmentId = departmentIdFilter;
+
+    return result;
+  }, [
+    typeFilter,
+    dateFromFilter,
+    dateToFilter,
+    articleIdFilter,
+    counterpartyIdFilter,
+    dealIdFilter,
+    departmentIdFilter,
+  ]);
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
-  const { data: operations = [], isLoading } = useGetOperationsQuery(
-    hasActiveFilters ? filters : undefined
-  );
+  const PAGE_SIZE = 50;
+  const [items, setItems] = useState<OperationWithRelations[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [trigger, { isFetching }] = useLazyGetOperationsQuery();
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
+  const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
   const { showSuccess, showError } = useNotification();
+
+  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
+
+  // Extract data reloading logic to avoid duplication
+  const reloadOperationsData = useCallback(async () => {
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+    clearSelection();
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset: 0,
+    };
+    const result = await trigger(params).unwrap();
+    setItems(result as OperationWithRelations[]);
+    setHasMore(result.length === PAGE_SIZE);
+    setOffset(result.length);
+  }, [hasActiveFilters, filters, trigger, clearSelection]);
+
+  // Memoize loadMore callback to prevent unnecessary re-renders
+  const loadMore = useCallback(async () => {
+    if (isFetching || !hasMore) return;
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset,
+    };
+    const result = await trigger(params).unwrap();
+    const page = result || [];
+    setItems((prev) => [...prev, ...page]);
+    setOffset((prevOffset) => prevOffset + page.length);
+    setHasMore(page.length === PAGE_SIZE);
+  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
+
+  // Initial and filters-changed load with proper dependencies
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      await reloadOperationsData();
+      if (cancelled) {
+        // Reset state if cancelled
+        setItems([]);
+        setOffset(0);
+        setHasMore(true);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadOperationsData]);
+
+  // Use IntersectionObserver hook for infinite scroll
+  const sentinelRef = useIntersectionObserver(
+    useCallback(
+      (entry) => {
+        if (entry.isIntersecting && !isFetching && hasMore) {
+          loadMore();
+        }
+      },
+      [isFetching, hasMore, loadMore]
+    ),
+    { rootMargin: '200px', enabled: hasMore && !isFetching }
+  );
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -101,9 +199,11 @@ export const OperationsPage = () => {
   };
 
   const handleCopy = (operation: Operation) => {
-    // Создаем копию операции без id для создания новой
-    const { id, createdAt, updatedAt, ...operationCopy } = operation;
-    setEditingOperation(operationCopy as Operation);
+    // Создаем глубокую копию операции без id для создания новой
+    const { id, createdAt, updatedAt, ...operationData } = operation;
+    // Use structuredClone for deep copy to ensure nested objects are properly copied
+    const operationCopy = structuredClone(operationData) as Operation;
+    setEditingOperation(operationCopy);
     setIsCopying(true);
     setIsFormOpen(true);
   };
@@ -113,6 +213,7 @@ export const OperationsPage = () => {
       try {
         await deleteOperation(id).unwrap();
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
+        await reloadOperationsData();
       } catch (error) {
         console.error('Failed to delete operation:', error);
         showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
@@ -124,16 +225,24 @@ export const OperationsPage = () => {
     try {
       await confirmOperation(id).unwrap();
       showSuccess('Операция успешно подтверждена');
+      await reloadOperationsData();
     } catch (error) {
       console.error('Failed to confirm operation:', error);
       showError('Ошибка при подтверждении операции');
     }
   };
 
-  const handleCloseForm = () => {
+  const handleCloseForm = async () => {
     setIsFormOpen(false);
     setEditingOperation(null);
     setIsCopying(false);
+
+    // Перезагружаем данные после закрытия формы (операция была создана/обновлена)
+    try {
+      await reloadOperationsData();
+    } catch (error) {
+      console.error('Failed to reload operations after form close:', error);
+    }
   };
 
   const getOperationTypeLabel = (type: string) => {
@@ -169,6 +278,22 @@ export const OperationsPage = () => {
   };
 
   const columns = [
+    {
+      key: 'select',
+      header: '',
+      render: (op: Operation) => (
+        <input
+          type="checkbox"
+          aria-label="Выбрать операцию"
+          checked={selectedIds.includes(op.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectOne(op.id);
+          }}
+        />
+      ),
+      width: '40px',
+    },
     {
       key: 'operationDate',
       header: 'Дата',
@@ -376,9 +501,9 @@ export const OperationsPage = () => {
             </div>
           </div>
 
-          {isLoading ? (
+          {items.length === 0 && isFetching ? (
             <TableSkeleton rows={5} columns={6} />
-          ) : operations.length === 0 ? (
+          ) : items.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="Нет операций"
@@ -387,11 +512,40 @@ export const OperationsPage = () => {
           ) : (
             <Table
               columns={columns}
-              data={operations}
+              data={items}
               keyExtractor={(op) => op.id}
               rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
             />
           )}
+          <BulkActionsBar
+            selectedCount={selectedIds.length}
+            onClear={clearSelection}
+            actions={[
+              {
+                label: `Удалить выбранные (${selectedIds.length})`,
+                variant: 'danger',
+                onClick: async () => {
+                  if (
+                    window.confirm(
+                      `Удалить выбранные операции (${selectedIds.length})?`
+                    )
+                  ) {
+                    try {
+                      await bulkDeleteOperations(selectedIds).unwrap();
+                      await reloadOperationsData();
+                      showSuccess(
+                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
+                      );
+                    } catch (error) {
+                      console.error('Failed to bulk delete operations:', error);
+                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+                    }
+                  }
+                },
+              },
+            ]}
+          />
+          <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
         <Modal

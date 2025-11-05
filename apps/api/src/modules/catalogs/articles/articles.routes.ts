@@ -138,4 +138,29 @@ router.post('/:id/archive', articlesController.archive);
  */
 router.post('/:id/unarchive', articlesController.unarchive);
 
+/**
+ * @swagger
+ * /api/articles/bulk-archive:
+ *   post:
+ *     summary: Bulk archive articles
+ *     tags: [Articles]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *     responses:
+ *       200:
+ *         description: UpdateMany result
+ */
+router.post('/bulk-archive', articlesController.bulkArchive);
+
 export default router;

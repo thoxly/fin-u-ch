@@ -12,9 +12,12 @@ import {
   useArchiveArticleMutation,
   useUnarchiveArticleMutation,
 } from '../../store/api/catalogsApi';
+import { useBulkArchiveArticlesMutation } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
 import { ArticleForm } from '@/features/catalog-forms/index';
+import { useBulkSelection } from '../../shared/hooks/useBulkSelection';
+import { BulkActionsBar } from '../../shared/ui/BulkActionsBar';
 
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -47,6 +50,9 @@ export const ArticlesPage = () => {
   const [deleteArticle] = useDeleteArticleMutation();
   const [archiveArticle] = useArchiveArticleMutation();
   const [unarchiveArticle] = useUnarchiveArticleMutation();
+  const [bulkArchiveArticles] = useBulkArchiveArticlesMutation();
+
+  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
 
   // Отладочная информация
   console.log('ArticlesPage - articles:', articles);
@@ -99,6 +105,22 @@ export const ArticlesPage = () => {
     typeFilter || activityFilter || isActiveFilter !== undefined;
 
   const columns = [
+    {
+      key: 'select',
+      header: '',
+      render: (a: Article) => (
+        <input
+          type="checkbox"
+          aria-label="Выбрать статью"
+          checked={selectedIds.includes(a.id)}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectOne(a.id);
+          }}
+        />
+      ),
+      width: '40px',
+    },
     { key: 'name', header: 'Название' },
     {
       key: 'type',
@@ -252,12 +274,34 @@ export const ArticlesPage = () => {
             </div>
           </div>
 
-          <Table
-            columns={columns}
-            data={articles}
-            keyExtractor={(a) => a.id}
-            loading={isLoading}
-          />
+          <>
+            <Table
+              columns={columns}
+              data={articles}
+              keyExtractor={(a) => a.id}
+              loading={isLoading}
+            />
+            <BulkActionsBar
+              selectedCount={selectedIds.length}
+              onClear={clearSelection}
+              actions={[
+                {
+                  label: `В архив выбранные (${selectedIds.length})`,
+                  variant: 'warning',
+                  onClick: async () => {
+                    if (
+                      window.confirm(
+                        `Отправить в архив выбранные статьи (${selectedIds.length})?`
+                      )
+                    ) {
+                      await bulkArchiveArticles(selectedIds);
+                      clearSelection();
+                    }
+                  },
+                },
+              ]}
+            />
+          </>
         </Card>
       </div>
       <OffCanvas

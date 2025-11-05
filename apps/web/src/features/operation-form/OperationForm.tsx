@@ -18,6 +18,10 @@ import type { Operation, CreateOperationDTO } from '@fin-u-ch/shared';
 import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
+import {
+  formatAmountInput,
+  parseAmountInputToNumber,
+} from '../../shared/lib/numberInput';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -65,7 +69,9 @@ export const OperationForm = ({
   };
 
   const [operationDate, setOperationDate] = useState(getInitialDate());
-  const [amount, setAmount] = useState(operation?.amount.toString() || '');
+  const [amount, setAmount] = useState(
+    operation?.amount != null ? formatAmountInput(String(operation.amount)) : ''
+  );
   const [currency, setCurrency] = useState(operation?.currency || 'RUB');
   const [articleId, setArticleId] = useState(operation?.articleId || '');
   const [accountId, setAccountId] = useState(operation?.accountId || '');
@@ -105,10 +111,11 @@ export const OperationForm = ({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    const amountNumber = parseAmountInputToNumber(amount);
     const operationData: CreateOperationDTO = {
       type: type as OperationType,
       operationDate: new Date(operationDate).toISOString(),
-      amount: parseFloat(amount),
+      amount: amountNumber,
       currency,
       articleId: articleId || undefined,
       accountId:
@@ -197,10 +204,11 @@ export const OperationForm = ({
 
         <Input
           label="Сумма"
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(formatAmountInput(e.target.value))}
+          placeholder="0"
           required
         />
 

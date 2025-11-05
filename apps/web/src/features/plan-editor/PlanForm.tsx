@@ -15,6 +15,10 @@ import type { PlanItem } from '@shared/types/operations';
 import { OperationType, Periodicity, PlanStatus } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
+import {
+  formatAmountInput,
+  parseAmountInputToNumber,
+} from '../../shared/lib/numberInput';
 
 // API возвращает даты как строки, не как Date объекты
 type PlanItemFromAPI = Omit<
@@ -42,7 +46,9 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [endDate, setEndDate] = useState(
     plan?.endDate ? plan.endDate.split('T')[0] : ''
   );
-  const [amount, setAmount] = useState(plan?.amount.toString() || '');
+  const [amount, setAmount] = useState(
+    plan?.amount != null ? formatAmountInput(String(plan.amount)) : ''
+  );
   const [currency, setCurrency] = useState(plan?.currency || 'RUB');
   const [articleId, setArticleId] = useState(plan?.articleId || '');
   const [accountId, setAccountId] = useState(plan?.accountId || '');
@@ -89,7 +95,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
       type: type as OperationType,
       startDate: new Date(startDate).toISOString(),
       endDate: endDate ? new Date(endDate).toISOString() : undefined,
-      amount: parseFloat(amount),
+      amount: parseAmountInputToNumber(amount),
       currency,
       articleId: articleId || undefined,
       accountId: accountId || undefined,
@@ -180,10 +186,11 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
 
         <Input
           label="Сумма"
-          type="number"
-          step="0.01"
+          type="text"
+          inputMode="decimal"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(formatAmountInput(e.target.value))}
+          placeholder="0"
           required
         />
 

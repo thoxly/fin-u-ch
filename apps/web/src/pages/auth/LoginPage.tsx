@@ -78,6 +78,15 @@ export const LoginPage = () => {
               autoComplete="current-password"
             />
           </div>
+          {/* <><div>
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              inchange={(e)} => setPassword(e.target.value
+                </div>
+              
+              </Input></div></> */}
 
           <Button type="submit" fullWidth disabled={isLoading}>
             {isLoading ? 'Вход...' : 'Войти'}
