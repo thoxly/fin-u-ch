@@ -52,20 +52,16 @@ export class OperationsService {
         (where.operationDate as Record<string, unknown>).lte = filters.dateTo;
     }
 
-    // Validate pagination parameters
-    const take = filters.limit;
-    const skip = filters.offset;
+    // Validate pagination parameters and set defaults
+    const take = filters.limit ?? 50; // Default limit
+    const skip = filters.offset ?? 0; // Default offset
 
-    if (take !== undefined) {
-      if (take < 1 || take > 200) {
-        throw new AppError('limit must be between 1 and 200', 400);
-      }
+    if (take < 1 || take > 200) {
+      throw new AppError('limit must be between 1 and 200', 400);
     }
 
-    if (skip !== undefined) {
-      if (skip < 0) {
-        throw new AppError('offset must be non-negative', 400);
-      }
+    if (skip < 0) {
+      throw new AppError('offset must be non-negative', 400);
     }
 
     return prisma.operation.findMany({
@@ -191,8 +187,23 @@ export class OperationsService {
       throw new AppError('All ids must be non-empty strings', 400);
     }
 
-    // Critical security: Ensure companyId is validated and included in the query
+    // Critical security: Validate that all operations belong to the user's company
     // This prevents data leakage between tenants
+    const operations = await prisma.operation.findMany({
+      where: {
+        id: { in: validIds },
+      },
+      select: { id: true, companyId: true },
+    });
+
+    // Check if all operations belong to the company
+    const invalidOperations = operations.filter(
+      (op) => op.companyId !== companyId
+    );
+    if (invalidOperations.length > 0) {
+      throw new AppError('Some operations do not belong to your company', 403);
+    }
+
     // Use transaction to ensure atomicity - all deletes succeed or none
     return prisma.$transaction(async (tx) => {
       return tx.operation.deleteMany({

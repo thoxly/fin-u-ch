@@ -122,6 +122,23 @@ export const OperationsPage = () => {
 
   const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
 
+  // Extract data reloading logic to avoid duplication
+  const reloadOperationsData = useCallback(async () => {
+    setItems([]);
+    setOffset(0);
+    setHasMore(true);
+    clearSelection();
+    const params: OpsQuery = {
+      ...(hasActiveFilters ? filters : {}),
+      limit: PAGE_SIZE,
+      offset: 0,
+    };
+    const result = await trigger(params).unwrap();
+    setItems(result as OperationWithRelations[]);
+    setHasMore(result.length === PAGE_SIZE);
+    setOffset(result.length);
+  }, [hasActiveFilters, filters, trigger, clearSelection]);
+
   // Memoize loadMore callback to prevent unnecessary re-renders
   const loadMore = useCallback(async () => {
     if (isFetching || !hasMore) return;
@@ -142,27 +159,19 @@ export const OperationsPage = () => {
     let cancelled = false;
 
     const load = async () => {
-      setItems([]);
-      setOffset(0);
-      setHasMore(true);
-      clearSelection();
-      const params: OpsQuery = {
-        ...(hasActiveFilters ? filters : {}),
-        limit: PAGE_SIZE,
-        offset: 0,
-      };
-      const result = await trigger(params).unwrap();
-      if (!cancelled) {
-        setItems(result as OperationWithRelations[]);
-        setHasMore(result.length === PAGE_SIZE);
-        setOffset(result.length);
+      await reloadOperationsData();
+      if (cancelled) {
+        // Reset state if cancelled
+        setItems([]);
+        setOffset(0);
+        setHasMore(true);
       }
     };
     load();
     return () => {
       cancelled = true;
     };
-  }, [filters, hasActiveFilters, trigger, clearSelection]);
+  }, [reloadOperationsData]);
 
   // Use IntersectionObserver hook for infinite scroll
   const sentinelRef = useIntersectionObserver(
@@ -190,14 +199,11 @@ export const OperationsPage = () => {
   };
 
   const handleCopy = (operation: Operation) => {
-    // Создаем копию операции без id для создания новой
-    const {
-      id: _id,
-      createdAt: _createdAt,
-      updatedAt: _updatedAt,
-      ...operationCopy
-    } = operation;
-    setEditingOperation(operationCopy as Operation);
+    // Создаем глубокую копию операции без id для создания новой
+    const { id, createdAt, updatedAt, ...operationData } = operation;
+    // Use structuredClone for deep copy to ensure nested objects are properly copied
+    const operationCopy = structuredClone(operationData) as Operation;
+    setEditingOperation(operationCopy);
     setIsCopying(true);
     setIsFormOpen(true);
   };
@@ -207,17 +213,7 @@ export const OperationsPage = () => {
       try {
         await deleteOperation(id).unwrap();
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
-
-        // Перезагружаем данные после удаления
-        const params: OpsQuery = {
-          ...(hasActiveFilters ? filters : {}),
-          limit: PAGE_SIZE,
-          offset: 0,
-        };
-        const result = await trigger(params).unwrap();
-        setItems(result as OperationWithRelations[]);
-        setHasMore(result.length === PAGE_SIZE);
-        setOffset(result.length);
+        await reloadOperationsData();
       } catch (error) {
         console.error('Failed to delete operation:', error);
         showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
@@ -229,17 +225,7 @@ export const OperationsPage = () => {
     try {
       await confirmOperation(id).unwrap();
       showSuccess('Операция успешно подтверждена');
-
-      // Перезагружаем данные после подтверждения
-      const params: OpsQuery = {
-        ...(hasActiveFilters ? filters : {}),
-        limit: PAGE_SIZE,
-        offset: 0,
-      };
-      const result = await trigger(params).unwrap();
-      setItems(result as OperationWithRelations[]);
-      setHasMore(result.length === PAGE_SIZE);
-      setOffset(result.length);
+      await reloadOperationsData();
     } catch (error) {
       console.error('Failed to confirm operation:', error);
       showError('Ошибка при подтверждении операции');
@@ -252,20 +238,8 @@ export const OperationsPage = () => {
     setIsCopying(false);
 
     // Перезагружаем данные после закрытия формы (операция была создана/обновлена)
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
-    clearSelection();
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset: 0,
-    };
     try {
-      const result = await trigger(params).unwrap();
-      setItems(result as OperationWithRelations[]);
-      setHasMore(result.length === PAGE_SIZE);
-      setOffset(result.length);
+      await reloadOperationsData();
     } catch (error) {
       console.error('Failed to reload operations after form close:', error);
     }
@@ -558,17 +532,7 @@ export const OperationsPage = () => {
                   ) {
                     try {
                       await bulkDeleteOperations(selectedIds).unwrap();
-                      clearSelection();
-                      // After delete, reload from scratch to keep list consistent
-                      const params: OpsQuery = {
-                        ...(hasActiveFilters ? filters : {}),
-                        limit: PAGE_SIZE,
-                        offset: 0,
-                      };
-                      const result = await trigger(params).unwrap();
-                      setItems(result as OperationWithRelations[]);
-                      setHasMore(result.length === PAGE_SIZE);
-                      setOffset(result.length);
+                      await reloadOperationsData();
                       showSuccess(
                         NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
                       );

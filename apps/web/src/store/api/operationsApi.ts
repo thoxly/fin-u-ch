@@ -30,8 +30,11 @@ export const operationsApi = apiSlice.injectEndpoints({
           params &&
           (params.limit !== undefined || params.offset !== undefined)
         ) {
-          // Create cache key based on query parameters
-          const cacheKey = JSON.stringify(params);
+          // Create efficient cache key from query parameters
+          const cacheKey = Object.entries(params)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([key, value]) => `${key}:${value}`)
+            .join('|');
           return [{ type: 'Operation', id: `LIST-${cacheKey}` }, 'Operation'];
         }
         return ['Operation'];

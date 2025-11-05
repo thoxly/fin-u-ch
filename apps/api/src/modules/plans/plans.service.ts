@@ -196,6 +196,7 @@ export class PlansService {
    */
   expandPlan(
     planItem: {
+      id?: string;
       startDate: Date;
       endDate?: Date | null;
       amount: number;
