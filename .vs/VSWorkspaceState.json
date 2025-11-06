@@ -4,8 +4,11 @@
     "\\apps",
     "\\apps\\api",
     "\\apps\\api\\src",
-    "\\apps\\api\\src\\config",
-    "\\apps\\api\\src\\services"
+    "\\apps\\api\\src\\modules",
+    "\\apps\\api\\src\\services",
+    "\\ops\\docker",
+    "\\packages\\shared"
   ],
+  "SelectedNode": "\\apps\\api\\src\\services\\metrics.store.ts",
   "PreviewInSolutionExplorer": false
 }

@@ -5,6 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 import { errorHandler } from './middlewares/error';
 import logger from './config/logger';
 import { swaggerSpec } from './config/swagger';
+import { repMetricMiddleware } from './middlewares/metrics';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -20,6 +21,7 @@ import operationsRoutes from './modules/operations/operations.routes';
 import plansRoutes from './modules/plans/plans.routes';
 import budgetsRoutes from './modules/budgets/budgets.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import metricsStat from './modules/metrics/metrics.routes';
 import demoRoutes from './modules/demo/demo.routes';
 
 const app: Application = express();
@@ -57,8 +59,9 @@ app.use('/api/salaries', salariesRoutes);
 app.use('/api/operations', operationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/budgets', budgetsRoutes);
-app.use('/api/reports', reportsRoutes);
+app.use('/api/reports', repMetricMiddleware, reportsRoutes);
 app.use('/api/demo', demoRoutes);
+app.use(metricsStat);
 
 // Error handling
 app.use(errorHandler);
