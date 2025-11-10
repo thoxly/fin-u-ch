@@ -22,6 +22,7 @@ jest.mock('../../config/db', () => ({
   default: {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       update: jest.fn(),
       findMany: jest.fn(),
     },
@@ -32,6 +33,7 @@ jest.mock('../../config/db', () => ({
       callback({
         user: {
           findUnique: jest.fn(),
+          findFirst: jest.fn(),
           update: jest.fn(),
         },
         emailToken: {
@@ -318,6 +320,7 @@ describe('UsersService', () => {
         async (callback) => {
           const tx = {
             user: {
+              findFirst: jest.fn(),
               update: jest
                 .fn()
                 .mockResolvedValue({ ...mockUser, email: newEmail }),
@@ -353,10 +356,15 @@ describe('UsersService', () => {
       ).rejects.toThrow(AppError);
     });
 
-    it('should throw error if new email is already in use', async () => {
+    it('should throw error if new email is already in use by another user', async () => {
       const token = 'token-123';
       const newEmail = 'existing@example.com';
-      const existingUser = { ...mockUser, email: newEmail };
+      // Создаем пользователя с другим ID, чтобы проверить, что email занят другим пользователем
+      const existingUser = {
+        id: 'user-2',
+        companyId: 'company-1',
+        email: newEmail,
+      };
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
         valid: true,
@@ -367,9 +375,6 @@ describe('UsersService', () => {
         existingUser
       );
 
-      await expect(
-        usersService.confirmEmailChangeWithEmail(token)
-      ).rejects.toThrow(AppError);
       await expect(
         usersService.confirmEmailChangeWithEmail(token)
       ).rejects.toThrow('Email already in use');
