@@ -20,6 +20,7 @@ export type EmailTemplate =
   | 'email-verification'
   | 'password-reset'
   | 'password-changed'
+  | 'email-change-old-verification'
   | 'email-change-verification';
 
 export interface EmailOptions {
@@ -108,6 +109,23 @@ export async function sendPasswordChangedEmail(email: string): Promise<void> {
     subject: 'Пароль изменён',
     template: 'password-changed',
     variables: {},
+  });
+}
+
+export async function sendEmailChangeOldVerificationEmail(
+  email: string,
+  newEmail: string,
+  token: string
+): Promise<void> {
+  const verificationUrl = `${env.FRONTEND_URL}/verify-email-change-old?token=${token}`;
+  await sendEmail({
+    to: email,
+    subject: 'Подтвердите изменение email',
+    template: 'email-change-old-verification',
+    variables: {
+      verificationUrl,
+      newEmail,
+    },
   });
 }
 

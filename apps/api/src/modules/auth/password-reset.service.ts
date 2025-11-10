@@ -1,5 +1,5 @@
 import prisma from '../../config/db';
-import { hashPassword } from '../../utils/hash';
+import { hashPassword, verifyPassword } from '../../utils/hash';
 import {
   validateEmail,
   validatePassword,
@@ -7,7 +7,10 @@ import {
 } from '../../utils/validation';
 import { AppError } from '../../middlewares/error';
 import logger from '../../config/logger';
-import { sendPasswordResetEmail } from '../../services/mail/mail.service';
+import {
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
+} from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 
 export class PasswordResetService {
@@ -20,10 +23,15 @@ export class PasswordResetService {
 
     if (!user) {
       // Не раскрываем, существует ли пользователь
+      // Логируем попытку для безопасности
+      logger.warn(`Password reset requested for non-existent email: ${email}`);
       return;
     }
 
     if (!user.isActive) {
+      logger.warn(
+        `Password reset requested for inactive user: ${user.id} (${email})`
+      );
       throw new AppError('User account is inactive', 403);
     }
 
@@ -33,10 +41,13 @@ export class PasswordResetService {
         type: 'password_reset',
       });
       await sendPasswordResetEmail(user.email, resetToken);
-      logger.info(`Password reset email sent to ${user.email}`);
+      logger.info(`Password reset email sent to ${user.email}`, {
+        userId: user.id,
+      });
     } catch (error) {
       logger.error('Failed to send password reset email', {
         userId: user.id,
+        email: user.email,
         error,
       });
       throw new AppError('Failed to send password reset email', 500);
@@ -53,7 +64,32 @@ export class PasswordResetService {
     );
 
     if (!validation.valid || !validation.userId) {
+      // Логируем попытку сброса пароля с невалидным токеном для безопасности
+      logger.warn('Password reset attempted with invalid or expired token', {
+        error: validation.error,
+      });
       throw new AppError(validation.error || 'Invalid or expired token', 400);
+    }
+
+    // Получаем пользователя для проверки текущего пароля
+    const user = await prisma.user.findUnique({
+      where: { id: validation.userId },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Проверяем, что новый пароль отличается от старого
+    const isSamePassword = await verifyPassword(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      logger.warn(
+        `Password reset attempted with same password for user ${validation.userId}`
+      );
+      throw new AppError(
+        'New password must be different from the current password',
+        400
+      );
     }
 
     const passwordHash = await hashPassword(newPassword);
@@ -67,7 +103,22 @@ export class PasswordResetService {
       await tokenService.markTokenAsUsed(token);
     });
 
-    logger.info(`Password reset for user ${validation.userId}`);
+    // Отправляем уведомление об изменении пароля
+    try {
+      await sendPasswordChangedEmail(user.email);
+      logger.info(`Password changed notification sent to ${user.email}`);
+    } catch (error) {
+      logger.error('Failed to send password changed email', {
+        userId: validation.userId,
+        error,
+      });
+      // Не блокируем сброс пароля, если письмо не отправилось
+    }
+
+    logger.info(`Password reset successfully for user ${validation.userId}`, {
+      userId: validation.userId,
+      email: user.email,
+    });
   }
 }
 

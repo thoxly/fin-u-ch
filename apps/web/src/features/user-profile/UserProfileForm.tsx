@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Save, Mail, Building } from 'lucide-react';
-import { useGetMeQuery, useUpdateUserMutation } from '../../store/api/authApi';
+import { Save, Mail, Building, Lock, KeyRound } from 'lucide-react';
+import {
+  useGetMeQuery,
+  useUpdateUserMutation,
+  useChangePasswordMutation,
+  useRequestEmailChangeMutation,
+} from '../../store/api/authApi';
 import { useUpdateCompanyMutation } from '../../store/api/companiesApi';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
@@ -21,11 +26,24 @@ export const UserProfileForm = ({
     currencyBase: 'RUB',
   });
 
+  const [showChangeEmail, setShowChangeEmail] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
   const { data: user, isLoading: userLoading } = useGetMeQuery();
   const [updateUser, { isLoading: updateUserLoading }] =
     useUpdateUserMutation();
   const [updateCompany, { isLoading: updateCompanyLoading }] =
     useUpdateCompanyMutation();
+  const [changePassword, { isLoading: changePasswordLoading }] =
+    useChangePasswordMutation();
+  const [requestEmailChange, { isLoading: requestEmailChangeLoading }] =
+    useRequestEmailChangeMutation();
 
   const updateLoading = updateUserLoading || updateCompanyLoading;
 
@@ -50,9 +68,8 @@ export const UserProfileForm = ({
 
   const handleSave = async (): Promise<void> => {
     try {
-      // Обновляем данные пользователя
+      // Обновляем данные пользователя (без email, так как его нельзя менять напрямую)
       await updateUser({
-        email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
       }).unwrap();
@@ -69,6 +86,55 @@ export const UserProfileForm = ({
     }
   };
 
+  const handleRequestEmailChange = async (): Promise<void> => {
+    try {
+      if (!newEmail || newEmail === user?.email) {
+        alert('Введите новый email, отличный от текущего');
+        return;
+      }
+
+      await requestEmailChange({ newEmail }).unwrap();
+      alert('Письмо с подтверждением отправлено на ваш текущий email');
+      setShowChangeEmail(false);
+      setNewEmail('');
+    } catch (error: unknown) {
+      const errorMessage = (error as { data?: { message?: string } })?.data
+        ?.message;
+      alert(errorMessage || 'Ошибка при запросе изменения email');
+    }
+  };
+
+  const handleChangePassword = async (): Promise<void> => {
+    try {
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert('Пароли не совпадают');
+        return;
+      }
+
+      if (passwordData.newPassword.length < 6) {
+        alert('Пароль должен быть не менее 6 символов');
+        return;
+      }
+
+      await changePassword({
+        currentPassword: passwordData.currentPassword,
+        newPassword: passwordData.newPassword,
+      }).unwrap();
+
+      alert('Пароль успешно изменен');
+      setShowChangePassword(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+    } catch (error: unknown) {
+      const errorMessage = (error as { data?: { message?: string } })?.data
+        ?.message;
+      alert(errorMessage || 'Ошибка при изменении пароля');
+    }
+  };
+
   if (userLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -79,18 +145,162 @@ export const UserProfileForm = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Email
-        </label>
-        <Input
-          type="email"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-          icon={<Mail size={16} />}
-          placeholder="Введите email"
-        />
+    <div className="space-y-6">
+      {/* Email секция */}
+      <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Email
+          </label>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowChangeEmail(!showChangeEmail)}
+          >
+            Изменить email
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <Mail size={16} />
+          <span>{formData.email}</span>
+        </div>
+
+        {showChangeEmail && (
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Новый email
+              </label>
+              <Input
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="Введите новый email"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowChangeEmail(false);
+                  setNewEmail('');
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleRequestEmailChange}
+                disabled={requestEmailChangeLoading}
+              >
+                {requestEmailChangeLoading ? 'Отправка...' : 'Отправить запрос'}
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              На ваш текущий email будет отправлено письмо с подтверждением
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Пароль секция */}
+      <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Пароль
+          </label>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowChangePassword(!showChangePassword)}
+          >
+            Изменить пароль
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+          <Lock size={16} />
+          <span>••••••••</span>
+        </div>
+
+        {showChangePassword && (
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Текущий пароль
+              </label>
+              <Input
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    currentPassword: e.target.value,
+                  })
+                }
+                placeholder="Введите текущий пароль"
+                icon={<KeyRound size={16} />}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Новый пароль
+              </label>
+              <Input
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    newPassword: e.target.value,
+                  })
+                }
+                placeholder="Введите новый пароль"
+                icon={<KeyRound size={16} />}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Подтвердите новый пароль
+              </label>
+              <Input
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) =>
+                  setPasswordData({
+                    ...passwordData,
+                    confirmPassword: e.target.value,
+                  })
+                }
+                placeholder="Повторите новый пароль"
+                icon={<KeyRound size={16} />}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowChangePassword(false);
+                  setPasswordData({
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmPassword: '',
+                  });
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleChangePassword}
+                disabled={changePasswordLoading}
+              >
+                {changePasswordLoading ? 'Изменение...' : 'Изменить пароль'}
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

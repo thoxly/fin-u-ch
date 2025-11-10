@@ -52,7 +52,26 @@ export class UsersController {
     try {
       const { newEmail } = req.body;
       await usersService.requestEmailChange(req.userId!, newEmail);
-      res.json({ message: 'Verification email sent to new email address' });
+      res.json({
+        message: 'Verification email sent to your current email address',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirmOldEmailForChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { token } = req.body;
+      await usersService.confirmOldEmailForChange(token);
+      res.json({
+        message:
+          'Old email confirmed. Verification email sent to new email address',
+      });
     } catch (error) {
       next(error);
     }
@@ -64,8 +83,8 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      const { token, newEmail } = req.body;
-      await usersService.confirmEmailChangeWithEmail(token, newEmail);
+      const { token } = req.body;
+      await usersService.confirmEmailChangeWithEmail(token);
       res.json({ message: 'Email changed successfully' });
     } catch (error) {
       next(error);

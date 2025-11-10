@@ -1,34 +1,37 @@
 import { randomUUID } from 'crypto';
 import prisma from '../../config/db';
-import { AppError } from '../../middlewares/error';
 import logger from '../../config/logger';
 
 export type TokenType =
   | 'email_verification'
   | 'password_reset'
-  | 'email_change';
+  | 'email_change_old'
+  | 'email_change_new';
 
 export interface CreateTokenOptions {
   userId: string;
   type: TokenType;
   expiresInMinutes?: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ValidateTokenResult {
   valid: boolean;
   userId?: string;
+  metadata?: Record<string, unknown>;
   error?: string;
 }
 
 const DEFAULT_EXPIRY: Record<TokenType, number> = {
   email_verification: 7 * 24 * 60, // 7 days
   password_reset: 30, // 30 minutes
-  email_change: 7 * 24 * 60, // 7 days
+  email_change_old: 24 * 60, // 24 hours
+  email_change_new: 7 * 24 * 60, // 7 days
 };
 
 export class TokenService {
   async createToken(options: CreateTokenOptions): Promise<string> {
-    const { userId, type, expiresInMinutes } = options;
+    const { userId, type, expiresInMinutes, metadata } = options;
     const token = randomUUID();
     const expiresIn = expiresInMinutes ?? DEFAULT_EXPIRY[type];
     const expiresAt = new Date(Date.now() + expiresIn * 60 * 1000);
@@ -51,10 +54,15 @@ export class TokenService {
         token,
         type,
         expiresAt,
+        metadata: metadata ? metadata : undefined,
       },
     });
 
-    logger.info(`Token created for user ${userId}`, { type, expiresAt });
+    logger.info(`Token created for user ${userId}`, {
+      type,
+      expiresAt,
+      hasMetadata: !!metadata,
+    });
     return token;
   }
 
@@ -105,6 +113,7 @@ export class TokenService {
     return {
       valid: true,
       userId: emailToken.userId,
+      metadata: emailToken.metadata as Record<string, unknown> | undefined,
     };
   }
 

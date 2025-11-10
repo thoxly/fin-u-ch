@@ -8,6 +8,7 @@ import {
 } from '../../utils/validation';
 import {
   sendPasswordChangedEmail,
+  sendEmailChangeOldVerificationEmail,
   sendEmailChangeVerificationEmail,
 } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
@@ -164,13 +165,19 @@ export class UsersService {
     }
 
     try {
-      const changeToken = await tokenService.createToken({
+      // Отправляем письмо на старый email для подтверждения
+      const oldEmailToken = await tokenService.createToken({
         userId: user.id,
-        type: 'email_change',
+        type: 'email_change_old',
+        metadata: { newEmail },
       });
-      await sendEmailChangeVerificationEmail(newEmail, changeToken);
+      await sendEmailChangeOldVerificationEmail(
+        user.email,
+        newEmail,
+        oldEmailToken
+      );
       logger.info(
-        `Email change verification sent to ${newEmail} for user ${userId}`
+        `Email change verification sent to old email ${user.email} for user ${userId}`
       );
     } catch (error) {
       logger.error('Failed to send email change verification', {
@@ -182,17 +189,77 @@ export class UsersService {
     }
   }
 
-  async confirmEmailChangeWithEmail(
-    token: string,
-    newEmail: string
-  ): Promise<void> {
-    validateEmail(newEmail);
-
-    const validation = await tokenService.validateToken(token, 'email_change');
+  async confirmOldEmailForChange(token: string): Promise<void> {
+    const validation = await tokenService.validateToken(
+      token,
+      'email_change_old'
+    );
 
     if (!validation.valid || !validation.userId) {
       throw new AppError(validation.error || 'Invalid token', 400);
     }
+
+    const newEmail = validation.metadata?.newEmail as string | undefined;
+
+    if (!newEmail) {
+      throw new AppError('New email not found in token', 400);
+    }
+
+    validateEmail(newEmail);
+
+    // Проверяем, не занят ли новый email
+    const existingUser = await prisma.user.findUnique({
+      where: { email: newEmail },
+    });
+
+    if (existingUser) {
+      throw new AppError('Email already in use', 409);
+    }
+
+    // Помечаем токен старого email как использованный
+    await tokenService.markTokenAsUsed(token);
+
+    // Отправляем письмо на новый email для подтверждения
+    try {
+      const newEmailToken = await tokenService.createToken({
+        userId: validation.userId,
+        type: 'email_change_new',
+        metadata: { newEmail },
+      });
+      await sendEmailChangeVerificationEmail(newEmail, newEmailToken);
+      logger.info(
+        `Email change verification sent to new email ${newEmail} for user ${validation.userId}`
+      );
+    } catch (error) {
+      logger.error('Failed to send email change verification to new email', {
+        userId: validation.userId,
+        newEmail,
+        error,
+      });
+      throw new AppError(
+        'Failed to send verification email to new address',
+        500
+      );
+    }
+  }
+
+  async confirmEmailChangeWithEmail(token: string): Promise<void> {
+    const validation = await tokenService.validateToken(
+      token,
+      'email_change_new'
+    );
+
+    if (!validation.valid || !validation.userId) {
+      throw new AppError(validation.error || 'Invalid token', 400);
+    }
+
+    const newEmail = validation.metadata?.newEmail as string | undefined;
+
+    if (!newEmail) {
+      throw new AppError('New email not found in token', 400);
+    }
+
+    validateEmail(newEmail);
 
     // Проверяем, не занят ли новый email
     const existingUser = await prisma.user.findUnique({
