@@ -194,9 +194,6 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                 }
               />
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Накопление поступлений, списаний и чистого потока с начала периода
-            </p>
           </div>
           <ExportMenu
             filenameBase="income_expense"
@@ -210,7 +207,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -244,7 +241,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                     preferredOrder={['Поступления', 'Списания', 'Чистый поток']}
                   />
                 }
-                wrapperStyle={{ paddingTop: 8 }}
+                wrapperStyle={{ paddingTop: 2 }}
               />
             )}
             <Line

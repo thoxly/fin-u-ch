@@ -30,11 +30,11 @@ export const ChartLegend: React.FC<ChartLegendProps> = ({
   }, [payload, preferredOrder]);
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-2">
+    <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0 px-0">
       {items.map((entry) => (
         <span
           key={entry.value}
-          className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
+          className="inline-flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
         >
           <span
             className="inline-block rounded-full"
