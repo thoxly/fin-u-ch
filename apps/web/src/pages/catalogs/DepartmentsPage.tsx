@@ -4,6 +4,7 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetDepartmentsQuery,
   useDeleteDepartmentMutation,
@@ -15,8 +16,25 @@ import { DepartmentForm } from '@/features/catalog-forms/index';
 export const DepartmentsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
   const { data: departments = [], isLoading } = useGetDepartmentsQuery();
   const [deleteDepartment] = useDeleteDepartmentMutation();
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteDepartment(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null });
+  };
 
   const columns = [
     { key: 'name', header: 'Название' },
@@ -37,7 +55,7 @@ export const DepartmentsPage = () => {
             <Pencil size={16} />
           </button>
           <button
-            onClick={() => window.confirm('Удалить?') && deleteDepartment(d.id)}
+            onClick={() => handleDelete(d.id)}
             className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
             title="Удалить"
           >
@@ -83,6 +101,14 @@ export const DepartmentsPage = () => {
           onClose={() => setIsFormOpen(false)}
         />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить это подразделение?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

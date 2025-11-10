@@ -7,6 +7,7 @@ import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
 import { Table } from '../shared/ui/Table';
 import { Modal } from '../shared/ui/Modal';
+import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Input } from '../shared/ui/Input';
 import {
   useGetBudgetsQuery,
@@ -66,19 +67,28 @@ export const BudgetsPage = () => {
     });
   };
 
-  const handleDelete = async (id: string) => {
-    if (
-      window.confirm(
-        'Вы уверены, что хотите удалить этот бюджет? Это возможно только если у бюджета нет плановых записей.'
-      )
-    ) {
-      try {
-        await deleteBudget(id).unwrap();
-      } catch (error) {
-        alert(
-          'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
-        );
-      }
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    try {
+      await deleteBudget(deleteModal.id).unwrap();
+      setDeleteModal({ isOpen: false, id: null });
+    } catch (error) {
+      alert(
+        'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
+      );
+      setDeleteModal({ isOpen: false, id: null });
     }
   };
 
@@ -253,6 +263,15 @@ export const BudgetsPage = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить этот бюджет? Это возможно только если у бюджета нет плановых записей."
+        confirmText="Удалить"
+        description="Если у бюджета есть плановые записи, используйте архивирование."
+      />
     </Layout>
   );
 };
