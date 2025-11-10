@@ -34,6 +34,16 @@ export const OperationForm = ({
   isCopy = false,
   onClose,
 }: OperationFormProps) => {
+  // Определяем, является ли операция дочерней (с родителем и не шаблон)
+  const isChildOperation =
+    operation && operation.recurrenceParentId && !operation.isTemplate;
+
+  // Определяем, является ли операция шаблоном
+  const isTemplate = operation && operation.isTemplate === true;
+
+  // Выбор: только текущую или все последующие (только для дочерних операций)
+  const [updateScope, setUpdateScope] = useState<'current' | 'all'>('current');
+
   const [type, setType] = useState<OperationType>(
     operation?.type || OperationType.EXPENSE
   );
@@ -141,12 +151,68 @@ export const OperationForm = ({
     try {
       // Если это копирование или нет operation.id, создаем новую операцию
       if (operation?.id && !isCopy) {
-        await updateOperation({
-          id: operation.id,
-          data: operationData,
-        }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
+        // Если это шаблон, обновляем только шаблон
+        if (isTemplate) {
+          await updateOperation({
+            id: operation.id,
+            data: operationData,
+          }).unwrap();
+          showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
+        }
+        // Если это дочерняя операция и выбран "все последующие"
+        else if (
+          isChildOperation &&
+          updateScope === 'all' &&
+          operation.recurrenceParentId
+        ) {
+          // Обновляем шаблон (родительскую операцию с isTemplate: true)
+          const templateOperationData: Partial<CreateOperationDTO> = {
+            articleId: articleId || undefined,
+            accountId:
+              type !== OperationType.TRANSFER
+                ? accountId || undefined
+                : undefined,
+            sourceAccountId:
+              type === OperationType.TRANSFER
+                ? sourceAccountId || undefined
+                : undefined,
+            targetAccountId:
+              type === OperationType.TRANSFER
+                ? targetAccountId || undefined
+                : undefined,
+            counterpartyId: counterpartyId || undefined,
+            dealId: dealId || undefined,
+            departmentId: departmentId || undefined,
+            description: description || undefined,
+            currency,
+            // Не передаем: operationDate, amount, repeat, recurrenceEndDate
+            // Эти поля шаблона не меняем, чтобы не сломать логику генерации
+          };
+
+          // Обновляем шаблон
+          await updateOperation({
+            id: operation.recurrenceParentId,
+            data: templateOperationData,
+          }).unwrap();
+
+          // Также обновляем текущую операцию
+          await updateOperation({
+            id: operation.id,
+            data: operationData,
+          }).unwrap();
+
+          showSuccess('Операция и все последующие обновлены');
+        } else {
+          // Обновляем только текущую операцию
+          await updateOperation({
+            id: operation.id,
+            data: operationData,
+          }).unwrap();
+          showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
+        }
       } else {
+        // Создание новой операции
+        // Если repeat !== 'none', сервис автоматически создаст шаблон и первую дочернюю операцию
         await createOperation(operationData).unwrap();
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
       }
@@ -189,7 +255,7 @@ export const OperationForm = ({
         <Select
           label="Тип операции"
           value={type}
-          onChange={(e) => setType(e.target.value as OperationType)}
+          onChange={(value) => setType(value as OperationType)}
           options={typeOptions}
           required
         />
@@ -215,7 +281,7 @@ export const OperationForm = ({
         <Select
           label="Валюта"
           value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
+          onChange={(value) => setCurrency(value)}
           options={currencyOptions}
           required
         />
@@ -226,7 +292,7 @@ export const OperationForm = ({
           <Select
             label="Счет списания"
             value={sourceAccountId}
-            onChange={(e) => setSourceAccountId(e.target.value)}
+            onChange={(value) => setSourceAccountId(value)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             required
@@ -234,7 +300,7 @@ export const OperationForm = ({
           <Select
             label="Счет зачисления"
             value={targetAccountId}
-            onChange={(e) => setTargetAccountId(e.target.value)}
+            onChange={(value) => setTargetAccountId(value)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             required
@@ -245,7 +311,7 @@ export const OperationForm = ({
           <Select
             label="Статья"
             value={articleId}
-            onChange={(e) => setArticleId(e.target.value)}
+            onChange={(value) => setArticleId(value)}
             options={articles
               .filter((a) => a.type === type)
               .map((a) => ({ value: a.id, label: a.name }))}
@@ -255,7 +321,7 @@ export const OperationForm = ({
           <Select
             label="Счет"
             value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
+            onChange={(value) => setAccountId(value)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
           />
@@ -266,7 +332,7 @@ export const OperationForm = ({
         <Select
           label="Контрагент"
           value={counterpartyId}
-          onChange={(e) => setCounterpartyId(e.target.value)}
+          onChange={(value) => setCounterpartyId(value)}
           options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
           placeholder="Не выбран"
         />
@@ -274,7 +340,7 @@ export const OperationForm = ({
         <Select
           label="Сделка"
           value={dealId}
-          onChange={(e) => setDealId(e.target.value)}
+          onChange={(value) => setDealId(value)}
           options={deals.map((d) => ({ value: d.id, label: d.name }))}
           placeholder="Не выбрана"
         />
@@ -282,7 +348,7 @@ export const OperationForm = ({
         <Select
           label="Подразделение"
           value={departmentId}
-          onChange={(e) => setDepartmentId(e.target.value)}
+          onChange={(value) => setDepartmentId(value)}
           options={departments.map((d) => ({ value: d.id, label: d.name }))}
           placeholder="Не выбрано"
         />
@@ -299,7 +365,7 @@ export const OperationForm = ({
         <Select
           label="Периодичность"
           value={repeat}
-          onChange={(e) => setRepeat(e.target.value as Periodicity)}
+          onChange={(value) => setRepeat(value as Periodicity)}
           options={repeatOptions}
         />
 
@@ -313,6 +379,47 @@ export const OperationForm = ({
           />
         )}
       </div>
+
+      {/* Выбор области обновления для дочерних операций */}
+      {isChildOperation && (
+        <div className="border-t pt-4">
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            Обновить:
+          </div>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="updateScope"
+                value="current"
+                checked={updateScope === 'current'}
+                onChange={(e) =>
+                  setUpdateScope(e.target.value as 'current' | 'all')
+                }
+                className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Только текущую операцию
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="updateScope"
+                value="all"
+                checked={updateScope === 'all'}
+                onChange={(e) =>
+                  setUpdateScope(e.target.value as 'current' | 'all')
+                }
+                className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Все последующие операции (изменит шаблон)
+              </span>
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-4 pt-4">
         <Button type="submit" disabled={isCreating || isUpdating}>
