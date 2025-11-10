@@ -1,7 +1,8 @@
 import { useState, FormEvent, useMemo, useEffect } from 'react';
-import { Input } from '../../shared/ui/Input';
-import { Select } from '../../shared/ui/Select';
 import { Button } from '../../shared/ui/Button';
+import { OperationBasicInfo } from './OperationBasicInfo';
+import { OperationFinancialParams } from './OperationFinancialParams';
+import { OperationRecurrenceSection } from './OperationRecurrenceSection';
 import {
   useCreateOperationMutation,
   useUpdateOperationMutation,
@@ -22,8 +23,6 @@ import {
   formatAmountInput,
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
-import { ChevronDown, ChevronUp } from 'lucide-react';
-import { InfoHint } from '../../shared/ui/InfoHint';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -106,7 +105,6 @@ export const OperationForm = ({
   );
   const [recurrenceEndDate, setRecurrenceEndDate] =
     useState(getInitialEndDate());
-  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
@@ -349,28 +347,6 @@ export const OperationForm = ({
     }
   };
 
-  const typeOptions = [
-    { value: 'income', label: 'Поступление' },
-    { value: 'expense', label: 'Списание' },
-    { value: 'transfer', label: 'Перевод' },
-  ];
-
-  const currencyOptions = [
-    { value: 'RUB', label: 'RUB' },
-    { value: 'USD', label: 'USD' },
-    { value: 'EUR', label: 'EUR' },
-  ];
-
-  const repeatOptions = [
-    { value: 'none', label: 'Не повторяется' },
-    { value: 'daily', label: 'Ежедневно' },
-    { value: 'weekly', label: 'Еженедельно' },
-    { value: 'monthly', label: 'Ежемесячно' },
-    { value: 'quarterly', label: 'Ежеквартально' },
-    { value: 'semiannual', label: 'Раз в полгода' },
-    { value: 'annual', label: 'Ежегодно' },
-  ];
-
   return (
     <form
       onSubmit={handleSubmit}
@@ -378,302 +354,131 @@ export const OperationForm = ({
       className="flex flex-col h-full min-h-0 px-6 py-4"
     >
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        {/* Блок A: Основное */}
-        <div className="space-y-4 mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Основное
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Select
-              label="Тип операции"
-              value={type}
-              onChange={(value) => {
-                setType(value as OperationType);
-                // Очищаем ошибки при изменении типа операции
-                setValidationErrors({});
-              }}
-              options={typeOptions}
-              required
-            />
-            <Input
-              label="Дата"
-              type="date"
-              value={operationDate}
-              onChange={(e) => {
-                setOperationDate(e.target.value);
-                if (validationErrors.operationDate) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.operationDate;
-                    return newErrors;
-                  });
-                }
-              }}
-              error={validationErrors.operationDate}
-              required
-            />
-            <Input
-              label="Сумма"
-              type="text"
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => {
-                setAmount(formatAmountInput(e.target.value));
-                if (validationErrors.amount) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.amount;
-                    return newErrors;
-                  });
-                }
-              }}
-              placeholder="0"
-              error={validationErrors.amount}
-              required
-            />
-            <Select
-              label="Валюта"
-              value={currency}
-              onChange={(value) => {
-                setCurrency(value);
-                if (validationErrors.currency) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.currency;
-                    return newErrors;
-                  });
-                }
-              }}
-              options={currencyOptions}
-              error={validationErrors.currency}
-              required
-            />
-          </div>
-        </div>
+        <OperationBasicInfo
+          type={type}
+          operationDate={operationDate}
+          amount={amount}
+          currency={currency}
+          validationErrors={validationErrors}
+          onTypeChange={(value) => {
+            setType(value as OperationType);
+            setValidationErrors({});
+          }}
+          onDateChange={(value) => {
+            setOperationDate(value);
+            if (validationErrors.operationDate) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.operationDate;
+                return newErrors;
+              });
+            }
+          }}
+          onAmountChange={(value) => {
+            setAmount(formatAmountInput(value));
+            if (validationErrors.amount) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.amount;
+                return newErrors;
+              });
+            }
+          }}
+          onCurrencyChange={(value) => {
+            setCurrency(value);
+            if (validationErrors.currency) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.currency;
+                return newErrors;
+              });
+            }
+          }}
+          onValidationErrorClear={(field) => {
+            setValidationErrors((prev) => {
+              const newErrors = { ...prev };
+              delete newErrors[field];
+              return newErrors;
+            });
+          }}
+        />
 
-        {/* Блок B: Финансовые параметры */}
-        <div className="space-y-4 mb-6">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-            Финансовые параметры
-          </h3>
-          {type === OperationType.TRANSFER ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select
-                label="Счет списания"
-                value={sourceAccountId}
-                onChange={(value) => {
-                  setSourceAccountId(value);
-                  if (validationErrors.sourceAccountId) {
-                    setValidationErrors((prev) => {
-                      const newErrors = { ...prev };
-                      delete newErrors.sourceAccountId;
-                      return newErrors;
-                    });
-                  }
-                }}
-                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-                placeholder="Выберите счет"
-                error={validationErrors.sourceAccountId}
-                required
-              />
-              <Select
-                label="Счет зачисления"
-                value={targetAccountId}
-                onChange={(value) => {
-                  setTargetAccountId(value);
-                  if (validationErrors.targetAccountId) {
-                    setValidationErrors((prev) => {
-                      const newErrors = { ...prev };
-                      delete newErrors.targetAccountId;
-                      return newErrors;
-                    });
-                  }
-                }}
-                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-                placeholder="Выберите счет"
-                error={validationErrors.targetAccountId}
-                required
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select
-                label="Статья"
-                value={articleId}
-                onChange={(value) => {
-                  setArticleId(value);
-                  if (validationErrors.articleId) {
-                    setValidationErrors((prev) => {
-                      const newErrors = { ...prev };
-                      delete newErrors.articleId;
-                      return newErrors;
-                    });
-                  }
-                }}
-                options={articles
-                  .filter((a) => a.type === type)
-                  .map((a) => ({ value: a.id, label: a.name }))}
-                placeholder="Выберите статью"
-                error={validationErrors.articleId}
-                required
-              />
-              <Select
-                label="Счет"
-                value={accountId}
-                onChange={(value) => {
-                  setAccountId(value);
-                  if (validationErrors.accountId) {
-                    setValidationErrors((prev) => {
-                      const newErrors = { ...prev };
-                      delete newErrors.accountId;
-                      return newErrors;
-                    });
-                  }
-                }}
-                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-                placeholder="Выберите счет"
-                error={validationErrors.accountId}
-                required
-              />
-              <Select
-                label="Контрагент"
-                value={counterpartyId}
-                onChange={(value) => setCounterpartyId(value)}
-                options={counterparties.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                }))}
-                placeholder="Не выбран"
-              />
-              <Select
-                label="Сделка"
-                value={dealId}
-                onChange={(value) => setDealId(value)}
-                options={filteredDeals.map((d) => ({
-                  value: d.id,
-                  label: d.name,
-                }))}
-                placeholder={
-                  counterpartyId
-                    ? 'Не выбрана'
-                    : filteredDeals.length === 0
-                      ? 'Нет доступных сделок'
-                      : 'Выберите сделку'
-                }
-                disabled={filteredDeals.length === 0}
-              />
-              <Select
-                label="Подразделение"
-                value={departmentId}
-                onChange={(value) => setDepartmentId(value)}
-                options={departments.map((d) => ({
-                  value: d.id,
-                  label: d.name,
-                }))}
-                placeholder="Не выбрано"
-              />
-            </div>
-          )}
-        </div>
+        <OperationFinancialParams
+          type={type}
+          articleId={articleId}
+          accountId={accountId}
+          sourceAccountId={sourceAccountId}
+          targetAccountId={targetAccountId}
+          counterpartyId={counterpartyId}
+          dealId={dealId}
+          departmentId={departmentId}
+          validationErrors={validationErrors}
+          articles={articles}
+          accounts={accounts}
+          counterparties={counterparties}
+          deals={deals}
+          filteredDeals={filteredDeals}
+          departments={departments}
+          onArticleChange={(value) => {
+            setArticleId(value);
+            if (validationErrors.articleId) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.articleId;
+                return newErrors;
+              });
+            }
+          }}
+          onAccountChange={(value) => {
+            setAccountId(value);
+            if (validationErrors.accountId) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.accountId;
+                return newErrors;
+              });
+            }
+          }}
+          onSourceAccountChange={(value) => {
+            setSourceAccountId(value);
+            if (validationErrors.sourceAccountId) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.sourceAccountId;
+                return newErrors;
+              });
+            }
+          }}
+          onTargetAccountChange={(value) => {
+            setTargetAccountId(value);
+            if (validationErrors.targetAccountId) {
+              setValidationErrors((prev) => {
+                const newErrors = { ...prev };
+                delete newErrors.targetAccountId;
+                return newErrors;
+              });
+            }
+          }}
+          onCounterpartyChange={setCounterpartyId}
+          onDealChange={setDealId}
+          onDepartmentChange={setDepartmentId}
+          onValidationErrorClear={(field) => {
+            setValidationErrors((prev) => {
+              const newErrors = { ...prev };
+              delete newErrors[field];
+              return newErrors;
+            });
+          }}
+        />
 
-        {/* Блок C: Дополнительно (сворачиваемый) */}
-        <div className="space-y-4 mb-6">
-          <button
-            type="button"
-            onClick={() => setShowAdditionalFields(!showAdditionalFields)}
-            className="flex items-center justify-between w-full text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <span>Дополнительно</span>
-            {showAdditionalFields ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-          {showAdditionalFields && (
-            <div className="space-y-4 pt-2">
-              <Input
-                label="Описание"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Дополнительная информация"
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Периодичность
-                    </label>
-                    <InfoHint
-                      content={
-                        <div className="space-y-3 text-xs leading-relaxed">
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              Зачем это нужно?
-                            </p>
-                            <p className="text-gray-700 dark:text-gray-300">
-                              Периодичность позволяет автоматически создавать
-                              повторяющиеся операции (например, зарплата каждый
-                              месяц, аренда каждый квартал).
-                            </p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              Как использовать?
-                            </p>
-                            <p className="text-gray-700 dark:text-gray-300">
-                              Выберите частоту повтора (ежедневно, еженедельно,
-                              ежемесячно и т.д.). Опционально укажите дату
-                              окончания — если не указать, операции будут
-                              создаваться бесконечно.
-                            </p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              Что будет после создания?
-                            </p>
-                            <p className="text-gray-700 dark:text-gray-300">
-                              Система создаст шаблон операции и будет
-                              автоматически генерировать операции по выбранному
-                              расписанию. Каждая операция появится в списке в
-                              день, указанный в шаблоне.
-                            </p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
-                              Обновление операций
-                            </p>
-                            <p className="text-gray-700 dark:text-gray-300">
-                              При редактировании повторяющейся операции вы
-                              можете обновить только текущую или все последующие
-                              операции (это изменит шаблон).
-                            </p>
-                          </div>
-                        </div>
-                      }
-                      className="ml-1"
-                    />
-                  </div>
-                  <Select
-                    label=""
-                    value={repeat}
-                    onChange={(value) => setRepeat(value as Periodicity)}
-                    options={repeatOptions}
-                  />
-                </div>
-                {repeat !== Periodicity.NONE && (
-                  <Input
-                    label="Дата окончания повторов"
-                    type="date"
-                    value={recurrenceEndDate}
-                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                    placeholder="Не указана (бесконечно)"
-                  />
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        <OperationRecurrenceSection
+          description={description}
+          repeat={repeat}
+          recurrenceEndDate={recurrenceEndDate}
+          onDescriptionChange={setDescription}
+          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onEndDateChange={setRecurrenceEndDate}
+        />
 
         {/* Выбор области обновления для дочерних операций */}
         {isChildOperation && (

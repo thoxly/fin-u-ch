@@ -14,6 +14,104 @@ import {
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
 
+// Вспомогательные функции для смены email
+async function validateEmailChange(
+  userId: string,
+  newEmail: string
+): Promise<{ user: { id: string; email: string } }> {
+  validateEmail(newEmail);
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (user.email === newEmail) {
+    throw new AppError('New email is the same as current email', 400);
+  }
+
+  const existingUser = await prisma.user.findUnique({
+    where: { email: newEmail },
+  });
+
+  if (existingUser) {
+    throw new AppError('Email already in use', 409);
+  }
+
+  return { user };
+}
+
+async function createOldEmailToken(
+  userId: string,
+  newEmail: string
+): Promise<string> {
+  return await tokenService.createToken({
+    userId,
+    type: 'email_change_old',
+    metadata: { newEmail },
+  });
+}
+
+async function sendOldEmailVerification(
+  oldEmail: string,
+  newEmail: string,
+  token: string,
+  userId: string
+): Promise<void> {
+  try {
+    await sendEmailChangeOldVerificationEmail(oldEmail, newEmail, token);
+    logger.info('Email change verification sent to old email', { userId });
+  } catch (error) {
+    // Если отправка email не удалась, удаляем созданный токен
+    try {
+      await tokenService.markTokenAsUsed(token);
+    } catch (cleanupError) {
+      logger.error('Failed to cleanup token after email send failure', {
+        userId,
+        error: cleanupError,
+      });
+    }
+    throw error;
+  }
+}
+
+async function createNewEmailToken(
+  userId: string,
+  newEmail: string
+): Promise<string> {
+  return await tokenService.createToken({
+    userId,
+    type: 'email_change_new',
+    metadata: { newEmail },
+  });
+}
+
+async function sendNewEmailVerification(
+  newEmail: string,
+  token: string,
+  userId: string
+): Promise<void> {
+  try {
+    await sendEmailChangeVerificationEmail(newEmail, token);
+    logger.info('Email change verification sent to new email', { userId });
+  } catch (error) {
+    // Если отправка email не удалась, удаляем созданный токен
+    try {
+      await tokenService.markTokenAsUsed(token);
+    } catch (cleanupError) {
+      logger.error('Failed to cleanup token after email send failure', {
+        userId,
+        error: cleanupError,
+      });
+    }
+    throw error;
+  }
+}
+
 export class UsersService {
   async getMe(userId: string) {
     const user = await prisma.user.findUnique({
@@ -141,64 +239,16 @@ export class UsersService {
   }
 
   async requestEmailChange(userId: string, newEmail: string) {
-    validateEmail(newEmail);
+    const { user } = await validateEmailChange(userId, newEmail);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new AppError('User not found', 404);
-    }
-
-    if (user.email === newEmail) {
-      throw new AppError('New email is the same as current email', 400);
-    }
-
-    // Проверяем, не занят ли новый email
-    const existingUser = await prisma.user.findUnique({
-      where: { email: newEmail },
-    });
-
-    if (existingUser) {
-      throw new AppError('Email already in use', 409);
-    }
-
-    // Используем транзакцию для атомарности процесса смены email
-    let oldEmailToken: string | null = null;
     try {
-      // Создаем токен (tokenService создает его в БД)
-      oldEmailToken = await tokenService.createToken({
-        userId: user.id,
-        type: 'email_change_old',
-        metadata: { newEmail },
-      });
-
-      // Отправляем письмо на старый email для подтверждения
-      // Если отправка не удастся, удалим токен
-      try {
-        await sendEmailChangeOldVerificationEmail(
-          user.email,
-          newEmail,
-          oldEmailToken
-        );
-        logger.info('Email change verification sent to old email', {
-          userId,
-        });
-      } catch (emailError) {
-        // Если отправка email не удалась, удаляем созданный токен
-        if (oldEmailToken) {
-          try {
-            await tokenService.markTokenAsUsed(oldEmailToken);
-          } catch (deleteError) {
-            logger.error('Failed to cleanup token after email send failure', {
-              userId,
-              error: deleteError,
-            });
-          }
-        }
-        throw emailError;
-      }
+      const oldEmailToken = await createOldEmailToken(user.id, newEmail);
+      await sendOldEmailVerification(
+        user.email,
+        newEmail,
+        oldEmailToken,
+        userId
+      );
     } catch (error) {
       logger.error('Failed to send email change verification', {
         userId,
@@ -224,56 +274,26 @@ export class UsersService {
       throw new AppError('New email not found in token', 400);
     }
 
-    validateEmail(newEmail);
+    await validateEmailChange(validation.userId, newEmail);
 
-    // Проверяем, не занят ли новый email
-    const existingUser = await prisma.user.findUnique({
-      where: { email: newEmail },
-    });
-
-    if (existingUser) {
-      throw new AppError('Email already in use', 409);
-    }
-
-    // Используем транзакцию для атомарности процесса
-    let newEmailToken: string | null = null;
     try {
+      // Помечаем токен старого email как использованный в транзакции
       await prisma.$transaction(async (tx) => {
-        // Помечаем токен старого email как использованный в транзакции
         await tx.emailToken.update({
           where: { token },
           data: { used: true },
         });
       });
 
-      // Создаем токен для нового email
-      newEmailToken = await tokenService.createToken({
-        userId: validation.userId,
-        type: 'email_change_new',
-        metadata: { newEmail },
-      });
-
-      // Отправляем письмо на новый email для подтверждения
-      // Если отправка не удастся, удалим токен
-      try {
-        await sendEmailChangeVerificationEmail(newEmail, newEmailToken);
-        logger.info('Email change verification sent to new email', {
-          userId: validation.userId,
-        });
-      } catch (emailError) {
-        // Если отправка email не удалась, удаляем созданный токен
-        if (newEmailToken) {
-          try {
-            await tokenService.markTokenAsUsed(newEmailToken);
-          } catch (deleteError) {
-            logger.error('Failed to cleanup token after email send failure', {
-              userId: validation.userId,
-              error: deleteError,
-            });
-          }
-        }
-        throw emailError;
-      }
+      const newEmailToken = await createNewEmailToken(
+        validation.userId,
+        newEmail
+      );
+      await sendNewEmailVerification(
+        newEmail,
+        newEmailToken,
+        validation.userId
+      );
     } catch (error) {
       logger.error('Failed to send email change verification to new email', {
         userId: validation.userId,
