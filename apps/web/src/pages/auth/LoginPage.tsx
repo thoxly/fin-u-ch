@@ -78,16 +78,14 @@ export const LoginPage = () => {
               autoComplete="current-password"
             />
           </div>
-          {/* <><div>
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              inchange={(e)} => setPassword(e.target.value
-                </div>
-              
-              </Input></div></> */}
-
+          <div className="text-right">
+            <Link
+              to="/forgot-password"
+              className="text-sm font-medium text-primary-600 dark:text-primary-500 hover:text-primary-500 dark:hover:text-primary-400"
+            >
+              Забыли пароль?
+            </Link>
+          </div>
           <Button type="submit" fullWidth disabled={isLoading}>
             {isLoading ? 'Вход...' : 'Войти'}
           </Button>

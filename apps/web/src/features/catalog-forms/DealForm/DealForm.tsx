@@ -72,14 +72,14 @@ export const DealForm = ({
       <Select
         label="Контрагент"
         value={counterpartyId}
-        onChange={(e) => setCounterpartyId(e.target.value)}
+        onChange={(value) => setCounterpartyId(value)}
         options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
         placeholder="Не выбран"
       />
       <Select
         label="Подразделение"
         value={departmentId}
-        onChange={(e) => setDepartmentId(e.target.value)}
+        onChange={(value) => setDepartmentId(value)}
         options={departments.map((d) => ({ value: d.id, label: d.name }))}
         placeholder="Не выбрано"
       />

@@ -156,7 +156,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Тип"
           value={type}
-          onChange={(e) => setType(e.target.value)}
+          onChange={(value) => setType(value)}
           options={typeOptions}
           required
         />
@@ -164,7 +164,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Статус"
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(value) => setStatus(value)}
           options={statusOptions}
           required
         />
@@ -197,7 +197,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Валюта"
           value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
+          onChange={(value) => setCurrency(value)}
           options={currencyOptions}
           required
         />
@@ -205,7 +205,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Повторение"
           value={repeat}
-          onChange={(e) => setRepeat(e.target.value)}
+          onChange={(value) => setRepeat(value)}
           options={repeatOptions}
           required
         />
@@ -214,7 +214,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
       <Select
         label="Статья"
         value={articleId}
-        onChange={(e) => setArticleId(e.target.value)}
+        onChange={(value) => setArticleId(value)}
         options={articles
           .filter((a) => a.type === type)
           .map((a) => ({ value: a.id, label: a.name }))}
@@ -224,7 +224,7 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
       <Select
         label="Счет"
         value={accountId}
-        onChange={(e) => setAccountId(e.target.value)}
+        onChange={(value) => setAccountId(value)}
         options={accounts.map((a) => ({ value: a.id, label: a.name }))}
         placeholder="Выберите счет"
       />

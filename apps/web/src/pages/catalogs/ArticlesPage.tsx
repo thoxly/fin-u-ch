@@ -202,8 +202,8 @@ export const ArticlesPage = () => {
                 <Select
                   label="Тип"
                   value={typeFilter}
-                  onChange={(e) =>
-                    setTypeFilter(e.target.value as 'income' | 'expense' | '')
+                  onChange={(value) =>
+                    setTypeFilter(value as 'income' | 'expense' | '')
                   }
                   options={[
                     { value: '', label: 'Все типы' },
@@ -218,13 +218,9 @@ export const ArticlesPage = () => {
                 <Select
                   label="Деятельность"
                   value={activityFilter}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setActivityFilter(
-                      e.target.value as
-                        | 'operating'
-                        | 'investing'
-                        | 'financing'
-                        | ''
+                      value as 'operating' | 'investing' | 'financing' | ''
                     )
                   }
                   options={[
@@ -247,8 +243,7 @@ export const ArticlesPage = () => {
                         ? 'true'
                         : 'false'
                   }
-                  onChange={(e) => {
-                    const value = e.target.value;
+                  onChange={(value) => {
                     setIsActiveFilter(
                       value === '' ? undefined : value === 'true'
                     );

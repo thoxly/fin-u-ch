@@ -23,6 +23,7 @@ export interface Operation {
   recurrenceParentId?: string | null;
   recurrenceEndDate?: Date | null;
   isConfirmed: boolean;
+  isTemplate: boolean;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -67,6 +68,7 @@ export interface CreateOperationDTO {
   description?: string;
   repeat?: Periodicity;
   recurrenceEndDate?: Date | string;
+  isTemplate?: boolean;
 }
 
 export interface CreatePlanItemDTO {

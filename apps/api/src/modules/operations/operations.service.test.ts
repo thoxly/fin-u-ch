@@ -1,4 +1,22 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+// Mock env.ts before importing anything that uses it
+jest.mock('../../config/env', () => ({
+  env: {
+    NODE_ENV: 'test',
+    PORT: 4000,
+    DATABASE_URL: 'postgresql://test',
+    REDIS_URL: 'redis://localhost:6379',
+    JWT_SECRET: 'test-secret',
+    JWT_ACCESS_EXPIRES_IN: '15m',
+    JWT_REFRESH_EXPIRES_IN: '7d',
+    FRONTEND_URL: 'http://localhost:3000',
+    SMTP_HOST: '',
+    SMTP_PORT: 465,
+    SMTP_USER: '',
+    SMTP_PASS: '',
+  },
+}));
+
 import { OperationsService, CreateOperationDTO } from './operations.service';
 import { AppError } from '../../middlewares/error';
 

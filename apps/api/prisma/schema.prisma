@@ -8,12 +8,12 @@ datasource db {
 }
 
 model Company {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   name         String
-  currencyBase String   @default("RUB")
-  uiSettings   Json?    // UI preferences: navigation icons, theme, etc.
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  currencyBase String    @default("RUB")
+  uiSettings   Json? // UI preferences: navigation icons, theme, etc.
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
   users          User[]
@@ -31,17 +31,19 @@ model Company {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  companyId    String
-  email        String   @unique
-  passwordHash String
-  firstName    String?
-  lastName     String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(uuid())
+  companyId       String
+  email           String   @unique
+  passwordHash    String
+  firstName       String?
+  lastName        String?
+  isActive        Boolean  @default(true)
+  isEmailVerified Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailTokens EmailToken[]
 
   @@index([companyId])
   @@map("users")
@@ -59,11 +61,11 @@ model Account {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  operations         Operation[] @relation("AccountOperations")
-  sourceOperations   Operation[] @relation("SourceAccountOperations")
-  targetOperations   Operation[] @relation("TargetAccountOperations")
-  planItems          PlanItem[]
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  operations       Operation[] @relation("AccountOperations")
+  sourceOperations Operation[] @relation("SourceAccountOperations")
+  targetOperations Operation[] @relation("TargetAccountOperations")
+  planItems        PlanItem[]
 
   @@index([companyId])
   @@map("accounts")
@@ -91,31 +93,31 @@ model Counterparty {
   companyId   String
   name        String
   inn         String?
-  category    String   // supplier|customer|gov|employee|other
+  category    String // supplier|customer|gov|employee|other
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  deals        Deal[]
-  operations   Operation[]
-  salaries     Salary[]
-  articles     Article[]
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+  operations Operation[]
+  salaries   Salary[]
+  articles   Article[]
 
   @@index([companyId])
   @@map("counterparties")
 }
 
 model Deal {
-  id              String   @id @default(uuid())
-  companyId       String
-  name            String
-  amount          Float?
-  departmentId    String?
-  counterpartyId  String?
-  description     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  companyId      String
+  name           String
+  amount         Float?
+  departmentId   String?
+  counterpartyId String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -128,18 +130,18 @@ model Deal {
 }
 
 model Article {
-  id            String   @id @default(uuid())
-  companyId     String
-  name          String
-  parentId      String?
-  type          String   // income|expense
-  activity      String?  // operating|investing|financing
-  indicator     String?  // cash|accrual
-  isActive      Boolean  @default(true)
-  description   String?
+  id             String   @id @default(uuid())
+  companyId      String
+  name           String
+  parentId       String?
+  type           String // income|expense
+  activity       String? // operating|investing|financing
+  indicator      String? // cash|accrual
+  isActive       Boolean  @default(true)
+  description    String?
   counterpartyId String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   parent       Article?      @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
@@ -154,26 +156,27 @@ model Article {
 }
 
 model Operation {
-  id                String    @id @default(uuid())
-  companyId         String
-  type              String    // income|expense|transfer
-  operationDate     DateTime
-  amount            Float
-  currency          String    @default("RUB")
-  accountId         String?
-  sourceAccountId   String?
-  targetAccountId   String?
-  articleId         String?
-  counterpartyId    String?
-  dealId            String?
-  departmentId      String?
-  description       String?
-  repeat            String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
+  id                 String    @id @default(uuid())
+  companyId          String
+  type               String // income|expense|transfer
+  operationDate      DateTime
+  amount             Float
+  currency           String    @default("RUB")
+  accountId          String?
+  sourceAccountId    String?
+  targetAccountId    String?
+  articleId          String?
+  counterpartyId     String?
+  dealId             String?
+  departmentId       String?
+  description        String?
+  repeat             String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
   recurrenceParentId String?
-  recurrenceEndDate DateTime?
-  isConfirmed       Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  recurrenceEndDate  DateTime?
+  isConfirmed        Boolean   @default(true)
+  isTemplate         Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   company            Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   account            Account?      @relation("AccountOperations", fields: [accountId], references: [id], onDelete: SetNull)
@@ -190,6 +193,7 @@ model Operation {
   @@index([companyId, articleId, operationDate])
   @@index([companyId, accountId, operationDate])
   @@index([companyId, repeat, isConfirmed])
+  @@index([companyId, repeat, isTemplate])
   @@index([recurrenceParentId, operationDate])
   @@map("operations")
 }
@@ -197,7 +201,7 @@ model Operation {
 model PlanItem {
   id          String    @id @default(uuid())
   companyId   String
-  type        String    // income|expense|transfer
+  type        String // income|expense|transfer
   startDate   DateTime
   endDate     DateTime?
   amount      Float
@@ -224,22 +228,22 @@ model PlanItem {
 }
 
 model Salary {
-  id                   String    @id @default(uuid())
-  companyId            String
+  id                     String    @id @default(uuid())
+  companyId              String
   employeeCounterpartyId String
-  departmentId         String?
-  baseWage             Float
-  contributionsPct     Float     @default(30.0)
-  incomeTaxPct         Float     @default(13.0)
-  periodicity          String    @default("monthly") // monthly|weekly|biweekly
-  effectiveFrom        DateTime
-  effectiveTo          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  departmentId           String?
+  baseWage               Float
+  contributionsPct       Float     @default(30.0)
+  incomeTaxPct           Float     @default(13.0)
+  periodicity            String    @default("monthly") // monthly|weekly|biweekly
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  company            Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employeeCounterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-  department         Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department           Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@map("salaries")
@@ -262,3 +266,20 @@ model Budget {
   @@map("budgets")
 }
 
+model EmailToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  type      String // email_verification|password_reset|email_change
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([type, used, expiresAt])
+  @@map("email_tokens")
+}

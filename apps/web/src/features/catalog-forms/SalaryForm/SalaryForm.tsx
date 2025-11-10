@@ -86,7 +86,7 @@ export const SalaryForm = ({
       <Select
         label="Сотрудник"
         value={employeeCounterpartyId}
-        onChange={(e) => setEmployeeCounterpartyId(e.target.value)}
+        onChange={(value) => setEmployeeCounterpartyId(value)}
         options={employees.map((e) => ({ value: e.id, label: e.name }))}
         placeholder="Выберите сотрудника"
         required
@@ -94,7 +94,7 @@ export const SalaryForm = ({
       <Select
         label="Подразделение"
         value={departmentId}
-        onChange={(e) => setDepartmentId(e.target.value)}
+        onChange={(value) => setDepartmentId(value)}
         options={departments.map((d) => ({ value: d.id, label: d.name }))}
         placeholder="Не выбрано"
       />
@@ -110,7 +110,7 @@ export const SalaryForm = ({
         <Select
           label="Периодичность"
           value={periodicity}
-          onChange={(e) => setPeriodicity(e.target.value)}
+          onChange={(value) => setPeriodicity(value)}
           options={[
             { value: 'monthly', label: 'Ежемесячно' },
             { value: 'weekly', label: 'Еженедельно' },

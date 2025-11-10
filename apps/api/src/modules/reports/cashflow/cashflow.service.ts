@@ -66,6 +66,7 @@ export class CashflowService {
         },
         type: { in: ['income', 'expense'] },
         isConfirmed: true,
+        isTemplate: false,
       },
       include: {
         article: {

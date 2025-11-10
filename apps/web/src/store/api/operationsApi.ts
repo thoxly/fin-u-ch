@@ -9,7 +9,9 @@ interface GetOperationsParams {
   dealId?: string;
   departmentId?: string;
   counterpartyId?: string;
+  accountId?: string;
   isConfirmed?: boolean;
+  isTemplate?: boolean;
   limit?: number;
   offset?: number;
 }
