@@ -125,7 +125,7 @@ export class DashboardService {
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
 
-    // Получаем все операции за период
+    // Получаем все операции за период (только реальные, не шаблоны)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -134,6 +134,7 @@ export class DashboardService {
           lte: params.periodTo,
         },
         isConfirmed: true,
+        isTemplate: false,
       },
       include: {
         account: { select: { id: true, name: true } },
@@ -259,7 +260,7 @@ export class DashboardService {
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
 
-    // Получаем все операции за период
+    // Получаем все операции за период (только реальные, не шаблоны)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -268,6 +269,7 @@ export class DashboardService {
           lte: params.periodTo,
         },
         isConfirmed: true,
+        isTemplate: false,
       },
       include: {
         article: {
@@ -393,7 +395,7 @@ export class DashboardService {
     const accountIds = accounts.map((a) => a.id);
     const accountIdsSet = new Set(accountIds);
 
-    // Получаем все операции с начала истории (для расчета начальных балансов)
+    // Получаем все операции с начала истории (для расчета начальных балансов, только реальные, не шаблоны)
     const allOperations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -406,6 +408,7 @@ export class DashboardService {
           lt: intervals[0].start, // До начала периода
         },
         isConfirmed: true,
+        isTemplate: false,
       },
       orderBy: {
         operationDate: 'asc',
