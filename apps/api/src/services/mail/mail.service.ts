@@ -9,6 +9,7 @@ const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
   secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
+  requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
@@ -58,7 +59,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     const html = replaceVariables(template, options.variables);
 
     await transporter.sendMail({
-      from: `"Vecta — Финучёт" <${env.SMTP_USER}>`,
+      from: `"Vecta — Финучёт" <${env.SMTP_FROM}>`,
       to: options.to,
       subject: options.subject,
       html,
