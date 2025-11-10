@@ -7,11 +7,15 @@ import { UserProfileForm } from './UserProfileForm';
 // Mock the authApi and companiesApi
 const mockUseGetMeQuery = jest.fn();
 const mockUseUpdateUserMutation = jest.fn();
+const mockUseChangePasswordMutation = jest.fn();
+const mockUseRequestEmailChangeMutation = jest.fn();
 const mockUseUpdateCompanyMutation = jest.fn();
 
 jest.mock('../../store/api/authApi', () => ({
   useGetMeQuery: () => mockUseGetMeQuery(),
   useUpdateUserMutation: () => mockUseUpdateUserMutation(),
+  useChangePasswordMutation: () => mockUseChangePasswordMutation(),
+  useRequestEmailChangeMutation: () => mockUseRequestEmailChangeMutation(),
 }));
 
 jest.mock('../../store/api/companiesApi', () => ({
@@ -46,6 +50,8 @@ describe('UserProfileForm', () => {
   const mockOnClose = jest.fn();
   const mockUpdateUser = jest.fn();
   const mockUpdateCompany = jest.fn();
+  const mockChangePassword = jest.fn();
+  const mockRequestEmailChange = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -72,6 +78,16 @@ describe('UserProfileForm', () => {
 
     mockUseUpdateCompanyMutation.mockReturnValue([
       mockUpdateCompany,
+      { isLoading: false },
+    ]);
+
+    mockUseChangePasswordMutation.mockReturnValue([
+      mockChangePassword,
+      { isLoading: false },
+    ]);
+
+    mockUseRequestEmailChangeMutation.mockReturnValue([
+      mockRequestEmailChange,
       { isLoading: false },
     ]);
   });

@@ -24,6 +24,7 @@ import {
   formatAmountInput,
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
+import { useOperationValidation } from './useOperationValidation';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -106,9 +107,12 @@ export const OperationForm = ({
   );
   const [recurrenceEndDate, setRecurrenceEndDate] =
     useState(getInitialEndDate());
-  const [validationErrors, setValidationErrors] = useState<
-    Record<string, string>
-  >({});
+  const {
+    validationErrors,
+    validateOperation,
+    clearValidationError,
+    clearAllValidationErrors,
+  } = useOperationValidation();
 
   const { data: articles = [] } = useGetArticlesQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
@@ -143,51 +147,23 @@ export const OperationForm = ({
     e.preventDefault();
 
     // Очищаем предыдущие ошибки
-    setValidationErrors({});
+    clearAllValidationErrors();
 
-    const errors: Record<string, string> = {};
-
-    // Валидация обязательных полей
-    if (!operationDate) {
-      errors.operationDate = 'Поле "Дата" обязательно для заполнения';
-    }
-
-    if (!amount || amount.trim() === '') {
-      errors.amount = 'Поле "Сумма" обязательно для заполнения';
-    } else {
-      const amountNumber = parseAmountInputToNumber(amount);
-      if (isNaN(amountNumber) || amountNumber <= 0) {
-        errors.amount = 'Сумма должна быть положительным числом';
-      }
-    }
-
-    if (!currency) {
-      errors.currency = 'Поле "Валюта" обязательно для заполнения';
-    }
-
-    // Валидация в зависимости от типа операции
-    if (type === OperationType.TRANSFER) {
-      if (!sourceAccountId) {
-        errors.sourceAccountId =
-          'Поле "Счет списания" обязательно для заполнения';
-      }
-      if (!targetAccountId) {
-        errors.targetAccountId =
-          'Поле "Счет зачисления" обязательно для заполнения';
-      }
-    } else {
-      if (!articleId) {
-        errors.articleId = 'Поле "Статья" обязательно для заполнения';
-      }
-      if (!accountId) {
-        errors.accountId = 'Поле "Счет" обязательно для заполнения';
-      }
-    }
+    // Валидация формы
+    const validation = validateOperation({
+      operationDate,
+      amount,
+      currency,
+      type,
+      articleId,
+      accountId,
+      sourceAccountId,
+      targetAccountId,
+    });
 
     // Если есть ошибки валидации, показываем их
-    if (Object.keys(errors).length > 0) {
-      setValidationErrors(errors);
-      const errorMessages = Object.values(errors).join(', ');
+    if (!validation.isValid) {
+      const errorMessages = Object.values(validation.errors).join(', ');
       showError(`Не заполнены обязательные поля: ${errorMessages}`);
       return;
     }
@@ -304,12 +280,16 @@ export const OperationForm = ({
 
         // Переводим известные ошибки на русский
         if (apiError.includes('accountId and articleId are required')) {
-          const apiErrors: Record<string, string> = {};
-          if (!articleId)
-            apiErrors.articleId = 'Поле "Статья" обязательно для заполнения';
-          if (!accountId)
-            apiErrors.accountId = 'Поле "Счет" обязательно для заполнения';
-          setValidationErrors(apiErrors);
+          validateOperation({
+            operationDate,
+            amount,
+            currency,
+            type,
+            articleId,
+            accountId,
+            sourceAccountId,
+            targetAccountId,
+          });
           showError('Не заполнены обязательные поля: Статья, Счет');
           return;
         }
@@ -317,14 +297,16 @@ export const OperationForm = ({
         if (
           apiError.includes('sourceAccountId and targetAccountId are required')
         ) {
-          const apiErrors: Record<string, string> = {};
-          if (!sourceAccountId)
-            apiErrors.sourceAccountId =
-              'Поле "Счет списания" обязательно для заполнения';
-          if (!targetAccountId)
-            apiErrors.targetAccountId =
-              'Поле "Счет зачисления" обязательно для заполнения';
-          setValidationErrors(apiErrors);
+          validateOperation({
+            operationDate,
+            amount,
+            currency,
+            type,
+            articleId,
+            accountId,
+            sourceAccountId,
+            targetAccountId,
+          });
           showError(
             'Не заполнены обязательные поля: Счет списания, Счет зачисления'
           );
@@ -365,7 +347,7 @@ export const OperationForm = ({
             onTypeChange={(value) => {
               try {
                 setType(value as OperationType);
-                setValidationErrors({});
+                clearAllValidationErrors();
               } catch (error) {
                 console.error('Error updating type:', error);
               }
@@ -373,13 +355,7 @@ export const OperationForm = ({
             onDateChange={(value) => {
               try {
                 setOperationDate(value);
-                if (validationErrors.operationDate) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.operationDate;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('operationDate');
               } catch (error) {
                 console.error('Error updating date:', error);
               }
@@ -387,13 +363,7 @@ export const OperationForm = ({
             onAmountChange={(value) => {
               try {
                 setAmount(formatAmountInput(value));
-                if (validationErrors.amount) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.amount;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('amount');
               } catch (error) {
                 console.error('Error updating amount:', error);
               }
@@ -401,24 +371,14 @@ export const OperationForm = ({
             onCurrencyChange={(value) => {
               try {
                 setCurrency(value);
-                if (validationErrors.currency) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.currency;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('currency');
               } catch (error) {
                 console.error('Error updating currency:', error);
               }
             }}
             onValidationErrorClear={(field) => {
               try {
-                setValidationErrors((prev) => {
-                  const newErrors = { ...prev };
-                  delete newErrors[field];
-                  return newErrors;
-                });
+                clearValidationError(field);
               } catch (error) {
                 console.error('Error clearing validation error:', error);
               }
@@ -446,13 +406,7 @@ export const OperationForm = ({
             onArticleChange={(value) => {
               try {
                 setArticleId(value);
-                if (validationErrors.articleId) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.articleId;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('articleId');
               } catch (error) {
                 console.error('Error updating article:', error);
               }
@@ -460,13 +414,7 @@ export const OperationForm = ({
             onAccountChange={(value) => {
               try {
                 setAccountId(value);
-                if (validationErrors.accountId) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.accountId;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('accountId');
               } catch (error) {
                 console.error('Error updating account:', error);
               }
@@ -474,13 +422,7 @@ export const OperationForm = ({
             onSourceAccountChange={(value) => {
               try {
                 setSourceAccountId(value);
-                if (validationErrors.sourceAccountId) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.sourceAccountId;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('sourceAccountId');
               } catch (error) {
                 console.error('Error updating source account:', error);
               }
@@ -488,13 +430,7 @@ export const OperationForm = ({
             onTargetAccountChange={(value) => {
               try {
                 setTargetAccountId(value);
-                if (validationErrors.targetAccountId) {
-                  setValidationErrors((prev) => {
-                    const newErrors = { ...prev };
-                    delete newErrors.targetAccountId;
-                    return newErrors;
-                  });
-                }
+                clearValidationError('targetAccountId');
               } catch (error) {
                 console.error('Error updating target account:', error);
               }
@@ -522,11 +458,7 @@ export const OperationForm = ({
             }}
             onValidationErrorClear={(field) => {
               try {
-                setValidationErrors((prev) => {
-                  const newErrors = { ...prev };
-                  delete newErrors[field];
-                  return newErrors;
-                });
+                clearValidationError(field);
               } catch (error) {
                 console.error('Error clearing validation error:', error);
               }

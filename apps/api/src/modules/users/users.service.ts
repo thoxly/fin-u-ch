@@ -320,18 +320,18 @@ export class UsersService {
     }
 
     // Проверяем, что пользователь принадлежит к указанной компании (если companyId передан)
+    // Включаем companyId в WHERE условие для предотвращения утечки данных между компаниями
     if (companyId) {
-      const user = await prisma.user.findUnique({
-        where: { id: validation.userId },
+      const user = await prisma.user.findFirst({
+        where: {
+          id: validation.userId,
+          companyId: companyId,
+        },
         select: { companyId: true },
       });
 
       if (!user) {
-        throw new AppError('User not found', 404);
-      }
-
-      if (user.companyId !== companyId) {
-        throw new AppError('Access denied', 403);
+        throw new AppError('User not found or access denied', 404);
       }
     }
 
