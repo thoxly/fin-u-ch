@@ -1,5 +1,6 @@
 import { useState, FormEvent, useMemo, useEffect } from 'react';
 import { Button } from '../../shared/ui/Button';
+import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { OperationBasicInfo } from './OperationBasicInfo';
 import { OperationFinancialParams } from './OperationFinancialParams';
 import { OperationRecurrenceSection } from './OperationRecurrenceSection';
@@ -354,131 +355,213 @@ export const OperationForm = ({
       className="flex flex-col h-full min-h-0 px-6 py-4"
     >
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        <OperationBasicInfo
-          type={type}
-          operationDate={operationDate}
-          amount={amount}
-          currency={currency}
-          validationErrors={validationErrors}
-          onTypeChange={(value) => {
-            setType(value as OperationType);
-            setValidationErrors({});
-          }}
-          onDateChange={(value) => {
-            setOperationDate(value);
-            if (validationErrors.operationDate) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.operationDate;
-                return newErrors;
-              });
-            }
-          }}
-          onAmountChange={(value) => {
-            setAmount(formatAmountInput(value));
-            if (validationErrors.amount) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.amount;
-                return newErrors;
-              });
-            }
-          }}
-          onCurrencyChange={(value) => {
-            setCurrency(value);
-            if (validationErrors.currency) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.currency;
-                return newErrors;
-              });
-            }
-          }}
-          onValidationErrorClear={(field) => {
-            setValidationErrors((prev) => {
-              const newErrors = { ...prev };
-              delete newErrors[field];
-              return newErrors;
-            });
-          }}
-        />
+        <ErrorBoundary>
+          <OperationBasicInfo
+            type={type}
+            operationDate={operationDate}
+            amount={amount}
+            currency={currency}
+            validationErrors={validationErrors}
+            onTypeChange={(value) => {
+              try {
+                setType(value as OperationType);
+                setValidationErrors({});
+              } catch (error) {
+                console.error('Error updating type:', error);
+              }
+            }}
+            onDateChange={(value) => {
+              try {
+                setOperationDate(value);
+                if (validationErrors.operationDate) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.operationDate;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating date:', error);
+              }
+            }}
+            onAmountChange={(value) => {
+              try {
+                setAmount(formatAmountInput(value));
+                if (validationErrors.amount) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.amount;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating amount:', error);
+              }
+            }}
+            onCurrencyChange={(value) => {
+              try {
+                setCurrency(value);
+                if (validationErrors.currency) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.currency;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating currency:', error);
+              }
+            }}
+            onValidationErrorClear={(field) => {
+              try {
+                setValidationErrors((prev) => {
+                  const newErrors = { ...prev };
+                  delete newErrors[field];
+                  return newErrors;
+                });
+              } catch (error) {
+                console.error('Error clearing validation error:', error);
+              }
+            }}
+          />
+        </ErrorBoundary>
 
-        <OperationFinancialParams
-          type={type}
-          articleId={articleId}
-          accountId={accountId}
-          sourceAccountId={sourceAccountId}
-          targetAccountId={targetAccountId}
-          counterpartyId={counterpartyId}
-          dealId={dealId}
-          departmentId={departmentId}
-          validationErrors={validationErrors}
-          articles={articles}
-          accounts={accounts}
-          counterparties={counterparties}
-          deals={deals}
-          filteredDeals={filteredDeals}
-          departments={departments}
-          onArticleChange={(value) => {
-            setArticleId(value);
-            if (validationErrors.articleId) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.articleId;
-                return newErrors;
-              });
-            }
-          }}
-          onAccountChange={(value) => {
-            setAccountId(value);
-            if (validationErrors.accountId) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.accountId;
-                return newErrors;
-              });
-            }
-          }}
-          onSourceAccountChange={(value) => {
-            setSourceAccountId(value);
-            if (validationErrors.sourceAccountId) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.sourceAccountId;
-                return newErrors;
-              });
-            }
-          }}
-          onTargetAccountChange={(value) => {
-            setTargetAccountId(value);
-            if (validationErrors.targetAccountId) {
-              setValidationErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors.targetAccountId;
-                return newErrors;
-              });
-            }
-          }}
-          onCounterpartyChange={setCounterpartyId}
-          onDealChange={setDealId}
-          onDepartmentChange={setDepartmentId}
-          onValidationErrorClear={(field) => {
-            setValidationErrors((prev) => {
-              const newErrors = { ...prev };
-              delete newErrors[field];
-              return newErrors;
-            });
-          }}
-        />
+        <ErrorBoundary>
+          <OperationFinancialParams
+            type={type}
+            articleId={articleId}
+            accountId={accountId}
+            sourceAccountId={sourceAccountId}
+            targetAccountId={targetAccountId}
+            counterpartyId={counterpartyId}
+            dealId={dealId}
+            departmentId={departmentId}
+            validationErrors={validationErrors}
+            articles={articles}
+            accounts={accounts}
+            counterparties={counterparties}
+            deals={deals}
+            filteredDeals={filteredDeals}
+            departments={departments}
+            onArticleChange={(value) => {
+              try {
+                setArticleId(value);
+                if (validationErrors.articleId) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.articleId;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating article:', error);
+              }
+            }}
+            onAccountChange={(value) => {
+              try {
+                setAccountId(value);
+                if (validationErrors.accountId) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.accountId;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating account:', error);
+              }
+            }}
+            onSourceAccountChange={(value) => {
+              try {
+                setSourceAccountId(value);
+                if (validationErrors.sourceAccountId) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.sourceAccountId;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating source account:', error);
+              }
+            }}
+            onTargetAccountChange={(value) => {
+              try {
+                setTargetAccountId(value);
+                if (validationErrors.targetAccountId) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.targetAccountId;
+                    return newErrors;
+                  });
+                }
+              } catch (error) {
+                console.error('Error updating target account:', error);
+              }
+            }}
+            onCounterpartyChange={(value) => {
+              try {
+                setCounterpartyId(value);
+              } catch (error) {
+                console.error('Error updating counterparty:', error);
+              }
+            }}
+            onDealChange={(value) => {
+              try {
+                setDealId(value);
+              } catch (error) {
+                console.error('Error updating deal:', error);
+              }
+            }}
+            onDepartmentChange={(value) => {
+              try {
+                setDepartmentId(value);
+              } catch (error) {
+                console.error('Error updating department:', error);
+              }
+            }}
+            onValidationErrorClear={(field) => {
+              try {
+                setValidationErrors((prev) => {
+                  const newErrors = { ...prev };
+                  delete newErrors[field];
+                  return newErrors;
+                });
+              } catch (error) {
+                console.error('Error clearing validation error:', error);
+              }
+            }}
+          />
+        </ErrorBoundary>
 
-        <OperationRecurrenceSection
-          description={description}
-          repeat={repeat}
-          recurrenceEndDate={recurrenceEndDate}
-          onDescriptionChange={setDescription}
-          onRepeatChange={(value) => setRepeat(value as Periodicity)}
-          onEndDateChange={setRecurrenceEndDate}
-        />
+        <ErrorBoundary>
+          <OperationRecurrenceSection
+            description={description}
+            repeat={repeat}
+            recurrenceEndDate={recurrenceEndDate}
+            onDescriptionChange={(value) => {
+              try {
+                setDescription(value);
+              } catch (error) {
+                console.error('Error updating description:', error);
+              }
+            }}
+            onRepeatChange={(value) => {
+              try {
+                setRepeat(value as Periodicity);
+              } catch (error) {
+                console.error('Error updating repeat:', error);
+              }
+            }}
+            onEndDateChange={(value) => {
+              try {
+                setRecurrenceEndDate(value);
+              } catch (error) {
+                console.error('Error updating end date:', error);
+              }
+            }}
+          />
+        </ErrorBoundary>
 
         {/* Выбор области обновления для дочерних операций */}
         {isChildOperation && (

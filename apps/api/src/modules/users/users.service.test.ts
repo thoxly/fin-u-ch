@@ -25,11 +25,17 @@ jest.mock('../../config/db', () => ({
       update: jest.fn(),
       findMany: jest.fn(),
     },
+    emailToken: {
+      update: jest.fn(),
+    },
     $transaction: jest.fn((callback) =>
       callback({
         user: {
           findUnique: jest.fn(),
           update: jest.fn(),
+        },
+        emailToken: {
+          update: jest.fn().mockResolvedValue(undefined),
         },
       })
     ),
@@ -237,7 +243,24 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      // Мокаем пользователя для validateEmailChange (первый вызов - проверка существования пользователя)
+      (mockedPrisma.user.findUnique as jest.Mock)
+        .mockResolvedValueOnce({
+          id: 'user-1',
+          email: 'oldemail@example.com',
+        })
+        // Второй вызов - проверка, что новый email не занят
+        .mockResolvedValueOnce(null);
+      (mockedPrisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            emailToken: {
+              update: jest.fn().mockResolvedValue(undefined),
+            },
+          };
+          return await callback(tx);
+        }
+      );
       (mockedTokenService.markTokenAsUsed as jest.Mock).mockResolvedValue(
         undefined
       );
@@ -254,7 +277,7 @@ describe('UsersService', () => {
         token,
         'email_change_old'
       );
-      expect(mockedTokenService.markTokenAsUsed).toHaveBeenCalledWith(token);
+      expect(mockedPrisma.$transaction).toHaveBeenCalled();
       expect(mockedTokenService.createToken).toHaveBeenCalledWith({
         userId: 'user-1',
         type: 'email_change_new',

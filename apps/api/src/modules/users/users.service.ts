@@ -306,7 +306,10 @@ export class UsersService {
     }
   }
 
-  async confirmEmailChangeWithEmail(token: string): Promise<void> {
+  async confirmEmailChangeWithEmail(
+    token: string,
+    companyId?: string
+  ): Promise<void> {
     const validation = await tokenService.validateToken(
       token,
       'email_change_new'
@@ -314,6 +317,22 @@ export class UsersService {
 
     if (!validation.valid || !validation.userId) {
       throw new AppError(validation.error || 'Invalid token', 400);
+    }
+
+    // Проверяем, что пользователь принадлежит к указанной компании (если companyId передан)
+    if (companyId) {
+      const user = await prisma.user.findUnique({
+        where: { id: validation.userId },
+        select: { companyId: true },
+      });
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      if (user.companyId !== companyId) {
+        throw new AppError('Access denied', 403);
+      }
     }
 
     const newEmail = validation.metadata?.newEmail as string | undefined;

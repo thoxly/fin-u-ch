@@ -84,7 +84,7 @@ export class UsersController {
   ) {
     try {
       const { token } = req.body;
-      await usersService.confirmEmailChangeWithEmail(token);
+      await usersService.confirmEmailChangeWithEmail(token, req.companyId);
       res.json({ message: 'Email changed successfully' });
     } catch (error) {
       next(error);
