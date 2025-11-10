@@ -115,10 +115,11 @@ describe('UsersService', () => {
   describe('changePassword', () => {
     it('should change password successfully', async () => {
       const userId = 'user-1';
+      const companyId = 'company-1';
       const currentPassword = 'oldPassword123';
       const newPassword = 'newPassword123';
 
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
       jest.spyOn(hashUtils, 'verifyPassword').mockResolvedValue(true);
       jest
         .spyOn(hashUtils, 'hashPassword')
@@ -126,10 +127,15 @@ describe('UsersService', () => {
       (mockedPrisma.user.update as jest.Mock).mockResolvedValue(mockUser);
       (sendPasswordChangedEmail as jest.Mock).mockResolvedValue(undefined);
 
-      await usersService.changePassword(userId, currentPassword, newPassword);
+      await usersService.changePassword(
+        userId,
+        companyId,
+        currentPassword,
+        newPassword
+      );
 
-      expect(mockedPrisma.user.findUnique).toHaveBeenCalledWith({
-        where: { id: userId },
+      expect(mockedPrisma.user.findFirst).toHaveBeenCalledWith({
+        where: { id: userId, companyId: companyId },
       });
       expect(hashUtils.verifyPassword).toHaveBeenCalledWith(
         currentPassword,
@@ -142,32 +148,54 @@ describe('UsersService', () => {
 
     it('should throw error if user not found', async () => {
       const userId = 'non-existent';
+      const companyId = 'company-1';
       const currentPassword = 'oldPassword123';
       const newPassword = 'newPassword123';
 
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue(null);
 
       await expect(
-        usersService.changePassword(userId, currentPassword, newPassword)
+        usersService.changePassword(
+          userId,
+          companyId,
+          currentPassword,
+          newPassword
+        )
       ).rejects.toThrow(AppError);
       await expect(
-        usersService.changePassword(userId, currentPassword, newPassword)
-      ).rejects.toThrow('User not found');
+        usersService.changePassword(
+          userId,
+          companyId,
+          currentPassword,
+          newPassword
+        )
+      ).rejects.toThrow('User not found or access denied');
     });
 
     it('should throw error if current password is incorrect', async () => {
       const userId = 'user-1';
+      const companyId = 'company-1';
       const currentPassword = 'wrongPassword';
       const newPassword = 'newPassword123';
 
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue(mockUser);
       jest.spyOn(hashUtils, 'verifyPassword').mockResolvedValue(false);
 
       await expect(
-        usersService.changePassword(userId, currentPassword, newPassword)
+        usersService.changePassword(
+          userId,
+          companyId,
+          currentPassword,
+          newPassword
+        )
       ).rejects.toThrow(AppError);
       await expect(
-        usersService.changePassword(userId, currentPassword, newPassword)
+        usersService.changePassword(
+          userId,
+          companyId,
+          currentPassword,
+          newPassword
+        )
       ).rejects.toThrow('Current password is incorrect');
     });
   });
@@ -175,11 +203,15 @@ describe('UsersService', () => {
   describe('requestEmailChange', () => {
     it('should request email change successfully', async () => {
       const userId = 'user-1';
+      const companyId = 'company-1';
       const newEmail = 'newemail@example.com';
 
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (mockedPrisma.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockUser)
+      (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: mockUser.id,
+          email: mockUser.email,
+          companyId: mockUser.companyId,
+        })
         .mockResolvedValueOnce(null);
       (mockedTokenService.createToken as jest.Mock).mockResolvedValue(
         'token-123'
@@ -188,9 +220,9 @@ describe('UsersService', () => {
         undefined
       );
 
-      await usersService.requestEmailChange(userId, newEmail);
+      await usersService.requestEmailChange(userId, companyId, newEmail);
 
-      expect(mockedPrisma.user.findUnique).toHaveBeenCalled();
+      expect(mockedPrisma.user.findFirst).toHaveBeenCalled();
       expect(mockedTokenService.createToken).toHaveBeenCalledWith({
         userId: mockUser.id,
         type: 'email_change_old',
@@ -205,32 +237,46 @@ describe('UsersService', () => {
 
     it('should throw error if new email is same as current', async () => {
       const userId = 'user-1';
+      const companyId = 'company-1';
       const newEmail = 'test@example.com';
 
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue({
+        id: mockUser.id,
+        email: mockUser.email,
+        companyId: mockUser.companyId,
+      });
 
       await expect(
-        usersService.requestEmailChange(userId, newEmail)
+        usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow(AppError);
       await expect(
-        usersService.requestEmailChange(userId, newEmail)
+        usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow('New email is the same as current email');
     });
 
     it('should throw error if new email is already in use', async () => {
       const userId = 'user-1';
+      const companyId = 'company-1';
       const newEmail = 'existing@example.com';
-      const existingUser = { ...mockUser, email: newEmail };
+      const existingUser = {
+        id: 'user-2',
+        companyId: companyId,
+        email: newEmail,
+      };
 
-      (mockedPrisma.user.findUnique as jest.Mock)
-        .mockResolvedValueOnce(mockUser)
+      (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: mockUser.id,
+          email: mockUser.email,
+          companyId: mockUser.companyId,
+        })
         .mockResolvedValueOnce(existingUser);
 
       await expect(
-        usersService.requestEmailChange(userId, newEmail)
+        usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow(AppError);
       await expect(
-        usersService.requestEmailChange(userId, newEmail)
+        usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow('Email already in use');
     });
   });
@@ -245,11 +291,17 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      // Мокаем пользователя для validateEmailChange (первый вызов - проверка существования пользователя)
-      (mockedPrisma.user.findUnique as jest.Mock)
+      // Мокаем пользователя для получения companyId
+      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
+        id: 'user-1',
+        companyId: 'company-1',
+      });
+      // Мокаем пользователя для validateEmailChange (проверка существования пользователя)
+      (mockedPrisma.user.findFirst as jest.Mock)
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'oldemail@example.com',
+          companyId: 'company-1',
         })
         // Второй вызов - проверка, что новый email не занят
         .mockResolvedValueOnce(null);
@@ -308,6 +360,7 @@ describe('UsersService', () => {
   describe('confirmEmailChangeWithEmail', () => {
     it('should confirm email change successfully', async () => {
       const token = 'token-123';
+      const companyId = 'company-1';
       const newEmail = 'newemail@example.com';
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
@@ -315,12 +368,17 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: 'user-1',
+          companyId: companyId,
+        })
+        .mockResolvedValueOnce(null);
       (mockedPrisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
           const tx = {
             user: {
-              findFirst: jest.fn(),
+              findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }),
               update: jest
                 .fn()
                 .mockResolvedValue({ ...mockUser, email: newEmail }),
@@ -334,7 +392,7 @@ describe('UsersService', () => {
         undefined
       );
 
-      await usersService.confirmEmailChangeWithEmail(token);
+      await usersService.confirmEmailChangeWithEmail(token, companyId);
 
       expect(mockedTokenService.validateToken).toHaveBeenCalledWith(
         token,
@@ -358,11 +416,12 @@ describe('UsersService', () => {
 
     it('should throw error if new email is already in use by another user', async () => {
       const token = 'token-123';
+      const companyId = 'company-1';
       const newEmail = 'existing@example.com';
       // Создаем пользователя с другим ID, чтобы проверить, что email занят другим пользователем
       const existingUser = {
         id: 'user-2',
-        companyId: 'company-1',
+        companyId: companyId,
         email: newEmail,
       };
 
@@ -371,12 +430,15 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValue(
-        existingUser
-      );
+      (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: 'user-1',
+          companyId: companyId,
+        })
+        .mockResolvedValueOnce(existingUser);
 
       await expect(
-        usersService.confirmEmailChangeWithEmail(token)
+        usersService.confirmEmailChangeWithEmail(token, companyId)
       ).rejects.toThrow('Email already in use');
     });
   });

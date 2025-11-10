@@ -41,7 +41,14 @@ const renderWithProviders = (component: React.ReactElement) => {
   const store = createMockStore();
   return render(
     <Provider store={store}>
-      <BrowserRouter>{component}</BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        {component}
+      </BrowserRouter>
     </Provider>
   );
 };
@@ -92,23 +99,26 @@ describe('UserProfileForm', () => {
     ]);
   });
 
-  it('renders form with user data', () => {
+  it('renders form with user data', async () => {
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
-    expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('John')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Doe')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Test Company')).toBeInTheDocument();
+    // Email is displayed as text, not input
+    expect(await screen.findByText('test@example.com')).toBeInTheDocument();
+    // Other fields are set via useEffect, so we need to wait for them
+    expect(await screen.findByDisplayValue('John')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Doe')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Test Company')).toBeInTheDocument();
     expect(screen.getByText('Базовая валюта')).toBeInTheDocument();
   });
 
   it('updates form fields when user types', async () => {
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
-    const emailInput = screen.getByDisplayValue('test@example.com');
-    fireEvent.change(emailInput, { target: { value: 'newemail@example.com' } });
+    // Wait for form to be populated, then find firstName input to test
+    const firstNameInput = await screen.findByDisplayValue('John');
+    fireEvent.change(firstNameInput, { target: { value: 'Jane' } });
 
-    expect(emailInput).toHaveValue('newemail@example.com');
+    expect(firstNameInput).toHaveValue('Jane');
   });
 
   it('calls updateUser and updateCompany when save button is clicked', async () => {
