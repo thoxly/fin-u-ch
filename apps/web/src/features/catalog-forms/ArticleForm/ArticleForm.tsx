@@ -85,7 +85,7 @@ export const ArticleForm = ({
       <Select
         label="Тип"
         value={type}
-        onChange={(e) => setType(e.target.value)}
+        onChange={(value) => setType(value)}
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
@@ -95,7 +95,7 @@ export const ArticleForm = ({
       <Select
         label="Деятельность"
         value={activity}
-        onChange={(e) => setActivity(e.target.value)}
+        onChange={(value) => setActivity(value)}
         options={[
           { value: 'operating', label: 'Операционная' },
           { value: 'investing', label: 'Инвестиционная' },
@@ -106,7 +106,7 @@ export const ArticleForm = ({
       <Select
         label="Контрагент"
         value={counterpartyId}
-        onChange={(e) => setCounterpartyId(e.target.value)}
+        onChange={(value) => setCounterpartyId(value)}
         options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
         placeholder="Не выбран"
       />

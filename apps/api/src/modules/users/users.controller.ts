@@ -29,6 +29,48 @@ export class UsersController {
       next(error);
     }
   }
+
+  async changePassword(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      await usersService.changePassword(
+        req.userId!,
+        currentPassword,
+        newPassword
+      );
+      res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async requestEmailChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { newEmail } = req.body;
+      await usersService.requestEmailChange(req.userId!, newEmail);
+      res.json({ message: 'Verification email sent to new email address' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirmEmailChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { token, newEmail } = req.body;
+      await usersService.confirmEmailChangeWithEmail(token, newEmail);
+      res.json({ message: 'Email changed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new UsersController();

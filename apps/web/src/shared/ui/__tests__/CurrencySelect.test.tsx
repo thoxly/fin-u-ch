@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { CurrencySelect } from '../CurrencySelect';
 
 describe('CurrencySelect', () => {
@@ -14,103 +15,114 @@ describe('CurrencySelect', () => {
   it('should render with default props', () => {
     render(<CurrencySelect {...defaultProps} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
-    expect(select).toHaveValue('');
+    const button = screen.getByRole('button');
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveTextContent('Выберите валюту');
   });
 
   it('should render with custom placeholder', () => {
     const placeholder = 'Выберите валюту';
     render(<CurrencySelect {...defaultProps} placeholder={placeholder} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
+    const button = screen.getByRole('button');
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveTextContent(placeholder);
   });
 
   it('should display selected value', () => {
     render(<CurrencySelect {...defaultProps} value="USD" />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveValue('USD');
+    const button = screen.getByRole('button');
+    expect(button).toHaveTextContent('USD - Доллар США ($)');
   });
 
-  it('should call onChange when selection changes', () => {
+  it('should call onChange when selection changes', async () => {
+    const user = userEvent.setup();
     const onChange = jest.fn();
     render(<CurrencySelect {...defaultProps} onChange={onChange} />);
 
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'EUR' } });
+    const button = screen.getByRole('button');
+    await user.click(button);
 
-    expect(onChange).toHaveBeenCalledWith('EUR');
+    await waitFor(() => {
+      const eurOption = screen.getByText('EUR - Евро (€)');
+      expect(eurOption).toBeInTheDocument();
+    });
+
+    // Find the option by role and click it
+    const eurOption = await screen.findByRole('option', { name: /EUR - Евро/ });
+    await user.click(eurOption);
+
+    await waitFor(
+      () => {
+        expect(onChange).toHaveBeenCalledWith('EUR');
+      },
+      { timeout: 3000 }
+    );
   });
 
   it('should be disabled when disabled prop is true', () => {
     render(<CurrencySelect {...defaultProps} disabled={true} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toBeDisabled();
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
   });
 
   it('should not be disabled when disabled prop is false', () => {
     render(<CurrencySelect {...defaultProps} disabled={false} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).not.toBeDisabled();
+    const button = screen.getByRole('button');
+    expect(button).not.toBeDisabled();
   });
 
-  it('should render all currency options', () => {
+  it('should render all currency options when opened', async () => {
+    const user = userEvent.setup();
     render(<CurrencySelect {...defaultProps} />);
 
-    const select = screen.getByRole('combobox');
-    const options = select.querySelectorAll('option');
+    const button = screen.getByRole('button');
+    await user.click(button);
 
-    // Should have placeholder option + all currencies
-    expect(options).toHaveLength(36); // 1 placeholder + 35 currencies
+    await waitFor(() => {
+      const usdOption = screen.getByText('USD - Доллар США ($)');
+      expect(usdOption).toBeInTheDocument();
+    });
+
+    // Check that major currencies are present
+    expect(screen.getByText('USD - Доллар США ($)')).toBeInTheDocument();
+    expect(screen.getByText('EUR - Евро (€)')).toBeInTheDocument();
+    expect(screen.getByText('RUB - Российский рубль (₽)')).toBeInTheDocument();
   });
 
-  it('should have placeholder as first option', () => {
-    render(<CurrencySelect {...defaultProps} placeholder="Выберите валюту" />);
-
-    const select = screen.getByRole('combobox');
-    const firstOption = select.querySelector('option:first-child');
-    expect(firstOption).toHaveTextContent('Выберите валюту');
-    expect(firstOption).toBeDisabled();
-  });
-
-  it('should include major currencies in options', () => {
+  it('should include major currencies in options', async () => {
+    const user = userEvent.setup();
     render(<CurrencySelect {...defaultProps} />);
 
-    // const select = screen.getByRole('combobox');
-    const usdOption = screen.getByText('USD - Доллар США ($)');
-    const eurOption = screen.getByText('EUR - Евро (€)');
-    const rubOption = screen.getByText('RUB - Российский рубль (₽)');
+    const button = screen.getByRole('button');
+    await user.click(button);
 
-    expect(usdOption).toBeInTheDocument();
-    expect(eurOption).toBeInTheDocument();
-    expect(rubOption).toBeInTheDocument();
-  });
+    await waitFor(() => {
+      const usdOption = screen.getByText('USD - Доллар США ($)');
+      const eurOption = screen.getByText('EUR - Евро (€)');
+      const rubOption = screen.getByText('RUB - Российский рубль (₽)');
 
-  it('should have proper option format', () => {
-    render(<CurrencySelect {...defaultProps} />);
-
-    const usdOption = screen.getByText('USD - Доллар США ($)');
-    expect(usdOption).toBeInTheDocument();
-    expect(usdOption).toHaveValue('USD');
+      expect(usdOption).toBeInTheDocument();
+      expect(eurOption).toBeInTheDocument();
+      expect(rubOption).toBeInTheDocument();
+    });
   });
 
   it('should apply correct CSS classes', () => {
     render(<CurrencySelect {...defaultProps} />);
 
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveClass('w-full', 'px-3', 'py-2', 'pr-10');
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('w-full', 'px-3', 'py-2', 'pr-10');
   });
 
   it('should show chevron icon', () => {
     render(<CurrencySelect {...defaultProps} />);
 
-    const chevron = screen
-      .getByRole('combobox')
-      .parentElement?.querySelector('svg');
+    const button = screen.getByRole('button');
+    const chevron = button.querySelector('svg');
     expect(chevron).toBeInTheDocument();
   });
 });

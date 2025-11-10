@@ -10,7 +10,7 @@ interface Column<T> {
 interface TableProps<T> {
   columns: Column<T>[];
   data: T[];
-  keyExtractor: (item: T) => string;
+  keyExtractor: (item: T, index?: number) => string;
   onRowClick?: (item: T) => void;
   loading?: boolean;
   emptyMessage?: string;
@@ -58,7 +58,7 @@ export function Table<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((item) => {
+          {data.map((item, index) => {
             const baseClassName = onRowClick ? 'cursor-pointer' : '';
             const customClassName = rowClassName ? rowClassName(item) : '';
             const className = [baseClassName, customClassName]
@@ -67,7 +67,7 @@ export function Table<T>({
 
             return (
               <tr
-                key={keyExtractor(item)}
+                key={keyExtractor(item, index)}
                 onClick={() => onRowClick?.(item)}
                 className={className}
               >

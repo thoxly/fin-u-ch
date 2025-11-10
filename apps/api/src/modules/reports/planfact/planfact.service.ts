@@ -83,7 +83,7 @@ export class PlanFactService {
       }
     }
 
-    // Get fact data
+    // Get fact data (только реальные операции, не шаблоны)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -93,6 +93,7 @@ export class PlanFactService {
         },
         type: { in: ['income', 'expense'] },
         isConfirmed: true,
+        isTemplate: false,
       },
       include: {
         article: { select: { id: true, name: true } },

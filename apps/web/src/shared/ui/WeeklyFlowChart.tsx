@@ -200,7 +200,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -268,7 +268,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                 content={
                   <ChartLegend preferredOrder={['Поступления', 'Списания']} />
                 }
-                wrapperStyle={{ paddingTop: 8 }}
+                wrapperStyle={{ paddingTop: 2 }}
               />
             )}
             <Bar

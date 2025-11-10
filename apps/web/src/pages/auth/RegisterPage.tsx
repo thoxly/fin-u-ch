@@ -1,7 +1,10 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { useRegisterMutation } from '../../store/api/authApi';
+import {
+  useRegisterMutation,
+  useResendVerificationMutation,
+} from '../../store/api/authApi';
 import { setCredentials } from '../../store/slices/authSlice';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
@@ -11,10 +14,13 @@ export const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
+  const [showVerificationMessage, setShowVerificationMessage] = useState(false);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [register, { isLoading }] = useRegisterMutation();
+  const [resendVerification, { isLoading: isResending }] =
+    useResendVerificationMutation();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,11 +38,64 @@ export const RegisterPage = () => {
         companyName,
       }).unwrap();
       dispatch(setCredentials(response));
-      navigate('/dashboard');
+      setShowVerificationMessage(true);
     } catch (err) {
       setError('Ошибка регистрации. Возможно, пользователь уже существует');
     }
   };
+
+  const handleResendVerification = async () => {
+    try {
+      await resendVerification({ email }).unwrap();
+    } catch (err) {
+      setError('Не удалось отправить письмо. Попробуйте позже.');
+    }
+  };
+
+  if (showVerificationMessage) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
+              Регистрация успешна!
+            </h2>
+            <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
+              На ваш email <strong>{email}</strong> отправлено письмо с
+              подтверждением.
+            </p>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Пожалуйста, проверьте почту и перейдите по ссылке для
+              подтверждения email.
+            </p>
+            {error && (
+              <div className="mt-4 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4">
+                <p className="text-sm text-red-800 dark:text-red-300">
+                  {error}
+                </p>
+              </div>
+            )}
+            <div className="mt-6 space-y-4">
+              <Button
+                onClick={handleResendVerification}
+                fullWidth
+                disabled={isResending}
+              >
+                {isResending ? 'Отправка...' : 'Отправить письмо снова'}
+              </Button>
+              <Button
+                onClick={() => navigate('/dashboard')}
+                fullWidth
+                variant="outline"
+              >
+                Перейти в приложение
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">

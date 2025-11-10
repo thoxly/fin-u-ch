@@ -1,0 +1,1467 @@
+/* ====================================
+   Базовые стили (светлая тема по умолчанию)
+   ==================================== */
+
+.rdrCalendarWrapper {
+  border-radius: 0 !important; /* Убираем border-radius, чтобы не конфликтовал с родительскими контейнерами */
+}
+
+body:not(.dark) .rdrCalendarWrapper {
+  background-color: #fff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+/* Скрываем панель с датами над календарем (rdrDateDisplay) */
+.rdrDateDisplayWrapper {
+  display: none !important;
+}
+
+/* ====================================
+   Стили для светлой темы
+   ==================================== */
+body:not(.dark) .rdrCalendarWrapper,
+body:not(.dark) .date-range-picker-wrapper .rdrCalendarWrapper {
+  background-color: #fff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+body:not(.dark) .rdrDateDisplayWrapper {
+  display: none !important;
+}
+
+body:not(.dark) .rdrDateDisplay {
+  color: #111827 !important;
+}
+
+body:not(.dark) .rdrDateDisplayItem {
+  background-color: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+}
+
+body:not(.dark) .rdrMonthAndYearPickers {
+  color: #111827 !important;
+}
+
+body:not(.dark) .rdrMonthAndYearPickers select {
+  background: #fff !important;
+  color: #111827 !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important; /* Единый border-radius для select */
+}
+
+body:not(.dark) .rdrMonthAndYearPickers select:hover {
+  background: #f3f4f6 !important;
+}
+
+body:not(.dark) .rdrWeekDay {
+  color: #6b7280 !important;
+}
+
+body:not(.dark) .rdrDay {
+  color: #111827 !important;
+  background-color: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+body:not(.dark) .rdrDayNumber {
+  color: #111827 !important;
+  font-weight: 600 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+body:not(.dark) .rdrDayNumber span {
+  color: #111827 !important;
+  font-weight: 600 !important;
+  line-height: 1 !important; /* Убираем лишние отступы для правильного центрирования */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+body:not(.dark) .rdrDay:not(.rdrDayToday) .rdrDayNumber span {
+  transform: translate(0, 0) !important;
+}
+
+body:not(.dark) .rdrDayPassive {
+  color: #9ca3af !important;
+}
+
+body:not(.dark) .rdrDayPassive .rdrDayNumber,
+body:not(.dark) .rdrDayPassive .rdrDayNumber span {
+  color: #9ca3af !important;
+}
+
+body:not(.dark) .rdrNextPrevButton {
+  background-color: #fff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 6px !important; /* Единый border-radius для кнопок */
+  color: #111827 !important;
+}
+
+body:not(.dark) .rdrNextPrevButton:hover {
+  background-color: #f3f4f6 !important;
+}
+
+body:not(.dark) .rdrPprevButton i {
+  border-color: transparent #111827 transparent transparent !important; /* Стрелка влево */
+}
+
+body:not(.dark) .rdrNextButton i {
+  border-color: transparent transparent transparent #111827 !important; /* Стрелка вправо */
+}
+
+body:not(.dark) .rdrDayDisabled {
+  color: #9ca3af !important;
+}
+
+body:not(.dark) .rdrDayDisabled .rdrDayNumber span {
+  color: #9ca3af !important;
+}
+
+/* Светлая тема через media query */
+@media (prefers-color-scheme: light) {
+  .rdrCalendarWrapper {
+    background-color: #fff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .rdrDateDisplayWrapper {
+    background-color: #f9fafb !important;
+  }
+
+  .rdrDateDisplayItem {
+    background-color: #fff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #111827 !important;
+  }
+
+  .rdrMonthAndYearPickers select {
+    background: #fff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .rdrWeekDay {
+    color: #6b7280 !important;
+  }
+
+  .rdrDay {
+    color: #111827 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .rdrDayNumber {
+    color: #111827 !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .rdrDayNumber span {
+    color: #111827 !important;
+    font-weight: 500 !important;
+    line-height: 1 !important; /* Убираем лишние отступы для правильного центрирования */
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    vertical-align: middle !important;
+    text-align: center !important;
+  }
+
+  .rdrDay:not(.rdrDayToday) .rdrDayNumber span {
+    transform: translate(0, 0) !important;
+  }
+
+  .rdrDayPassive {
+    color: #9ca3af !important;
+  }
+
+  .rdrDayPassive .rdrDayNumber,
+  .rdrDayPassive .rdrDayNumber span {
+    color: #9ca3af !important;
+  }
+
+  .rdrNextPrevButton {
+    background-color: #fff !important;
+    border: 1px solid #e5e7eb !important;
+    color: #111827 !important;
+  }
+
+  .rdrNextPrevButton:hover {
+    background-color: #f3f4f6 !important;
+  }
+
+  .rdrPprevButton i {
+    border-color: transparent #111827 transparent transparent !important; /* Стрелка влево */
+  }
+
+  .rdrNextButton i {
+    border-color: transparent transparent transparent #111827 !important; /* Стрелка вправо */
+  }
+}
+
+/* Темная тема через media query */
+@media (prefers-color-scheme: dark) {
+  body:not(.light) .rdrCalendarWrapper,
+  html:not(.light) .rdrCalendarWrapper {
+    background-color: #1a1a1a !important;
+    color: #fff !important;
+    border: 1px solid #404040 !important;
+  }
+
+  body:not(.light) .rdrMonthAndYearPickers select,
+  body:not(.light) .rdrMonthPicker select,
+  body:not(.light) .rdrYearPicker select,
+  html:not(.light) .rdrMonthAndYearPickers select,
+  html:not(.light) .rdrMonthPicker select,
+  html:not(.light) .rdrYearPicker select {
+    background-color: #2a2a2a !important;
+    background: #2a2a2a !important;
+    color: #ffffff !important;
+    border: 1px solid #404040 !important;
+    border-radius: 6px !important; /* Единый border-radius для select */
+  }
+
+  body:not(.light) .rdrNextPrevButton,
+  html:not(.light) .rdrNextPrevButton {
+    background-color: #2a2a2a !important;
+    background: #2a2a2a !important;
+    border: 1px solid #404040 !important;
+    border-radius: 6px !important; /* Единый border-radius для кнопок */
+    color: #fff !important;
+  }
+}
+
+/* Dark mode class support - улучшенная контрастность */
+.dark .rdrCalendarWrapper {
+  background-color: #1a1a1a !important;
+  color: #fff !important;
+  border: 1px solid #404040 !important;
+}
+
+/* Исправляем все возможные белые элементы */
+.dark .rdrMonths,
+.dark .rdrMonth,
+.dark .rdrWeeks,
+.dark .rdrDays {
+  background-color: #1a1a1a !important;
+}
+
+/* Убираем белые границы и border-radius конфликты */
+.dark .rdrCalendarWrapper,
+.dark .rdrMonthAndYearWrapper,
+.dark .rdrMonths,
+.dark .rdrMonth {
+  border-color: #404040 !important;
+  border-radius: 0 !important; /* Убираем border-radius у внутренних элементов */
+}
+
+/* Убираем border-radius у всех внутренних элементов календаря */
+.rdrCalendarWrapper,
+.rdrMonths,
+.rdrMonth,
+.rdrMonthAndYearWrapper,
+.rdrWeeks,
+.rdrDays {
+  border-radius: 0 !important;
+}
+
+.dark .rdrDateDisplayWrapper {
+  background-color: #2a2a2a !important;
+}
+
+.dark .rdrDateDisplayItem {
+  background-color: #404040 !important;
+  border: 1px solid #525252 !important;
+  color: #fff !important;
+}
+
+.dark .rdrMonthAndYearWrapper {
+  background-color: #1a1a1a !important;
+  border-bottom: 1px solid #404040 !important;
+}
+
+.dark .rdrMonthAndYearPickers {
+  color: #ffffff !important;
+}
+
+.dark .rdrMonthAndYearPickers select {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для select */
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+.dark .rdrMonthAndYearPickers select:hover {
+  background: #3a3a3a !important;
+  border-color: #525252 !important;
+}
+
+.dark .rdrMonthPicker select,
+.dark .rdrYearPicker select {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для select */
+  font-weight: 600 !important;
+  font-size: 14px !important;
+}
+
+/* Улучшаем видимость опций в select */
+.dark .rdrMonthAndYearPickers select option,
+.dark .rdrMonthPicker select option,
+.dark .rdrYearPicker select option {
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+}
+
+/* Дополнительные стили для select элементов - исправляем белый цвет */
+.dark select {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+}
+
+.dark select:focus {
+  border-color: #525252 !important;
+  outline: none !important;
+}
+
+/* Для всех вложенных select в календаре - МАКСИМАЛЬНАЯ СПЕЦИФИЧНОСТЬ */
+.dark .rdrCalendarWrapper select,
+.dark .rdrMonthAndYearWrapper select,
+.dark .rdrMonthAndYearPickers select,
+.dark .rdrMonthPicker select,
+.dark .rdrYearPicker select,
+.dark .date-range-picker-wrapper select,
+.dark .date-range-picker-wrapper .rdrCalendarWrapper select,
+html.dark select,
+html.dark .rdrCalendarWrapper select,
+html.dark .rdrMonthAndYearWrapper select,
+html.dark .rdrMonthAndYearPickers select,
+html.dark .rdrMonthPicker select,
+html.dark .rdrYearPicker select {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border: 1px solid #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для всех select */
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+
+/* Опции в select */
+.dark select option,
+.dark .rdrCalendarWrapper select option,
+html.dark select option,
+html.dark .rdrCalendarWrapper select option {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+/* Стрелки навигации - убираем белый цвет */
+.dark .rdrNextPrevButton i {
+  border-color: #ffffff !important;
+}
+
+.dark .rdrPprevButton i {
+  border-color: transparent #ffffff transparent transparent !important; /* Стрелка влево */
+}
+
+.dark .rdrNextButton i {
+  border-color: transparent transparent transparent #ffffff !important; /* Стрелка вправо */
+}
+
+.dark .rdrWeekDay {
+  color: #b4b4b4 !important; /* более яркий серый */
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  font-size: 11px !important;
+}
+
+.dark .rdrDay {
+  color: #fff !important;
+  background-color: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+/* Максимально специфичные стили для чисел в темной теме */
+.dark .rdrCalendarWrapper .rdrDayNumber,
+.dark .rdrDay .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayNumber,
+html.dark .rdrDay .rdrDayNumber {
+  color: #f3f4f6 !important; /* очень светлый цвет для лучшего контраста */
+  font-weight: 600 !important;
+  text-shadow: none !important; /* убираем тень для лучшей читаемости */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+.dark .rdrCalendarWrapper .rdrDayNumber span,
+.dark .rdrDay .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayNumber span,
+html.dark .rdrDay .rdrDayNumber span {
+  color: #f3f4f6 !important; /* очень светлый цвет для лучшего контраста */
+  font-weight: 600 !important;
+  text-shadow: none !important; /* убираем тень для лучшей читаемости */
+  line-height: 1 !important; /* Убираем лишние отступы для правильного центрирования */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+}
+
+.dark .rdrDayPassive {
+  color: #737373 !important; /* более яркий серый для пассивных дней */
+}
+
+/* Максимально специфичные стили для пассивных дней в темной теме */
+.dark .rdrDayPassive .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDayPassive .rdrDayNumber,
+.dark .rdrDayPassive .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDayPassive .rdrDayNumber span,
+html.dark .rdrDayPassive .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayPassive .rdrDayNumber,
+html.dark .rdrDayPassive .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayPassive .rdrDayNumber span {
+  color: #737373 !important;
+}
+
+.dark .rdrNextPrevButton {
+  background-color: #2a2a2a !important;
+  border: 1px solid #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для кнопок */
+  color: #fff !important;
+}
+
+.dark .rdrNextPrevButton:hover {
+  background-color: #3a3a3a !important;
+  border-color: #525252 !important;
+}
+
+.dark .rdrMonths {
+  background-color: #1a1a1a !important;
+}
+
+.dark .rdrMonth {
+  background-color: #1a1a1a !important;
+}
+
+.dark .rdrMonthName {
+  color: #ffffff !important;
+}
+
+/* Дополнительно убираем все возможные белые элементы */
+.dark .rdrWeeks,
+.dark .rdrDays,
+.dark table {
+  background-color: #1a1a1a !important;
+}
+
+/* Убираем белые линии в таблице */
+.dark .rdrCalendarWrapper table,
+.dark .rdrCalendarWrapper thead,
+.dark .rdrCalendarWrapper tbody,
+.dark .rdrCalendarWrapper tr,
+.dark .rdrCalendarWrapper td,
+.dark .rdrCalendarWrapper th {
+  background-color: transparent !important;
+  border-color: #404040 !important;
+}
+
+/* Центрируем содержимое ячеек таблицы */
+.rdrCalendarWrapper td {
+  vertical-align: middle !important;
+  text-align: center !important;
+  padding: 0 !important;
+}
+
+.rdrCalendarWrapper td .rdrDay {
+  margin: 0 auto !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Сброс line-height для всех элементов календаря */
+.rdrCalendarWrapper,
+.rdrCalendarWrapper *,
+.rdrMonth,
+.rdrMonth *,
+.rdrDay,
+.rdrDay *,
+.rdrDayNumber,
+.rdrDayNumber * {
+  box-sizing: border-box !important;
+}
+
+/* Убираем любые transform и позиционирование которые могут смещать числа */
+.rdrDayNumber,
+.rdrDayNumber span {
+  position: relative !important;
+  transform: none !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* Исправляем цвет всех текстовых элементов */
+.dark .rdrCalendarWrapper,
+.dark .rdrMonthAndYearPickers,
+.dark .rdrMonthPicker,
+.dark .rdrYearPicker,
+html.dark .rdrCalendarWrapper,
+html.dark .rdrMonthAndYearPickers,
+html.dark .rdrMonthPicker,
+html.dark .rdrYearPicker {
+  color: #ffffff !important;
+}
+
+/* Дополнительное правило для перекрытия всех inline стилей */
+.dark .rdrCalendarWrapper select[style],
+html.dark .rdrCalendarWrapper select[style] {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+/* Для кнопок навигации - убираем белый фон и границы */
+.dark .rdrNextPrevButton,
+html.dark .rdrNextPrevButton {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  border-color: #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для всех кнопок */
+}
+
+
+/* ====================================
+   Date range picker wrapper
+   ==================================== */
+.date-range-picker-wrapper {
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dark .date-range-picker-wrapper {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  background-color: #1a1a1a;
+  border: 1px solid #404040;
+}
+
+/* ====================================
+   МОБИЛЬНАЯ ВЕРСИЯ
+   ==================================== */
+
+/* Модалка на весь экран для мобильных устройств */
+.date-range-picker-mobile-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  z-index: 9999 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  margin: 0 !important;
+  animation: fadeIn 0.15s ease;
+}
+
+/* Темный оверлей для dark mode */
+.dark .date-range-picker-mobile-modal {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-wrapper {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 600px !important;
+  height: auto !important;
+  max-height: 90vh !important;
+  border-radius: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background-color: #fff !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  overflow: hidden !important;
+  top: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-wrapper {
+  background-color: #1a1a1a !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid #404040 !important;
+}
+
+/* Шапка мобильной версии */
+.date-range-picker-mobile-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 16px 20px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  background-color: #fff !important;
+  flex-shrink: 0 !important;
+}
+
+.dark .date-range-picker-mobile-header {
+  background-color: #1a1a1a !important;
+  border-bottom-color: #404040 !important;
+}
+
+.date-range-picker-mobile-title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  margin: 0 !important;
+}
+
+.dark .date-range-picker-mobile-title {
+  color: #ffffff !important;
+}
+
+.date-range-picker-mobile-close {
+  background: none !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  color: #6b7280 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.2s ease !important;
+  border-radius: 6px !important;
+}
+
+.date-range-picker-mobile-close:hover {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+.dark .date-range-picker-mobile-close {
+  color: #b4b4b4 !important;
+}
+
+.dark .date-range-picker-mobile-close:hover {
+  background-color: #2a2a2a !important;
+  color: #ffffff !important;
+}
+
+.date-range-picker-mobile-close svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+/* Быстрые фильтры - горизонтальный скролл в один ряд */
+.date-range-picker-mobile-modal .date-range-picker-quick-filters {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  background-color: #fff !important;
+  flex-shrink: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE and Edge */
+}
+
+/* Скрываем scrollbar в webkit */
+.date-range-picker-mobile-modal .date-range-picker-quick-filters::-webkit-scrollbar {
+  display: none !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-quick-filters {
+  background-color: #1a1a1a !important;
+  border-bottom-color: #404040 !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-quick-filter-btn {
+  flex: 0 0 auto !important;
+  min-width: fit-content !important;
+  padding: 8px 16px !important;
+  border-radius: 20px !important;
+  border: 1px solid #e5e7eb !important;
+  background-color: #fff !important;
+  color: #374151 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-quick-filter-btn {
+  background-color: #2a2a2a !important;
+  border-color: #525252 !important;
+  color: #ffffff !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-quick-filter-btn:active {
+  transform: scale(0.98) !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-quick-filter-btn.active {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-quick-filter-btn.active {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Контейнер календаря */
+.date-range-picker-mobile-modal .date-range-picker-calendar-container {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  padding: 8px 0 !important;
+  pointer-events: auto !important;
+  background-color: #fff !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-calendar-container {
+  background-color: #1a1a1a !important;
+}
+
+/* Темная тема для мобильного календаря - убираем белые элементы */
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper {
+  background-color: #1a1a1a !important;
+  border-color: #404040 !important;
+}
+
+.dark .date-range-picker-mobile-modal .rdrMonths,
+.dark .date-range-picker-mobile-modal .rdrMonth,
+.dark .date-range-picker-mobile-modal .rdrMonthAndYearWrapper,
+html.dark .date-range-picker-mobile-modal .rdrMonths,
+html.dark .date-range-picker-mobile-modal .rdrMonth,
+html.dark .date-range-picker-mobile-modal .rdrMonthAndYearWrapper {
+  background-color: #1a1a1a !important;
+  border-color: #404040 !important;
+}
+
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper select,
+.dark .date-range-picker-mobile-modal .rdrMonthAndYearPickers select,
+.dark .date-range-picker-mobile-modal .rdrMonthPicker select,
+.dark .date-range-picker-mobile-modal .rdrYearPicker select,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper select,
+html.dark .date-range-picker-mobile-modal .rdrMonthAndYearPickers select,
+html.dark .date-range-picker-mobile-modal .rdrMonthPicker select,
+html.dark .date-range-picker-mobile-modal .rdrYearPicker select {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  color: #ffffff !important;
+  border-color: #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для select в мобильной версии */
+}
+
+.dark .date-range-picker-mobile-modal .rdrNextPrevButton,
+html.dark .date-range-picker-mobile-modal .rdrNextPrevButton {
+  background-color: #2a2a2a !important;
+  background: #2a2a2a !important;
+  border-color: #404040 !important;
+  border-radius: 6px !important; /* Единый border-radius для кнопок в мобильной версии */
+  color: #ffffff !important;
+}
+
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper table,
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper thead,
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper tbody,
+.dark .date-range-picker-mobile-modal .rdrCalendarWrapper tr,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper table,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper thead,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper tbody,
+html.dark .date-range-picker-mobile-modal .rdrCalendarWrapper tr {
+  background-color: transparent !important;
+  border-color: #404040 !important;
+}
+
+/* Выравниваем календарь по центру */
+.date-range-picker-mobile-modal .date-range-picker-calendar-container .rdrCalendarWrapper,
+.date-range-picker-mobile-modal .rdrCalendarWrapper {
+  margin: 0 auto !important;
+  pointer-events: auto !important;
+}
+
+/* Убеждаемся что дни календаря кликабельны на ВСЕХ платформах */
+.rdrDay,
+.rdrDayNumber {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2) !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* Убираем pointer-events: none для всех дочерних элементов календаря */
+.rdrMonth,
+.rdrMonths,
+.rdrDays,
+.rdrWeeks {
+  pointer-events: auto !important;
+}
+
+/* Дополнительные стили для мобильной версии */
+.date-range-picker-mobile-modal .rdrDay,
+.date-range-picker-mobile-modal .rdrDayNumber {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2) !important;
+}
+
+.date-range-picker-mobile-modal .rdrMonth,
+.date-range-picker-mobile-modal .rdrMonths,
+.date-range-picker-mobile-modal .rdrDays {
+  pointer-events: auto !important;
+}
+
+/* Стили для подсказки - менее заметная */
+.date-range-picker-mobile-modal .date-range-picker-hint {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  line-height: 1.4 !important;
+  flex-shrink: 0 !important;
+  text-align: center !important;
+  background-color: transparent !important; /* Убираем фон */
+  border-radius: 0 !important; /* Убираем скругления */
+  margin: 12px 16px 16px 16px !important; /* Увеличиваем margin */
+  min-height: auto !important; /* Убираем минимальную высоту */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-hint {
+  color: #737373 !important; /* Более приглушенный цвет */
+  background-color: transparent !important; /* Убираем фон */
+}
+
+/* Делаем текст внутри плашки менее заметным */
+.date-range-picker-mobile-modal .date-range-picker-hint .text-green-600,
+.date-range-picker-mobile-modal .date-range-picker-hint .text-blue-600 {
+  color: #6b7280 !important; /* Приглушенный серый вместо ярких цветов */
+  font-weight: 400 !important; /* Убираем жирный шрифт */
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-hint .text-green-400,
+.dark .date-range-picker-mobile-modal .date-range-picker-hint .text-blue-400 {
+  color: #737373 !important; /* Приглушенный серый в темной теме */
+  font-weight: 400 !important; /* Убираем жирный шрифт */
+}
+
+/* Кнопки действий */
+.date-range-picker-mobile-modal .date-range-picker-actions {
+  display: flex !important;
+  gap: 12px !important;
+  padding: 16px !important;
+  border-top: 1px solid #e5e7eb !important;
+  background-color: #fff !important;
+  flex-shrink: 0 !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-actions {
+  background-color: #1a1a1a !important;
+  border-top-color: #404040 !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-apply-btn {
+  flex: 1 !important;
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-apply-btn:hover:not(:disabled) {
+  background-color: #2563eb !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-apply-btn:active:not(:disabled) {
+  transform: scale(0.98) !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-apply-btn:disabled {
+  background-color: #93c5fd !important;
+  cursor: not-allowed !important;
+  opacity: 0.6 !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-apply-btn:disabled {
+  background-color: #1e40af !important;
+  opacity: 0.5 !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-close-btn {
+  padding: 12px 24px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e5e7eb !important;
+  background-color: #fff !important;
+  color: #374151 !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-close-btn {
+  background-color: #2a2a2a !important;
+  border-color: #525252 !important;
+  color: #ffffff !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-close-btn:hover {
+  background-color: #f9fafb !important;
+  border-color: #d1d5db !important;
+}
+
+.dark .date-range-picker-mobile-modal .date-range-picker-close-btn:hover {
+  background-color: #3a3a3a !important;
+  border-color: #626262 !important;
+}
+
+.date-range-picker-mobile-modal .date-range-picker-close-btn:active {
+  transform: scale(0.98) !important;
+}
+
+/* ====================================
+   ДЕСКТОПНАЯ ВЕРСИЯ
+   ==================================== */
+
+/* Контейнер для десктопа */
+.date-range-picker-desktop-wrapper {
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  left: 0 !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  border-radius: 12px !important;
+  background-color: #fff !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+  overflow: hidden !important;
+  border: 1px solid #e5e7eb !important;
+}
+
+.dark .date-range-picker-desktop-wrapper {
+  background-color: #1a1a1a !important;
+  border-color: #404040 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Боковая панель с быстрыми фильтрами */
+.date-range-picker-desktop-sidebar {
+  width: 180px !important;
+  padding: 12px !important;
+  border-right: 1px solid #e5e7eb !important;
+  background-color: #f9fafb !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.dark .date-range-picker-desktop-sidebar {
+  background-color: #2a2a2a !important;
+  border-right-color: #404040 !important;
+}
+
+/* Кнопки быстрых фильтров для десктопа */
+.date-range-picker-desktop-filter-btn {
+  width: 100% !important;
+  padding: 10px 12px !important;
+  text-align: left !important;
+  border: none !important;
+  background-color: transparent !important;
+  color: #374151 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border-radius: 6px !important;
+}
+
+.dark .date-range-picker-desktop-filter-btn {
+  color: #ffffff !important;
+}
+
+.date-range-picker-desktop-filter-btn:hover {
+  background-color: #f3f4f6 !important;
+  color: #111827 !important;
+}
+
+.dark .date-range-picker-desktop-filter-btn:hover {
+  background-color: #3a3a3a !important;
+  color: #ffffff !important;
+}
+
+.date-range-picker-desktop-filter-btn.active {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+  font-weight: 600 !important;
+}
+
+.dark .date-range-picker-desktop-filter-btn.active {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+  color: #60a5fa !important;
+}
+
+/* Контейнер календаря для десктопа */
+.date-range-picker-desktop-calendar {
+  display: flex !important;
+}
+
+.date-range-picker-desktop-calendar .rdrCalendarWrapper {
+  border: none !important;
+}
+
+/* ====================================
+   Улучшенные стили для диапазонов
+   ==================================== */
+
+/* Улучшаем визуальное отображение выбранного диапазона */
+.rdrDayInRange {
+  background-color: rgba(59, 130, 246, 0.2) !important;
+  color: #111827 !important;
+}
+
+.rdrDayInRange .rdrDayNumber,
+.rdrDayInRange .rdrDayNumber span {
+  color: #111827 !important;
+  font-weight: 600 !important;
+}
+
+.dark .rdrDayInRange {
+  background-color: rgba(59, 130, 246, 0.35) !important;
+  color: #fff !important;
+}
+
+/* Максимально специфичные стили для чисел в выбранном диапазоне в темной теме */
+.dark .rdrDayInRange .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDayInRange .rdrDayNumber,
+.dark .rdrDayInRange .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDayInRange .rdrDayNumber span,
+html.dark .rdrDayInRange .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayInRange .rdrDayNumber,
+html.dark .rdrDayInRange .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayInRange .rdrDayNumber span {
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+
+.rdrDayStartRange,
+.rdrDayEndRange {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  border: 2px solid #2563eb !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4) !important;
+}
+
+.rdrDayStartRange .rdrDayNumber,
+.rdrDayStartRange .rdrDayNumber span,
+.rdrDayEndRange .rdrDayNumber,
+.rdrDayEndRange .rdrDayNumber span {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+.dark .rdrDayStartRange,
+.dark .rdrDayEndRange {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+  border: 2px solid #60a5fa !important;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.6) !important;
+}
+
+/* Максимально специфичные стили для чисел в начале и конце диапазона в темной теме */
+.dark .rdrDayStartRange .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDayStartRange .rdrDayNumber,
+.dark .rdrDayStartRange .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDayStartRange .rdrDayNumber span,
+.dark .rdrDayEndRange .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDayEndRange .rdrDayNumber,
+.dark .rdrDayEndRange .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDayEndRange .rdrDayNumber span,
+html.dark .rdrDayStartRange .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayStartRange .rdrDayNumber,
+html.dark .rdrDayStartRange .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayStartRange .rdrDayNumber span,
+html.dark .rdrDayEndRange .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayEndRange .rdrDayNumber,
+html.dark .rdrDayEndRange .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayEndRange .rdrDayNumber span {
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+
+/* Улучшаем hover эффекты для дней */
+.rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  cursor: pointer !important;
+  transform: scale(1.05) !important;
+  transition: all 0.15s ease !important;
+}
+
+.rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber,
+.rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span {
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
+.dark .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover {
+  background-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+/* Максимально специфичные стили для чисел при hover в темной теме */
+.dark .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber,
+.dark .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span,
+html.dark .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber,
+html.dark .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDay:not(.rdrDayPassive):not(.rdrDayDisabled):hover .rdrDayNumber span {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* Улучшаем стили при выборе диапазона (предпросмотр) */
+.rdrDayStartPreview,
+.rdrDayInPreview,
+.rdrDayEndPreview {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.4) !important;
+}
+
+.dark .rdrDayStartPreview,
+.dark .rdrDayInPreview,
+.dark .rdrDayEndPreview {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+  border-color: rgba(59, 130, 246, 0.6) !important;
+}
+
+/* Улучшаем кликабельность дат на ВСЕХ устройствах */
+.rdrDay {
+  min-height: 40px !important;
+  height: 100% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  text-align: center !important;
+}
+
+.rdrDayNumber {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 32px !important;
+  line-height: 1 !important; /* Убираем лишние отступы для правильного центрирования */
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  text-align: center !important;
+  position: relative !important;
+}
+
+/* Дополнительное центрирование для span внутри .rdrDayNumber */
+.rdrDayNumber span {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  vertical-align: middle !important;
+  text-align: center !important;
+  width: auto !important;
+  height: auto !important;
+  position: relative !important;
+}
+
+/* Убираем transform только для обычных дней (не сегодняшний день) */
+.rdrDay:not(.rdrDayToday) .rdrDayNumber span {
+  transform: translate(0, 0) !important;
+}
+
+/* Active state для тач-устройств */
+.rdrDay:active {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  transform: scale(0.96) !important;
+  transition: transform 0.1s ease, background-color 0.1s ease !important;
+}
+
+.dark .rdrDay:active {
+  background-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+/* Улучшенные стили для мобильных устройств */
+@media (max-width: 768px) {
+  .rdrDay {
+    min-height: 44px !important;
+  }
+
+  .rdrDayNumber {
+    min-height: 38px !important;
+    font-size: 15px !important;
+  }
+  
+  /* Более заметная обратная связь на мобильных */
+  .rdrDay:active {
+    background-color: rgba(59, 130, 246, 0.25) !important;
+    transform: scale(0.94) !important;
+  }
+
+  .dark .rdrDay:active {
+    background-color: rgba(59, 130, 246, 0.45) !important;
+  }
+}
+
+/* Улучшаем отображение сегодняшней даты - более яркая подсветка */
+.rdrDayToday .rdrDayNumber {
+  font-weight: 700 !important;
+  color: #3b82f6 !important;
+}
+
+.rdrDayToday .rdrDayNumber span {
+  font-weight: 700 !important;
+  color: #3b82f6 !important;
+  position: relative !important;
+  /* Убираем padding-bottom, чтобы число не сдвигалось вверх */
+}
+
+.rdrDayToday .rdrDayNumber span:after {
+  content: '' !important;
+  position: absolute !important;
+  background-color: #3b82f6 !important;
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  bottom: -10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Максимально специфичные стили для сегодняшнего дня в темной теме */
+.dark .rdrDayToday .rdrDayNumber,
+.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber,
+html.dark .rdrDayToday .rdrDayNumber,
+html.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber {
+  font-weight: 700 !important;
+  color: #60a5fa !important;
+  text-shadow: none !important;
+}
+
+.dark .rdrDayToday .rdrDayNumber span,
+.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber span,
+html.dark .rdrDayToday .rdrDayNumber span,
+html.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber span {
+  font-weight: 700 !important;
+  color: #60a5fa !important;
+  position: relative !important;
+  /* Убираем padding-bottom, чтобы число не сдвигалось вверх */
+  text-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Максимально специфичные стили для точки в темной теме */
+.dark .rdrDayToday .rdrDayNumber span:after,
+.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber span:after,
+html.dark .rdrDayToday .rdrDayNumber span:after,
+html.dark .rdrCalendarWrapper .rdrDayToday .rdrDayNumber span:after {
+  content: '' !important;
+  position: absolute !important;
+  background-color: #60a5fa !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  bottom: -10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.4) !important;
+  z-index: 1 !important;
+}
+
+/* Улучшаем стили для навигации по месяцам */
+.rdrMonthAndYearWrapper {
+  padding: 12px 16px !important;
+}
+
+.dark .rdrMonthAndYearWrapper {
+  background-color: #1a1a1a !important;
+  border-bottom: 1px solid #404040 !important;
+}
+
+/* === Скрываем встроенную левую панель === */
+.rdrDefinedRangesWrapper {
+  display: none !important;
+}
+
+/* === Центрируем календарь === */
+.rdrMonths {
+  justify-content: center !important;
+}
+
+.rdrMonth {
+  width: 320px !important;
+}
+
+/* ====================================
+   Адаптивность для маленьких экранов
+   ==================================== */
+
+/* Планшеты (768px - 1024px) */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .date-range-picker-mobile-modal .date-range-picker-wrapper {
+    max-width: 90vw !important;
+    max-height: 85vh !important;
+  }
+
+  .date-range-picker-mobile-modal .date-range-picker-calendar-container {
+    padding: 16px !important;
+  }
+
+  .rdrMonth {
+    width: 100% !important;
+    max-width: 380px !important;
+  }
+
+  .rdrMonths {
+    justify-content: center !important;
+    gap: 16px !important;
+  }
+
+  /* Уменьшаем отступы на планшетах */
+  .date-range-picker-mobile-header {
+    padding: 20px !important;
+  }
+
+  .date-range-picker-mobile-modal .date-range-picker-actions {
+    padding: 20px !important;
+  }
+}
+
+/* Мобильные телефоны */
+@media (max-width: 768px) {
+  .date-range-picker-mobile-modal {
+    padding: 0 !important;
+  }
+
+  .date-range-picker-mobile-modal .date-range-picker-wrapper {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+  }
+
+  .rdrMonths {
+    flex-direction: column !important;
+  }
+
+  .rdrMonth {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 8px !important;
+  }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 375px) {
+  .date-range-picker-mobile-modal .date-range-picker-quick-filter-btn {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+  }
+
+  .date-range-picker-mobile-header {
+    padding: 12px 16px !important;
+  }
+
+  .date-range-picker-mobile-title {
+    font-size: 16px !important;
+  }
+
+  .rdrMonth {
+    padding: 0 4px !important;
+  }
+}

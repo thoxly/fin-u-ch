@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { Trash2, X, Copy, Check } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
 import { Table } from '../shared/ui/Table';
 import { Select } from '../shared/ui/Select';
-import { Input } from '../shared/ui/Input';
+import { DateRangePicker } from '../shared/ui/DateRangePicker';
 import TableSkeleton from '../shared/ui/TableSkeleton';
 import { EmptyState } from '../shared/ui/EmptyState';
 import { FolderOpen } from 'lucide-react';
@@ -24,6 +24,7 @@ import {
   useGetCounterpartiesQuery,
   useGetDealsQuery,
   useGetDepartmentsQuery,
+  useGetAccountsQuery,
 } from '../store/api/catalogsApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
@@ -32,6 +33,7 @@ import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 import { useBulkSelection } from '../shared/hooks/useBulkSelection';
 import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
+import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 
 export const OperationsPage = () => {
@@ -40,6 +42,11 @@ export const OperationsPage = () => {
     account?: { name?: string } | null;
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
+    recurrenceParent?: {
+      id: string;
+      repeat: string;
+      operationDate: Date | string;
+    } | null;
   };
 
   type OpsQuery = {
@@ -66,16 +73,42 @@ export const OperationsPage = () => {
   >('');
   const [dateFromFilter, setDateFromFilter] = useState('');
   const [dateToFilter, setDateToFilter] = useState('');
+  const [dateRangeStart, setDateRangeStart] = useState<Date | undefined>(
+    undefined
+  );
+  const [dateRangeEnd, setDateRangeEnd] = useState<Date | undefined>(undefined);
   const [articleIdFilter, setArticleIdFilter] = useState('');
   const [counterpartyIdFilter, setCounterpartyIdFilter] = useState('');
   const [dealIdFilter, setDealIdFilter] = useState('');
   const [departmentIdFilter, setDepartmentIdFilter] = useState('');
+  const [accountIdFilter, setAccountIdFilter] = useState('');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Загружаем справочники для фильтров
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
+  const { data: accounts = [] } = useGetAccountsQuery();
+
+  // Фильтруем статьи по типу операции
+  const filteredArticles = useMemo(() => {
+    if (typeFilter === 'expense') {
+      return articles.filter((a) => a.type === 'expense');
+    }
+    if (typeFilter === 'income') {
+      return articles.filter((a) => a.type === 'income');
+    }
+    return articles;
+  }, [articles, typeFilter]);
+
+  // Фильтруем сделки по контрагенту
+  const filteredDeals = useMemo(() => {
+    if (counterpartyIdFilter) {
+      return deals.filter((d) => d.counterpartyId === counterpartyIdFilter);
+    }
+    return deals;
+  }, [deals, counterpartyIdFilter]);
 
   // Формируем объект фильтров с useMemo для избежания ненужных пересозданий
   const filters = useMemo(() => {
@@ -87,6 +120,7 @@ export const OperationsPage = () => {
       counterpartyId?: string;
       dealId?: string;
       departmentId?: string;
+      accountId?: string;
     } = {};
 
     if (typeFilter) result.type = typeFilter;
@@ -96,6 +130,7 @@ export const OperationsPage = () => {
     if (counterpartyIdFilter) result.counterpartyId = counterpartyIdFilter;
     if (dealIdFilter) result.dealId = dealIdFilter;
     if (departmentIdFilter) result.departmentId = departmentIdFilter;
+    if (accountIdFilter) result.accountId = accountIdFilter;
 
     return result;
   }, [
@@ -106,6 +141,7 @@ export const OperationsPage = () => {
     counterpartyIdFilter,
     dealIdFilter,
     departmentIdFilter,
+    accountIdFilter,
   ]);
 
   const hasActiveFilters = Object.keys(filters).length > 0;
@@ -121,6 +157,7 @@ export const OperationsPage = () => {
   const { showSuccess, showError } = useNotification();
 
   const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
+  const isMobile = useIsMobile();
 
   // Extract data reloading logic to avoid duplication
   const reloadOperationsData = useCallback(async () => {
@@ -149,7 +186,12 @@ export const OperationsPage = () => {
     };
     const result = await trigger(params).unwrap();
     const page = result || [];
-    setItems((prev) => [...prev, ...page]);
+    // Фильтруем дубликаты по id при добавлении новых элементов
+    setItems((prev) => {
+      const existingIds = new Set(prev.map((item) => item.id));
+      const newItems = page.filter((item) => !existingIds.has(item.id));
+      return [...prev, ...newItems];
+    });
     setOffset((prevOffset) => prevOffset + page.length);
     setHasMore(page.length === PAGE_SIZE);
   }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
@@ -200,7 +242,12 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
-    const { id, createdAt, updatedAt, ...operationData } = operation;
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      ...operationData
+    } = operation;
     // Use structuredClone for deep copy to ensure nested objects are properly copied
     const operationCopy = structuredClone(operationData) as Operation;
     setEditingOperation(operationCopy);
@@ -232,6 +279,19 @@ export const OperationsPage = () => {
     }
   };
 
+  const handleReject = async (id: string) => {
+    if (window.confirm('Вы уверены, что хотите отклонить эту операцию?')) {
+      try {
+        await deleteOperation(id).unwrap();
+        showSuccess('Операция отклонена');
+        await reloadOperationsData();
+      } catch (error) {
+        console.error('Failed to reject operation:', error);
+        showError('Ошибка при отклонении операции');
+      }
+    }
+  };
+
   const handleCloseForm = async () => {
     setIsFormOpen(false);
     setEditingOperation(null);
@@ -254,7 +314,25 @@ export const OperationsPage = () => {
     return labels[type] || type;
   };
 
-  const getPeriodicityLabel = (repeat: string) => {
+  const getPeriodicityLabel = (op: OperationWithRelations) => {
+    // Если это дочерняя операция (есть родитель)
+    if (op.recurrenceParentId && op.recurrenceParent) {
+      const parentRepeat = op.recurrenceParent.repeat;
+      const parentDate = op.recurrenceParent.operationDate;
+      const labels: Record<string, string> = {
+        daily: 'Ежедневно',
+        weekly: 'Еженедельно',
+        monthly: 'Ежемесячно',
+        quarterly: 'Ежеквартально',
+        semiannual: 'Раз в полгода',
+        annual: 'Ежегодно',
+      };
+      const periodLabel = labels[parentRepeat] || parentRepeat;
+      const formattedDate = formatDate(parentDate);
+      return `${periodLabel} с ${formattedDate}`;
+    }
+
+    // Если это родительская операция или обычная операция
     const labels: Record<string, string> = {
       none: '-',
       daily: 'Ежедневно',
@@ -264,17 +342,66 @@ export const OperationsPage = () => {
       semiannual: 'Раз в полгода',
       annual: 'Ежегодно',
     };
-    return labels[repeat] || repeat;
+    return labels[op.repeat] || op.repeat;
   };
 
   const handleClearFilters = () => {
     setTypeFilter('');
     setDateFromFilter('');
     setDateToFilter('');
+    setDateRangeStart(undefined);
+    setDateRangeEnd(undefined);
     setArticleIdFilter('');
     setCounterpartyIdFilter('');
     setDealIdFilter('');
     setDepartmentIdFilter('');
+    setAccountIdFilter('');
+  };
+
+  // Сбрасываем связанные фильтры при изменении родительских
+  useEffect(() => {
+    if (typeFilter !== 'expense' && articleIdFilter) {
+      const selectedArticle = articles.find((a) => a.id === articleIdFilter);
+      if (
+        selectedArticle &&
+        selectedArticle.type === 'expense' &&
+        typeFilter === 'income'
+      ) {
+        setArticleIdFilter('');
+      }
+    }
+  }, [typeFilter, articleIdFilter, articles]);
+
+  useEffect(() => {
+    if (!counterpartyIdFilter && dealIdFilter) {
+      const selectedDeal = deals.find((d) => d.id === dealIdFilter);
+      if (selectedDeal && selectedDeal.counterpartyId) {
+        // Если контрагент был удален, сбрасываем сделку
+        setDealIdFilter('');
+      }
+    } else if (counterpartyIdFilter && dealIdFilter) {
+      const selectedDeal = deals.find((d) => d.id === dealIdFilter);
+      if (
+        selectedDeal &&
+        selectedDeal.counterpartyId !== counterpartyIdFilter
+      ) {
+        setDealIdFilter('');
+      }
+    }
+  }, [counterpartyIdFilter, dealIdFilter, deals]);
+
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    setDateRangeStart(startDate);
+    setDateRangeEnd(endDate);
+    // Форматируем даты в формат YYYY-MM-DD для API
+    const formatDateForAPI = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    setDateFromFilter(formatDateForAPI(startDate));
+    setDateToFilter(formatDateForAPI(endDate));
   };
 
   const columns = [
@@ -337,7 +464,7 @@ export const OperationsPage = () => {
     {
       key: 'repeat',
       header: 'Периодичность',
-      render: (op: Operation) => getPeriodicityLabel(op.repeat),
+      render: (op: OperationWithRelations) => getPeriodicityLabel(op),
       width: '130px',
     },
     {
@@ -345,158 +472,235 @@ export const OperationsPage = () => {
       header: 'Действия',
       render: (op: Operation) => (
         <div className="flex gap-2">
-          {!op.isConfirmed && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleConfirm(op.id);
-              }}
-              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-              title="Подтвердить"
-            >
-              <Check size={16} />
-            </button>
+          {!op.isConfirmed ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConfirm(op.id);
+                }}
+                className="text-green-600 hover:text-green-800 dark:text-green-500 dark:hover:text-green-400 p-1 rounded hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                title="Подтвердить"
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReject(op.id);
+                }}
+                className="text-orange-600 hover:text-orange-800 dark:text-orange-500 dark:hover:text-orange-400 p-1 rounded hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors"
+                title="Отклонить"
+              >
+                <X size={16} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy(op);
+                }}
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                title="Копировать"
+              >
+                <Copy size={16} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(op.id);
+                }}
+                className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                title="Удалить"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
           )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(op);
-            }}
-            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
-            title="Изменить"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopy(op);
-            }}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-            title="Копировать"
-          >
-            <Copy size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(op.id);
-            }}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Удалить"
-          >
-            <Trash2 size={16} />
-          </button>
         </div>
       ),
-      width: '180px',
+      width: '120px',
     },
   ];
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
             Операции
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
             <RecurringOperations onEdit={handleEdit} />
-            <Button onClick={handleCreate}>Создать операцию</Button>
+            <Button
+              onClick={handleCreate}
+              size="sm"
+              className="text-sm sm:text-base whitespace-nowrap"
+            >
+              <span className="hidden sm:inline">Создать операцию</span>
+              <span className="sm:hidden">Создать</span>
+            </Button>
           </div>
         </div>
 
         <Card>
           <div className="mb-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Select
-                label="Тип"
-                value={typeFilter}
-                onChange={(e) =>
-                  setTypeFilter(
-                    e.target.value as 'income' | 'expense' | 'transfer' | ''
-                  )
-                }
-                options={[
-                  { value: '', label: 'Все типы' },
-                  { value: 'income', label: 'Поступление' },
-                  { value: 'expense', label: 'Списание' },
-                  { value: 'transfer', label: 'Перевод' },
-                ]}
-                placeholder="Выберите тип"
-                fullWidth={false}
-              />
-              <Input
-                label="Дата от"
-                type="date"
-                value={dateFromFilter}
-                onChange={(e) => setDateFromFilter(e.target.value)}
-                fullWidth={false}
-              />
-              <Input
-                label="Дата до"
-                type="date"
-                value={dateToFilter}
-                onChange={(e) => setDateToFilter(e.target.value)}
-                fullWidth={false}
-              />
-              <Select
-                label="Статья"
-                value={articleIdFilter}
-                onChange={(e) => setArticleIdFilter(e.target.value)}
-                options={[
-                  { value: '', label: 'Все статьи' },
-                  ...articles.map((a) => ({ value: a.id, label: a.name })),
-                ]}
-                placeholder="Выберите статью"
-                fullWidth={false}
-              />
-              <Select
-                label="Контрагент"
-                value={counterpartyIdFilter}
-                onChange={(e) => setCounterpartyIdFilter(e.target.value)}
-                options={[
-                  { value: '', label: 'Все контрагенты' },
-                  ...counterparties.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  })),
-                ]}
-                placeholder="Выберите контрагента"
-                fullWidth={false}
-              />
-              <Select
-                label="Сделка"
-                value={dealIdFilter}
-                onChange={(e) => setDealIdFilter(e.target.value)}
-                options={[
-                  { value: '', label: 'Все сделки' },
-                  ...deals.map((d) => ({ value: d.id, label: d.name })),
-                ]}
-                placeholder="Выберите сделку"
-                fullWidth={false}
-              />
-              <Select
-                label="Отдел"
-                value={departmentIdFilter}
-                onChange={(e) => setDepartmentIdFilter(e.target.value)}
-                options={[
-                  { value: '', label: 'Все отделы' },
-                  ...departments.map((d) => ({ value: d.id, label: d.name })),
-                ]}
-                placeholder="Выберите отдел"
-                fullWidth={false}
-              />
-              {hasActiveFilters && (
-                <div className="flex items-end">
-                  <Button
-                    onClick={handleClearFilters}
-                    className="btn-secondary flex items-center gap-2 w-full"
-                  >
-                    <X size={16} />
-                    Сбросить фильтры
-                  </Button>
+            {/* Основные фильтры - всегда видимы */}
+            <div className="space-y-3">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Основное
+              </div>
+              {/* На мобильных устройствах - горизонтальная прокрутка в один ряд */}
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 filters-scroll md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-4 md:overflow-x-visible md:pb-0 md:-mx-0 md:px-0">
+                <div className="flex-shrink-0 w-[200px] md:w-auto md:flex-shrink">
+                  <DateRangePicker
+                    startDate={dateRangeStart}
+                    endDate={dateRangeEnd}
+                    onChange={handleDateRangeChange}
+                    placeholder="Период"
+                  />
                 </div>
+                <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                  <Select
+                    value={typeFilter}
+                    onChange={(value) =>
+                      setTypeFilter(
+                        value as 'income' | 'expense' | 'transfer' | ''
+                      )
+                    }
+                    options={[
+                      { value: '', label: 'Тип операции' },
+                      { value: 'income', label: 'Поступление' },
+                      { value: 'expense', label: 'Списание' },
+                      { value: 'transfer', label: 'Перевод' },
+                    ]}
+                    placeholder="Тип операции"
+                    fullWidth={false}
+                  />
+                </div>
+                <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                  <Select
+                    value={articleIdFilter}
+                    onChange={(value) => setArticleIdFilter(value)}
+                    options={[
+                      { value: '', label: 'Статья' },
+                      ...filteredArticles.map((a) => ({
+                        value: a.id,
+                        label: a.name,
+                      })),
+                    ]}
+                    placeholder="Статья"
+                    fullWidth={false}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Дополнительные фильтры - показываются по кнопке */}
+            {showAdvancedFilters && (
+              <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Контекст
+                </div>
+                {/* На мобильных устройствах - горизонтальная прокрутка в один ряд */}
+                <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 filters-scroll md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-x-visible md:pb-0 md:-mx-0 md:px-0">
+                  <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                    <Select
+                      value={counterpartyIdFilter}
+                      onChange={(value) => {
+                        setCounterpartyIdFilter(value);
+                        // Сбрасываем сделку при смене контрагента
+                        if (!value) {
+                          setDealIdFilter('');
+                        }
+                      }}
+                      options={[
+                        { value: '', label: 'Контрагент' },
+                        ...counterparties.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                        })),
+                      ]}
+                      placeholder="Контрагент"
+                      fullWidth={false}
+                    />
+                  </div>
+                  <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                    <Select
+                      value={dealIdFilter}
+                      onChange={(value) => setDealIdFilter(value)}
+                      options={[
+                        { value: '', label: 'Сделка' },
+                        ...filteredDeals.map((d) => ({
+                          value: d.id,
+                          label: d.name,
+                        })),
+                      ]}
+                      placeholder="Сделка"
+                      fullWidth={false}
+                      disabled={
+                        !counterpartyIdFilter && filteredDeals.length === 0
+                      }
+                    />
+                  </div>
+                  <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                    <Select
+                      value={departmentIdFilter}
+                      onChange={(value) => setDepartmentIdFilter(value)}
+                      options={[
+                        { value: '', label: 'Отдел' },
+                        ...departments.map((d) => ({
+                          value: d.id,
+                          label: d.name,
+                        })),
+                      ]}
+                      placeholder="Отдел"
+                      fullWidth={false}
+                    />
+                  </div>
+                  <div className="flex-shrink-0 w-[160px] md:w-auto md:flex-shrink">
+                    <Select
+                      value={accountIdFilter}
+                      onChange={(value) => setAccountIdFilter(value)}
+                      options={[
+                        { value: '', label: 'Счёт' },
+                        ...accounts.map((a) => ({
+                          value: a.id,
+                          label: a.name,
+                        })),
+                      ]}
+                      placeholder="Счёт"
+                      fullWidth={false}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Кнопки управления фильтрами */}
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                variant="secondary"
+                size="sm"
+                className="text-sm"
+              >
+                {showAdvancedFilters
+                  ? 'Скрыть дополнительные'
+                  : 'Дополнительные фильтры'}
+              </Button>
+              {hasActiveFilters && (
+                <Button
+                  onClick={handleClearFilters}
+                  variant="secondary"
+                  size="sm"
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <X size={16} />
+                  <span>Сбросить фильтры</span>
+                </Button>
               )}
             </div>
           </div>
@@ -509,12 +713,127 @@ export const OperationsPage = () => {
               title="Нет операций"
               description="Создайте первую операцию, чтобы начать."
             />
+          ) : isMobile ? (
+            <div className="space-y-3">
+              {items.map((op, index) => (
+                <div
+                  key={op.id || `operation-${index}`}
+                  onClick={() => handleEdit(op)}
+                  className={`rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors ${
+                    !op.isConfirmed
+                      ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-300 dark:border-yellow-700'
+                      : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-500 dark:text-zinc-400">
+                      {formatDate(op.operationDate)}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {getOperationTypeLabel(op.type)} —{' '}
+                      {formatMoney(op.amount, op.currency)}
+                    </span>
+                  </div>
+
+                  <div className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
+                    <div>
+                      <span className="text-gray-500 dark:text-zinc-400">
+                        Статья:
+                      </span>{' '}
+                      {op.article?.name || '-'}
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-zinc-400">
+                        Счёт:
+                      </span>{' '}
+                      {op.type === 'transfer'
+                        ? `${op.sourceAccount?.name || '-'} → ${
+                            op.targetAccount?.name || '-'
+                          }`
+                        : op.account?.name || '-'}
+                    </div>
+                    {(op.repeat !== 'none' || op.recurrenceParentId) && (
+                      <div>
+                        <span className="text-gray-500 dark:text-zinc-400">
+                          Периодичность:
+                        </span>{' '}
+                        {getPeriodicityLabel(op)}
+                      </div>
+                    )}
+                    {op.description && (
+                      <div>
+                        <span className="text-gray-500 dark:text-zinc-400">
+                          Описание:
+                        </span>{' '}
+                        {op.description}
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className="flex justify-end gap-3 mt-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {!op.isConfirmed ? (
+                      <>
+                        <button
+                          onClick={() => handleConfirm(op.id)}
+                          title="Подтвердить"
+                          className="p-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded transition-colors"
+                        >
+                          <Check
+                            size={16}
+                            className="text-green-600 dark:text-green-500"
+                          />
+                        </button>
+                        <button
+                          onClick={() => handleReject(op.id)}
+                          title="Отклонить"
+                          className="p-2 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 rounded transition-colors"
+                        >
+                          <X
+                            size={16}
+                            className="text-orange-600 dark:text-orange-500"
+                          />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleCopy(op)}
+                          title="Копировать"
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                        >
+                          <Copy
+                            size={16}
+                            className="text-blue-500 dark:text-blue-300"
+                          />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(op.id)}
+                          title="Удалить"
+                          className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded transition-colors"
+                        >
+                          <Trash2
+                            size={16}
+                            className="text-red-600 dark:text-red-500"
+                          />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <Table
               columns={columns}
               data={items}
-              keyExtractor={(op) => op.id}
-              rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
+              keyExtractor={(op, index) => op.id || `operation-${index}`}
+              rowClassName={(op) =>
+                !op.isConfirmed ? 'bg-yellow-50 dark:bg-yellow-950/30' : ''
+              }
+              onRowClick={handleEdit}
             />
           )}
           <BulkActionsBar
