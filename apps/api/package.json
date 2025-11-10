@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc && node scripts/add-js-extensions.js",
+    "build": "tsc && node scripts/add-js-extensions.js && node scripts/copy-templates.js",
     "start": "node dist/server.js",
     "test": "jest",
     "test:watch": "jest --watch",

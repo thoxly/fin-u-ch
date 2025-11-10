@@ -2,12 +2,14 @@ import nodemailer from 'nodemailer';
 import { env } from '../../config/env';
 import logger from '../../config/logger';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
   secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
+  requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
@@ -29,6 +31,9 @@ export interface EmailOptions {
 
 function loadTemplate(templateName: EmailTemplate): string {
   try {
+    // Определяем __dirname для ES modules
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const templatePath = join(__dirname, 'templates', `${templateName}.html`);
     return readFileSync(templatePath, 'utf-8');
   } catch (error) {
@@ -54,7 +59,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     const html = replaceVariables(template, options.variables);
 
     await transporter.sendMail({
-      from: `"Vecta — Финучёт" <${env.SMTP_USER}>`,
+      from: `"Vecta — Финучёт" <${env.SMTP_FROM}>`,
       to: options.to,
       subject: options.subject,
       html,

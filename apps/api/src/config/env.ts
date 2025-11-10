@@ -1,15 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-// Определяем корень проекта (монорепо)
-// apps/api/src/config -> apps/api -> корень проекта
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const rootPath = path.resolve(__dirname, '../../..');
-
-// Load .env from monorepo root
-dotenv.config({ path: path.resolve(rootPath, '.env') });
+// Load .env from monorepo root (current working directory)
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -26,4 +19,5 @@ export const env = {
     process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
+  SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || '',
 };
