@@ -11,6 +11,7 @@ import TableSkeleton from '../shared/ui/TableSkeleton';
 import { EmptyState } from '../shared/ui/EmptyState';
 import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
+import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import {
@@ -66,6 +67,18 @@ export const OperationsPage = () => {
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+
+  // Состояния для модалок подтверждения удаления
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    type: 'delete' | 'reject' | 'bulk';
+    ids?: string[];
+  }>({
+    isOpen: false,
+    id: null,
+    type: 'delete',
+  });
 
   // Фильтры
   const [typeFilter, setTypeFilter] = useState<
@@ -242,6 +255,7 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const {
       id: _id,
       createdAt: _createdAt,
@@ -255,16 +269,19 @@ export const OperationsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту операцию?')) {
-      try {
-        await deleteOperation(id).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
-        await reloadOperationsData();
-      } catch (error) {
-        console.error('Failed to delete operation:', error);
-        showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
-      }
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id, type: 'delete' });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    try {
+      await deleteOperation(deleteModal.id).unwrap();
+      showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
+      await reloadOperationsData();
+    } catch (error) {
+      console.error('Failed to delete operation:', error);
+      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
     }
   };
 
@@ -279,17 +296,44 @@ export const OperationsPage = () => {
     }
   };
 
-  const handleReject = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите отклонить эту операцию?')) {
-      try {
-        await deleteOperation(id).unwrap();
-        showSuccess('Операция отклонена');
-        await reloadOperationsData();
-      } catch (error) {
-        console.error('Failed to reject operation:', error);
-        showError('Ошибка при отклонении операции');
-      }
+  const handleReject = (id: string) => {
+    setDeleteModal({ isOpen: true, id, type: 'reject' });
+  };
+
+  const confirmReject = async () => {
+    if (!deleteModal.id) return;
+    try {
+      await deleteOperation(deleteModal.id).unwrap();
+      showSuccess('Операция отклонена');
+      await reloadOperationsData();
+    } catch (error) {
+      console.error('Failed to reject operation:', error);
+      showError('Ошибка при отклонении операции');
     }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!deleteModal.ids || deleteModal.ids.length === 0) return;
+    try {
+      await bulkDeleteOperations(deleteModal.ids).unwrap();
+      await reloadOperationsData();
+      showSuccess(NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS);
+      clearSelection();
+    } catch (error) {
+      console.error('Failed to bulk delete operations:', error);
+      showError('Ошибка при удалении операций');
+    }
+  };
+
+  const handleModalConfirm = async () => {
+    if (deleteModal.type === 'delete') {
+      await confirmDelete();
+    } else if (deleteModal.type === 'reject') {
+      await confirmReject();
+    } else if (deleteModal.type === 'bulk') {
+      await confirmBulkDelete();
+    }
+    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
   };
 
   const handleCloseForm = async () => {
@@ -843,23 +887,13 @@ export const OperationsPage = () => {
               {
                 label: `Удалить выбранные (${selectedIds.length})`,
                 variant: 'danger',
-                onClick: async () => {
-                  if (
-                    window.confirm(
-                      `Удалить выбранные операции (${selectedIds.length})?`
-                    )
-                  ) {
-                    try {
-                      await bulkDeleteOperations(selectedIds).unwrap();
-                      await reloadOperationsData();
-                      showSuccess(
-                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
-                      );
-                    } catch (error) {
-                      console.error('Failed to bulk delete operations:', error);
-                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
-                    }
-                  }
+                onClick: () => {
+                  setDeleteModal({
+                    isOpen: true,
+                    id: null,
+                    type: 'bulk',
+                    ids: selectedIds,
+                  });
                 },
               },
             ]}
@@ -877,7 +911,7 @@ export const OperationsPage = () => {
                 ? 'Редактировать операцию'
                 : 'Создать операцию'
           }
-          size="lg"
+          size="2xl"
         >
           <OperationForm
             operation={editingOperation}
@@ -885,6 +919,36 @@ export const OperationsPage = () => {
             onClose={handleCloseForm}
           />
         </Modal>
+
+        <ConfirmDeleteModal
+          isOpen={deleteModal.isOpen}
+          onClose={() =>
+            setDeleteModal({ isOpen: false, id: null, type: 'delete' })
+          }
+          onConfirm={handleModalConfirm}
+          title={
+            deleteModal.type === 'reject'
+              ? 'Подтверждение отклонения'
+              : deleteModal.type === 'bulk'
+                ? 'Подтверждение удаления'
+                : 'Подтверждение удаления'
+          }
+          message={
+            deleteModal.type === 'reject'
+              ? 'Вы уверены, что хотите отклонить эту операцию?'
+              : deleteModal.type === 'bulk'
+                ? `Вы уверены, что хотите удалить выбранные операции (${deleteModal.ids?.length || 0})?`
+                : 'Вы уверены, что хотите удалить эту операцию?'
+          }
+          confirmText={
+            deleteModal.type === 'reject'
+              ? 'Отклонить'
+              : deleteModal.type === 'bulk'
+                ? `Удалить ${deleteModal.ids?.length || 0}`
+                : 'Удалить'
+          }
+          variant={deleteModal.type === 'reject' ? 'warning' : 'delete'}
+        />
       </div>
     </Layout>
   );

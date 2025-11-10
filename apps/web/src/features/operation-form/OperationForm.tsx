@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useMemo, useEffect } from 'react';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import { Button } from '../../shared/ui/Button';
@@ -22,6 +22,8 @@ import {
   formatAmountInput,
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { InfoHint } from '../../shared/ui/InfoHint';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -104,12 +106,32 @@ export const OperationForm = ({
   );
   const [recurrenceEndDate, setRecurrenceEndDate] =
     useState(getInitialEndDate());
+  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
 
   const { data: articles = [] } = useGetArticlesQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
+
+  // Фильтрация сделок по выбранному контрагенту
+  const filteredDeals = useMemo(() => {
+    if (!counterpartyId) return deals;
+    return deals.filter((deal) => deal.counterpartyId === counterpartyId);
+  }, [deals, counterpartyId]);
+
+  // Сброс сделки при изменении контрагента
+  useEffect(() => {
+    if (counterpartyId && dealId) {
+      const currentDeal = deals.find((d) => d.id === dealId);
+      if (currentDeal && currentDeal.counterpartyId !== counterpartyId) {
+        setDealId('');
+      }
+    }
+  }, [counterpartyId, dealId, deals]);
 
   const [createOperation, { isLoading: isCreating }] =
     useCreateOperationMutation();
@@ -120,6 +142,56 @@ export const OperationForm = ({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    // Очищаем предыдущие ошибки
+    setValidationErrors({});
+
+    const errors: Record<string, string> = {};
+
+    // Валидация обязательных полей
+    if (!operationDate) {
+      errors.operationDate = 'Поле "Дата" обязательно для заполнения';
+    }
+
+    if (!amount || amount.trim() === '') {
+      errors.amount = 'Поле "Сумма" обязательно для заполнения';
+    } else {
+      const amountNumber = parseAmountInputToNumber(amount);
+      if (isNaN(amountNumber) || amountNumber <= 0) {
+        errors.amount = 'Сумма должна быть положительным числом';
+      }
+    }
+
+    if (!currency) {
+      errors.currency = 'Поле "Валюта" обязательно для заполнения';
+    }
+
+    // Валидация в зависимости от типа операции
+    if (type === OperationType.TRANSFER) {
+      if (!sourceAccountId) {
+        errors.sourceAccountId =
+          'Поле "Счет списания" обязательно для заполнения';
+      }
+      if (!targetAccountId) {
+        errors.targetAccountId =
+          'Поле "Счет зачисления" обязательно для заполнения';
+      }
+    } else {
+      if (!articleId) {
+        errors.articleId = 'Поле "Статья" обязательно для заполнения';
+      }
+      if (!accountId) {
+        errors.accountId = 'Поле "Счет" обязательно для заполнения';
+      }
+    }
+
+    // Если есть ошибки валидации, показываем их
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      const errorMessages = Object.values(errors).join(', ');
+      showError(`Не заполнены обязательные поля: ${errorMessages}`);
+      return;
+    }
 
     const amountNumber = parseAmountInputToNumber(amount);
     const operationData: CreateOperationDTO = {
@@ -217,13 +289,63 @@ export const OperationForm = ({
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
       }
       onClose();
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to save operation:', error);
-      showError(
-        operation?.id && !isCopy
-          ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR
-      );
+
+      // Обработка ошибок валидации от API
+      if (
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data
+      ) {
+        const apiError = String(error.data.message);
+
+        // Переводим известные ошибки на русский
+        if (apiError.includes('accountId and articleId are required')) {
+          const apiErrors: Record<string, string> = {};
+          if (!articleId)
+            apiErrors.articleId = 'Поле "Статья" обязательно для заполнения';
+          if (!accountId)
+            apiErrors.accountId = 'Поле "Счет" обязательно для заполнения';
+          setValidationErrors(apiErrors);
+          showError('Не заполнены обязательные поля: Статья, Счет');
+          return;
+        }
+
+        if (
+          apiError.includes('sourceAccountId and targetAccountId are required')
+        ) {
+          const apiErrors: Record<string, string> = {};
+          if (!sourceAccountId)
+            apiErrors.sourceAccountId =
+              'Поле "Счет списания" обязательно для заполнения';
+          if (!targetAccountId)
+            apiErrors.targetAccountId =
+              'Поле "Счет зачисления" обязательно для заполнения';
+          setValidationErrors(apiErrors);
+          showError(
+            'Не заполнены обязательные поля: Счет списания, Счет зачисления'
+          );
+          return;
+        }
+
+        // Общая ошибка
+        showError(
+          apiError ||
+            (operation?.id && !isCopy
+              ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
+              : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR)
+        );
+      } else {
+        showError(
+          operation?.id && !isCopy
+            ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
+            : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR
+        );
+      }
     }
   };
 
@@ -250,184 +372,370 @@ export const OperationForm = ({
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Тип операции"
-          value={type}
-          onChange={(value) => setType(value as OperationType)}
-          options={typeOptions}
-          required
-        />
-
-        <Input
-          label="Дата"
-          type="date"
-          value={operationDate}
-          onChange={(e) => setOperationDate(e.target.value)}
-          required
-        />
-
-        <Input
-          label="Сумма"
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(formatAmountInput(e.target.value))}
-          placeholder="0"
-          required
-        />
-
-        <Select
-          label="Валюта"
-          value={currency}
-          onChange={(value) => setCurrency(value)}
-          options={currencyOptions}
-          required
-        />
-      </div>
-
-      {type === OperationType.TRANSFER ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Счет списания"
-            value={sourceAccountId}
-            onChange={(value) => setSourceAccountId(value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-            required
-          />
-          <Select
-            label="Счет зачисления"
-            value={targetAccountId}
-            onChange={(value) => setTargetAccountId(value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-            required
-          />
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex flex-col h-full min-h-0 px-6 py-4"
+    >
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+        {/* Блок A: Основное */}
+        <div className="space-y-4 mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            Основное
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Select
+              label="Тип операции"
+              value={type}
+              onChange={(value) => {
+                setType(value as OperationType);
+                // Очищаем ошибки при изменении типа операции
+                setValidationErrors({});
+              }}
+              options={typeOptions}
+              required
+            />
+            <Input
+              label="Дата"
+              type="date"
+              value={operationDate}
+              onChange={(e) => {
+                setOperationDate(e.target.value);
+                if (validationErrors.operationDate) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.operationDate;
+                    return newErrors;
+                  });
+                }
+              }}
+              error={validationErrors.operationDate}
+              required
+            />
+            <Input
+              label="Сумма"
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => {
+                setAmount(formatAmountInput(e.target.value));
+                if (validationErrors.amount) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.amount;
+                    return newErrors;
+                  });
+                }
+              }}
+              placeholder="0"
+              error={validationErrors.amount}
+              required
+            />
+            <Select
+              label="Валюта"
+              value={currency}
+              onChange={(value) => {
+                setCurrency(value);
+                if (validationErrors.currency) {
+                  setValidationErrors((prev) => {
+                    const newErrors = { ...prev };
+                    delete newErrors.currency;
+                    return newErrors;
+                  });
+                }
+              }}
+              options={currencyOptions}
+              error={validationErrors.currency}
+              required
+            />
+          </div>
         </div>
-      ) : (
-        <>
-          <Select
-            label="Статья"
-            value={articleId}
-            onChange={(value) => setArticleId(value)}
-            options={articles
-              .filter((a) => a.type === type)
-              .map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите статью"
-          />
 
-          <Select
-            label="Счет"
-            value={accountId}
-            onChange={(value) => setAccountId(value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-          />
-        </>
-      )}
+        {/* Блок B: Финансовые параметры */}
+        <div className="space-y-4 mb-6">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+            Финансовые параметры
+          </h3>
+          {type === OperationType.TRANSFER ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select
+                label="Счет списания"
+                value={sourceAccountId}
+                onChange={(value) => {
+                  setSourceAccountId(value);
+                  if (validationErrors.sourceAccountId) {
+                    setValidationErrors((prev) => {
+                      const newErrors = { ...prev };
+                      delete newErrors.sourceAccountId;
+                      return newErrors;
+                    });
+                  }
+                }}
+                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+                placeholder="Выберите счет"
+                error={validationErrors.sourceAccountId}
+                required
+              />
+              <Select
+                label="Счет зачисления"
+                value={targetAccountId}
+                onChange={(value) => {
+                  setTargetAccountId(value);
+                  if (validationErrors.targetAccountId) {
+                    setValidationErrors((prev) => {
+                      const newErrors = { ...prev };
+                      delete newErrors.targetAccountId;
+                      return newErrors;
+                    });
+                  }
+                }}
+                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+                placeholder="Выберите счет"
+                error={validationErrors.targetAccountId}
+                required
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select
+                label="Статья"
+                value={articleId}
+                onChange={(value) => {
+                  setArticleId(value);
+                  if (validationErrors.articleId) {
+                    setValidationErrors((prev) => {
+                      const newErrors = { ...prev };
+                      delete newErrors.articleId;
+                      return newErrors;
+                    });
+                  }
+                }}
+                options={articles
+                  .filter((a) => a.type === type)
+                  .map((a) => ({ value: a.id, label: a.name }))}
+                placeholder="Выберите статью"
+                error={validationErrors.articleId}
+                required
+              />
+              <Select
+                label="Счет"
+                value={accountId}
+                onChange={(value) => {
+                  setAccountId(value);
+                  if (validationErrors.accountId) {
+                    setValidationErrors((prev) => {
+                      const newErrors = { ...prev };
+                      delete newErrors.accountId;
+                      return newErrors;
+                    });
+                  }
+                }}
+                options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+                placeholder="Выберите счет"
+                error={validationErrors.accountId}
+                required
+              />
+              <Select
+                label="Контрагент"
+                value={counterpartyId}
+                onChange={(value) => setCounterpartyId(value)}
+                options={counterparties.map((c) => ({
+                  value: c.id,
+                  label: c.name,
+                }))}
+                placeholder="Не выбран"
+              />
+              <Select
+                label="Сделка"
+                value={dealId}
+                onChange={(value) => setDealId(value)}
+                options={filteredDeals.map((d) => ({
+                  value: d.id,
+                  label: d.name,
+                }))}
+                placeholder={
+                  counterpartyId
+                    ? 'Не выбрана'
+                    : filteredDeals.length === 0
+                      ? 'Нет доступных сделок'
+                      : 'Выберите сделку'
+                }
+                disabled={filteredDeals.length === 0}
+              />
+              <Select
+                label="Подразделение"
+                value={departmentId}
+                onChange={(value) => setDepartmentId(value)}
+                options={departments.map((d) => ({
+                  value: d.id,
+                  label: d.name,
+                }))}
+                placeholder="Не выбрано"
+              />
+            </div>
+          )}
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Select
-          label="Контрагент"
-          value={counterpartyId}
-          onChange={(value) => setCounterpartyId(value)}
-          options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder="Не выбран"
-        />
+        {/* Блок C: Дополнительно (сворачиваемый) */}
+        <div className="space-y-4 mb-6">
+          <button
+            type="button"
+            onClick={() => setShowAdditionalFields(!showAdditionalFields)}
+            className="flex items-center justify-between w-full text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <span>Дополнительно</span>
+            {showAdditionalFields ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+          {showAdditionalFields && (
+            <div className="space-y-4 pt-2">
+              <Input
+                label="Описание"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Дополнительная информация"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Периодичность
+                    </label>
+                    <InfoHint
+                      content={
+                        <div className="space-y-3 text-xs leading-relaxed">
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
+                              Зачем это нужно?
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              Периодичность позволяет автоматически создавать
+                              повторяющиеся операции (например, зарплата каждый
+                              месяц, аренда каждый квартал).
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
+                              Как использовать?
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              Выберите частоту повтора (ежедневно, еженедельно,
+                              ежемесячно и т.д.). Опционально укажите дату
+                              окончания — если не указать, операции будут
+                              создаваться бесконечно.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
+                              Что будет после создания?
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              Система создаст шаблон операции и будет
+                              автоматически генерировать операции по выбранному
+                              расписанию. Каждая операция появится в списке в
+                              день, указанный в шаблоне.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white mb-1">
+                              Обновление операций
+                            </p>
+                            <p className="text-gray-700 dark:text-gray-300">
+                              При редактировании повторяющейся операции вы
+                              можете обновить только текущую или все последующие
+                              операции (это изменит шаблон).
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      className="ml-1"
+                    />
+                  </div>
+                  <Select
+                    label=""
+                    value={repeat}
+                    onChange={(value) => setRepeat(value as Periodicity)}
+                    options={repeatOptions}
+                  />
+                </div>
+                {repeat !== Periodicity.NONE && (
+                  <Input
+                    label="Дата окончания повторов"
+                    type="date"
+                    value={recurrenceEndDate}
+                    onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                    placeholder="Не указана (бесконечно)"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
-        <Select
-          label="Сделка"
-          value={dealId}
-          onChange={(value) => setDealId(value)}
-          options={deals.map((d) => ({ value: d.id, label: d.name }))}
-          placeholder="Не выбрана"
-        />
-
-        <Select
-          label="Подразделение"
-          value={departmentId}
-          onChange={(value) => setDepartmentId(value)}
-          options={departments.map((d) => ({ value: d.id, label: d.name }))}
-          placeholder="Не выбрано"
-        />
-      </div>
-
-      <Input
-        label="Описание"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Дополнительная информация"
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Периодичность"
-          value={repeat}
-          onChange={(value) => setRepeat(value as Periodicity)}
-          options={repeatOptions}
-        />
-
-        {repeat !== Periodicity.NONE && (
-          <Input
-            label="Дата окончания повторов"
-            type="date"
-            value={recurrenceEndDate}
-            onChange={(e) => setRecurrenceEndDate(e.target.value)}
-            placeholder="Не указана (бесконечно)"
-          />
+        {/* Выбор области обновления для дочерних операций */}
+        {isChildOperation && (
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-6">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Обновить:
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="updateScope"
+                  value="current"
+                  checked={updateScope === 'current'}
+                  onChange={(e) =>
+                    setUpdateScope(e.target.value as 'current' | 'all')
+                  }
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Только текущую операцию
+                </span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="updateScope"
+                  value="all"
+                  checked={updateScope === 'all'}
+                  onChange={(e) =>
+                    setUpdateScope(e.target.value as 'current' | 'all')
+                  }
+                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Все последующие операции (изменит шаблон)
+                </span>
+              </label>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Выбор области обновления для дочерних операций */}
-      {isChildOperation && (
-        <div className="border-t pt-4">
-          <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Обновить:
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="updateScope"
-                value="current"
-                checked={updateScope === 'current'}
-                onChange={(e) =>
-                  setUpdateScope(e.target.value as 'current' | 'all')
-                }
-                className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Только текущую операцию
-              </span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="updateScope"
-                value="all"
-                checked={updateScope === 'all'}
-                onChange={(e) =>
-                  setUpdateScope(e.target.value as 'current' | 'all')
-                }
-                className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                Все последующие операции (изменит шаблон)
-              </span>
-            </label>
-          </div>
+      {/* Sticky Footer с кнопками */}
+      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <Button
+            type="submit"
+            disabled={isCreating || isUpdating}
+            className="flex-1 sm:flex-none"
+          >
+            {operation?.id && !isCopy ? 'Сохранить' : 'Создать'}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            className="flex-1 sm:flex-none"
+          >
+            Отмена
+          </Button>
         </div>
-      )}
-
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
-          {operation?.id && !isCopy ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
       </div>
     </form>
   );
