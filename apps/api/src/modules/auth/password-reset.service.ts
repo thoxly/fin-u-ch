@@ -23,15 +23,15 @@ export class PasswordResetService {
 
     if (!user) {
       // Не раскрываем, существует ли пользователь
-      // Логируем попытку для безопасности
-      logger.warn(`Password reset requested for non-existent email: ${email}`);
+      // Логируем попытку для безопасности без чувствительной информации
+      logger.warn('Password reset requested for non-existent email');
       return;
     }
 
     if (!user.isActive) {
-      logger.warn(
-        `Password reset requested for inactive user: ${user.id} (${email})`
-      );
+      logger.warn('Password reset requested for inactive user', {
+        userId: user.id,
+      });
       throw new AppError('User account is inactive', 403);
     }
 
@@ -41,13 +41,12 @@ export class PasswordResetService {
         type: 'password_reset',
       });
       await sendPasswordResetEmail(user.email, resetToken);
-      logger.info(`Password reset email sent to ${user.email}`, {
+      logger.info('Password reset email sent', {
         userId: user.id,
       });
     } catch (error) {
       logger.error('Failed to send password reset email', {
         userId: user.id,
-        email: user.email,
         error,
       });
       throw new AppError('Failed to send password reset email', 500);
@@ -106,7 +105,9 @@ export class PasswordResetService {
     // Отправляем уведомление об изменении пароля
     try {
       await sendPasswordChangedEmail(user.email);
-      logger.info(`Password changed notification sent to ${user.email}`);
+      logger.info('Password changed notification sent', {
+        userId: validation.userId,
+      });
     } catch (error) {
       logger.error('Failed to send password changed email', {
         userId: validation.userId,
@@ -115,9 +116,8 @@ export class PasswordResetService {
       // Не блокируем сброс пароля, если письмо не отправилось
     }
 
-    logger.info(`Password reset successfully for user ${validation.userId}`, {
+    logger.info('Password reset successfully', {
       userId: validation.userId,
-      email: user.email,
     });
   }
 }

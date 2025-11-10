@@ -164,25 +164,44 @@ export class UsersService {
       throw new AppError('Email already in use', 409);
     }
 
+    // Используем транзакцию для атомарности процесса смены email
+    let oldEmailToken: string | null = null;
     try {
-      // Отправляем письмо на старый email для подтверждения
-      const oldEmailToken = await tokenService.createToken({
+      // Создаем токен (tokenService создает его в БД)
+      oldEmailToken = await tokenService.createToken({
         userId: user.id,
         type: 'email_change_old',
         metadata: { newEmail },
       });
-      await sendEmailChangeOldVerificationEmail(
-        user.email,
-        newEmail,
-        oldEmailToken
-      );
-      logger.info(
-        `Email change verification sent to old email ${user.email} for user ${userId}`
-      );
+
+      // Отправляем письмо на старый email для подтверждения
+      // Если отправка не удастся, удалим токен
+      try {
+        await sendEmailChangeOldVerificationEmail(
+          user.email,
+          newEmail,
+          oldEmailToken
+        );
+        logger.info('Email change verification sent to old email', {
+          userId,
+        });
+      } catch (emailError) {
+        // Если отправка email не удалась, удаляем созданный токен
+        if (oldEmailToken) {
+          try {
+            await tokenService.markTokenAsUsed(oldEmailToken);
+          } catch (deleteError) {
+            logger.error('Failed to cleanup token after email send failure', {
+              userId,
+              error: deleteError,
+            });
+          }
+        }
+        throw emailError;
+      }
     } catch (error) {
       logger.error('Failed to send email change verification', {
         userId,
-        newEmail,
         error,
       });
       throw new AppError('Failed to send verification email', 500);
@@ -216,24 +235,48 @@ export class UsersService {
       throw new AppError('Email already in use', 409);
     }
 
-    // Помечаем токен старого email как использованный
-    await tokenService.markTokenAsUsed(token);
-
-    // Отправляем письмо на новый email для подтверждения
+    // Используем транзакцию для атомарности процесса
+    let newEmailToken: string | null = null;
     try {
-      const newEmailToken = await tokenService.createToken({
+      await prisma.$transaction(async (tx) => {
+        // Помечаем токен старого email как использованный в транзакции
+        await tx.emailToken.update({
+          where: { token },
+          data: { used: true },
+        });
+      });
+
+      // Создаем токен для нового email
+      newEmailToken = await tokenService.createToken({
         userId: validation.userId,
         type: 'email_change_new',
         metadata: { newEmail },
       });
-      await sendEmailChangeVerificationEmail(newEmail, newEmailToken);
-      logger.info(
-        `Email change verification sent to new email ${newEmail} for user ${validation.userId}`
-      );
+
+      // Отправляем письмо на новый email для подтверждения
+      // Если отправка не удастся, удалим токен
+      try {
+        await sendEmailChangeVerificationEmail(newEmail, newEmailToken);
+        logger.info('Email change verification sent to new email', {
+          userId: validation.userId,
+        });
+      } catch (emailError) {
+        // Если отправка email не удалась, удаляем созданный токен
+        if (newEmailToken) {
+          try {
+            await tokenService.markTokenAsUsed(newEmailToken);
+          } catch (deleteError) {
+            logger.error('Failed to cleanup token after email send failure', {
+              userId: validation.userId,
+              error: deleteError,
+            });
+          }
+        }
+        throw emailError;
+      }
     } catch (error) {
       logger.error('Failed to send email change verification to new email', {
         userId: validation.userId,
-        newEmail,
         error,
       });
       throw new AppError(
@@ -282,7 +325,9 @@ export class UsersService {
       await tokenService.markTokenAsUsed(token);
     });
 
-    logger.info(`Email changed for user ${validation.userId} to ${newEmail}`);
+    logger.info('Email changed successfully', {
+      userId: validation.userId,
+    });
   }
 }
 
