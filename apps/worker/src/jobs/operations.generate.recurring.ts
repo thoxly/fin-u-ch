@@ -9,7 +9,7 @@ interface GenerateRecurringParams {
 /**
  * Генерирует периодические операции на указанную дату
  *
- * Для каждой операции-шаблона (repeat !== 'none' и recurrenceParentId === null)
+ * Для каждой операции-шаблона (isTemplate: true с периодичностью)
  * проверяет, нужна ли новая операция на целевую дату, и создает ее если нужно
  */
 export async function generateRecurringOperations(
@@ -26,12 +26,12 @@ export async function generateRecurringOperations(
   );
 
   try {
-    // Находим все операции-шаблоны (родительские операции с периодичностью)
+    // Находим все операции-шаблоны (isTemplate: true с периодичностью)
     const templateOperations = await prisma.operation.findMany({
       where: {
         ...(companyId && { companyId }),
         repeat: { not: 'none' },
-        recurrenceParentId: null,
+        isTemplate: true,
         // Проверяем, что шаблон еще активен (дата окончания не наступила)
         OR: [
           { recurrenceEndDate: null },
@@ -112,13 +112,12 @@ export async function generateRecurringOperations(
               counterpartyId: template.counterpartyId,
               dealId: template.dealId,
               departmentId: template.departmentId,
-              description: template.description
-                ? `${template.description} (автоматически)`
-                : 'Периодическая операция',
+              description: template.description, // Копируем описание как есть, без изменений
               repeat: 'none', // Дочерняя операция не повторяется
               recurrenceParentId: template.id,
               recurrenceEndDate: null,
               isConfirmed: false, // Требует подтверждения
+              isTemplate: false, // Реальная операция
             },
           });
         });
