@@ -7,7 +7,7 @@ import { join } from 'path';
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
   port: env.SMTP_PORT,
-  secure: true, // обязательно для 465
+  secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
   auth: {
     user: env.SMTP_USER,
     pass: env.SMTP_PASS,
