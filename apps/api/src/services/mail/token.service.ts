@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { Prisma } from '@prisma/client';
 import prisma from '../../config/db';
 import logger from '../../config/logger';
 
@@ -54,7 +55,7 @@ export class TokenService {
         token,
         type,
         expiresAt,
-        metadata: metadata ? metadata : undefined,
+        metadata: metadata ? (metadata as Prisma.InputJsonValue) : undefined,
       },
     });
 
