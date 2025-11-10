@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
+import { Pencil, Trash2, X, Copy, Check, Upload } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -13,6 +13,7 @@ import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
+import { BankImportModal } from '../features/bank-import/BankImportModal';
 import {
   useLazyGetOperationsQuery,
   useDeleteOperationMutation,
@@ -55,10 +56,30 @@ export const OperationsPage = () => {
   };
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+
+  // Проверяем, есть ли сохраненное состояние импорта при монтировании страницы
+  useEffect(() => {
+    const stored = localStorage.getItem('bankImportModal_state');
+    if (stored) {
+      try {
+        const state = JSON.parse(stored);
+        const now = Date.now();
+        const hoursPassed = (now - state.timestamp) / (1000 * 60 * 60);
+
+        // Если прошло меньше 24 часов и есть сессия, открываем модальное окно
+        if (hoursPassed < 24 && state.sessionId) {
+          setIsImportModalOpen(true);
+        }
+      } catch (error) {
+        console.error('Failed to load import modal state:', error);
+      }
+    }
+  }, []);
 
   // Фильтры
   const [typeFilter, setTypeFilter] = useState<
@@ -402,7 +423,18 @@ export const OperationsPage = () => {
           </h1>
           <div className="flex items-center gap-3">
             <RecurringOperations onEdit={handleEdit} />
-            <Button onClick={handleCreate}>Создать операцию</Button>
+            <Button
+              onClick={() => setIsImportModalOpen(true)}
+              className="btn-secondary h-10 px-4 flex items-center justify-center"
+            >
+              <Upload size={16} />
+            </Button>
+            <Button
+              onClick={handleCreate}
+              className="h-10 px-4 flex items-center justify-center"
+            >
+              Создать операцию
+            </Button>
           </div>
         </div>
 
@@ -566,6 +598,11 @@ export const OperationsPage = () => {
             onClose={handleCloseForm}
           />
         </Modal>
+
+        <BankImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+        />
       </div>
     </Layout>
   );

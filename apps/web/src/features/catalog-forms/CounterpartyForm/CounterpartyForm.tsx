@@ -6,36 +6,52 @@ import {
 import { Counterparty } from '@shared/types/catalogs';
 import { useState, useEffect } from 'react';
 
+interface CounterpartyFormProps {
+  counterparty: Counterparty | null;
+  onClose: () => void;
+  onSuccess?: (createdId: string) => void;
+  initialName?: string;
+  initialInn?: string;
+}
+
 export const CounterpartyForm = ({
   counterparty,
   onClose,
-}: {
-  counterparty: Counterparty | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(counterparty?.name || '');
-  const [inn, setInn] = useState(counterparty?.inn || '');
+  onSuccess,
+  initialName = '',
+  initialInn = '',
+}: CounterpartyFormProps) => {
+  const [name, setName] = useState(counterparty?.name || initialName);
+  const [inn, setInn] = useState(counterparty?.inn || initialInn);
   const [category, setCategory] = useState(counterparty?.category || 'other');
   const [create, { isLoading: isCreating }] = useCreateCounterpartyMutation();
   const [update, { isLoading: isUpdating }] = useUpdateCounterpartyMutation();
 
-  // Синхронизация локального состояния с пропсом counterparty
   useEffect(() => {
-    setName(counterparty?.name || '');
-    setInn(counterparty?.inn || '');
+    setName(counterparty?.name || initialName);
+    setInn(counterparty?.inn || initialInn);
     setCategory(counterparty?.category || 'other');
-  }, [counterparty]); // Зависимость от counterparty
+  }, [counterparty, initialName, initialInn]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (counterparty)
+      if (counterparty) {
         await update({
           id: counterparty.id,
           data: { name, inn, category },
         }).unwrap();
-      else await create({ name, inn, category }).unwrap();
-      onClose();
+      } else {
+        const result = await create({ name, inn, category }).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
+      }
+      if (counterparty) {
+        onClose();
+      }
     } catch (error) {
       console.error('Failed to save counterparty:', error);
     }

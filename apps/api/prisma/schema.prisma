@@ -8,38 +8,43 @@ datasource db {
 }
 
 model Company {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   name         String
-  currencyBase String   @default("RUB")
-  uiSettings   Json?    // UI preferences: navigation icons, theme, etc.
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  currencyBase String    @default("RUB")
+  inn          String? // ИНН компании для определения направления операций
+  uiSettings   Json? // UI preferences: navigation icons, theme, etc.
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  users          User[]
-  accounts       Account[]
-  departments    Department[]
-  counterparties Counterparty[]
-  deals          Deal[]
-  articles       Article[]
-  operations     Operation[]
-  planItems      PlanItem[]
-  salaries       Salary[]
-  budgets        Budget[]
+  users              User[]
+  accounts           Account[]
+  departments        Department[]
+  counterparties     Counterparty[]
+  deals              Deal[]
+  articles           Article[]
+  operations         Operation[]
+  planItems          PlanItem[]
+  salaries           Salary[]
+  budgets            Budget[]
+  importSessions     ImportSession[]
+  importedOperations ImportedOperation[]
+  mappingRules       MappingRule[]
 
   @@map("companies")
 }
 
 model User {
-  id           String   @id @default(uuid())
-  companyId    String
-  email        String   @unique
-  passwordHash String
-  firstName    String?
-  lastName     String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  companyId           String
+  email               String   @unique
+  passwordHash        String
+  firstName           String?
+  lastName            String?
+  isActive            Boolean  @default(true)
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
@@ -59,11 +64,12 @@ model Account {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  operations         Operation[] @relation("AccountOperations")
-  sourceOperations   Operation[] @relation("SourceAccountOperations")
-  targetOperations   Operation[] @relation("TargetAccountOperations")
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  operations         Operation[]         @relation("AccountOperations")
+  sourceOperations   Operation[]         @relation("SourceAccountOperations")
+  targetOperations   Operation[]         @relation("TargetAccountOperations")
   planItems          PlanItem[]
+  importedOperations ImportedOperation[]
 
   @@index([companyId])
   @@map("accounts")
@@ -77,10 +83,11 @@ model Department {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  deals      Deal[]
-  operations Operation[]
-  salaries   Salary[]
+  company           Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals             Deal[]
+  operations        Operation[]
+  salaries          Salary[]
+  importedOperations ImportedOperation[]
 
   @@index([companyId])
   @@map("departments")
@@ -91,62 +98,65 @@ model Counterparty {
   companyId   String
   name        String
   inn         String?
-  category    String   // supplier|customer|gov|employee|other
+  category    String // supplier|customer|gov|employee|other
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company      Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  deals        Deal[]
-  operations   Operation[]
-  salaries     Salary[]
-  articles     Article[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals              Deal[]
+  operations         Operation[]
+  salaries           Salary[]
+  articles           Article[]
+  importedOperations ImportedOperation[]
 
   @@index([companyId])
   @@map("counterparties")
 }
 
 model Deal {
-  id              String   @id @default(uuid())
-  companyId       String
-  name            String
-  amount          Float?
-  departmentId    String?
-  counterpartyId  String?
-  description     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  companyId      String
+  name           String
+  amount         Float?
+  departmentId   String?
+  counterpartyId String?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
-  operations   Operation[]
-  planItems    PlanItem[]
+  company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department          Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  counterparty        Counterparty?        @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  operations          Operation[]
+  planItems           PlanItem[]
+  importedOperations  ImportedOperation[]
 
   @@index([companyId])
   @@map("deals")
 }
 
 model Article {
-  id            String   @id @default(uuid())
-  companyId     String
-  name          String
-  parentId      String?
-  type          String   // income|expense
-  activity      String?  // operating|investing|financing
-  indicator     String?  // cash|accrual
-  isActive      Boolean  @default(true)
-  description   String?
+  id             String   @id @default(uuid())
+  companyId      String
+  name           String
+  parentId       String?
+  type           String // income|expense
+  activity       String? // operating|investing|financing
+  indicator      String? // cash|accrual
+  isActive       Boolean  @default(true)
+  description    String?
   counterpartyId String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent       Article?      @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children     Article[]     @relation("ArticleHierarchy")
-  counterparty Counterparty? @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
-  operations   Operation[]
-  planItems    PlanItem[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent             Article?            @relation("ArticleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children           Article[]           @relation("ArticleHierarchy")
+  counterparty       Counterparty?       @relation(fields: [counterpartyId], references: [id], onDelete: SetNull)
+  operations         Operation[]
+  planItems          PlanItem[]
+  importedOperations ImportedOperation[]
 
   @@index([companyId])
   @@index([companyId, parentId])
@@ -154,26 +164,26 @@ model Article {
 }
 
 model Operation {
-  id                String    @id @default(uuid())
-  companyId         String
-  type              String    // income|expense|transfer
-  operationDate     DateTime
-  amount            Float
-  currency          String    @default("RUB")
-  accountId         String?
-  sourceAccountId   String?
-  targetAccountId   String?
-  articleId         String?
-  counterpartyId    String?
-  dealId            String?
-  departmentId      String?
-  description       String?
-  repeat            String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
+  id                 String    @id @default(uuid())
+  companyId          String
+  type               String // income|expense|transfer
+  operationDate      DateTime
+  amount             Float
+  currency           String    @default("RUB")
+  accountId          String?
+  sourceAccountId    String?
+  targetAccountId    String?
+  articleId          String?
+  counterpartyId     String?
+  dealId             String?
+  departmentId       String?
+  description        String?
+  repeat             String    @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
   recurrenceParentId String?
-  recurrenceEndDate DateTime?
-  isConfirmed       Boolean   @default(true)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  recurrenceEndDate  DateTime?
+  isConfirmed        Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   company            Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   account            Account?      @relation("AccountOperations", fields: [accountId], references: [id], onDelete: SetNull)
@@ -197,7 +207,7 @@ model Operation {
 model PlanItem {
   id          String    @id @default(uuid())
   companyId   String
-  type        String    // income|expense|transfer
+  type        String // income|expense|transfer
   startDate   DateTime
   endDate     DateTime?
   amount      Float
@@ -224,22 +234,22 @@ model PlanItem {
 }
 
 model Salary {
-  id                   String    @id @default(uuid())
-  companyId            String
+  id                     String    @id @default(uuid())
+  companyId              String
   employeeCounterpartyId String
-  departmentId         String?
-  baseWage             Float
-  contributionsPct     Float     @default(30.0)
-  incomeTaxPct         Float     @default(13.0)
-  periodicity          String    @default("monthly") // monthly|weekly|biweekly
-  effectiveFrom        DateTime
-  effectiveTo          DateTime?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  departmentId           String?
+  baseWage               Float
+  contributionsPct       Float     @default(30.0)
+  incomeTaxPct           Float     @default(13.0)
+  periodicity            String    @default("monthly") // monthly|weekly|biweekly
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-  company            Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   employeeCounterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-  department         Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  department           Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@map("salaries")
@@ -262,3 +272,96 @@ model Budget {
   @@map("budgets")
 }
 
+model ImportSession {
+  id             String   @id @default(uuid())
+  companyId      String
+  userId         String // кто загрузил
+  fileName       String
+  status         String   @default("draft") // draft|confirmed|processed|canceled
+  importedCount  Int      @default(0) // всего строк из файла
+  confirmedCount Int      @default(0) // подтверждено пользователем
+  processedCount Int      @default(0) // создано операций
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  importedOperations ImportedOperation[]
+
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@map("import_sessions")
+}
+
+model ImportedOperation {
+  id                    String   @id @default(uuid())
+  importSessionId       String
+  companyId             String
+  // Данные из выписки
+  date                  DateTime
+  number                String? // номер документа
+  amount                Float
+  description           String // НазначениеПлатежа
+  direction             String? // income|expense|transfer
+  // Плательщик
+  payer                 String?
+  payerInn              String?
+  payerAccount          String? // ПлательщикСчет
+  // Получатель
+  receiver              String?
+  receiverInn           String?
+  receiverAccount       String? // ПолучательСчет
+  // Результаты автосопоставления
+  matchedArticleId      String?
+  matchedCounterpartyId String?
+  matchedAccountId      String?
+  matchedDealId          String?
+  matchedDepartmentId    String?
+  currency               String   @default("RUB")
+  repeat                 String   @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
+  matchedBy             String? // template|fuzzy|manual|null
+  matchedRuleId         String? // ссылка на примененное правило
+  // Статусы
+  confirmed             Boolean  @default(false)
+  processed             Boolean  @default(false)
+  draft                 Boolean  @default(true)
+  // Метаданные
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  importSession       ImportSession @relation(fields: [importSessionId], references: [id], onDelete: Cascade)
+  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  matchedArticle      Article?      @relation(fields: [matchedArticleId], references: [id], onDelete: SetNull)
+  matchedCounterparty Counterparty? @relation(fields: [matchedCounterpartyId], references: [id], onDelete: SetNull)
+  matchedAccount      Account?      @relation(fields: [matchedAccountId], references: [id], onDelete: SetNull)
+  matchedDeal         Deal?        @relation(fields: [matchedDealId], references: [id], onDelete: SetNull)
+  matchedDepartment   Department?  @relation(fields: [matchedDepartmentId], references: [id], onDelete: SetNull)
+  matchedRule         MappingRule?  @relation(fields: [matchedRuleId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, importSessionId])
+  @@index([companyId, confirmed, processed])
+  @@index([importSessionId])
+  @@map("imported_operations")
+}
+
+model MappingRule {
+  id          String    @id @default(uuid())
+  companyId   String
+  userId      String // кто создал правило
+  ruleType    String // contains|equals|regex|alias
+  pattern     String // текст для поиска
+  targetType  String // article|counterparty|account|operationType
+  targetId    String? // ID сущности (если null, то targetName используется для создания)
+  targetName  String? // читаемое имя для удобства
+  sourceField String    @default("description") // description|receiver|payer|inn
+  usageCount  Int       @default(0)
+  lastUsedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  importedOperations ImportedOperation[]
+
+  @@index([companyId, ruleType, sourceField])
+  @@index([companyId, targetType])
+  @@map("mapping_rules")
+}

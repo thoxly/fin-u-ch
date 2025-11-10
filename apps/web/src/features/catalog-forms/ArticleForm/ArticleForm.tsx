@@ -7,15 +7,23 @@ import {
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 
+interface ArticleFormProps {
+  article: Article | null;
+  onClose: () => void;
+  onSuccess?: (createdId: string) => void;
+  initialName?: string;
+  initialType?: 'income' | 'expense' | 'transfer';
+}
+
 export const ArticleForm = ({
   article,
   onClose,
-}: {
-  article: Article | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(article?.name || '');
-  const [type, setType] = useState(article?.type || 'expense');
+  onSuccess,
+  initialName = '',
+  initialType = 'expense',
+}: ArticleFormProps) => {
+  const [name, setName] = useState(article?.name || initialName);
+  const [type, setType] = useState(article?.type || initialType);
   const [activity, setActivity] = useState(article?.activity || 'operating');
   const [counterpartyId, setCounterpartyId] = useState(
     article?.counterpartyId || ''
@@ -24,27 +32,13 @@ export const ArticleForm = ({
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
+
   useEffect(() => {
-    console.log('ArticleForm - article prop changed:', article);
-    if (article) {
-      console.log('ArticleForm - setting form values from article:', {
-        name: article.name,
-        type: article.type,
-        activity: article.activity,
-      });
-      setName(article.name || '');
-      setType(article.type || 'expense');
-      setActivity(article.activity || 'operating');
-      setCounterpartyId(article.counterpartyId || '');
-    } else {
-      console.log('ArticleForm - resetting form for new article');
-      // Сброс при создании новой статьи
-      setName('');
-      setType('expense');
-      setActivity('operating');
-      setCounterpartyId('');
-    }
-  }, [article]);
+    setName(article?.name || initialName);
+    setType(article?.type || initialType);
+    setActivity(article?.activity || 'operating');
+    setCounterpartyId(article?.counterpartyId || '');
+  }, [article, initialName, initialType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,15 +54,22 @@ export const ArticleForm = ({
           },
         }).unwrap();
       } else {
-        await create({
+        const result = await create({
           name,
           type,
           activity,
           isActive: true,
           counterpartyId: counterpartyId || undefined,
         }).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
       }
-      onClose();
+      if (article) {
+        onClose();
+      }
     } catch (error) {
       console.error('Failed to save article:', error);
     }
@@ -107,8 +108,10 @@ export const ArticleForm = ({
         label="Контрагент"
         value={counterpartyId}
         onChange={(e) => setCounterpartyId(e.target.value)}
-        options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
-        placeholder="Не выбран"
+        options={[
+          { value: '', label: 'Не выбран' },
+          ...counterparties.map((c) => ({ value: c.id, label: c.name })),
+        ]}
       />
       <div className="flex gap-4 pt-4">
         <Button type="submit" disabled={isCreating || isUpdating}>
