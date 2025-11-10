@@ -25,6 +25,8 @@ import {
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
 import { useOperationValidation } from './useOperationValidation';
+import { useFilteredDeals } from './useFilteredDeals';
+import { handleApiError } from './useOperationErrorHandler';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -121,10 +123,7 @@ export const OperationForm = ({
   const { data: departments = [] } = useGetDepartmentsQuery();
 
   // Фильтрация сделок по выбранному контрагенту
-  const filteredDeals = useMemo(() => {
-    if (!counterpartyId) return deals;
-    return deals.filter((deal) => deal.counterpartyId === counterpartyId);
-  }, [deals, counterpartyId]);
+  const filteredDeals = useFilteredDeals(counterpartyId, deals);
 
   // Сброс сделки при изменении контрагента
   useEffect(() => {
@@ -265,68 +264,23 @@ export const OperationForm = ({
       }
       onClose();
     } catch (error: unknown) {
-      console.error('Failed to save operation:', error);
-
-      // Обработка ошибок валидации от API
-      if (
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data
-      ) {
-        const apiError = String(error.data.message);
-
-        // Переводим известные ошибки на русский
-        if (apiError.includes('accountId and articleId are required')) {
-          validateOperation({
-            operationDate,
-            amount,
-            currency,
-            type,
-            articleId,
-            accountId,
-            sourceAccountId,
-            targetAccountId,
-          });
-          showError('Не заполнены обязательные поля: Статья, Счет');
-          return;
-        }
-
-        if (
-          apiError.includes('sourceAccountId and targetAccountId are required')
-        ) {
-          validateOperation({
-            operationDate,
-            amount,
-            currency,
-            type,
-            articleId,
-            accountId,
-            sourceAccountId,
-            targetAccountId,
-          });
-          showError(
-            'Не заполнены обязательные поля: Счет списания, Счет зачисления'
-          );
-          return;
-        }
-
-        // Общая ошибка
-        showError(
-          apiError ||
-            (operation?.id && !isCopy
-              ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
-              : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR)
-        );
-      } else {
-        showError(
-          operation?.id && !isCopy
-            ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
-            : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR
-        );
-      }
+      handleApiError({
+        error,
+        operation,
+        isCopy,
+        formData: {
+          operationDate,
+          amount,
+          currency,
+          type: type as string,
+          articleId,
+          accountId,
+          sourceAccountId,
+          targetAccountId,
+        },
+        validateOperation,
+        showError,
+      });
     }
   };
 

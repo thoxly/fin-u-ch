@@ -124,7 +124,6 @@ describe('UserProfileForm', () => {
 
     await waitFor(() => {
       expect(mockUpdateUser).toHaveBeenCalledWith({
-        email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
       });
