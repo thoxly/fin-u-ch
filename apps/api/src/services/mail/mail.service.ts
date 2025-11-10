@@ -2,7 +2,8 @@ import nodemailer from 'nodemailer';
 import { env } from '../../config/env';
 import logger from '../../config/logger';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const transporter = nodemailer.createTransport({
   host: env.SMTP_HOST,
@@ -29,6 +30,9 @@ export interface EmailOptions {
 
 function loadTemplate(templateName: EmailTemplate): string {
   try {
+    // Определяем __dirname для ES modules
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const templatePath = join(__dirname, 'templates', `${templateName}.html`);
     return readFileSync(templatePath, 'utf-8');
   } catch (error) {
