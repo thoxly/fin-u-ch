@@ -204,7 +204,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       balance += getPlanMonthNet(month);
       return { month, balance };
     });
-  }, [planData, allMonths, planLookups]);
+  }, [planData, allMonths, planLookups, getPlanMonthNet]);
 
   const totalNetCashflow = data.activities.reduce(
     (sum, activity) => sum + activity.netCashflow,
@@ -235,6 +235,26 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return names[activity] || activity;
   };
 
+  const getActivityColor = (activity: string) => {
+    const colors: Record<string, string> = {
+      operating: 'bg-blue-50 dark:bg-[#1F1F1F]',
+      investing: 'bg-emerald-50 dark:bg-[#1F1F1F]',
+      financing: 'bg-amber-50 dark:bg-[#1F1F1F]',
+      unknown: 'bg-gray-50 dark:bg-[#1F1F1F]',
+    };
+    return colors[activity] || 'bg-gray-50 dark:bg-[#1F1F1F]';
+  };
+
+  const getActivityBorderColor = (activity: string) => {
+    const colors: Record<string, string> = {
+      operating: '#2563EB', // blue-600
+      investing: '#047857', // emerald-700
+      financing: '#B45309', // amber-600
+      unknown: '#6B7280', // gray-500
+    };
+    return colors[activity] || '#6B7280';
+  };
+
   const renderMonthlyCells = (
     params: {
       month: string;
@@ -251,13 +271,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       return (
         <React.Fragment key={cellKey}>
           <td
-            className="px-3 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-500 border-l border-blue-200 dark:border-gray-700 whitespace-nowrap"
+            className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
             style={{ minWidth: `${subColumnWidth}px` }}
           >
             {formatNumber(planValue)}
           </td>
           <td
-            className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700 whitespace-nowrap"
+            className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
             style={{ minWidth: `${subColumnWidth}px` }}
           >
             {formatNumber(factValue)}
@@ -269,7 +289,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return (
       <td
         key={cellKey}
-        className="px-3 py-2.5 text-right text-xs font-semibold text-blue-800 dark:text-blue-200 border-l border-blue-200 dark:border-gray-700 whitespace-nowrap"
+        className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
         style={{ minWidth: `${columnWidths.month}px` }}
       >
         {formatNumber(factValue)}
@@ -278,8 +298,8 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
-      <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
+      <div className="bg-zinc-50 dark:bg-zinc-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {title || 'Отчет о движении денежных средств'}:{' '}
           {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
@@ -287,47 +307,47 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
         </div>
       </div>
 
-      <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-380px)]">
-        <table className="w-full border-collapse relative table-auto">
+      <div className="w-full overflow-x-auto overflow-y-visible max-h-[calc(100vh-380px)] md:max-h-[80vh]">
+        <table className="w-full border-collapse relative table-auto bg-zinc-50 dark:bg-zinc-900">
           <thead className="sticky top-0 z-30">
-            <tr className="bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-b-2 border-gray-300 dark:border-gray-950">
+            <tr className="bg-zinc-100 dark:bg-zinc-800 border-b border-gray-300 dark:border-gray-700">
               <th
-                className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider sticky left-0 bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"
+                className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider sticky left-0 bg-zinc-100 dark:bg-zinc-800 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"
                 style={{ width: `${columnWidths.article}px` }}
               >
-                Статья
+                СТАТЬЯ
               </th>
               {allMonths.map((month) => (
                 <th
                   key={month}
                   colSpan={showPlan ? 2 : 1}
-                  className="px-2 py-3 text-center text-[10px] font-bold text-gray-800 dark:text-white uppercase tracking-wide border-l border-gray-300 dark:border-gray-700 whitespace-nowrap"
+                  className="px-2 py-3 text-center text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wide border-l border-gray-300 dark:border-gray-700 whitespace-nowrap"
                   style={{ minWidth: `${columnWidths.month}px` }}
                 >
-                  {formatMonthLabel(month)}
+                  {formatMonthLabel(month).toUpperCase()}
                 </th>
               ))}
               <th
-                className="px-4 py-3 text-right text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 border-l-2 border-gray-300 dark:border-gray-700 whitespace-nowrap"
+                className="px-4 py-3 text-right text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800 border-l-2 border-gray-300 dark:border-gray-700 whitespace-nowrap"
                 style={{ minWidth: `${columnWidths.total}px` }}
                 colSpan={showPlan ? 2 : 1}
               >
-                Итого
+                ИТОГО
               </th>
             </tr>
             {showPlan && (
-              <tr className="bg-gradient-to-b from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 border-b border-gray-300 dark:border-gray-700">
-                <th className="sticky left-0 bg-gradient-to-b from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-800 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"></th>
+              <tr className="bg-zinc-100 dark:bg-zinc-800 border-b border-gray-300 dark:border-gray-700">
+                <th className="sticky left-0 bg-zinc-100 dark:bg-zinc-800 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"></th>
                 {allMonths.map((month) => (
                   <React.Fragment key={`${month}-subcol`}>
                     <th
-                      className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
+                      className="px-2 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
                       style={{ minWidth: `${subColumnWidth}px` }}
                     >
                       План
                     </th>
                     <th
-                      className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
+                      className="px-2 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
                       style={{ minWidth: `${subColumnWidth}px` }}
                     >
                       Факт
@@ -335,13 +355,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   </React.Fragment>
                 ))}
                 <th
-                  className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
+                  className="px-2 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
                   style={{ minWidth: `${subColumnWidth}px` }}
                 >
                   План
                 </th>
                 <th
-                  className="px-2 py-2 text-center text-[10px] font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
+                  className="px-2 py-2 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap border-l border-gray-300 dark:border-gray-700"
                   style={{ minWidth: `${subColumnWidth}px` }}
                 >
                   Факт
@@ -349,27 +369,32 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               </tr>
             )}
           </thead>
-          <tbody className="text-[9px]">
+          <tbody className="text-sm bg-zinc-50 dark:bg-zinc-900">
             {activitiesToRender.map((activity) => {
               const planActivity = planActivityMap.get(activity.activity);
               const planSource: ActivityGroup | undefined =
                 planActivity || (!hasFactData ? activity : undefined);
 
+              const activityColor = getActivityColor(activity.activity);
+              const borderColor = getActivityBorderColor(activity.activity);
               return (
                 <React.Fragment key={activity.activity}>
                   <tr
-                    className="bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 cursor-pointer border-b border-blue-200 dark:border-gray-700 transition-colors duration-150"
+                    className={`${activityColor} cursor-pointer border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5`}
                     onClick={() => toggleSection(activity.activity)}
+                    style={{ borderLeft: `3px solid ${borderColor}` }}
                   >
                     <td
-                      className="px-4 py-2.5 font-semibold text-xs text-blue-800 dark:text-blue-200 sticky left-0 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
-                      style={{ width: `${columnWidths.article}px` }}
+                      className={`px-4 py-2 font-semibold text-sm text-gray-900 dark:text-zinc-50 sticky left-0 ${activityColor} z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]`}
+                      style={{
+                        width: `${columnWidths.article}px`,
+                      }}
                     >
                       <div className="flex items-center space-x-3">
-                        <span className="text-blue-500 dark:text-blue-400 font-bold text-base">
+                        <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
                           {expandedSections[activity.activity] ? '▾' : '▸'}
                         </span>
-                        <span className="font-bold">
+                        <span className="font-semibold">
                           {getActivityDisplayName(activity.activity)}
                         </span>
                       </div>
@@ -412,8 +437,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                       );
                     })}
                     <td
-                      className="px-4 py-2.5 text-right text-xs font-bold text-blue-800 dark:text-blue-200 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-900 dark:to-blue-800 dark:hover:from-blue-800 dark:hover:to-blue-700 border-l-2 border-blue-200 dark:border-gray-700 whitespace-nowrap"
-                      style={{ minWidth: `${columnWidths.total}px` }}
+                      className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
+                      style={{
+                        minWidth: `${columnWidths.total}px`,
+                      }}
                     >
                       {formatNumber(
                         hasFactData
@@ -449,18 +476,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             return (
                               <tr
                                 key={`${activity.activity}-income-${group.articleId}`}
-                                className="bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
                               >
                                 <td
-                                  className="px-4 py-2.5 pl-10 text-xs text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-green-50 dark:bg-gray-800 dark:hover:bg-green-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                                   style={{ width: `${columnWidths.article}px` }}
                                 >
-                                  <span className="flex items-center">
-                                    <span className="text-green-600 dark:text-green-400 mr-2">
-                                      ↑
-                                    </span>
-                                    {articleName}
-                                  </span>
+                                  {articleName}
                                 </td>
                                 {allMonths.map((month) => {
                                   const factAmount = hasFactData
@@ -479,19 +501,29 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                         key={`${activity.activity}-income-${group.articleId}-${month}`}
                                       >
                                         <td
-                                          className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                           style={{
                                             minWidth: `${subColumnWidth}px`,
                                           }}
                                         >
+                                          {planAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
                                           {formatNumber(planAmount)}
                                         </td>
                                         <td
-                                          className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                           style={{
                                             minWidth: `${subColumnWidth}px`,
                                           }}
                                         >
+                                          {factAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
                                           {formatNumber(factAmount)}
                                         </td>
                                       </React.Fragment>
@@ -501,26 +533,41 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                   return (
                                     <td
                                       key={`${activity.activity}-income-${group.articleId}-${month}`}
-                                      className="px-3 py-2.5 text-right text-xs text-green-700 dark:text-green-400 font-medium border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                       style={{
                                         minWidth: `${columnWidths.month}px`,
                                       }}
                                     >
+                                      {factAmount !== 0 && (
+                                        <span className="text-green-600 dark:text-green-400 mr-1">
+                                          ▲
+                                        </span>
+                                      )}
                                       {formatNumber(factAmount)}
                                     </td>
                                   );
                                 })}
                                 <td
-                                  className="px-4 py-2.5 text-right text-xs font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-l-2 border-gray-300 dark:border-gray-700 whitespace-nowrap"
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
                                   style={{
                                     minWidth: `${columnWidths.total}px`,
                                   }}
                                 >
-                                  {formatNumber(
-                                    hasFactData
+                                  {(() => {
+                                    const total = hasFactData
                                       ? group.total
-                                      : planGroup?.total || 0
-                                  )}
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-green-600 dark:text-green-400 mr-1">
+                                            ▲
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             );
@@ -552,18 +599,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                             return (
                               <tr
                                 key={`${activity.activity}-expense-${group.articleId}`}
-                                className="bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 border-b border-gray-200 dark:border-gray-700/50 transition-colors duration-100"
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
                               >
                                 <td
-                                  className="px-4 py-2.5 pl-10 text-xs text-gray-700 dark:text-gray-300 sticky left-0 bg-white hover:bg-red-50 dark:bg-gray-800 dark:hover:bg-red-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                                   style={{ width: `${columnWidths.article}px` }}
                                 >
-                                  <span className="flex items-center">
-                                    <span className="text-red-600 dark:text-red-400 mr-2">
-                                      ↓
-                                    </span>
-                                    {articleName}
-                                  </span>
+                                  {articleName}
                                 </td>
                                 {allMonths.map((month) => {
                                   const factAmount = hasFactData
@@ -582,19 +624,29 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                         key={`${activity.activity}-expense-${group.articleId}-${month}`}
                                       >
                                         <td
-                                          className="px-3 py-2.5 text-right text-xs text-gray-500 border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                           style={{
                                             minWidth: `${subColumnWidth}px`,
                                           }}
                                         >
+                                          {planAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
                                           {formatNumber(planAmount)}
                                         </td>
                                         <td
-                                          className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                           style={{
                                             minWidth: `${subColumnWidth}px`,
                                           }}
                                         >
+                                          {factAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
                                           {formatNumber(factAmount)}
                                         </td>
                                       </React.Fragment>
@@ -604,26 +656,41 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                                   return (
                                     <td
                                       key={`${activity.activity}-expense-${group.articleId}-${month}`}
-                                      className="px-3 py-2.5 text-right text-xs text-red-700 dark:text-red-400 font-medium border-l border-gray-200 dark:border-gray-700/50 whitespace-nowrap"
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
                                       style={{
                                         minWidth: `${columnWidths.month}px`,
                                       }}
                                     >
+                                      {factAmount !== 0 && (
+                                        <span className="text-red-600 dark:text-red-400 mr-1">
+                                          ▼
+                                        </span>
+                                      )}
                                       {formatNumber(factAmount)}
                                     </td>
                                   );
                                 })}
                                 <td
-                                  className="px-4 py-2.5 text-right text-xs font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-l-2 border-gray-300 dark:border-gray-700 whitespace-nowrap"
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
                                   style={{
                                     minWidth: `${columnWidths.total}px`,
                                   }}
                                 >
-                                  {formatNumber(
-                                    hasFactData
+                                  {(() => {
+                                    const total = hasFactData
                                       ? group.total
-                                      : planGroup?.total || 0
-                                  )}
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-red-600 dark:text-red-400 mr-1">
+                                            ▼
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
                                 </td>
                               </tr>
                             );
@@ -635,9 +702,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               );
             })}
 
-            <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
+            <tr className="border-t-2 border-zinc-400 dark:border-zinc-500 bg-indigo-100 dark:bg-[#232336]">
               <td
-                className="px-4 py-4 font-bold text-xs text-gray-900 dark:text-gray-100 uppercase tracking-wide sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                className="px-4 py-4 font-semibold text-[15px] text-indigo-900 dark:text-white sticky left-0 bg-indigo-100 dark:bg-[#232336] z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
                 style={{ width: `${columnWidths.article}px` }}
               >
                 Общий денежный поток
@@ -671,13 +738,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   return (
                     <React.Fragment key={`totals-${month}`}>
                       <td
-                        className="px-3 py-4 text-right text-xs font-bold text-gray-600 dark:text-gray-400 border-l border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(planTotal)}
                       </td>
                       <td
-                        className="px-3 py-4 text-right text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                        className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(factTotal)}
@@ -689,7 +756,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 return (
                   <td
                     key={`totals-${month}`}
-                    className="px-3 py-4 text-right text-xs font-bold text-gray-900 dark:text-gray-100 border-l border-gray-300 dark:border-gray-600 whitespace-nowrap"
+                    className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
                     style={{ minWidth: `${columnWidths.month}px` }}
                   >
                     {formatNumber(factTotal)}
@@ -697,8 +764,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 );
               })}
               <td
-                className="px-4 py-4 text-right text-xs font-extrabold text-gray-900 dark:text-gray-100 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 border-l-2 border-gray-300 dark:border-gray-600 whitespace-nowrap"
-                style={{ minWidth: `${columnWidths.total}px` }}
+                className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                style={{
+                  minWidth: `${columnWidths.total}px`,
+                }}
               >
                 {formatNumber(
                   hasFactData
@@ -708,29 +777,32 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               </td>
             </tr>
 
-            <tr className="bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 border-t border-indigo-300 dark:border-gray-700">
+            <tr className="bg-zinc-50 dark:bg-[#202020] border-t border-gray-300 dark:border-t dark:border-white/8 sticky bottom-0 z-20">
               <td
-                className="px-4 py-3 font-bold text-xs text-indigo-900 dark:text-indigo-300 sticky left-0 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
-                style={{ width: `${columnWidths.article}px` }}
+                className="px-4 py-2 font-normal text-sm text-zinc-400 dark:text-zinc-400 sticky left-0 bg-zinc-50 dark:bg-[#202020] z-30 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                style={{
+                  width: `${columnWidths.article}px`,
+                  color: '#A1A1AA',
+                }}
               >
                 Остаток на конец периода
               </td>
               {cumulativeBalances.map(({ month, balance }, idx) => {
                 const planBalance = planCumulativeBalances[idx]?.balance ?? 0;
                 const isPositive = balance >= 0;
-                const isPlanPositive = planBalance >= 0;
+                const _isPlanPositive = planBalance >= 0;
 
                 if (showPlan) {
                   return (
                     <React.Fragment key={`balance-${month}`}>
                       <td
-                        className="px-3 py-3 text-right text-xs text-gray-500 border-l border-indigo-300 dark:border-gray-700 whitespace-nowrap"
+                        className="px-3 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(planBalance)}
                       </td>
                       <td
-                        className={`px-3 py-3 text-right text-xs font-semibold border-l border-indigo-300 dark:border-gray-700 whitespace-nowrap ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                        className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(balance)}
@@ -742,7 +814,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 return (
                   <td
                     key={`balance-${month}`}
-                    className={`px-3 py-3 text-right text-xs font-semibold border-l border-indigo-300 dark:border-gray-700 whitespace-nowrap ${isPositive ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'}`}
+                    className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'}`}
                     style={{ minWidth: `${columnWidths.month}px` }}
                   >
                     {formatNumber(balance)}
@@ -750,11 +822,11 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 );
               })}
               <td
-                className={`px-4 py-3 text-right text-xs font-bold border-l-2 border-indigo-300 dark:border-gray-700 whitespace-nowrap ${
+                className={`px-4 py-2 text-right text-[13px] font-normal border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${
                   (cumulativeBalances[cumulativeBalances.length - 1]?.balance ||
                     0) >= 0
-                    ? 'text-indigo-900 dark:text-indigo-300 bg-gradient-to-r from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800'
-                    : 'text-red-900 dark:text-red-300 bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900 dark:to-red-800'
+                    ? 'text-zinc-400 dark:text-zinc-400'
+                    : 'text-red-700 dark:text-red-400'
                 }`}
                 style={{ minWidth: `${columnWidths.total}px` }}
               >
