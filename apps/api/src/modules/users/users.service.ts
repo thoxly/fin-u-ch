@@ -227,27 +227,42 @@ export class UsersService {
       validateEmail(data.email);
     }
 
-    // Обновляем пользователя, полагаясь на уникальное ограничение базы данных
-    // для предотвращения race condition. Обрабатываем ошибку нарушения уникальности.
+    // Обновляем пользователя в транзакции с проверкой companyId для предотвращения утечки данных
+    // Полагаемся на уникальное ограничение базы данных для предотвращения race condition.
     try {
-      const updatedUser = await prisma.user.update({
-        where: { id: userId },
-        data,
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          companyId: true,
-          isActive: true,
-          company: {
-            select: {
-              id: true,
-              name: true,
-              currencyBase: true,
+      const updatedUser = await prisma.$transaction(async (tx) => {
+        // Проверяем, что пользователь принадлежит к этой компании перед обновлением
+        const userCheckInTx = await tx.user.findFirst({
+          where: {
+            id: userId,
+            companyId: companyId,
+          },
+          select: { id: true },
+        });
+
+        if (!userCheckInTx) {
+          throw new AppError('User not found or access denied', 404);
+        }
+
+        return await tx.user.update({
+          where: { id: userId },
+          data,
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            companyId: true,
+            isActive: true,
+            company: {
+              select: {
+                id: true,
+                name: true,
+                currencyBase: true,
+              },
             },
           },
-        },
+        });
       });
 
       return {
@@ -255,6 +270,9 @@ export class UsersService {
         companyName: updatedUser.company.name,
       };
     } catch (error: unknown) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       handleUniqueConstraintError(error, 'email', 'Email already in use');
     }
   }
@@ -291,9 +309,25 @@ export class UsersService {
 
     const passwordHash = await hashPassword(newPassword);
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash },
+    // Обновляем пароль в транзакции с проверкой companyId для предотвращения утечки данных
+    await prisma.$transaction(async (tx) => {
+      // Проверяем, что пользователь принадлежит к этой компании перед обновлением
+      const userCheckInTx = await tx.user.findFirst({
+        where: {
+          id: userId,
+          companyId: companyId,
+        },
+        select: { id: true },
+      });
+
+      if (!userCheckInTx) {
+        throw new AppError('User not found or access denied', 404);
+      }
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+      });
     });
 
     // Отправляем уведомление об изменении пароля
@@ -434,12 +468,12 @@ export class UsersService {
 
     validateEmail(newEmail);
 
-    // Обновляем email в транзакции, полагаясь на уникальное ограничение базы данных
-    // для предотвращения race condition. Обрабатываем ошибку нарушения уникальности.
+    // Обновляем email в транзакции с проверкой companyId для предотвращения утечки данных
+    // Полагаемся на уникальное ограничение базы данных для предотвращения race condition.
     try {
       await prisma.$transaction(async (tx) => {
         // Проверяем, что пользователь принадлежит к этой компании перед обновлением
-        // (Prisma update поддерживает только уникальные поля в WHERE)
+        // (Prisma update поддерживает только уникальные поля в WHERE, поэтому проверяем отдельно)
         const userCheck = await tx.user.findFirst({
           where: {
             id: validation.userId,
@@ -463,6 +497,9 @@ export class UsersService {
         await tokenService.markTokenAsUsed(token);
       });
     } catch (error: unknown) {
+      if (error instanceof AppError) {
+        throw error;
+      }
       handleUniqueConstraintError(error, 'email', 'Email already in use');
     }
 

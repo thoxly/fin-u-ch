@@ -1,9 +1,6 @@
-import { useState, FormEvent, useMemo, useEffect } from 'react';
-import { Button } from '../../shared/ui/Button';
-import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
-import { OperationBasicInfo } from './OperationBasicInfo';
-import { OperationFinancialParams } from './OperationFinancialParams';
-import { OperationRecurrenceSection } from './OperationRecurrenceSection';
+import { useState, FormEvent, useEffect } from 'react';
+import { OperationFormFields } from './OperationFormFields';
+import { OperationFormActions } from './OperationFormActions';
 import {
   useCreateOperationMutation,
   useUpdateOperationMutation,
@@ -284,6 +281,46 @@ export const OperationForm = ({
     }
   };
 
+  const handleTypeChange = (value: string) => {
+    setType(value as OperationType);
+    clearAllValidationErrors();
+  };
+
+  const handleDateChange = (value: string) => {
+    setOperationDate(value);
+    clearValidationError('operationDate');
+  };
+
+  const handleAmountChange = (value: string) => {
+    setAmount(formatAmountInput(value));
+    clearValidationError('amount');
+  };
+
+  const handleCurrencyChange = (value: string) => {
+    setCurrency(value);
+    clearValidationError('currency');
+  };
+
+  const handleArticleChange = (value: string) => {
+    setArticleId(value);
+    clearValidationError('articleId');
+  };
+
+  const handleAccountChange = (value: string) => {
+    setAccountId(value);
+    clearValidationError('accountId');
+  };
+
+  const handleSourceAccountChange = (value: string) => {
+    setSourceAccountId(value);
+    clearValidationError('sourceAccountId');
+  };
+
+  const handleTargetAccountChange = (value: string) => {
+    setTargetAccountId(value);
+    clearValidationError('targetAccountId');
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -291,226 +328,56 @@ export const OperationForm = ({
       className="flex flex-col h-full min-h-0 px-6 py-4"
     >
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        <ErrorBoundary>
-          <OperationBasicInfo
-            type={type}
-            operationDate={operationDate}
-            amount={amount}
-            currency={currency}
-            validationErrors={validationErrors}
-            onTypeChange={(value) => {
-              try {
-                setType(value as OperationType);
-                clearAllValidationErrors();
-              } catch (error) {
-                console.error('Error updating type:', error);
-              }
-            }}
-            onDateChange={(value) => {
-              try {
-                setOperationDate(value);
-                clearValidationError('operationDate');
-              } catch (error) {
-                console.error('Error updating date:', error);
-              }
-            }}
-            onAmountChange={(value) => {
-              try {
-                setAmount(formatAmountInput(value));
-                clearValidationError('amount');
-              } catch (error) {
-                console.error('Error updating amount:', error);
-              }
-            }}
-            onCurrencyChange={(value) => {
-              try {
-                setCurrency(value);
-                clearValidationError('currency');
-              } catch (error) {
-                console.error('Error updating currency:', error);
-              }
-            }}
-            onValidationErrorClear={(field) => {
-              try {
-                clearValidationError(field);
-              } catch (error) {
-                console.error('Error clearing validation error:', error);
-              }
-            }}
-          />
-        </ErrorBoundary>
-
-        <ErrorBoundary>
-          <OperationFinancialParams
-            type={type}
-            articleId={articleId}
-            accountId={accountId}
-            sourceAccountId={sourceAccountId}
-            targetAccountId={targetAccountId}
-            counterpartyId={counterpartyId}
-            dealId={dealId}
-            departmentId={departmentId}
-            validationErrors={validationErrors}
-            articles={articles}
-            accounts={accounts}
-            counterparties={counterparties}
-            deals={deals}
-            filteredDeals={filteredDeals}
-            departments={departments}
-            onArticleChange={(value) => {
-              try {
-                setArticleId(value);
-                clearValidationError('articleId');
-              } catch (error) {
-                console.error('Error updating article:', error);
-              }
-            }}
-            onAccountChange={(value) => {
-              try {
-                setAccountId(value);
-                clearValidationError('accountId');
-              } catch (error) {
-                console.error('Error updating account:', error);
-              }
-            }}
-            onSourceAccountChange={(value) => {
-              try {
-                setSourceAccountId(value);
-                clearValidationError('sourceAccountId');
-              } catch (error) {
-                console.error('Error updating source account:', error);
-              }
-            }}
-            onTargetAccountChange={(value) => {
-              try {
-                setTargetAccountId(value);
-                clearValidationError('targetAccountId');
-              } catch (error) {
-                console.error('Error updating target account:', error);
-              }
-            }}
-            onCounterpartyChange={(value) => {
-              try {
-                setCounterpartyId(value);
-              } catch (error) {
-                console.error('Error updating counterparty:', error);
-              }
-            }}
-            onDealChange={(value) => {
-              try {
-                setDealId(value);
-              } catch (error) {
-                console.error('Error updating deal:', error);
-              }
-            }}
-            onDepartmentChange={(value) => {
-              try {
-                setDepartmentId(value);
-              } catch (error) {
-                console.error('Error updating department:', error);
-              }
-            }}
-            onValidationErrorClear={(field) => {
-              try {
-                clearValidationError(field);
-              } catch (error) {
-                console.error('Error clearing validation error:', error);
-              }
-            }}
-          />
-        </ErrorBoundary>
-
-        <ErrorBoundary>
-          <OperationRecurrenceSection
-            description={description}
-            repeat={repeat}
-            recurrenceEndDate={recurrenceEndDate}
-            onDescriptionChange={(value) => {
-              try {
-                setDescription(value);
-              } catch (error) {
-                console.error('Error updating description:', error);
-              }
-            }}
-            onRepeatChange={(value) => {
-              try {
-                setRepeat(value as Periodicity);
-              } catch (error) {
-                console.error('Error updating repeat:', error);
-              }
-            }}
-            onEndDateChange={(value) => {
-              try {
-                setRecurrenceEndDate(value);
-              } catch (error) {
-                console.error('Error updating end date:', error);
-              }
-            }}
-          />
-        </ErrorBoundary>
-
-        {/* Выбор области обновления для дочерних операций */}
-        {isChildOperation && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mb-6">
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Обновить:
-            </div>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="updateScope"
-                  value="current"
-                  checked={updateScope === 'current'}
-                  onChange={(e) =>
-                    setUpdateScope(e.target.value as 'current' | 'all')
-                  }
-                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Только текущую операцию
-                </span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="updateScope"
-                  value="all"
-                  checked={updateScope === 'all'}
-                  onChange={(e) =>
-                    setUpdateScope(e.target.value as 'current' | 'all')
-                  }
-                  className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Все последующие операции (изменит шаблон)
-                </span>
-              </label>
-            </div>
-          </div>
-        )}
+        <OperationFormFields
+          type={type}
+          operationDate={operationDate}
+          amount={amount}
+          currency={currency}
+          articleId={articleId}
+          accountId={accountId}
+          sourceAccountId={sourceAccountId}
+          targetAccountId={targetAccountId}
+          counterpartyId={counterpartyId}
+          dealId={dealId}
+          departmentId={departmentId}
+          description={description}
+          repeat={repeat}
+          recurrenceEndDate={recurrenceEndDate}
+          validationErrors={validationErrors}
+          articles={articles}
+          accounts={accounts}
+          counterparties={counterparties}
+          deals={deals}
+          filteredDeals={filteredDeals}
+          departments={departments}
+          onTypeChange={handleTypeChange}
+          onDateChange={handleDateChange}
+          onAmountChange={handleAmountChange}
+          onCurrencyChange={handleCurrencyChange}
+          onArticleChange={handleArticleChange}
+          onAccountChange={handleAccountChange}
+          onSourceAccountChange={handleSourceAccountChange}
+          onTargetAccountChange={handleTargetAccountChange}
+          onCounterpartyChange={setCounterpartyId}
+          onDealChange={setDealId}
+          onDepartmentChange={setDepartmentId}
+          onDescriptionChange={setDescription}
+          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onEndDateChange={setRecurrenceEndDate}
+          onValidationErrorClear={clearValidationError}
+        />
       </div>
 
-      {/* Sticky Footer с кнопками */}
-      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <Button
-            type="submit"
-            disabled={isCreating || isUpdating}
-            className="flex-1 sm:flex-none"
-          >
-            {operation?.id && !isCopy ? 'Сохранить' : 'Создать'}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            className="flex-1 sm:flex-none"
-          >
-            Отмена
-          </Button>
-        </div>
-      </div>
+      <OperationFormActions
+        operation={operation}
+        isCopy={isCopy}
+        isChildOperation={isChildOperation}
+        updateScope={updateScope}
+        isCreating={isCreating}
+        isUpdating={isUpdating}
+        onUpdateScopeChange={setUpdateScope}
+        onClose={onClose}
+      />
     </form>
   );
 };

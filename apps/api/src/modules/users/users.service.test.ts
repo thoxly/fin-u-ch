@@ -437,6 +437,7 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
+      // Мокируем findFirst для проверки до транзакции
       (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValueOnce({
         id: 'user-1',
         companyId: companyId,
@@ -449,7 +450,24 @@ describe('UsersService', () => {
           target: ['email'],
         },
       };
-      (mockedPrisma.$transaction as jest.Mock).mockRejectedValue(prismaError);
+
+      // Мокируем транзакцию так, чтобы она выполняла callback, но update выбрасывал ошибку
+      (mockedPrisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            user: {
+              findFirst: jest.fn().mockResolvedValue({
+                id: 'user-1',
+              }),
+              update: jest.fn().mockRejectedValue(prismaError),
+            },
+            emailToken: {
+              update: jest.fn().mockResolvedValue(undefined),
+            },
+          };
+          return callback(tx);
+        }
+      );
 
       await expect(
         usersService.confirmEmailChangeWithEmail(token, companyId)

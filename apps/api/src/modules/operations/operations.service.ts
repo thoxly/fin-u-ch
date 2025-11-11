@@ -1,5 +1,6 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
+import { formatZodErrors } from '../../utils/validation';
 import {
   CreateOperationSchema,
   UpdateOperationSchema,
@@ -140,13 +141,8 @@ export class OperationsService {
     const validationResult = CreateOperationSchema.safeParse(data);
 
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(
-        (err: { path: (string | number)[]; message: string }) => {
-          const path = err.path.join('.');
-          return `${path}: ${err.message}`;
-        }
-      );
-      throw new AppError(`Validation failed: ${errors.join(', ')}`, 400);
+      const errorMessage = formatZodErrors(validationResult.error);
+      throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
     }
 
     const validatedData = validationResult.data;
@@ -215,13 +211,8 @@ export class OperationsService {
       const validationResult = UpdateOperationSchema.safeParse(data);
 
       if (!validationResult.success) {
-        const errors = validationResult.error.errors.map(
-          (err: { path: (string | number)[]; message: string }) => {
-            const path = err.path.join('.');
-            return `${path}: ${err.message}`;
-          }
-        );
-        throw new AppError(`Validation failed: ${errors.join(', ')}`, 400);
+        const errorMessage = formatZodErrors(validationResult.error);
+        throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
       }
 
       const validatedData = validationResult.data;
