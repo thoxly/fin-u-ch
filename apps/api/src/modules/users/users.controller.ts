@@ -76,7 +76,7 @@ export class UsersController {
   ) {
     try {
       const { token } = req.body;
-      await usersService.confirmOldEmailForChange(token);
+      await usersService.confirmOldEmailForChange(token, req.companyId!);
       res.json({
         message:
           'Old email confirmed. Verification email sent to new email address',
@@ -93,7 +93,7 @@ export class UsersController {
   ) {
     try {
       const { token } = req.body;
-      await usersService.confirmEmailChangeWithEmail(token, req.companyId);
+      await usersService.confirmEmailChangeWithEmail(token, req.companyId!);
       res.json({ message: 'Email changed successfully' });
     } catch (error) {
       next(error);

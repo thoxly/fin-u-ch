@@ -8,7 +8,7 @@ import {
 } from '@fin-u-ch/shared';
 
 // Keep for backward compatibility with tests
-export interface CreateOperationDTO extends CreateOperationInput {}
+export type CreateOperationDTO = CreateOperationInput;
 
 export interface OperationFilters {
   type?: string;
@@ -140,10 +140,12 @@ export class OperationsService {
     const validationResult = CreateOperationSchema.safeParse(data);
 
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map((err) => {
-        const path = err.path.join('.');
-        return `${path}: ${err.message}`;
-      });
+      const errors = validationResult.error.errors.map(
+        (err: { path: (string | number)[]; message: string }) => {
+          const path = err.path.join('.');
+          return `${path}: ${err.message}`;
+        }
+      );
       throw new AppError(`Validation failed: ${errors.join(', ')}`, 400);
     }
 
@@ -213,10 +215,12 @@ export class OperationsService {
       const validationResult = UpdateOperationSchema.safeParse(data);
 
       if (!validationResult.success) {
-        const errors = validationResult.error.errors.map((err) => {
-          const path = err.path.join('.');
-          return `${path}: ${err.message}`;
-        });
+        const errors = validationResult.error.errors.map(
+          (err: { path: (string | number)[]; message: string }) => {
+            const path = err.path.join('.');
+            return `${path}: ${err.message}`;
+          }
+        );
         throw new AppError(`Validation failed: ${errors.join(', ')}`, 400);
       }
 

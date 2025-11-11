@@ -14,6 +14,30 @@ import {
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
 
+// Вспомогательная функция для обработки ошибок нарушения уникального ограничения Prisma
+function handleUniqueConstraintError(
+  error: unknown,
+  field: string,
+  message?: string
+): void {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'P2002' &&
+    'meta' in error &&
+    error.meta &&
+    typeof error.meta === 'object' &&
+    'target' in error.meta &&
+    Array.isArray(error.meta.target) &&
+    error.meta.target.includes(field)
+  ) {
+    throw new AppError(message || `${field} already in use`, 409);
+  }
+  // Пробрасываем другие ошибки дальше
+  throw error;
+}
+
 // Вспомогательные функции для смены email
 async function validateEmailChange(
   userId: string,
@@ -198,52 +222,41 @@ export class UsersService {
       throw new AppError('User not found or access denied', 404);
     }
 
-    // Если обновляется email, проверяем уникальность в рамках компании
-    // Используем findFirst с фильтром по companyId для предотвращения утечки данных между компаниями
+    // Если обновляется email, валидируем его формат
     if (data.email && data.email !== userCheck.email) {
       validateEmail(data.email);
-
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: data.email,
-          companyId: companyId,
-        },
-        select: { id: true, companyId: true },
-      });
-
-      if (existingUser) {
-        // Если email занят другим пользователем из той же компании, это ошибка
-        if (existingUser.id !== userId) {
-          throw new AppError('Email already in use', 409);
-        }
-      }
     }
 
-    // Обновляем пользователя (Prisma update поддерживает только уникальные поля в WHERE)
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        companyId: true,
-        isActive: true,
-        company: {
-          select: {
-            id: true,
-            name: true,
-            currencyBase: true,
+    // Обновляем пользователя, полагаясь на уникальное ограничение базы данных
+    // для предотвращения race condition. Обрабатываем ошибку нарушения уникальности.
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          companyId: true,
+          isActive: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              currencyBase: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    return {
-      ...updatedUser,
-      companyName: updatedUser.company.name,
-    };
+      return {
+        ...updatedUser,
+        companyName: updatedUser.company.name,
+      };
+    } catch (error: unknown) {
+      handleUniqueConstraintError(error, 'email', 'Email already in use');
+    }
   }
 
   async changePassword(
@@ -321,7 +334,10 @@ export class UsersService {
     }
   }
 
-  async confirmOldEmailForChange(token: string): Promise<void> {
+  async confirmOldEmailForChange(
+    token: string,
+    companyId: string
+  ): Promise<void> {
     const validation = await tokenService.validateToken(
       token,
       'email_change_old'
@@ -331,9 +347,13 @@ export class UsersService {
       throw new AppError(validation.error || 'Invalid token', 400);
     }
 
-    // Получаем companyId пользователя для проверки безопасности
-    const user = await prisma.user.findUnique({
-      where: { id: validation.userId },
+    // Проверяем, что пользователь принадлежит к указанной компании
+    // Включаем companyId в WHERE условие для предотвращения утечки данных между компаниями
+    const user = await prisma.user.findFirst({
+      where: {
+        id: validation.userId,
+        companyId: companyId,
+      },
       select: { companyId: true },
     });
 
@@ -414,48 +434,37 @@ export class UsersService {
 
     validateEmail(newEmail);
 
-    // Проверяем, не занят ли новый email в рамках текущей компании
-    // Используем фильтр по companyId для предотвращения утечки данных между компаниями
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        email: newEmail,
-        companyId: companyId,
-      },
-      select: { id: true, companyId: true },
-    });
+    // Обновляем email в транзакции, полагаясь на уникальное ограничение базы данных
+    // для предотвращения race condition. Обрабатываем ошибку нарушения уникальности.
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Проверяем, что пользователь принадлежит к этой компании перед обновлением
+        // (Prisma update поддерживает только уникальные поля в WHERE)
+        const userCheck = await tx.user.findFirst({
+          where: {
+            id: validation.userId,
+            companyId: companyId,
+          },
+          select: { id: true },
+        });
 
-    if (existingUser) {
-      // Если email занят другим пользователем из той же компании, это ошибка
-      if (existingUser.id !== validation.userId) {
-        throw new AppError('Email already in use', 409);
-      }
+        if (!userCheck) {
+          throw new AppError('User not found or access denied', 404);
+        }
+
+        await tx.user.update({
+          where: { id: validation.userId },
+          data: {
+            email: newEmail,
+            isEmailVerified: true, // Новый email считается подтвержденным
+          },
+        });
+
+        await tokenService.markTokenAsUsed(token);
+      });
+    } catch (error: unknown) {
+      handleUniqueConstraintError(error, 'email', 'Email already in use');
     }
-
-    await prisma.$transaction(async (tx) => {
-      // Проверяем, что пользователь принадлежит к этой компании перед обновлением
-      // (Prisma update поддерживает только уникальные поля в WHERE)
-      const userCheck = await tx.user.findFirst({
-        where: {
-          id: validation.userId,
-          companyId: companyId,
-        },
-        select: { id: true },
-      });
-
-      if (!userCheck) {
-        throw new AppError('User not found or access denied', 404);
-      }
-
-      await tx.user.update({
-        where: { id: validation.userId },
-        data: {
-          email: newEmail,
-          isEmailVerified: true, // Новый email считается подтвержденным
-        },
-      });
-
-      await tokenService.markTokenAsUsed(token);
-    });
 
     logger.info('Email changed successfully', {
       userId: validation.userId,

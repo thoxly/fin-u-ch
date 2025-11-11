@@ -19,6 +19,7 @@ jest.mock('../../config/env', () => ({
 
 import { OperationsService, CreateOperationDTO } from './operations.service';
 import { AppError } from '../../middlewares/error';
+import { OperationType } from '@fin-u-ch/shared';
 
 describe('OperationsService', () => {
   let operationsService: OperationsService;
@@ -29,9 +30,12 @@ describe('OperationsService', () => {
 
   describe('create validation', () => {
     const baseOperation: CreateOperationDTO = {
-      type: 'income',
+      type: OperationType.INCOME,
       operationDate: new Date('2024-01-15'),
       amount: 1000,
+      currency: 'RUB',
+      accountId: 'account-1',
+      articleId: 'article-1',
     };
 
     it('should throw error for invalid type', async () => {
@@ -47,18 +51,23 @@ describe('OperationsService', () => {
 
     it('should require accountId and articleId for income operations', () => {
       // This tests the validation logic understanding
-      const validTypes = ['income', 'expense', 'transfer'];
-      expect(validTypes).toContain('income');
-      expect(validTypes).toContain('expense');
-      expect(validTypes).toContain('transfer');
+      const validTypes = [
+        OperationType.INCOME,
+        OperationType.EXPENSE,
+        OperationType.TRANSFER,
+      ];
+      expect(validTypes).toContain(OperationType.INCOME);
+      expect(validTypes).toContain(OperationType.EXPENSE);
+      expect(validTypes).toContain(OperationType.TRANSFER);
     });
 
     it('should require sourceAccountId and targetAccountId for transfer operations', () => {
       // This tests the validation logic understanding
-      const transferOperation: Partial<CreateOperationDTO> = {
-        type: 'transfer',
+      const transferOperation = {
+        type: OperationType.TRANSFER,
         operationDate: new Date(),
         amount: 1000,
+        currency: 'RUB',
         sourceAccountId: 'account-1',
         targetAccountId: 'account-2',
       };
@@ -80,12 +89,12 @@ describe('OperationsService', () => {
 
   describe('filters', () => {
     it('should build where clause with type filter', () => {
-      const filters = { type: 'income' };
+      const filters = { type: OperationType.INCOME };
       const where: any = { companyId: 'test-company' };
 
       if (filters.type) where.type = filters.type;
 
-      expect(where.type).toBe('income');
+      expect(where.type).toBe(OperationType.INCOME);
     });
 
     it('should build where clause with date range filter', () => {
@@ -108,7 +117,7 @@ describe('OperationsService', () => {
 
     it('should build where clause with multiple filters', () => {
       const filters = {
-        type: 'expense',
+        type: OperationType.EXPENSE,
         articleId: 'article-1',
         dealId: 'deal-1',
       };
@@ -118,7 +127,7 @@ describe('OperationsService', () => {
       if (filters.articleId) where.articleId = filters.articleId;
       if (filters.dealId) where.dealId = filters.dealId;
 
-      expect(where.type).toBe('expense');
+      expect(where.type).toBe(OperationType.EXPENSE);
       expect(where.articleId).toBe('article-1');
       expect(where.dealId).toBe('deal-1');
     });

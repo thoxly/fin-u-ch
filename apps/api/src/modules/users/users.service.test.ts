@@ -275,6 +275,16 @@ describe('UsersService', () => {
       await expect(
         usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow(AppError);
+
+      // Reset mocks for second assertion
+      (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: mockUser.id,
+          email: mockUser.email,
+          companyId: mockUser.companyId,
+        })
+        .mockResolvedValueOnce(existingUser);
+
       await expect(
         usersService.requestEmailChange(userId, companyId, newEmail)
       ).rejects.toThrow('Email already in use');
@@ -284,6 +294,7 @@ describe('UsersService', () => {
   describe('confirmOldEmailForChange', () => {
     it('should confirm old email and send verification to new email', async () => {
       const token = 'token-123';
+      const companyId = 'company-1';
       const newEmail = 'newemail@example.com';
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
@@ -291,19 +302,19 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      // Мокаем пользователя для получения companyId
-      (mockedPrisma.user.findUnique as jest.Mock).mockResolvedValueOnce({
-        id: 'user-1',
-        companyId: 'company-1',
-      });
-      // Мокаем пользователя для validateEmailChange (проверка существования пользователя)
+      // Мокаем пользователя для получения companyId (первый вызов findFirst)
       (mockedPrisma.user.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
+          id: 'user-1',
+          companyId: 'company-1',
+        })
+        // Второй вызов - проверка существования пользователя в validateEmailChange
         .mockResolvedValueOnce({
           id: 'user-1',
           email: 'oldemail@example.com',
           companyId: 'company-1',
         })
-        // Второй вызов - проверка, что новый email не занят
+        // Третий вызов - проверка, что новый email не занят
         .mockResolvedValueOnce(null);
       (mockedPrisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
@@ -325,7 +336,7 @@ describe('UsersService', () => {
         undefined
       );
 
-      await usersService.confirmOldEmailForChange(token);
+      await usersService.confirmOldEmailForChange(token, companyId);
 
       expect(mockedTokenService.validateToken).toHaveBeenCalledWith(
         token,
@@ -345,6 +356,7 @@ describe('UsersService', () => {
 
     it('should throw error if token is invalid', async () => {
       const token = 'invalid-token';
+      const companyId = 'company-1';
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
         valid: false,
@@ -352,7 +364,7 @@ describe('UsersService', () => {
       });
 
       await expect(
-        usersService.confirmOldEmailForChange(token)
+        usersService.confirmOldEmailForChange(token, companyId)
       ).rejects.toThrow(AppError);
     });
   });
@@ -419,24 +431,25 @@ describe('UsersService', () => {
       const token = 'token-123';
       const companyId = 'company-1';
       const newEmail = 'existing@example.com';
-      // Создаем пользователя с другим ID, чтобы проверить, что email занят другим пользователем
-      const existingUser = {
-        id: 'user-2',
-        companyId: companyId,
-        email: newEmail,
-      };
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
         valid: true,
         userId: 'user-1',
         metadata: { newEmail },
       });
-      (mockedPrisma.user.findFirst as jest.Mock)
-        .mockResolvedValueOnce({
-          id: 'user-1',
-          companyId: companyId,
-        })
-        .mockResolvedValueOnce(existingUser);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValueOnce({
+        id: 'user-1',
+        companyId: companyId,
+      });
+
+      // Мокируем ошибку нарушения уникального ограничения от Prisma
+      const prismaError = {
+        code: 'P2002',
+        meta: {
+          target: ['email'],
+        },
+      };
+      (mockedPrisma.$transaction as jest.Mock).mockRejectedValue(prismaError);
 
       await expect(
         usersService.confirmEmailChangeWithEmail(token, companyId)
