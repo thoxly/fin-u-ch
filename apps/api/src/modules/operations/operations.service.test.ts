@@ -17,15 +17,33 @@ jest.mock('../../config/env', () => ({
   },
 }));
 
+jest.mock('../../config/db', () => ({
+  __esModule: true,
+  default: {
+    account: {
+      findMany: jest.fn(),
+    },
+    operation: {
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    $transaction: jest.fn(),
+  },
+}));
+
 import { OperationsService, CreateOperationDTO } from './operations.service';
 import { AppError } from '../../middlewares/error';
 import { OperationType } from '@fin-u-ch/shared';
+import prisma from '../../config/db';
+
+const mockedPrisma = prisma as jest.Mocked<typeof prisma>;
 
 describe('OperationsService', () => {
   let operationsService: OperationsService;
 
   beforeEach(() => {
     operationsService = new OperationsService();
+    jest.clearAllMocks();
   });
 
   describe('create validation', () => {
@@ -130,6 +148,107 @@ describe('OperationsService', () => {
       expect(where.type).toBe(OperationType.EXPENSE);
       expect(where.articleId).toBe('article-1');
       expect(where.dealId).toBe('deal-1');
+    });
+  });
+
+  describe('account ownership validation', () => {
+    const companyId = 'company-1';
+    const incomeOperation: CreateOperationDTO = {
+      type: OperationType.INCOME,
+      operationDate: new Date('2024-01-15'),
+      amount: 1000,
+      currency: 'RUB',
+      accountId: 'account-1',
+      articleId: 'article-1',
+    };
+
+    const transferOperation: CreateOperationDTO = {
+      type: OperationType.TRANSFER,
+      operationDate: new Date('2024-01-15'),
+      amount: 1000,
+      currency: 'RUB',
+      sourceAccountId: 'account-1',
+      targetAccountId: 'account-2',
+    };
+
+    it('should validate account ownership on create for income operation', async () => {
+      // Mock account validation - account belongs to company
+      (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
+        { id: 'account-1' },
+      ]);
+      (mockedPrisma.operation.create as jest.Mock).mockResolvedValue({
+        ...incomeOperation,
+        id: 'op-1',
+        companyId,
+      });
+
+      await operationsService.create(companyId, incomeOperation);
+
+      expect(mockedPrisma.account.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['account-1'] },
+          companyId,
+        },
+        select: { id: true },
+      });
+    });
+
+    it('should throw error if account does not belong to company on create', async () => {
+      // Mock account validation - account not found or doesn't belong to company
+      (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([]);
+
+      await expect(
+        operationsService.create(companyId, incomeOperation)
+      ).rejects.toThrow(AppError);
+
+      await expect(
+        operationsService.create(companyId, incomeOperation)
+      ).rejects.toThrow('Invalid or unauthorized accounts');
+    });
+
+    it('should validate both accounts on create for transfer operation', async () => {
+      // Mock account validation - both accounts belong to company
+      (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
+        { id: 'account-1' },
+        { id: 'account-2' },
+      ]);
+      (mockedPrisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const mockCreate = jest.fn().mockResolvedValue({
+            ...transferOperation,
+            id: 'template-1',
+            companyId,
+            isTemplate: true,
+          });
+          const tx = { operation: { create: mockCreate } };
+          return await callback(tx);
+        }
+      );
+
+      await operationsService.create(companyId, transferOperation);
+
+      expect(mockedPrisma.account.findMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['account-1', 'account-2'] },
+          companyId,
+        },
+        select: { id: true },
+      });
+    });
+
+    it('should throw error if one of transfer accounts does not belong to company', async () => {
+      // Mock account validation - only one account found
+      (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
+        { id: 'account-1' },
+      ]);
+
+      await expect(
+        operationsService.create(companyId, transferOperation)
+      ).rejects.toThrow(AppError);
+
+      await expect(
+        operationsService.create(companyId, transferOperation)
+      ).rejects.toThrow('Invalid or unauthorized accounts');
     });
   });
 });

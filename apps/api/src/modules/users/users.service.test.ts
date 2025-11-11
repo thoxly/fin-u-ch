@@ -23,7 +23,9 @@ jest.mock('../../config/db', () => ({
     user: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       findMany: jest.fn(),
     },
     emailToken: {
@@ -33,8 +35,10 @@ jest.mock('../../config/db', () => ({
       callback({
         user: {
           findUnique: jest.fn(),
+          findUniqueOrThrow: jest.fn(),
           findFirst: jest.fn(),
           update: jest.fn(),
+          updateMany: jest.fn(),
         },
         emailToken: {
           update: jest.fn().mockResolvedValue(undefined),
@@ -124,7 +128,19 @@ describe('UsersService', () => {
       jest
         .spyOn(hashUtils, 'hashPassword')
         .mockResolvedValue('$2b$10$newHashedPassword');
-      (mockedPrisma.user.update as jest.Mock).mockResolvedValue(mockUser);
+
+      // Mock the transaction with updateMany
+      (mockedPrisma.$transaction as jest.Mock).mockImplementation(
+        async (callback) => {
+          const tx = {
+            user: {
+              findFirst: jest.fn().mockResolvedValue({ id: userId }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          };
+          return await callback(tx);
+        }
+      );
       (sendPasswordChangedEmail as jest.Mock).mockResolvedValue(undefined);
 
       await usersService.changePassword(
@@ -142,7 +158,7 @@ describe('UsersService', () => {
         mockUser.passwordHash
       );
       expect(hashUtils.hashPassword).toHaveBeenCalledWith(newPassword);
-      expect(mockedPrisma.user.update).toHaveBeenCalled();
+      expect(mockedPrisma.$transaction).toHaveBeenCalled();
       expect(sendPasswordChangedEmail).toHaveBeenCalledWith(mockUser.email);
     });
 
@@ -380,20 +396,16 @@ describe('UsersService', () => {
         userId: 'user-1',
         metadata: { newEmail },
       });
-      (mockedPrisma.user.findFirst as jest.Mock)
-        .mockResolvedValueOnce({
-          id: 'user-1',
-          companyId: companyId,
-        })
-        .mockResolvedValueOnce(null);
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue({
+        id: 'user-1',
+        companyId: companyId,
+      });
       (mockedPrisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
           const tx = {
             user: {
               findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }),
-              update: jest
-                .fn()
-                .mockResolvedValue({ ...mockUser, email: newEmail }),
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
             },
           };
           await callback(tx);
@@ -438,7 +450,7 @@ describe('UsersService', () => {
         metadata: { newEmail },
       });
       // Мокируем findFirst для проверки до транзакции
-      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValueOnce({
+      (mockedPrisma.user.findFirst as jest.Mock).mockResolvedValue({
         id: 'user-1',
         companyId: companyId,
       });
@@ -451,7 +463,7 @@ describe('UsersService', () => {
         },
       };
 
-      // Мокируем транзакцию так, чтобы она выполняла callback, но update выбрасывал ошибку
+      // Мокируем транзакцию так, чтобы она выполняла callback, но updateMany выбрасывал ошибку
       (mockedPrisma.$transaction as jest.Mock).mockImplementation(
         async (callback) => {
           const tx = {
@@ -459,7 +471,7 @@ describe('UsersService', () => {
               findFirst: jest.fn().mockResolvedValue({
                 id: 'user-1',
               }),
-              update: jest.fn().mockRejectedValue(prismaError),
+              updateMany: jest.fn().mockRejectedValue(prismaError),
             },
             emailToken: {
               update: jest.fn().mockResolvedValue(undefined),

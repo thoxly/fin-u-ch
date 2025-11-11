@@ -26,6 +26,40 @@ export interface OperationFilters {
   offset?: number;
 }
 
+// Вспомогательная функция для проверки принадлежности счетов компании
+async function validateAccountsOwnership(
+  companyId: string,
+  accountIds: (string | null | undefined)[]
+): Promise<void> {
+  // Фильтруем только валидные ID
+  const validAccountIds = accountIds.filter(
+    (id): id is string => typeof id === 'string' && id.length > 0
+  );
+
+  if (validAccountIds.length === 0) {
+    return; // Нет счетов для проверки
+  }
+
+  // Проверяем, что все счета существуют и принадлежат компании
+  const accounts = await prisma.account.findMany({
+    where: {
+      id: { in: validAccountIds },
+      companyId,
+    },
+    select: { id: true },
+  });
+
+  // Если количество найденных счетов не совпадает с запрошенными, значит есть недействительные
+  if (accounts.length !== validAccountIds.length) {
+    const foundIds = new Set(accounts.map((acc) => acc.id));
+    const invalidIds = validAccountIds.filter((id) => !foundIds.has(id));
+    throw new AppError(
+      `Invalid or unauthorized accounts: ${invalidIds.join(', ')}`,
+      403
+    );
+  }
+}
+
 export class OperationsService {
   async getAll(companyId: string, filters: OperationFilters) {
     const where: Record<string, unknown> = { companyId };
@@ -147,6 +181,13 @@ export class OperationsService {
 
     const validatedData = validationResult.data;
 
+    // Validate that all accounts belong to the company
+    await validateAccountsOwnership(companyId, [
+      validatedData.accountId,
+      validatedData.sourceAccountId,
+      validatedData.targetAccountId,
+    ]);
+
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
     if (validatedData.repeat && validatedData.repeat !== 'none') {
       return prisma.$transaction(async (tx) => {
@@ -216,6 +257,14 @@ export class OperationsService {
       }
 
       const validatedData = validationResult.data;
+
+      // Validate that all accounts (if provided) belong to the company
+      await validateAccountsOwnership(companyId, [
+        validatedData.accountId,
+        validatedData.sourceAccountId,
+        validatedData.targetAccountId,
+      ]);
+
       return prisma.operation.update({
         where: { id },
         data: validatedData,

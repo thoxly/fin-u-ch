@@ -244,9 +244,22 @@ export class UsersService {
           throw new AppError('User not found or access denied', 404);
         }
 
-        return await tx.user.update({
-          where: { id: userId },
+        // Используем updateMany для безопасной фильтрации по companyId
+        const updateResult = await tx.user.updateMany({
+          where: {
+            id: userId,
+            companyId: companyId,
+          },
           data,
+        });
+
+        if (updateResult.count === 0) {
+          throw new AppError('User not found or access denied', 404);
+        }
+
+        // Получаем обновленного пользователя
+        const updatedUser = await tx.user.findUniqueOrThrow({
+          where: { id: userId },
           select: {
             id: true,
             email: true,
@@ -263,6 +276,8 @@ export class UsersService {
             },
           },
         });
+
+        return updatedUser;
       });
 
       return {
@@ -324,10 +339,18 @@ export class UsersService {
         throw new AppError('User not found or access denied', 404);
       }
 
-      await tx.user.update({
-        where: { id: userId },
+      // Используем updateMany для безопасной фильтрации по companyId
+      const updateResult = await tx.user.updateMany({
+        where: {
+          id: userId,
+          companyId: companyId,
+        },
         data: { passwordHash },
       });
+
+      if (updateResult.count === 0) {
+        throw new AppError('User not found or access denied', 404);
+      }
     });
 
     // Отправляем уведомление об изменении пароля
@@ -486,13 +509,21 @@ export class UsersService {
           throw new AppError('User not found or access denied', 404);
         }
 
-        await tx.user.update({
-          where: { id: validation.userId },
+        // Используем updateMany для безопасной фильтрации по companyId
+        const updateResult = await tx.user.updateMany({
+          where: {
+            id: validation.userId,
+            companyId: companyId,
+          },
           data: {
             email: newEmail,
             isEmailVerified: true, // Новый email считается подтвержденным
           },
         });
+
+        if (updateResult.count === 0) {
+          throw new AppError('User not found or access denied', 404);
+        }
 
         await tokenService.markTokenAsUsed(token);
       });
