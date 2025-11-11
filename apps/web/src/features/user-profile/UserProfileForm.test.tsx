@@ -7,11 +7,15 @@ import { UserProfileForm } from './UserProfileForm';
 // Mock the authApi and companiesApi
 const mockUseGetMeQuery = jest.fn();
 const mockUseUpdateUserMutation = jest.fn();
+const mockUseChangePasswordMutation = jest.fn();
+const mockUseRequestEmailChangeMutation = jest.fn();
 const mockUseUpdateCompanyMutation = jest.fn();
 
 jest.mock('../../store/api/authApi', () => ({
   useGetMeQuery: () => mockUseGetMeQuery(),
   useUpdateUserMutation: () => mockUseUpdateUserMutation(),
+  useChangePasswordMutation: () => mockUseChangePasswordMutation(),
+  useRequestEmailChangeMutation: () => mockUseRequestEmailChangeMutation(),
 }));
 
 jest.mock('../../store/api/companiesApi', () => ({
@@ -29,6 +33,9 @@ const createMockStore = () => {
         },
         isAuthenticated: true,
       }),
+      notification: () => ({
+        notifications: [],
+      }),
     },
   });
 };
@@ -37,7 +44,14 @@ const renderWithProviders = (component: React.ReactElement) => {
   const store = createMockStore();
   return render(
     <Provider store={store}>
-      <BrowserRouter>{component}</BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        {component}
+      </BrowserRouter>
     </Provider>
   );
 };
@@ -46,6 +60,8 @@ describe('UserProfileForm', () => {
   const mockOnClose = jest.fn();
   const mockUpdateUser = jest.fn();
   const mockUpdateCompany = jest.fn();
+  const mockChangePassword = jest.fn();
+  const mockRequestEmailChange = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -74,25 +90,38 @@ describe('UserProfileForm', () => {
       mockUpdateCompany,
       { isLoading: false },
     ]);
+
+    mockUseChangePasswordMutation.mockReturnValue([
+      mockChangePassword,
+      { isLoading: false },
+    ]);
+
+    mockUseRequestEmailChangeMutation.mockReturnValue([
+      mockRequestEmailChange,
+      { isLoading: false },
+    ]);
   });
 
-  it('renders form with user data', () => {
+  it('renders form with user data', async () => {
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
-    expect(screen.getByDisplayValue('test@example.com')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('John')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Doe')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Test Company')).toBeInTheDocument();
+    // Email is displayed as text, not input
+    expect(await screen.findByText('test@example.com')).toBeInTheDocument();
+    // Other fields are set via useEffect, so we need to wait for them
+    expect(await screen.findByDisplayValue('John')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Doe')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Test Company')).toBeInTheDocument();
     expect(screen.getByText('Базовая валюта')).toBeInTheDocument();
   });
 
   it('updates form fields when user types', async () => {
     renderWithProviders(<UserProfileForm onClose={mockOnClose} />);
 
-    const emailInput = screen.getByDisplayValue('test@example.com');
-    fireEvent.change(emailInput, { target: { value: 'newemail@example.com' } });
+    // Wait for form to be populated, then find firstName input to test
+    const firstNameInput = await screen.findByDisplayValue('John');
+    fireEvent.change(firstNameInput, { target: { value: 'Jane' } });
 
-    expect(emailInput).toHaveValue('newemail@example.com');
+    expect(firstNameInput).toHaveValue('Jane');
   });
 
   it('calls updateUser and updateCompany when save button is clicked', async () => {
@@ -108,7 +137,6 @@ describe('UserProfileForm', () => {
 
     await waitFor(() => {
       expect(mockUpdateUser).toHaveBeenCalledWith({
-        email: 'test@example.com',
         firstName: 'John',
         lastName: 'Doe',
       });

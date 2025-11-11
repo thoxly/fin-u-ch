@@ -5,6 +5,7 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetDealsQuery,
   useDeleteDealMutation,
@@ -17,8 +18,25 @@ import { DealForm } from '@/features/catalog-forms/index';
 export const DealsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Deal | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
   const { data: deals = [], isLoading } = useGetDealsQuery();
   const [deleteDeal] = useDeleteDealMutation();
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteDeal(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null });
+  };
 
   const columns = [
     { key: 'name', header: 'Название' },
@@ -45,7 +63,7 @@ export const DealsPage = () => {
             <Pencil size={16} />
           </button>
           <button
-            onClick={() => window.confirm('Удалить?') && deleteDeal(d.id)}
+            onClick={() => handleDelete(d.id)}
             className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
             title="Удалить"
           >
@@ -88,6 +106,14 @@ export const DealsPage = () => {
       >
         <DealForm deal={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить эту сделку?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

@@ -62,9 +62,12 @@ interface RequestEmailChangeRequest {
   newEmail: string;
 }
 
+interface ConfirmOldEmailForChangeRequest {
+  token: string;
+}
+
 interface ConfirmEmailChangeRequest {
   token: string;
-  newEmail: string;
 }
 
 export const authApi = apiSlice.injectEndpoints({
@@ -156,6 +159,16 @@ export const authApi = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    confirmOldEmailForChange: builder.mutation<
+      { message: string },
+      ConfirmOldEmailForChangeRequest
+    >({
+      query: (data) => ({
+        url: '/users/me/confirm-email-change-old',
+        method: 'POST',
+        body: data,
+      }),
+    }),
     confirmEmailChange: builder.mutation<
       { message: string },
       ConfirmEmailChangeRequest
@@ -182,5 +195,6 @@ export const {
   useResetPasswordMutation,
   useChangePasswordMutation,
   useRequestEmailChangeMutation,
+  useConfirmOldEmailForChangeMutation,
   useConfirmEmailChangeMutation,
 } = authApi;

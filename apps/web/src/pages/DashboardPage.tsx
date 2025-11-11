@@ -297,7 +297,7 @@ export const DashboardPage = () => {
                   Поступления:
                 </span>
                 <span className="font-semibold text-green-500 dark:text-green-400">
-                  {formatMoney(dashboardData.summary.income)} ₽
+                  {formatMoney(dashboardData.summary.income)}
                 </span>
               </div>
 
@@ -310,7 +310,7 @@ export const DashboardPage = () => {
                   Списания:
                 </span>
                 <span className="font-semibold text-red-500 dark:text-red-400">
-                  {formatMoney(dashboardData.summary.expense)} ₽
+                  {formatMoney(dashboardData.summary.expense)}
                 </span>
               </div>
 
@@ -336,7 +336,7 @@ export const DashboardPage = () => {
                   }`}
                 >
                   {dashboardData.summary.netProfit >= 0 ? '+' : ''}
-                  {formatMoney(dashboardData.summary.netProfit)} ₽
+                  {formatMoney(dashboardData.summary.netProfit)}
                 </span>
               </div>
             </div>

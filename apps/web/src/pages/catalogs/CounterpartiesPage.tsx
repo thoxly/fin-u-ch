@@ -5,6 +5,7 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetCounterpartiesQuery,
   useDeleteCounterpartyMutation,
@@ -16,8 +17,25 @@ import { CounterpartyForm } from '@/features/catalog-forms/index';
 export const CounterpartiesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Counterparty | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
   const { data: counterparties = [], isLoading } = useGetCounterpartiesQuery();
   const [deleteCounterparty] = useDeleteCounterpartyMutation();
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteCounterparty(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null });
+  };
 
   const categoryLabels: Record<string, string> = {
     supplier: 'Поставщик',
@@ -51,9 +69,7 @@ export const CounterpartiesPage = () => {
             <Pencil size={16} />
           </button>
           <button
-            onClick={() =>
-              window.confirm('Удалить?') && deleteCounterparty(c.id)
-            }
+            onClick={() => handleDelete(c.id)}
             className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
             title="Удалить"
           >
@@ -99,6 +115,14 @@ export const CounterpartiesPage = () => {
           onClose={() => setIsFormOpen(false)}
         />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить этого контрагента?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

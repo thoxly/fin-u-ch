@@ -5,7 +5,7 @@ import usersService from './users.service';
 export class UsersController {
   async getMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await usersService.getMe(req.userId!);
+      const result = await usersService.getMe(req.userId!, req.companyId!);
       res.json(result);
     } catch (error) {
       next(error);
@@ -23,7 +23,11 @@ export class UsersController {
 
   async updateMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await usersService.updateMe(req.userId!, req.body);
+      const result = await usersService.updateMe(
+        req.userId!,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -35,6 +39,7 @@ export class UsersController {
       const { currentPassword, newPassword } = req.body;
       await usersService.changePassword(
         req.userId!,
+        req.companyId!,
         currentPassword,
         newPassword
       );
@@ -51,8 +56,31 @@ export class UsersController {
   ) {
     try {
       const { newEmail } = req.body;
-      await usersService.requestEmailChange(req.userId!, newEmail);
-      res.json({ message: 'Verification email sent to new email address' });
+      await usersService.requestEmailChange(
+        req.userId!,
+        req.companyId!,
+        newEmail
+      );
+      res.json({
+        message: 'Verification email sent to your current email address',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async confirmOldEmailForChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { token } = req.body;
+      await usersService.confirmOldEmailForChange(token, req.companyId!);
+      res.json({
+        message:
+          'Old email confirmed. Verification email sent to new email address',
+      });
     } catch (error) {
       next(error);
     }
@@ -64,8 +92,8 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      const { token, newEmail } = req.body;
-      await usersService.confirmEmailChangeWithEmail(token, newEmail);
+      const { token } = req.body;
+      await usersService.confirmEmailChangeWithEmail(token, req.companyId!);
       res.json({ message: 'Email changed successfully' });
     } catch (error) {
       next(error);

@@ -6,6 +6,7 @@ import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
 import { OffCanvas } from '../shared/ui/OffCanvas';
+import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Table } from '../shared/ui/Table';
 import { PlanForm } from '../features/plan-editor/PlanForm';
 import { CashflowTable } from '../widgets/CashflowTable';
@@ -87,15 +88,28 @@ export const BudgetDetailsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту плановую запись?')) {
-      try {
-        await deletePlan(id).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.PLAN.DELETE_SUCCESS);
-      } catch (error) {
-        console.error('Failed to delete plan:', error);
-        showError(NOTIFICATION_MESSAGES.PLAN.DELETE_ERROR);
-      }
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    try {
+      await deletePlan(deleteModal.id).unwrap();
+      showSuccess(NOTIFICATION_MESSAGES.PLAN.DELETE_SUCCESS);
+      setDeleteModal({ isOpen: false, id: null });
+    } catch (error) {
+      console.error('Failed to delete plan:', error);
+      showError(NOTIFICATION_MESSAGES.PLAN.DELETE_ERROR);
+      setDeleteModal({ isOpen: false, id: null });
     }
   };
 
@@ -304,6 +318,14 @@ export const BudgetDetailsPage = () => {
           onClose={handleCloseForm}
         />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить эту плановую запись?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

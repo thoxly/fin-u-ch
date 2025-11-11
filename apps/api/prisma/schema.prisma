@@ -270,9 +270,10 @@ model EmailToken {
   id        String   @id @default(uuid())
   userId    String
   token     String   @unique
-  type      String // email_verification|password_reset|email_change
+  type      String // email_verification|password_reset|email_change_old|email_change_new
   expiresAt DateTime
   used      Boolean  @default(false)
+  metadata  Json? // Additional data (e.g., newEmail for email_change)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
