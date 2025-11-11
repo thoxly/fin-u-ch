@@ -14,9 +14,14 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@fin-u-ch/shared'],
+    force: false, // Set to true if you need to force re-optimization
   },
   server: {
     port: 5173,
+    watch: {
+      // Watch for changes in the shared package
+      ignored: ['!**/node_modules/@fin-u-ch/shared/**'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
