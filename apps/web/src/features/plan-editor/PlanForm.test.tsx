@@ -41,6 +41,9 @@ const createMockStore = () => {
   return configureStore({
     reducer: {
       api: () => ({}),
+      notification: () => ({
+        notifications: [],
+      }),
     },
   });
 };
@@ -109,7 +112,9 @@ describe('PlanForm', () => {
 
       renderWithProvider(<PlanForm plan={null} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByLabelText('Сумма');
+      const amountInput = await waitFor(() => {
+        return screen.getByLabelText(/Сумма/i);
+      });
       fireEvent.change(amountInput, { target: { value: '1000' } });
 
       const submitButton = screen.getByText('Создать');
@@ -143,7 +148,9 @@ describe('PlanForm', () => {
         />
       );
 
-      const amountInput = screen.getByLabelText('Сумма');
+      const amountInput = await waitFor(() => {
+        return screen.getByLabelText(/Сумма/i);
+      });
       fireEvent.change(amountInput, { target: { value: '500' } });
 
       const submitButton = screen.getByText('Создать');
@@ -188,7 +195,9 @@ describe('PlanForm', () => {
 
       renderWithProvider(<PlanForm plan={mockPlan} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByLabelText('Сумма');
+      const amountInput = await waitFor(() => {
+        return screen.getByLabelText(/Сумма/i);
+      });
       fireEvent.change(amountInput, { target: { value: '6000' } });
 
       const submitButton = screen.getByText('Сохранить');
@@ -257,7 +266,9 @@ describe('PlanForm', () => {
     it('updates form fields when user types', async () => {
       renderWithProvider(<PlanForm plan={null} onClose={mockOnClose} />);
 
-      const amountInput = screen.getByLabelText('Сумма');
+      const amountInput = await waitFor(() => {
+        return screen.getByLabelText(/Сумма/i);
+      });
       fireEvent.change(amountInput, { target: { value: '2500.50' } });
 
       // formatAmountInput formats with spaces for thousands

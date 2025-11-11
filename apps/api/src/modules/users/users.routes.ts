@@ -109,9 +109,9 @@ router.post('/me/request-email-change', usersController.requestEmailChange);
 
 /**
  * @swagger
- * /api/users/me/confirm-email-change:
+ * /api/users/me/confirm-email-change-old:
  *   post:
- *     summary: Confirm email change
+ *     summary: Confirm old email for email change
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -123,11 +123,38 @@ router.post('/me/request-email-change', usersController.requestEmailChange);
  *             type: object
  *             required:
  *               - token
- *               - newEmail
  *             properties:
  *               token:
  *                 type: string
- *               newEmail:
+ *     responses:
+ *       200:
+ *         description: Old email confirmed, verification email sent to new email
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post(
+  '/me/confirm-email-change-old',
+  usersController.confirmOldEmailForChange
+);
+
+/**
+ * @swagger
+ * /api/users/me/confirm-email-change:
+ *   post:
+ *     summary: Confirm new email and complete email change
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
  *                 type: string
  *     responses:
  *       200:

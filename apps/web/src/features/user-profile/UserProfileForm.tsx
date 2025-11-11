@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Save, Mail, Building } from 'lucide-react';
-import { useGetMeQuery, useUpdateUserMutation } from '../../store/api/authApi';
+import { Save } from 'lucide-react';
+import {
+  useGetMeQuery,
+  useUpdateUserMutation,
+  useChangePasswordMutation,
+  useRequestEmailChangeMutation,
+} from '../../store/api/authApi';
 import { useUpdateCompanyMutation } from '../../store/api/companiesApi';
-import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
-import { CurrencySelect } from '../../shared/ui/CurrencySelect';
+import { ProfileInfoSection } from './ProfileInfoSection';
+import { EmailChangeSection } from './EmailChangeSection';
+import { PasswordChangeSection } from './PasswordChangeSection';
+import { useNotification } from '../../shared/hooks/useNotification';
 
 interface UserProfileFormProps {
   onClose: () => void;
@@ -26,6 +33,12 @@ export const UserProfileForm = ({
     useUpdateUserMutation();
   const [updateCompany, { isLoading: updateCompanyLoading }] =
     useUpdateCompanyMutation();
+  const [changePassword, { isLoading: changePasswordLoading }] =
+    useChangePasswordMutation();
+  const [requestEmailChange, { isLoading: requestEmailChangeLoading }] =
+    useRequestEmailChangeMutation();
+
+  const { showSuccess, showError } = useNotification();
 
   const updateLoading = updateUserLoading || updateCompanyLoading;
 
@@ -50,9 +63,8 @@ export const UserProfileForm = ({
 
   const handleSave = async (): Promise<void> => {
     try {
-      // Обновляем данные пользователя
+      // Обновляем данные пользователя (без email, так как его нельзя менять напрямую)
       await updateUser({
-        email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
       }).unwrap();
@@ -63,9 +75,37 @@ export const UserProfileForm = ({
         currencyBase: formData.currencyBase,
       }).unwrap();
 
+      showSuccess('Профиль успешно обновлен');
       onClose();
     } catch (error) {
       console.error('Ошибка при обновлении профиля:', error);
+      showError('Ошибка при обновлении профиля');
+    }
+  };
+
+  const handleRequestEmailChange = async (newEmail: string): Promise<void> => {
+    try {
+      await requestEmailChange({ newEmail }).unwrap();
+      showSuccess('Письмо с подтверждением отправлено на ваш текущий email');
+    } catch (error) {
+      console.error('Ошибка при запросе смены email:', error);
+      showError('Ошибка при запросе смены email');
+    }
+  };
+
+  const handleChangePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> => {
+    try {
+      await changePassword({
+        currentPassword,
+        newPassword,
+      }).unwrap();
+      showSuccess('Пароль успешно изменен');
+    } catch (error) {
+      console.error('Ошибка при смене пароля:', error);
+      showError('Ошибка при смене пароля');
     }
   };
 
@@ -79,68 +119,30 @@ export const UserProfileForm = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Email
-        </label>
-        <Input
-          type="email"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-          icon={<Mail size={16} />}
-          placeholder="Введите email"
-        />
-      </div>
+    <div className="space-y-6">
+      <EmailChangeSection
+        currentEmail={formData.email}
+        onRequestEmailChange={handleRequestEmailChange}
+        isLoading={requestEmailChangeLoading}
+      />
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Имя
-          </label>
-          <Input
-            type="text"
-            value={formData.firstName}
-            onChange={(e) => handleInputChange('firstName', e.target.value)}
-            placeholder="Введите имя"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Фамилия
-          </label>
-          <Input
-            type="text"
-            value={formData.lastName}
-            onChange={(e) => handleInputChange('lastName', e.target.value)}
-            placeholder="Введите фамилию"
-          />
-        </div>
-      </div>
+      <PasswordChangeSection
+        onChangePassword={handleChangePassword}
+        isLoading={changePasswordLoading}
+      />
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Название компании
-        </label>
-        <Input
-          type="text"
-          value={formData.companyName}
-          onChange={(e) => handleInputChange('companyName', e.target.value)}
-          icon={<Building size={16} />}
-          placeholder="Введите название компании"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Базовая валюта
-        </label>
-        <CurrencySelect
-          value={formData.currencyBase}
-          onChange={(value) => handleInputChange('currencyBase', value)}
-          placeholder="Выберите базовую валюту"
-        />
-      </div>
+      <ProfileInfoSection
+        firstName={formData.firstName}
+        lastName={formData.lastName}
+        companyName={formData.companyName}
+        currencyBase={formData.currencyBase}
+        onFirstNameChange={(value) => handleInputChange('firstName', value)}
+        onLastNameChange={(value) => handleInputChange('lastName', value)}
+        onCompanyNameChange={(value) => handleInputChange('companyName', value)}
+        onCurrencyBaseChange={(value) =>
+          handleInputChange('currencyBase', value)
+        }
+      />
 
       <div className="flex items-center justify-end gap-3 pt-4">
         <Button variant="outline" onClick={onClose} disabled={updateLoading}>

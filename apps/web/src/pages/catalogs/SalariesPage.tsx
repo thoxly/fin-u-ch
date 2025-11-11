@@ -4,6 +4,7 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetSalariesQuery,
   useDeleteSalaryMutation,
@@ -17,8 +18,25 @@ import { SalaryForm } from '@/features/catalog-forms/index';
 export const SalariesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Salary | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
   const { data: salaries = [], isLoading } = useGetSalariesQuery();
   const [deleteSalary] = useDeleteSalaryMutation();
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteSalary(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null });
+  };
 
   const columns = [
     { key: 'employeeName', header: 'Сотрудник' },
@@ -59,7 +77,7 @@ export const SalariesPage = () => {
             <Pencil size={16} />
           </button>
           <button
-            onClick={() => window.confirm('Удалить?') && deleteSalary(s.id)}
+            onClick={() => handleDelete(s.id)}
             className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
             title="Удалить"
           >
@@ -102,6 +120,14 @@ export const SalariesPage = () => {
       >
         <SalaryForm salary={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить эту запись о зарплате?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

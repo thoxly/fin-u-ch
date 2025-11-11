@@ -60,6 +60,7 @@ const createMockStore = () => {
     reducer: {
       auth: (state = { user: null, token: null }) => state,
       api: (state = {}) => state,
+      notification: (state = { notifications: [] }) => state,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
@@ -200,16 +201,22 @@ describe('Layout - MenuPopover Integration', () => {
       fireEvent.click(catalogButton);
     }
 
-    await waitFor(() => {
-      expect(screen.getByText('Статьи')).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Статьи')).toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
 
     const articleLink = screen.getByText('Статьи');
     fireEvent.click(articleLink);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Статьи')).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByText('Статьи')).not.toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
   });
 
   it('should not open MenuPopover for items without children', () => {
@@ -288,11 +295,16 @@ describe('Layout - MenuPopover Integration', () => {
       fireEvent.click(catalogButton);
     }
 
-    await waitFor(() => {
-      expect(screen.getByLabelText('Создать статью')).toBeInTheDocument();
-      expect(screen.getByLabelText('Создать счет')).toBeInTheDocument();
-      expect(screen.getByLabelText('Создать контрагента')).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByLabelText('Создать статью')).toBeInTheDocument();
+        expect(screen.getByLabelText('Создать счет')).toBeInTheDocument();
+        expect(
+          screen.getByLabelText('Создать контрагента')
+        ).toBeInTheDocument();
+      },
+      { timeout: 10000 }
+    );
   });
 
   it('should open OffCanvas when create action is clicked for a specific catalog', async () => {

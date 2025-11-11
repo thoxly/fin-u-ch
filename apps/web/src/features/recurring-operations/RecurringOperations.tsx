@@ -11,6 +11,7 @@ import type { Operation } from '@fin-u-ch/shared';
 import { Periodicity } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 
 interface RecurringOperationsProps {
   onEdit: (operation: Operation) => void;
@@ -21,6 +22,15 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { showSuccess, showError } = useNotification();
   const isMobile = useIsMobile();
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    operation: Operation | null;
+    childrenCount: number;
+  }>({
+    isOpen: false,
+    operation: null,
+    childrenCount: 0,
+  });
 
   // Получаем только шаблоны
   const { data: allOperations = [] } = useGetOperationsQuery({
@@ -47,7 +57,7 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isMobile]);
 
-  const handleDisableRecurrence = async (
+  const handleDisableRecurrence = (
     operation: Operation,
     e: React.MouseEvent
   ) => {
@@ -58,22 +68,26 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
       (op) => op.recurrenceParentId === operation.id
     );
 
-    let confirmMessage = 'Удалить шаблон повторяющейся операции?';
-    if (children.length > 0) {
-      confirmMessage = `Удалить шаблон?\n\nВсе ${children.length} дочерних операций останутся в базе как обычные операции.`;
-    }
+    setDeleteModal({
+      isOpen: true,
+      operation,
+      childrenCount: children.length,
+    });
+  };
 
-    if (!window.confirm(confirmMessage)) return;
+  const confirmDelete = async () => {
+    if (!deleteModal.operation) return;
 
     try {
       // Удаляем только шаблон, все дочерние операции остаются
-      await deleteOperation(operation.id).unwrap();
+      await deleteOperation(deleteModal.operation.id).unwrap();
 
       showSuccess(
-        children.length > 0
-          ? `Шаблон удален. ${children.length} дочерних операций остались в базе`
+        deleteModal.childrenCount > 0
+          ? `Шаблон удален. ${deleteModal.childrenCount} дочерних операций остались в базе`
           : 'Шаблон удален'
       );
+      setDeleteModal({ isOpen: false, operation: null, childrenCount: 0 });
     } catch (error) {
       console.error('Failed to delete template:', error);
       showError('Ошибка при удалении шаблона');
@@ -249,6 +263,30 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
           )}
         </>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() =>
+          setDeleteModal({ isOpen: false, operation: null, childrenCount: 0 })
+        }
+        onConfirm={confirmDelete}
+        title="Подтверждение удаления шаблона"
+        message={
+          deleteModal.childrenCount > 0
+            ? `Удалить шаблон?\n\nВсе ${deleteModal.childrenCount} дочерних операций останутся в базе как обычные операции.`
+            : 'Удалить шаблон повторяющейся операции?'
+        }
+        confirmText="Удалить"
+        variant="delete"
+        description={
+          deleteModal.childrenCount > 0 ? (
+            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              Все {deleteModal.childrenCount} дочерних операций останутся в базе
+              как обычные операции.
+            </div>
+          ) : undefined
+        }
+      />
     </div>
   );
 };

@@ -1,23 +1,15 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
-import { validateRequired } from '../../utils/validation';
+import { formatZodErrors } from '../../utils/validation';
+import {
+  CreateOperationSchema,
+  UpdateOperationSchema,
+  type CreateOperationInput,
+  type UpdateOperationInput,
+} from '@fin-u-ch/shared';
 
-export interface CreateOperationDTO {
-  type: string;
-  operationDate: Date;
-  amount: number;
-  currency?: string;
-  accountId?: string;
-  sourceAccountId?: string;
-  targetAccountId?: string;
-  articleId?: string;
-  counterpartyId?: string;
-  dealId?: string;
-  departmentId?: string;
-  description?: string;
-  repeat?: string;
-  recurrenceEndDate?: Date;
-}
+// Keep for backward compatibility with tests
+export type CreateOperationDTO = CreateOperationInput;
 
 export interface OperationFilters {
   type?: string;
@@ -32,6 +24,40 @@ export interface OperationFilters {
   isTemplate?: boolean;
   limit?: number;
   offset?: number;
+}
+
+// Вспомогательная функция для проверки принадлежности счетов компании
+async function validateAccountsOwnership(
+  companyId: string,
+  accountIds: (string | null | undefined)[]
+): Promise<void> {
+  // Фильтруем только валидные ID
+  const validAccountIds = accountIds.filter(
+    (id): id is string => typeof id === 'string' && id.length > 0
+  );
+
+  if (validAccountIds.length === 0) {
+    return; // Нет счетов для проверки
+  }
+
+  // Проверяем, что все счета существуют и принадлежат компании
+  const accounts = await prisma.account.findMany({
+    where: {
+      id: { in: validAccountIds },
+      companyId,
+    },
+    select: { id: true },
+  });
+
+  // Если количество найденных счетов не совпадает с запрошенными, значит есть недействительные
+  if (accounts.length !== validAccountIds.length) {
+    const foundIds = new Set(accounts.map((acc) => acc.id));
+    const invalidIds = validAccountIds.filter((id) => !foundIds.has(id));
+    throw new AppError(
+      `Invalid or unauthorized accounts: ${invalidIds.join(', ')}`,
+      403
+    );
+  }
 }
 
 export class OperationsService {
@@ -145,50 +171,34 @@ export class OperationsService {
   }
 
   async create(companyId: string, data: CreateOperationDTO) {
-    validateRequired({
-      type: data.type,
-      operationDate: data.operationDate,
-      amount: data.amount,
-    });
+    // Validate using Zod schema
+    const validationResult = CreateOperationSchema.safeParse(data);
 
-    const validTypes = ['income', 'expense', 'transfer'];
-    if (!validTypes.includes(data.type)) {
-      throw new AppError('Type must be income, expense, or transfer', 400);
+    if (!validationResult.success) {
+      const errorMessage = formatZodErrors(validationResult.error);
+      throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
     }
 
-    // Validate based on type
-    if (data.type === 'income' || data.type === 'expense') {
-      if (!data.accountId || !data.articleId) {
-        throw new AppError(
-          'accountId and articleId are required for income/expense operations',
-          400
-        );
-      }
-    }
+    const validatedData = validationResult.data;
 
-    if (data.type === 'transfer') {
-      if (!data.sourceAccountId || !data.targetAccountId) {
-        throw new AppError(
-          'sourceAccountId and targetAccountId are required for transfer operations',
-          400
-        );
-      }
-      if (data.sourceAccountId === data.targetAccountId) {
-        throw new AppError('Source and target accounts must be different', 400);
-      }
-    }
+    // Validate that all accounts belong to the company
+    await validateAccountsOwnership(companyId, [
+      validatedData.accountId,
+      validatedData.sourceAccountId,
+      validatedData.targetAccountId,
+    ]);
 
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
-    if (data.repeat && data.repeat !== 'none') {
+    if (validatedData.repeat && validatedData.repeat !== 'none') {
       return prisma.$transaction(async (tx) => {
         // Создаем шаблон (isTemplate: true)
         const template = await tx.operation.create({
           data: {
-            ...data,
+            ...validatedData,
             companyId,
             isTemplate: true,
             // Шаблон не должен иметь дату операции, используем дату начала повторов
-            operationDate: data.operationDate,
+            operationDate: validatedData.operationDate,
           },
         });
 
@@ -197,7 +207,7 @@ export class OperationsService {
           data: {
             companyId: template.companyId,
             type: template.type,
-            operationDate: data.operationDate,
+            operationDate: validatedData.operationDate,
             amount: template.amount,
             currency: template.currency,
             accountId: template.accountId,
@@ -223,7 +233,7 @@ export class OperationsService {
     // Обычная операция (не повторяющаяся)
     return prisma.operation.create({
       data: {
-        ...data,
+        ...validatedData,
         companyId,
         isTemplate: false,
       },
@@ -233,14 +243,35 @@ export class OperationsService {
   async update(
     id: string,
     companyId: string,
-    data: Partial<CreateOperationDTO>
+    data: Partial<CreateOperationInput>
   ) {
     await this.getById(id, companyId);
 
-    return prisma.operation.update({
-      where: { id },
-      data,
-    });
+    // Validate using Zod schema (partial validation for updates)
+    if (Object.keys(data).length > 0) {
+      const validationResult = UpdateOperationSchema.safeParse(data);
+
+      if (!validationResult.success) {
+        const errorMessage = formatZodErrors(validationResult.error);
+        throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
+      }
+
+      const validatedData = validationResult.data;
+
+      // Validate that all accounts (if provided) belong to the company
+      await validateAccountsOwnership(companyId, [
+        validatedData.accountId,
+        validatedData.sourceAccountId,
+        validatedData.targetAccountId,
+      ]);
+
+      return prisma.operation.update({
+        where: { id },
+        data: validatedData,
+      });
+    }
+
+    return prisma.operation.findUnique({ where: { id } });
   }
 
   async delete(id: string, companyId: string) {

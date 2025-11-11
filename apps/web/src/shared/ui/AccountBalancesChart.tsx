@@ -71,6 +71,32 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   className = '',
 }) => {
   const isSmall = useIsSmallScreen();
+
+  // Определяем текущую дату (сегодня, без времени)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Обрабатываем данные: обрываем линию на текущей дате
+  // Ось X должна показывать весь период, но линия должна обрываться
+  const processedData = data
+    ? data.map((point) => {
+        const pointDate = new Date(point.date);
+        pointDate.setHours(0, 0, 0, 0);
+
+        // Если точка находится в будущем (после сегодня), устанавливаем null для всех значений счетов
+        if (pointDate > today) {
+          const result = { ...point };
+          // Устанавливаем null для всех счетов
+          accounts.forEach((account) => {
+            result[account.name] = null;
+          });
+          return result;
+        }
+
+        return point;
+      })
+    : undefined;
+
   const {
     isPanelOpen,
     hoveredOnce,
@@ -82,7 +108,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     hasData,
     getAccountColor,
     buildExportRows,
-  } = useAccountBalancesChart(data, false);
+  } = useAccountBalancesChart(processedData || data, false);
   // Tooltip content moved to CustomTooltip with aggregated income/expense
 
   // data transformation and interactions are handled by hook
@@ -136,11 +162,11 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           </ResponsiveContainer>
 
           {/* Сообщение поверх графика */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="text-center text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-4 py-2 rounded-lg">
-              <div className="text-2xl mb-1">💰</div>
-              <div className="text-sm font-medium">
-                Нет данных за выбранный период
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="text-center text-gray-500 dark:text-gray-400 bg-white/80 dark:bg-gray-800/80 px-3 py-1.5 rounded-lg">
+              <div className="text-xs font-medium leading-tight">
+                <div>Нет данных</div>
+                <div>за выбранный период</div>
               </div>
             </div>
           </div>
@@ -190,7 +216,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
-            data={data}
+            data={processedData || data}
             margin={{ top: 5, right: 30, left: 20, bottom: 56 }}
           >
             <CartesianGrid
@@ -202,9 +228,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               className="text-gray-600 dark:text-gray-400"
               fontSize={12}
               tick={{ fontSize: 11 }}
-              angle={data.length > 8 ? -45 : 0}
-              textAnchor={data.length > 8 ? 'end' : 'middle'}
-              height={data.length > 8 ? 80 : 30}
+              angle={(processedData || data).length > 8 ? -45 : 0}
+              textAnchor={(processedData || data).length > 8 ? 'end' : 'middle'}
+              height={(processedData || data).length > 8 ? 80 : 30}
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
@@ -218,7 +244,9 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
             <Tooltip
               cursor={false}
               content={({ active, payload, label }) => {
-                const currentPoint = data.find((d) => d.label === label);
+                const currentPoint = (processedData || data).find(
+                  (d) => d.label === label
+                );
                 const hasOps = currentPoint?.operations?.some(
                   (op) => op.amount && op.amount !== 0
                 );
@@ -248,9 +276,17 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 stroke={getAccountColor(index)}
                 strokeWidth={2}
                 activeDot={false}
+                connectNulls={false}
                 dot={(props) => {
                   // Показываем точку только для счетов, по которым есть операции в этот день
-                  const dataPoint = data[props.index];
+                  const dataPoint = (processedData || data)[props.index];
+                  const accountBalance = dataPoint?.[accountName];
+
+                  // Не показываем точки для null значений (будущие даты)
+                  if (accountBalance === null || accountBalance === undefined) {
+                    return null;
+                  }
+
                   const operations = dataPoint?.operations || [];
                   if (!operations.length) return null;
 
