@@ -41,6 +41,9 @@ const createMockStore = () => {
   return configureStore({
     reducer: {
       api: () => ({}),
+      notification: () => ({
+        notifications: [],
+      }),
     },
   });
 };

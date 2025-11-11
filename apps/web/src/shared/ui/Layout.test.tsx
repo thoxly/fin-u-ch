@@ -60,6 +60,7 @@ const createMockStore = () => {
     reducer: {
       auth: (state = { user: null, token: null }) => state,
       api: (state = {}) => state,
+      notification: (state = { notifications: [] }) => state,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

@@ -150,6 +150,23 @@ async function sendNewEmailVerification(
   }
 }
 
+async function processOldEmailConfirmation(
+  token: string,
+  userId: string,
+  newEmail: string
+): Promise<void> {
+  // Помечаем токен старого email как использованный в транзакции
+  await prisma.$transaction(async (tx) => {
+    await tx.emailToken.update({
+      where: { token },
+      data: { used: true },
+    });
+  });
+
+  const newEmailToken = await createNewEmailToken(userId, newEmail);
+  await sendNewEmailVerification(newEmail, newEmailToken, userId);
+}
+
 export class UsersService {
   async getMe(userId: string, companyId: string) {
     // Проверяем, что пользователь принадлежит к указанной компании
@@ -405,7 +422,6 @@ export class UsersService {
     }
 
     // Проверяем, что пользователь принадлежит к указанной компании
-    // Включаем companyId в WHERE условие для предотвращения утечки данных между компаниями
     const user = await prisma.user.findFirst({
       where: {
         id: validation.userId,
@@ -427,23 +443,7 @@ export class UsersService {
     await validateEmailChange(validation.userId, newEmail, user.companyId);
 
     try {
-      // Помечаем токен старого email как использованный в транзакции
-      await prisma.$transaction(async (tx) => {
-        await tx.emailToken.update({
-          where: { token },
-          data: { used: true },
-        });
-      });
-
-      const newEmailToken = await createNewEmailToken(
-        validation.userId,
-        newEmail
-      );
-      await sendNewEmailVerification(
-        newEmail,
-        newEmailToken,
-        validation.userId
-      );
+      await processOldEmailConfirmation(token, validation.userId, newEmail);
     } catch (error) {
       logger.error('Failed to send email change verification to new email', {
         userId: validation.userId,

@@ -38,6 +38,91 @@ interface FormValues {
   updateScope?: 'current' | 'all';
 }
 
+// Вспомогательная функция для создания DTO операции
+function buildOperationDTO(formValues: FormValues): CreateOperationDTO {
+  const {
+    type,
+    operationDate,
+    amount,
+    currency,
+    articleId,
+    accountId,
+    sourceAccountId,
+    targetAccountId,
+    counterpartyId,
+    dealId,
+    departmentId,
+    description,
+    repeat,
+    recurrenceEndDate,
+  } = formValues;
+
+  const amountNumber = parseAmountInputToNumber(amount);
+
+  return {
+    type: type as OperationType,
+    operationDate: new Date(operationDate).toISOString(),
+    amount: amountNumber,
+    currency,
+    articleId: articleId || undefined,
+    accountId:
+      type !== OperationType.TRANSFER ? accountId || undefined : undefined,
+    sourceAccountId:
+      type === OperationType.TRANSFER
+        ? sourceAccountId || undefined
+        : undefined,
+    targetAccountId:
+      type === OperationType.TRANSFER
+        ? targetAccountId || undefined
+        : undefined,
+    counterpartyId: counterpartyId || undefined,
+    dealId: dealId || undefined,
+    departmentId: departmentId || undefined,
+    description: description || undefined,
+    repeat: repeat as Periodicity,
+    recurrenceEndDate: recurrenceEndDate
+      ? new Date(recurrenceEndDate).toISOString()
+      : undefined,
+  };
+}
+
+// Вспомогательная функция для создания частичного DTO шаблона
+function buildTemplateUpdateDTO(
+  formValues: FormValues
+): Partial<CreateOperationDTO> {
+  const {
+    type,
+    currency,
+    articleId,
+    accountId,
+    sourceAccountId,
+    targetAccountId,
+    counterpartyId,
+    dealId,
+    departmentId,
+    description,
+  } = formValues;
+
+  return {
+    articleId: articleId || undefined,
+    accountId:
+      type !== OperationType.TRANSFER ? accountId || undefined : undefined,
+    sourceAccountId:
+      type === OperationType.TRANSFER
+        ? sourceAccountId || undefined
+        : undefined,
+    targetAccountId:
+      type === OperationType.TRANSFER
+        ? targetAccountId || undefined
+        : undefined,
+    counterpartyId: counterpartyId || undefined,
+    dealId: dealId || undefined,
+    departmentId: departmentId || undefined,
+    description: description || undefined,
+    currency,
+  };
+}
+
 export const useOperationSubmit = ({
   operation,
   isCopy,
@@ -68,12 +153,6 @@ export const useOperationSubmit = ({
       accountId,
       sourceAccountId,
       targetAccountId,
-      counterpartyId,
-      dealId,
-      departmentId,
-      description,
-      repeat,
-      recurrenceEndDate,
       updateScope,
     } = formValues;
 
@@ -96,101 +175,51 @@ export const useOperationSubmit = ({
       return { success: false };
     }
 
-    const amountNumber = parseAmountInputToNumber(amount);
-    const operationData: CreateOperationDTO = {
-      type: type as OperationType,
-      operationDate: new Date(operationDate).toISOString(),
-      amount: amountNumber,
-      currency,
-      articleId: articleId || undefined,
-      accountId:
-        type !== OperationType.TRANSFER ? accountId || undefined : undefined,
-      sourceAccountId:
-        type === OperationType.TRANSFER
-          ? sourceAccountId || undefined
-          : undefined,
-      targetAccountId:
-        type === OperationType.TRANSFER
-          ? targetAccountId || undefined
-          : undefined,
-      counterpartyId: counterpartyId || undefined,
-      dealId: dealId || undefined,
-      departmentId: departmentId || undefined,
-      description: description || undefined,
-      repeat: repeat as Periodicity,
-      recurrenceEndDate: recurrenceEndDate
-        ? new Date(recurrenceEndDate).toISOString()
-        : undefined,
-    };
+    const operationData = buildOperationDTO(formValues);
 
     try {
-      // Если это копирование или нет operation.id, создаем новую операцию
-      if (operation?.id && !isCopy) {
-        // Если это шаблон, обновляем только шаблон
-        if (isTemplate) {
-          await updateOperation({
-            id: operation.id,
-            data: operationData,
-          }).unwrap();
-          showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
-        }
-        // Если это дочерняя операция и выбран "все последующие"
-        else if (
-          isChildOperation &&
-          updateScope === 'all' &&
-          operation.recurrenceParentId
-        ) {
-          // Обновляем шаблон (родительскую операцию с isTemplate: true)
-          const templateOperationData: Partial<CreateOperationDTO> = {
-            articleId: articleId || undefined,
-            accountId:
-              type !== OperationType.TRANSFER
-                ? accountId || undefined
-                : undefined,
-            sourceAccountId:
-              type === OperationType.TRANSFER
-                ? sourceAccountId || undefined
-                : undefined,
-            targetAccountId:
-              type === OperationType.TRANSFER
-                ? targetAccountId || undefined
-                : undefined,
-            counterpartyId: counterpartyId || undefined,
-            dealId: dealId || undefined,
-            departmentId: departmentId || undefined,
-            description: description || undefined,
-            currency,
-            // Не передаем: operationDate, amount, repeat, recurrenceEndDate
-            // Эти поля шаблона не меняем, чтобы не сломать логику генерации
-          };
-
-          // Обновляем шаблон
-          await updateOperation({
-            id: operation.recurrenceParentId,
-            data: templateOperationData,
-          }).unwrap();
-
-          // Также обновляем текущую операцию
-          await updateOperation({
-            id: operation.id,
-            data: operationData,
-          }).unwrap();
-
-          showSuccess('Операция и все последующие обновлены');
-        } else {
-          // Обновляем только текущую операцию
-          await updateOperation({
-            id: operation.id,
-            data: operationData,
-          }).unwrap();
-          showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
-        }
-      } else {
-        // Создание новой операции
-        // Если repeat !== 'none', сервис автоматически создаст шаблон и первую дочернюю операцию
+      // Создание новой операции или копирование
+      if (!operation?.id || isCopy) {
         await createOperation(operationData).unwrap();
         showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
       }
+      // Обновление шаблона
+      else if (isTemplate) {
+        await updateOperation({
+          id: operation.id,
+          data: operationData,
+        }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
+      }
+      // Обновление дочерней операции и всех последующих
+      else if (
+        isChildOperation &&
+        updateScope === 'all' &&
+        operation.recurrenceParentId
+      ) {
+        const templateData = buildTemplateUpdateDTO(formValues);
+
+        await updateOperation({
+          id: operation.recurrenceParentId,
+          data: templateData,
+        }).unwrap();
+
+        await updateOperation({
+          id: operation.id,
+          data: operationData,
+        }).unwrap();
+
+        showSuccess('Операция и все последующие обновлены');
+      }
+      // Обновление только текущей операции
+      else {
+        await updateOperation({
+          id: operation.id,
+          data: operationData,
+        }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
+      }
+
       onClose();
       return { success: true };
     } catch (error: unknown) {

@@ -1,4 +1,4 @@
-import { useState, FormEvent, useEffect } from 'react';
+import { FormEvent, useEffect } from 'react';
 import { OperationFormFields } from './OperationFormFields';
 import { OperationFormActions } from './OperationFormActions';
 import {
@@ -8,13 +8,13 @@ import {
   useGetDealsQuery,
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
-import { toISODate } from '../../shared/lib/date';
 import type { Operation } from '@fin-u-ch/shared';
 import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { formatAmountInput } from '../../shared/lib/numberInput';
 import { useOperationValidation } from './useOperationValidation';
 import { useFilteredDeals } from './useFilteredDeals';
 import { useOperationSubmit } from './useOperationSubmit';
+import { useOperationFormState } from './useOperationFormState';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -27,69 +27,44 @@ export const OperationForm = ({
   isCopy = false,
   onClose,
 }: OperationFormProps) => {
-  // Выбор: только текущую или все последующие (только для дочерних операций)
-  const [updateScope, setUpdateScope] = useState<'current' | 'all'>('current');
+  // Управление состоянием формы
+  const { formState, formSetters } = useOperationFormState(operation);
+  const {
+    type,
+    operationDate,
+    amount,
+    currency,
+    articleId,
+    accountId,
+    sourceAccountId,
+    targetAccountId,
+    counterpartyId,
+    dealId,
+    departmentId,
+    description,
+    repeat,
+    recurrenceEndDate,
+    updateScope,
+  } = formState;
 
-  const [type, setType] = useState<OperationType>(
-    operation?.type || OperationType.EXPENSE
-  );
+  const {
+    setType,
+    setOperationDate,
+    setAmount,
+    setCurrency,
+    setArticleId,
+    setAccountId,
+    setSourceAccountId,
+    setTargetAccountId,
+    setCounterpartyId,
+    setDealId,
+    setDepartmentId,
+    setDescription,
+    setRepeat,
+    setRecurrenceEndDate,
+    setUpdateScope,
+  } = formSetters;
 
-  // Обрабатываем дату: может быть Date или строка (приходит с API как строка)
-  const getInitialDate = (): string => {
-    if (!operation?.operationDate) return toISODate(new Date());
-    const date = operation.operationDate;
-    // RTK Query возвращает даты как строки, но тип определен как Date
-    // Проверяем оба варианта
-    if (date instanceof Date) {
-      return toISODate(date);
-    }
-    // Если это строка (что обычно происходит при десериализации JSON)
-    const dateStr = date as unknown as string;
-    if (typeof dateStr === 'string') {
-      return dateStr.split('T')[0];
-    }
-    return toISODate(new Date());
-  };
-
-  const getInitialEndDate = (): string => {
-    if (!operation?.recurrenceEndDate) return '';
-    const date = operation.recurrenceEndDate;
-    if (date instanceof Date) {
-      return toISODate(date);
-    }
-    const dateStr = date as unknown as string;
-    if (typeof dateStr === 'string') {
-      return dateStr.split('T')[0];
-    }
-    return '';
-  };
-
-  const [operationDate, setOperationDate] = useState(getInitialDate());
-  const [amount, setAmount] = useState(
-    operation?.amount != null ? formatAmountInput(String(operation.amount)) : ''
-  );
-  const [currency, setCurrency] = useState(operation?.currency || 'RUB');
-  const [articleId, setArticleId] = useState(operation?.articleId || '');
-  const [accountId, setAccountId] = useState(operation?.accountId || '');
-  const [sourceAccountId, setSourceAccountId] = useState(
-    operation?.sourceAccountId || ''
-  );
-  const [targetAccountId, setTargetAccountId] = useState(
-    operation?.targetAccountId || ''
-  );
-  const [counterpartyId, setCounterpartyId] = useState(
-    operation?.counterpartyId || ''
-  );
-  const [dealId, setDealId] = useState(operation?.dealId || '');
-  const [departmentId, setDepartmentId] = useState(
-    operation?.departmentId || ''
-  );
-  const [description, setDescription] = useState(operation?.description || '');
-  const [repeat, setRepeat] = useState<Periodicity>(
-    operation?.repeat || Periodicity.NONE
-  );
-  const [recurrenceEndDate, setRecurrenceEndDate] =
-    useState(getInitialEndDate());
   const {
     validationErrors,
     validateOperation,
@@ -111,7 +86,6 @@ export const OperationForm = ({
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
 
-  // Фильтрация сделок по выбранному контрагенту
   const filteredDeals = useFilteredDeals(counterpartyId, deals);
 
   // Сброс сделки при изменении контрагента
@@ -122,32 +96,12 @@ export const OperationForm = ({
         setDealId('');
       }
     }
-  }, [counterpartyId, dealId, deals]);
+  }, [counterpartyId, dealId, deals, setDealId]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
-    // Очищаем предыдущие ошибки
     clearAllValidationErrors();
-
-    // Передаем все значения формы в хук для обработки
-    await submitOperation({
-      type,
-      operationDate,
-      amount,
-      currency,
-      articleId,
-      accountId,
-      sourceAccountId,
-      targetAccountId,
-      counterpartyId,
-      dealId,
-      departmentId,
-      description,
-      repeat,
-      recurrenceEndDate,
-      updateScope,
-    });
+    await submitOperation(formState);
   };
 
   const handleTypeChange = (value: string) => {
