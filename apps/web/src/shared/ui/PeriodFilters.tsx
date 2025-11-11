@@ -1,87 +1,85 @@
-// import { useState, useEffect } from 'react';
-import { Input } from './Input';
-import { Select } from './Select';
 import { Button } from './Button';
+import { DateRangePicker } from './DateRangePicker';
 import { PeriodFiltersProps, PeriodFormat } from '@fin-u-ch/shared';
-import {
-  getPeriodRange,
-  getNextPeriod,
-  getPreviousPeriod,
-  // formatPeriodDisplay,
-  getPeriodFormatOptions,
-} from '../lib/period';
+import { getNextPeriod, getPreviousPeriod } from '../lib/period';
+
+// Автоматически определяет формат периода на основе диапазона дат
+const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  const daysDiff =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
+
+  if (daysDiff === 1) {
+    return 'day';
+  } else if (daysDiff <= 7) {
+    return 'week';
+  } else if (daysDiff <= 31) {
+    return 'month';
+  } else if (daysDiff <= 93) {
+    return 'quarter';
+  } else {
+    return 'year';
+  }
+};
 
 export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
-  // const [periodDisplay, setPeriodDisplay] = useState('');
-
-  // Обновляем отображение периода при изменении
-  // useEffect(() => {
-  //   setPeriodDisplay(formatPeriodDisplay(value.range, value.format));
-  // }, [value.range, value.format]);
-
-  const handleFormatChange = (newFormat: PeriodFormat) => {
-    const newRange = getPeriodRange(new Date(value.range.from), newFormat);
+  const handlePreviousPeriod = () => {
+    const format = detectPeriodFormat(value.range.from, value.range.to);
+    const newRange = getPreviousPeriod(value.range, format);
+    // Определяем формат для нового диапазона
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     onChange({
       format: newFormat,
       range: newRange,
     });
   };
 
-  const handlePreviousPeriod = () => {
-    const newRange = getPreviousPeriod(value.range, value.format);
-    onChange({
-      format: value.format,
-      range: newRange,
-    });
-  };
-
   const handleNextPeriod = () => {
-    const newRange = getNextPeriod(value.range, value.format);
+    const format = detectPeriodFormat(value.range.from, value.range.to);
+    const newRange = getNextPeriod(value.range, format);
+    // Определяем формат для нового диапазона
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     onChange({
-      format: value.format,
+      format: newFormat,
       range: newRange,
     });
   };
 
-  const handleManualDateChange = (field: 'from' | 'to', dateValue: string) => {
-    const newRange = {
-      ...value.range,
-      [field]: dateValue,
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    // Форматируем даты в формат YYYY-MM-DD для API
+    const formatDateForAPI = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     };
+    const newRange = {
+      from: formatDateForAPI(startDate),
+      to: formatDateForAPI(endDate),
+    };
+    // Автоматически определяем формат на основе диапазона
+    const format = detectPeriodFormat(newRange.from, newRange.to);
     onChange({
-      format: value.format,
+      format,
       range: newRange,
     });
   };
+
+  const startDate = value.range.from ? new Date(value.range.from) : new Date();
+  const endDate = value.range.to ? new Date(value.range.to) : new Date();
 
   return (
     <div className="space-y-4">
       {/* Фильтры */}
       <div className="flex items-end gap-4">
         <div className="flex-1">
-          <Input
-            label="Период с"
-            type="date"
-            value={value.range.from}
-            onChange={(e) => handleManualDateChange('from', e.target.value)}
-          />
-        </div>
-
-        <div className="flex-1">
-          <Input
-            label="Период по"
-            type="date"
-            value={value.range.to}
-            onChange={(e) => handleManualDateChange('to', e.target.value)}
-          />
-        </div>
-
-        <div className="w-32">
-          <Select
-            label="Формат периода"
-            value={value.format}
-            onChange={(e) => handleFormatChange(e.target.value as PeriodFormat)}
-            options={getPeriodFormatOptions()}
+          <DateRangePicker
+            label="Период"
+            startDate={startDate}
+            endDate={endDate}
+            onChange={handleDateRangeChange}
           />
         </div>
       </div>
@@ -101,9 +99,6 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
             →
           </Button>
         </div>
-
-        {/* Пустое место под форматом */}
-        <div className="w-32"></div>
       </div>
     </div>
   );

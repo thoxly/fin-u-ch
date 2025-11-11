@@ -69,7 +69,7 @@ export const CounterpartyForm = ({
       <Select
         label="Категория"
         value={category}
-        onChange={(e) => setCategory(e.target.value)}
+        onChange={(value) => setCategory(value)}
         options={[
           { value: 'supplier', label: 'Поставщик' },
           { value: 'customer', label: 'Клиент' },

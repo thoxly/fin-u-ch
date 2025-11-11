@@ -43,10 +43,12 @@ model User {
   lastName            String?
   isActive            Boolean  @default(true)
   onboardingCompleted Boolean  @default(false)
+  isEmailVerified     Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailTokens EmailToken[]
 
   @@index([companyId])
   @@map("users")
@@ -182,6 +184,7 @@ model Operation {
   recurrenceParentId String?
   recurrenceEndDate  DateTime?
   isConfirmed        Boolean   @default(true)
+  isTemplate         Boolean   @default(false)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -200,6 +203,7 @@ model Operation {
   @@index([companyId, articleId, operationDate])
   @@index([companyId, accountId, operationDate])
   @@index([companyId, repeat, isConfirmed])
+  @@index([companyId, repeat, isTemplate])
   @@index([recurrenceParentId, operationDate])
   @@map("operations")
 }
@@ -364,4 +368,23 @@ model MappingRule {
   @@index([companyId, ruleType, sourceField])
   @@index([companyId, targetType])
   @@map("mapping_rules")
+}
+
+model EmailToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  type      String // email_verification|password_reset|email_change_old|email_change_new
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  metadata  Json? // Additional data (e.g., newEmail for email_change)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([type, used, expiresAt])
+  @@map("email_tokens")
 }

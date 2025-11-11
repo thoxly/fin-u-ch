@@ -10,7 +10,7 @@ interface Column<T> {
 interface TableProps<T> {
   columns: Column<T>[];
   data: T[];
-  keyExtractor: (item: T) => string;
+  keyExtractor: (item: T, index?: number) => string;
   onRowClick?: (item: T) => void;
   loading?: boolean;
   emptyMessage?: string;
@@ -47,7 +47,7 @@ export function Table<T>({
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr>
-             {columns.map((column) => {
+            {columns.map((column) => {
               const isRulesColumn = column.key === 'rules';
               return (
                 <th
@@ -56,7 +56,9 @@ export function Table<T>({
                   className={`overflow-hidden ${isRulesColumn ? '!text-center' : ''}`}
                 >
                   {isRulesColumn ? (
-                    <div className="flex justify-center items-center">{column.header}</div>
+                    <div className="flex justify-center items-center">
+                      {column.header}
+                    </div>
                   ) : (
                     column.header
                   )}
@@ -66,7 +68,7 @@ export function Table<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((item) => {
+          {data.map((item, index) => {
             const baseClassName = onRowClick ? 'cursor-pointer' : '';
             const customClassName = rowClassName ? rowClassName(item) : '';
             const className = [baseClassName, customClassName]
@@ -75,15 +77,15 @@ export function Table<T>({
 
             return (
               <tr
-                key={keyExtractor(item)}
+                key={keyExtractor(item, index)}
                 onClick={() => onRowClick?.(item)}
                 className={className}
               >
                 {columns.map((column) => {
                   const isRulesColumn = column.key === 'rules';
                   return (
-                    <td 
-                      key={column.key} 
+                    <td
+                      key={column.key}
                       className={`overflow-hidden ${isRulesColumn ? 'text-center' : ''}`}
                     >
                       {column.render

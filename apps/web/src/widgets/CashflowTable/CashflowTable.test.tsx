@@ -67,11 +67,12 @@ describe('CashflowTable', () => {
   it('renders table with correct headers', () => {
     render(<CashflowTable {...defaultProps} />);
 
-    expect(screen.getByText('Статья')).toBeInTheDocument();
-    expect(screen.getByText('Итого')).toBeInTheDocument();
-    expect(screen.getByText(/янв 25/)).toBeInTheDocument();
-    expect(screen.getByText(/февр 25/)).toBeInTheDocument();
-    expect(screen.getByText(/март 25/)).toBeInTheDocument();
+    // Check for header text (can be uppercase in the component)
+    expect(screen.getByText(/статья/i)).toBeInTheDocument();
+    expect(screen.getByText(/итого/i)).toBeInTheDocument();
+    expect(screen.getByText(/янв 25/i)).toBeInTheDocument();
+    expect(screen.getByText(/февр 25/i)).toBeInTheDocument();
+    expect(screen.getByText(/март 25/i)).toBeInTheDocument();
   });
 
   it('renders activity rows with correct names', () => {
@@ -146,7 +147,8 @@ describe('CashflowTable', () => {
 
     render(<CashflowTable {...defaultProps} data={emptyData} />);
 
-    expect(screen.getByText('Статья')).toBeInTheDocument();
+    // Check for header text (can be uppercase in the component)
+    expect(screen.getByText(/статья/i)).toBeInTheDocument();
     expect(screen.getByText('Общий денежный поток')).toBeInTheDocument();
   });
 

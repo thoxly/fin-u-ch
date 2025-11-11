@@ -7,23 +7,15 @@ import {
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 
-interface ArticleFormProps {
-  article: Article | null;
-  onClose: () => void;
-  onSuccess?: (createdId: string) => void;
-  initialName?: string;
-  initialType?: 'income' | 'expense' | 'transfer';
-}
-
 export const ArticleForm = ({
   article,
   onClose,
-  onSuccess,
-  initialName = '',
-  initialType = 'expense',
-}: ArticleFormProps) => {
-  const [name, setName] = useState(article?.name || initialName);
-  const [type, setType] = useState(article?.type || initialType);
+}: {
+  article: Article | null;
+  onClose: () => void;
+}) => {
+  const [name, setName] = useState(article?.name || '');
+  const [type, setType] = useState(article?.type || 'expense');
   const [activity, setActivity] = useState(article?.activity || 'operating');
   const [counterpartyId, setCounterpartyId] = useState(
     article?.counterpartyId || ''
@@ -32,13 +24,27 @@ export const ArticleForm = ({
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
-
   useEffect(() => {
-    setName(article?.name || initialName);
-    setType(article?.type || initialType);
-    setActivity(article?.activity || 'operating');
-    setCounterpartyId(article?.counterpartyId || '');
-  }, [article, initialName, initialType]);
+    console.log('ArticleForm - article prop changed:', article);
+    if (article) {
+      console.log('ArticleForm - setting form values from article:', {
+        name: article.name,
+        type: article.type,
+        activity: article.activity,
+      });
+      setName(article.name || '');
+      setType(article.type || 'expense');
+      setActivity(article.activity || 'operating');
+      setCounterpartyId(article.counterpartyId || '');
+    } else {
+      console.log('ArticleForm - resetting form for new article');
+      // Сброс при создании новой статьи
+      setName('');
+      setType('expense');
+      setActivity('operating');
+      setCounterpartyId('');
+    }
+  }, [article]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,22 +60,15 @@ export const ArticleForm = ({
           },
         }).unwrap();
       } else {
-        const result = await create({
+        await create({
           name,
           type,
           activity,
           isActive: true,
           counterpartyId: counterpartyId || undefined,
         }).unwrap();
-        if (onSuccess && result.id) {
-          onSuccess(result.id);
-        } else {
-          onClose();
-        }
       }
-      if (article) {
-        onClose();
-      }
+      onClose();
     } catch (error) {
       console.error('Failed to save article:', error);
     }
@@ -86,7 +85,7 @@ export const ArticleForm = ({
       <Select
         label="Тип"
         value={type}
-        onChange={(e) => setType(e.target.value)}
+        onChange={(value) => setType(value)}
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
@@ -96,7 +95,7 @@ export const ArticleForm = ({
       <Select
         label="Деятельность"
         value={activity}
-        onChange={(e) => setActivity(e.target.value)}
+        onChange={(value) => setActivity(value)}
         options={[
           { value: 'operating', label: 'Операционная' },
           { value: 'investing', label: 'Инвестиционная' },
@@ -107,11 +106,9 @@ export const ArticleForm = ({
       <Select
         label="Контрагент"
         value={counterpartyId}
-        onChange={(e) => setCounterpartyId(e.target.value)}
-        options={[
-          { value: '', label: 'Не выбран' },
-          ...counterparties.map((c) => ({ value: c.id, label: c.name })),
-        ]}
+        onChange={(value) => setCounterpartyId(value)}
+        options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
+        placeholder="Не выбран"
       />
       <div className="flex gap-4 pt-4">
         <Button type="submit" disabled={isCreating || isUpdating}>
