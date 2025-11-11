@@ -12,6 +12,7 @@ export * from './types/period';
 
 // Schemas
 export * from './schemas/notifications';
+export * from './schemas/operations';
 
 // Constants
 export * from './constants/enums';

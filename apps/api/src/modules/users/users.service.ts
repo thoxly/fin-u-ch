@@ -191,11 +191,32 @@ export class UsersService {
         id: userId,
         companyId: companyId,
       },
-      select: { id: true },
+      select: { id: true, email: true },
     });
 
     if (!userCheck) {
       throw new AppError('User not found or access denied', 404);
+    }
+
+    // Если обновляется email, проверяем уникальность в рамках компании
+    // Используем findFirst с фильтром по companyId для предотвращения утечки данных между компаниями
+    if (data.email && data.email !== userCheck.email) {
+      validateEmail(data.email);
+
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          email: data.email,
+          companyId: companyId,
+        },
+        select: { id: true, companyId: true },
+      });
+
+      if (existingUser) {
+        // Если email занят другим пользователем из той же компании, это ошибка
+        if (existingUser.id !== userId) {
+          throw new AppError('Email already in use', 409);
+        }
+      }
     }
 
     // Обновляем пользователя (Prisma update поддерживает только уникальные поля в WHERE)
@@ -360,7 +381,7 @@ export class UsersService {
 
   async confirmEmailChangeWithEmail(
     token: string,
-    companyId?: string
+    companyId: string
   ): Promise<void> {
     const validation = await tokenService.validateToken(
       token,
@@ -371,20 +392,18 @@ export class UsersService {
       throw new AppError(validation.error || 'Invalid token', 400);
     }
 
-    // Проверяем, что пользователь принадлежит к указанной компании (если companyId передан)
+    // Проверяем, что пользователь принадлежит к указанной компании
     // Включаем companyId в WHERE условие для предотвращения утечки данных между компаниями
-    if (companyId) {
-      const user = await prisma.user.findFirst({
-        where: {
-          id: validation.userId,
-          companyId: companyId,
-        },
-        select: { companyId: true },
-      });
+    const user = await prisma.user.findFirst({
+      where: {
+        id: validation.userId,
+        companyId: companyId,
+      },
+      select: { companyId: true },
+    });
 
-      if (!user) {
-        throw new AppError('User not found or access denied', 404);
-      }
+    if (!user) {
+      throw new AppError('User not found or access denied', 404);
     }
 
     const newEmail = validation.metadata?.newEmail as string | undefined;
@@ -396,53 +415,35 @@ export class UsersService {
     validateEmail(newEmail);
 
     // Проверяем, не занят ли новый email в рамках текущей компании
-    // Если companyId передан, используем фильтр по companyId для предотвращения утечки данных
-    if (companyId) {
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: newEmail,
-          companyId: companyId,
-        },
-        select: { id: true, companyId: true },
-      });
+    // Используем фильтр по companyId для предотвращения утечки данных между компаниями
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        email: newEmail,
+        companyId: companyId,
+      },
+      select: { id: true, companyId: true },
+    });
 
-      if (existingUser) {
-        // Если email занят другим пользователем из той же компании, это ошибка
-        if (existingUser.id !== validation.userId) {
-          throw new AppError('Email already in use', 409);
-        }
-      }
-    } else {
-      // Если companyId не передан (для обратной совместимости), проверяем глобально
-      // но это менее безопасно, поэтому рекомендуется всегда передавать companyId
-      const existingUser = await prisma.user.findUnique({
-        where: { email: newEmail },
-        select: { id: true, companyId: true },
-      });
-
-      if (existingUser) {
-        // Если email занят другим пользователем, это ошибка
-        if (existingUser.id !== validation.userId) {
-          throw new AppError('Email already in use', 409);
-        }
+    if (existingUser) {
+      // Если email занят другим пользователем из той же компании, это ошибка
+      if (existingUser.id !== validation.userId) {
+        throw new AppError('Email already in use', 409);
       }
     }
 
     await prisma.$transaction(async (tx) => {
-      // Если companyId передан, проверяем, что пользователь принадлежит к этой компании
-      // перед обновлением (Prisma update поддерживает только уникальные поля в WHERE)
-      if (companyId) {
-        const userCheck = await tx.user.findFirst({
-          where: {
-            id: validation.userId,
-            companyId: companyId,
-          },
-          select: { id: true },
-        });
+      // Проверяем, что пользователь принадлежит к этой компании перед обновлением
+      // (Prisma update поддерживает только уникальные поля в WHERE)
+      const userCheck = await tx.user.findFirst({
+        where: {
+          id: validation.userId,
+          companyId: companyId,
+        },
+        select: { id: true },
+      });
 
-        if (!userCheck) {
-          throw new AppError('User not found or access denied', 404);
-        }
+      if (!userCheck) {
+        throw new AppError('User not found or access denied', 404);
       }
 
       await tx.user.update({

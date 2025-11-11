@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { OperationType } from '@fin-u-ch/shared';
+import { OperationType, CreateOperationSchema } from '@fin-u-ch/shared';
 import { parseAmountInputToNumber } from '../../shared/lib/numberInput';
 
 export interface ValidationErrors {
@@ -17,6 +17,34 @@ export interface OperationFormData {
   targetAccountId: string;
 }
 
+// Map Zod error messages to Russian
+const translateError = (message: string): string => {
+  const translations: Record<string, string> = {
+    Required: 'обязательно для заполнения',
+    'Account is required for income/expense operations':
+      'Счет обязателен для операций доход/расход',
+    'Article is required for income/expense operations':
+      'Статья обязательна для операций доход/расход',
+    'Source account is required for transfer operations':
+      'Счет списания обязателен для переводов',
+    'Target account is required for transfer operations':
+      'Счет зачисления обязателен для переводов',
+    'Source and target accounts must be different':
+      'Счета списания и зачисления должны отличаться',
+    'Amount must be a positive number':
+      'Сумма должна быть положительным числом',
+    'Currency is required': 'Валюта обязательна',
+  };
+
+  for (const [key, value] of Object.entries(translations)) {
+    if (message.includes(key)) {
+      return value;
+    }
+  }
+
+  return message;
+};
+
 export const useOperationValidation = () => {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>(
     {}
@@ -27,41 +55,36 @@ export const useOperationValidation = () => {
   ): { isValid: boolean; errors: ValidationErrors } => {
     const errors: ValidationErrors = {};
 
-    // Валидация обязательных полей
-    if (!formData.operationDate) {
-      errors.operationDate = 'Поле "Дата" обязательно для заполнения';
-    }
+    // Convert form data to format expected by Zod schema
+    const amountNumber = parseAmountInputToNumber(formData.amount);
 
-    if (!formData.amount || formData.amount.trim() === '') {
-      errors.amount = 'Поле "Сумма" обязательно для заполнения';
-    } else {
-      const amountNumber = parseAmountInputToNumber(formData.amount);
-      if (isNaN(amountNumber) || amountNumber <= 0) {
-        errors.amount = 'Сумма должна быть положительным числом';
-      }
-    }
+    // Prepare data for validation
+    const validationData: Record<string, unknown> = {
+      type: formData.type,
+      operationDate: formData.operationDate,
+      amount: isNaN(amountNumber) ? 0 : amountNumber,
+      currency: formData.currency,
+    };
 
-    if (!formData.currency) {
-      errors.currency = 'Поле "Валюта" обязательно для заполнения';
-    }
-
-    // Валидация в зависимости от типа операции
+    // Add type-specific fields
     if (formData.type === OperationType.TRANSFER) {
-      if (!formData.sourceAccountId) {
-        errors.sourceAccountId =
-          'Поле "Счет списания" обязательно для заполнения';
-      }
-      if (!formData.targetAccountId) {
-        errors.targetAccountId =
-          'Поле "Счет зачисления" обязательно для заполнения';
-      }
+      validationData.sourceAccountId = formData.sourceAccountId || '';
+      validationData.targetAccountId = formData.targetAccountId || '';
     } else {
-      if (!formData.articleId) {
-        errors.articleId = 'Поле "Статья" обязательно для заполнения';
-      }
-      if (!formData.accountId) {
-        errors.accountId = 'Поле "Счет" обязательно для заполнения';
-      }
+      validationData.accountId = formData.accountId || '';
+      validationData.articleId = formData.articleId || '';
+    }
+
+    // Validate using Zod schema
+    const result = CreateOperationSchema.safeParse(validationData);
+
+    if (!result.success) {
+      // Convert Zod errors to our format
+      result.error.errors.forEach((error) => {
+        const field = error.path.join('.');
+        const message = translateError(error.message);
+        errors[field] = message;
+      });
     }
 
     setValidationErrors(errors);

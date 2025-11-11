@@ -11,6 +11,7 @@ import { Button } from '../../shared/ui/Button';
 import { ProfileInfoSection } from './ProfileInfoSection';
 import { EmailChangeSection } from './EmailChangeSection';
 import { PasswordChangeSection } from './PasswordChangeSection';
+import { useNotification } from '../../shared/hooks/useNotification';
 
 interface UserProfileFormProps {
   onClose: () => void;
@@ -36,6 +37,8 @@ export const UserProfileForm = ({
     useChangePasswordMutation();
   const [requestEmailChange, { isLoading: requestEmailChangeLoading }] =
     useRequestEmailChangeMutation();
+
+  const { showSuccess, showError } = useNotification();
 
   const updateLoading = updateUserLoading || updateCompanyLoading;
 
@@ -72,26 +75,38 @@ export const UserProfileForm = ({
         currencyBase: formData.currencyBase,
       }).unwrap();
 
+      showSuccess('Профиль успешно обновлен');
       onClose();
     } catch (error) {
       console.error('Ошибка при обновлении профиля:', error);
+      showError('Ошибка при обновлении профиля');
     }
   };
 
   const handleRequestEmailChange = async (newEmail: string): Promise<void> => {
-    await requestEmailChange({ newEmail }).unwrap();
-    alert('Письмо с подтверждением отправлено на ваш текущий email');
+    try {
+      await requestEmailChange({ newEmail }).unwrap();
+      showSuccess('Письмо с подтверждением отправлено на ваш текущий email');
+    } catch (error) {
+      console.error('Ошибка при запросе смены email:', error);
+      showError('Ошибка при запросе смены email');
+    }
   };
 
   const handleChangePassword = async (
     currentPassword: string,
     newPassword: string
   ): Promise<void> => {
-    await changePassword({
-      currentPassword,
-      newPassword,
-    }).unwrap();
-    alert('Пароль успешно изменен');
+    try {
+      await changePassword({
+        currentPassword,
+        newPassword,
+      }).unwrap();
+      showSuccess('Пароль успешно изменен');
+    } catch (error) {
+      console.error('Ошибка при смене пароля:', error);
+      showError('Ошибка при смене пароля');
+    }
   };
 
   if (userLoading) {

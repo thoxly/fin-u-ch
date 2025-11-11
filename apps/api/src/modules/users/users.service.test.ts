@@ -403,6 +403,7 @@ describe('UsersService', () => {
 
     it('should throw error if token is invalid', async () => {
       const token = 'invalid-token';
+      const companyId = 'company-1';
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
         valid: false,
@@ -410,7 +411,7 @@ describe('UsersService', () => {
       });
 
       await expect(
-        usersService.confirmEmailChangeWithEmail(token)
+        usersService.confirmEmailChangeWithEmail(token, companyId)
       ).rejects.toThrow(AppError);
     });
 
