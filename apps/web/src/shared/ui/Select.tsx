@@ -9,7 +9,7 @@ interface SelectOption {
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: SelectOption[];
+  options?: SelectOption[];
   placeholder?: string;
   fullWidth?: boolean;
 }
@@ -40,11 +40,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               {placeholder}
             </option>
           )}
-          {options.map((option) => (
+          {options?.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
-          ))}
+          )) || []}
         </select>
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
       </div>

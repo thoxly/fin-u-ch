@@ -202,6 +202,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             filenameBase="income_expense"
             buildRows={buildExportRows}
             columns={['date', 'category', 'amount', 'type']}
+            entity="reports"
           />
         </div>
       </div>

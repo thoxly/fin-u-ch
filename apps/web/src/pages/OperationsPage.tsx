@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
@@ -13,6 +13,8 @@ import { FolderOpen } from 'lucide-react';
 import { Modal } from '../shared/ui/Modal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
+import { usePermissions } from '../shared/hooks/usePermissions';
+import { ProtectedAction } from '../shared/components/ProtectedAction';
 import {
   useLazyGetOperationsQuery,
   useDeleteOperationMutation,
@@ -71,11 +73,22 @@ export const OperationsPage = () => {
   const [dealIdFilter, setDealIdFilter] = useState('');
   const [departmentIdFilter, setDepartmentIdFilter] = useState('');
 
-  // Загружаем справочники для фильтров
-  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
-  const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  const { data: deals = [] } = useGetDealsQuery();
-  const { data: departments = [] } = useGetDepartmentsQuery();
+  const { canRead } = usePermissions();
+
+  // Загружаем справочники для фильтров (только если есть права на просмотр операций)
+  const { data: articles = [] } = useGetArticlesQuery(
+    { isActive: true },
+    { skip: !canRead('operations') }
+  );
+  const { data: counterparties = [] } = useGetCounterpartiesQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: deals = [] } = useGetDealsQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: departments = [] } = useGetDepartmentsQuery(undefined, {
+    skip: !canRead('operations'),
+  });
 
   // Формируем объект фильтров с useMemo для избежания ненужных пересозданий
   const filters = useMemo(() => {
@@ -124,6 +137,11 @@ export const OperationsPage = () => {
 
   // Extract data reloading logic to avoid duplication
   const reloadOperationsData = useCallback(async () => {
+    if (!canRead('operations')) {
+      setItems([]);
+      setHasMore(false);
+      return;
+    }
     setItems([]);
     setOffset(0);
     setHasMore(true);
@@ -137,11 +155,11 @@ export const OperationsPage = () => {
     setItems(result as OperationWithRelations[]);
     setHasMore(result.length === PAGE_SIZE);
     setOffset(result.length);
-  }, [hasActiveFilters, filters, trigger, clearSelection]);
+  }, [hasActiveFilters, filters, trigger, clearSelection, canRead]);
 
   // Memoize loadMore callback to prevent unnecessary re-renders
   const loadMore = useCallback(async () => {
-    if (isFetching || !hasMore) return;
+    if (isFetching || !hasMore || !canRead('operations')) return;
     const params: OpsQuery = {
       ...(hasActiveFilters ? filters : {}),
       limit: PAGE_SIZE,
@@ -152,7 +170,15 @@ export const OperationsPage = () => {
     setItems((prev) => [...prev, ...page]);
     setOffset((prevOffset) => prevOffset + page.length);
     setHasMore(page.length === PAGE_SIZE);
-  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
+  }, [
+    isFetching,
+    hasMore,
+    hasActiveFilters,
+    filters,
+    offset,
+    trigger,
+    canRead,
+  ]);
 
   // Initial and filters-changed load with proper dependencies
   useEffect(() => {
@@ -167,11 +193,16 @@ export const OperationsPage = () => {
         setHasMore(true);
       }
     };
-    load();
+    if (canRead('operations')) {
+      load();
+    } else {
+      setItems([]);
+      setHasMore(false);
+    }
     return () => {
       cancelled = true;
     };
-  }, [reloadOperationsData]);
+  }, [reloadOperationsData, canRead]);
 
   // Use IntersectionObserver hook for infinite scroll
   const sentinelRef = useIntersectionObserver(
@@ -200,6 +231,7 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id, createdAt, updatedAt, ...operationData } = operation;
     // Use structuredClone for deep copy to ensure nested objects are properly copied
     const operationCopy = structuredClone(operationData) as Operation;
@@ -346,47 +378,79 @@ export const OperationsPage = () => {
       render: (op: Operation) => (
         <div className="flex gap-2">
           {!op.isConfirmed && (
+            <ProtectedAction entity="operations" action="confirm">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConfirm(op.id);
+                }}
+                className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
+                title="Подтвердить"
+              >
+                <Check size={16} />
+              </button>
+            </ProtectedAction>
+          )}
+          <ProtectedAction
+            entity="operations"
+            action="update"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на редактирование"
+              >
+                <Pencil size={16} />
+              </button>
+            }
+          >
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                handleConfirm(op.id);
+                handleEdit(op);
               }}
-              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-              title="Подтвердить"
+              className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
+              title="Изменить"
             >
-              <Check size={16} />
+              <Pencil size={16} />
             </button>
-          )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(op);
-            }}
-            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
-            title="Изменить"
+          </ProtectedAction>
+          <ProtectedAction entity="operations" action="create">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleCopy(op);
+              }}
+              className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+              title="Копировать"
+            >
+              <Copy size={16} />
+            </button>
+          </ProtectedAction>
+          <ProtectedAction
+            entity="operations"
+            action="delete"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на удаление"
+              >
+                <Trash2 size={16} />
+              </button>
+            }
           >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCopy(op);
-            }}
-            className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
-            title="Копировать"
-          >
-            <Copy size={16} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(op.id);
-            }}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Удалить"
-          >
-            <Trash2 size={16} />
-          </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(op.id);
+              }}
+              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+              title="Удалить"
+            >
+              <Trash2 size={16} />
+            </button>
+          </ProtectedAction>
         </div>
       ),
       width: '180px',
@@ -401,8 +465,12 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-3">
-            <RecurringOperations onEdit={handleEdit} />
-            <Button onClick={handleCreate}>Создать операцию</Button>
+            <ProtectedAction entity="operations" action="read">
+              <RecurringOperations onEdit={handleEdit} />
+            </ProtectedAction>
+            <ProtectedAction entity="operations" action="create">
+              <Button onClick={handleCreate}>Создать операцию</Button>
+            </ProtectedAction>
           </div>
         </div>
 
@@ -517,34 +585,39 @@ export const OperationsPage = () => {
               rowClassName={(op) => (!op.isConfirmed ? 'bg-yellow-50' : '')}
             />
           )}
-          <BulkActionsBar
-            selectedCount={selectedIds.length}
-            onClear={clearSelection}
-            actions={[
-              {
-                label: `Удалить выбранные (${selectedIds.length})`,
-                variant: 'danger',
-                onClick: async () => {
-                  if (
-                    window.confirm(
-                      `Удалить выбранные операции (${selectedIds.length})?`
-                    )
-                  ) {
-                    try {
-                      await bulkDeleteOperations(selectedIds).unwrap();
-                      await reloadOperationsData();
-                      showSuccess(
-                        NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
-                      );
-                    } catch (error) {
-                      console.error('Failed to bulk delete operations:', error);
-                      showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+          <ProtectedAction entity="operations" action="delete">
+            <BulkActionsBar
+              selectedCount={selectedIds.length}
+              onClear={clearSelection}
+              actions={[
+                {
+                  label: `Удалить выбранные (${selectedIds.length})`,
+                  variant: 'danger',
+                  onClick: async () => {
+                    if (
+                      window.confirm(
+                        `Удалить выбранные операции (${selectedIds.length})?`
+                      )
+                    ) {
+                      try {
+                        await bulkDeleteOperations(selectedIds).unwrap();
+                        await reloadOperationsData();
+                        showSuccess(
+                          NOTIFICATION_MESSAGES.OPERATION.DELETE_SUCCESS
+                        );
+                      } catch (error) {
+                        console.error(
+                          'Failed to bulk delete operations:',
+                          error
+                        );
+                        showError(NOTIFICATION_MESSAGES.OPERATION.DELETE_ERROR);
+                      }
                     }
-                  }
+                  },
                 },
-              },
-            ]}
-          />
+              ]}
+            />
+          </ProtectedAction>
           <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 

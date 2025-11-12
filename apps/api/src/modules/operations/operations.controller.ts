@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
 import operationsService from './operations.service';
+import auditLogService from '../audit/audit.service';
 
 export class OperationsController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
@@ -50,6 +51,21 @@ export class OperationsController {
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const result = await operationsService.create(req.companyId!, req.body);
+
+      // Логируем действие
+      await auditLogService.logAction({
+        userId: req.userId!,
+        companyId: req.companyId!,
+        action: 'create',
+        entity: 'operation',
+        entityId: result.id,
+        changes: { new: result },
+        metadata: {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        },
+      });
+
       res.status(201).json(result);
     } catch (error) {
       next(error);
@@ -58,11 +74,32 @@ export class OperationsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      // Получаем старую версию для логирования
+      const oldOperation = await operationsService.getById(
+        req.params.id,
+        req.companyId!
+      );
+
       const result = await operationsService.update(
         req.params.id,
         req.companyId!,
         req.body
       );
+
+      // Логируем действие
+      await auditLogService.logAction({
+        userId: req.userId!,
+        companyId: req.companyId!,
+        action: 'update',
+        entity: 'operation',
+        entityId: result.id,
+        changes: { old: oldOperation, new: result },
+        metadata: {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        },
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -71,10 +108,31 @@ export class OperationsController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      // Получаем данные перед удалением для логирования
+      const oldOperation = await operationsService.getById(
+        req.params.id,
+        req.companyId!
+      );
+
       const result = await operationsService.delete(
         req.params.id,
         req.companyId!
       );
+
+      // Логируем действие
+      await auditLogService.logAction({
+        userId: req.userId!,
+        companyId: req.companyId!,
+        action: 'delete',
+        entity: 'operation',
+        entityId: req.params.id,
+        changes: { old: oldOperation },
+        metadata: {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        },
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -83,10 +141,31 @@ export class OperationsController {
 
   async confirm(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      // Получаем старую версию для логирования
+      const oldOperation = await operationsService.getById(
+        req.params.id,
+        req.companyId!
+      );
+
       const result = await operationsService.confirmOperation(
         req.params.id,
         req.companyId!
       );
+
+      // Логируем действие
+      await auditLogService.logAction({
+        userId: req.userId!,
+        companyId: req.companyId!,
+        action: 'confirm',
+        entity: 'operation',
+        entityId: result.id,
+        changes: { old: oldOperation, new: result },
+        metadata: {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        },
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -96,7 +175,37 @@ export class OperationsController {
   async bulkDelete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const { ids } = req.body as { ids: string[] };
+
+      // Получаем данные перед удалением для логирования
+      const oldOperations = await Promise.all(
+        ids.map((id) =>
+          operationsService.getById(id, req.companyId!).catch(() => null)
+        )
+      );
+
       const result = await operationsService.bulkDelete(req.companyId!, ids);
+
+      // Логируем каждое удаление
+      await Promise.all(
+        ids.map((id, index) =>
+          auditLogService.logAction({
+            userId: req.userId!,
+            companyId: req.companyId!,
+            action: 'delete',
+            entity: 'operation',
+            entityId: id,
+            changes: oldOperations[index]
+              ? { old: oldOperations[index] }
+              : undefined,
+            metadata: {
+              ip: req.ip,
+              userAgent: req.get('user-agent'),
+              bulk: true,
+            },
+          })
+        )
+      );
+
       res.json(result);
     } catch (error) {
       next(error);

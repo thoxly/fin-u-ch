@@ -5,6 +5,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { seedInitialData } from '../apps/api/src/modules/auth/seed-initial-data';
 
 const prisma = new PrismaClient();
 
@@ -19,13 +20,58 @@ async function setupDemoUser() {
     // Проверяем, существует ли уже демо-пользователь
     const existingUser = await prisma.user.findUnique({
       where: { email: 'demo@example.com' },
-      include: { company: true },
+      include: {
+        company: true,
+        userRoles: {
+          include: {
+            role: true,
+          },
+        },
+      },
     });
 
     if (existingUser) {
       console.log('✅ Demo user already exists:', existingUser.email);
       console.log('   Company:', existingUser.company.name);
       console.log('   User ID:', existingUser.id);
+
+      // Проверяем, есть ли у пользователя роли
+      if (existingUser.userRoles.length === 0) {
+        console.log('⚠️  User has no roles, assigning super admin role...');
+
+        // Ищем роль "Супер-пользователь"
+        const superAdminRole = await prisma.role.findFirst({
+          where: {
+            companyId: existingUser.companyId,
+            name: 'Супер-пользователь',
+            isSystem: true,
+          },
+        });
+
+        if (superAdminRole) {
+          await prisma.userRole.create({
+            data: {
+              userId: existingUser.id,
+              roleId: superAdminRole.id,
+              assignedBy: null,
+            },
+          });
+          console.log('✅ Super admin role assigned to existing user');
+        } else {
+          console.log(
+            '⚠️  Super admin role not found, creating initial data...'
+          );
+          await seedInitialData(
+            prisma as unknown as Parameters<typeof seedInitialData>[0],
+            existingUser.companyId,
+            existingUser.id
+          );
+          console.log('✅ Initial data created and role assigned');
+        }
+      } else {
+        console.log('✅ User already has roles assigned');
+      }
+
       return;
     }
 
@@ -48,9 +94,19 @@ async function setupDemoUser() {
         email: 'demo@example.com',
         passwordHash: hashedPassword,
         isActive: true,
+        isSuperAdmin: true, // Первый пользователь компании автоматически становится супер-администратором
       },
     });
     console.log('✅ Demo user created:', user.email, '(ID:', user.id, ')');
+
+    // Создаем системные роли и назначаем роль "Супер-пользователь"
+    console.log('🔐 Creating system roles and assigning permissions...');
+    await seedInitialData(
+      prisma as unknown as Parameters<typeof seedInitialData>[0],
+      company.id,
+      user.id
+    );
+    console.log('✅ System roles created and super admin role assigned');
 
     // Создаем начальные справочники
     console.log('📚 Creating initial catalogs...');

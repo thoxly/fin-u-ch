@@ -7,7 +7,8 @@ import logger from '../../config/logger';
  */
 export async function seedInitialData(
   tx: PrismaClient,
-  companyId: string
+  companyId: string,
+  firstUserId?: string
 ): Promise<void> {
   // 1. СЧЕТА
   const accounts = await tx.account.createMany({
@@ -136,8 +137,236 @@ export async function seedInitialData(
     });
   }
 
+  // 6. СИСТЕМНЫЕ РОЛИ И ПРАВА
+  console.log('[seedInitialData] Начало создания системных ролей', {
+    companyId,
+    firstUserId,
+  });
+
+  // Определяем все сущности и действия согласно ТЗ
+  // ВАЖНО: При добавлении новых сущностей/действий, обязательно добавляйте их сюда
+  const entities = [
+    {
+      name: 'articles',
+      actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
+    },
+    { name: 'accounts', actions: ['create', 'read', 'update', 'delete'] },
+    { name: 'departments', actions: ['create', 'read', 'update', 'delete'] },
+    { name: 'counterparties', actions: ['create', 'read', 'update', 'delete'] },
+    { name: 'deals', actions: ['create', 'read', 'update', 'delete'] },
+    { name: 'salaries', actions: ['create', 'read', 'update', 'delete'] },
+    {
+      name: 'operations',
+      actions: ['create', 'read', 'update', 'delete', 'confirm', 'cancel'],
+    },
+    {
+      name: 'budgets',
+      actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
+    },
+    { name: 'reports', actions: ['read', 'export'] },
+    {
+      name: 'users',
+      actions: ['create', 'read', 'update', 'delete', 'manage_roles'],
+    },
+    { name: 'audit', actions: ['read'] },
+  ];
+
+  // Проверяем, существует ли уже роль "Супер-пользователь"
+  let superAdminRole = await tx.role.findFirst({
+    where: {
+      companyId,
+      name: 'Супер-пользователь',
+      isSystem: true,
+    },
+  });
+
+  // Создаем или обновляем роль "Супер-пользователь"
+  if (!superAdminRole) {
+    superAdminRole = await tx.role.create({
+      data: {
+        companyId,
+        name: 'Супер-пользователь',
+        description:
+          'Системная роль с полными правами доступа ко всем функциям системы',
+        category: 'Системные',
+        isSystem: true,
+        isActive: true,
+      },
+    });
+
+    console.log('[seedInitialData] Создана роль "Супер-пользователь":', {
+      roleId: superAdminRole.id,
+      companyId,
+      name: superAdminRole.name,
+      isSystem: superAdminRole.isSystem,
+    });
+  } else {
+    console.log(
+      '[seedInitialData] Роль "Супер-пользователь" уже существует, обновляем права:',
+      {
+        roleId: superAdminRole.id,
+        companyId,
+      }
+    );
+  }
+
+  // Получаем все существующие права роли "Супер-пользователь"
+  const existingPermissions = await tx.rolePermission.findMany({
+    where: {
+      roleId: superAdminRole.id,
+    },
+  });
+
+  // Создаём Set для быстрой проверки существующих прав
+  const existingPermissionsSet = new Set(
+    existingPermissions.map((p) => `${p.entity}:${p.action}`)
+  );
+
+  // Формируем полный список всех необходимых прав
+  const allRequiredPermissions = [];
+  for (const entity of entities) {
+    for (const action of entity.actions) {
+      const permissionKey = `${entity.name}:${action}`;
+      if (!existingPermissionsSet.has(permissionKey)) {
+        allRequiredPermissions.push({
+          roleId: superAdminRole.id,
+          entity: entity.name,
+          action,
+          allowed: true,
+        });
+      }
+    }
+  }
+
+  // Добавляем недостающие права
+  if (allRequiredPermissions.length > 0) {
+    await tx.rolePermission.createMany({
+      data: allRequiredPermissions,
+      skipDuplicates: true,
+    });
+
+    console.log(
+      '[seedInitialData] Добавлены недостающие права для роли "Супер-пользователь":',
+      {
+        roleId: superAdminRole.id,
+        addedCount: allRequiredPermissions.length,
+        addedPermissions: allRequiredPermissions.map(
+          (p) => `${p.entity}:${p.action}`
+        ),
+      }
+    );
+  }
+
+  // Убеждаемся, что все права установлены в allowed: true (на случай, если были изменены)
+  await tx.rolePermission.updateMany({
+    where: {
+      roleId: superAdminRole.id,
+      allowed: false,
+    },
+    data: {
+      allowed: true,
+    },
+  });
+
+  // Получаем финальный список всех прав для логирования
+  const finalPermissions = await tx.rolePermission.findMany({
+    where: {
+      roleId: superAdminRole.id,
+    },
+  });
+
+  console.log(
+    '[seedInitialData] Финальные права для роли "Супер-пользователь":',
+    {
+      roleId: superAdminRole.id,
+      totalPermissionsCount: finalPermissions.length,
+      permissions: finalPermissions.map((p) => `${p.entity}:${p.action}`),
+    }
+  );
+
+  // Создаем роль "По умолчанию"
+  const defaultRole = await tx.role.create({
+    data: {
+      companyId,
+      name: 'По умолчанию',
+      description: 'Системная роль с минимальными правами (только просмотр)',
+      category: 'Системные',
+      isSystem: true,
+      isActive: true,
+    },
+  });
+
+  console.log('[seedInitialData] Создана роль "По умолчанию":', {
+    roleId: defaultRole.id,
+    companyId,
+    name: defaultRole.name,
+    isSystem: defaultRole.isSystem,
+  });
+
+  // Создаем права только на чтение для роли "По умолчанию"
+  const defaultPermissions = [];
+  for (const entity of entities) {
+    // Для reports добавляем только read (export не даём)
+    if (entity.name === 'reports') {
+      defaultPermissions.push({
+        roleId: defaultRole.id,
+        entity: entity.name,
+        action: 'read',
+        allowed: true,
+      });
+    } else {
+      // Для остальных сущностей добавляем только read
+      defaultPermissions.push({
+        roleId: defaultRole.id,
+        entity: entity.name,
+        action: 'read',
+        allowed: true,
+      });
+    }
+  }
+
+  await tx.rolePermission.createMany({
+    data: defaultPermissions,
+  });
+
+  console.log('[seedInitialData] Созданы права для роли "По умолчанию":', {
+    roleId: defaultRole.id,
+    permissionsCount: defaultPermissions.length,
+    permissions: defaultPermissions.map((p) => `${p.entity}:${p.action}`),
+  });
+
+  // Назначаем роль "Супер-пользователь" первому пользователю, если он передан
+  if (firstUserId) {
+    const userRole = await tx.userRole.create({
+      data: {
+        userId: firstUserId,
+        roleId: superAdminRole.id,
+        assignedBy: null, // Системное назначение
+      },
+    });
+
+    console.log(
+      '[seedInitialData] Роль "Супер-пользователь" назначена первому пользователю:',
+      {
+        userRoleId: userRole.id,
+        userId: firstUserId,
+        roleId: superAdminRole.id,
+        roleName: superAdminRole.name,
+        assignedAt: userRole.assignedAt,
+      }
+    );
+  } else {
+    console.log(
+      '[seedInitialData] firstUserId не передан, роль не назначена пользователю'
+    );
+  }
+
   logger.info('Initial data seeded successfully', {
     companyId,
     accounts: accounts.count,
+    rolesCreated: 2,
+    superAdminRoleId: superAdminRole.id,
+    defaultRoleId: defaultRole.id,
+    firstUserId,
   });
 }

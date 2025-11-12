@@ -6,6 +6,8 @@ import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import { Select } from '../../shared/ui/Select';
+import { usePermissions } from '../../shared/hooks/usePermissions';
+import { ProtectedAction } from '../../shared/components/ProtectedAction';
 import {
   useGetArticlesQuery,
   useDeleteArticleMutation,
@@ -40,12 +42,15 @@ export const ArticlesPage = () => {
     ...(isActiveFilter !== undefined && { isActive: isActiveFilter }),
   };
 
+  const { canRead } = usePermissions();
+
   const {
     data: articles = [],
     isLoading,
     error,
   } = useGetArticlesQuery(
-    Object.keys(filters).length > 0 ? filters : undefined
+    Object.keys(filters).length > 0 ? filters : undefined,
+    { skip: !canRead('articles') }
   );
   const [deleteArticle] = useDeleteArticleMutation();
   const [archiveArticle] = useArchiveArticleMutation();
@@ -149,37 +154,69 @@ export const ArticlesPage = () => {
       header: 'Действия',
       render: (a: Article) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => handleEdit(a)}
-            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
-            title="Изменить"
+          <ProtectedAction
+            entity="articles"
+            action="update"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на редактирование"
+              >
+                <Pencil size={16} />
+              </button>
+            }
           >
-            <Pencil size={16} />
-          </button>
+            <button
+              onClick={() => handleEdit(a)}
+              className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
+              title="Изменить"
+            >
+              <Pencil size={16} />
+            </button>
+          </ProtectedAction>
           {a.isActive ? (
-            <button
-              onClick={() => handleArchive(a.id)}
-              className="text-amber-600 hover:text-amber-800 p-1 rounded hover:bg-amber-50 transition-colors"
-              title="Архивировать"
-            >
-              <Archive size={16} />
-            </button>
+            <ProtectedAction entity="articles" action="archive">
+              <button
+                onClick={() => handleArchive(a.id)}
+                className="text-amber-600 hover:text-amber-800 p-1 rounded hover:bg-amber-50 transition-colors"
+                title="Архивировать"
+              >
+                <Archive size={16} />
+              </button>
+            </ProtectedAction>
           ) : (
-            <button
-              onClick={() => handleUnarchive(a.id)}
-              className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-              title="Вернуть из архива"
-            >
-              <RotateCcw size={16} />
-            </button>
+            <ProtectedAction entity="articles" action="restore">
+              <button
+                onClick={() => handleUnarchive(a.id)}
+                className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
+                title="Вернуть из архива"
+              >
+                <RotateCcw size={16} />
+              </button>
+            </ProtectedAction>
           )}
-          <button
-            onClick={() => handleDelete(a.id)}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Удалить"
+          <ProtectedAction
+            entity="articles"
+            action="delete"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на удаление"
+              >
+                <Trash2 size={16} />
+              </button>
+            }
           >
-            <Trash2 size={16} />
-          </button>
+            <button
+              onClick={() => handleDelete(a.id)}
+              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+              title="Удалить"
+            >
+              <Trash2 size={16} />
+            </button>
+          </ProtectedAction>
         </div>
       ),
     },
@@ -192,7 +229,9 @@ export const ArticlesPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Статьи
           </h1>
-          <Button onClick={handleCreate}>Создать статью</Button>
+          <ProtectedAction entity="articles" action="create">
+            <Button onClick={handleCreate}>Создать статью</Button>
+          </ProtectedAction>
         </div>
 
         <Card>
@@ -281,26 +320,28 @@ export const ArticlesPage = () => {
               keyExtractor={(a) => a.id}
               loading={isLoading}
             />
-            <BulkActionsBar
-              selectedCount={selectedIds.length}
-              onClear={clearSelection}
-              actions={[
-                {
-                  label: `В архив выбранные (${selectedIds.length})`,
-                  variant: 'warning',
-                  onClick: async () => {
-                    if (
-                      window.confirm(
-                        `Отправить в архив выбранные статьи (${selectedIds.length})?`
-                      )
-                    ) {
-                      await bulkArchiveArticles(selectedIds);
-                      clearSelection();
-                    }
+            <ProtectedAction entity="articles" action="archive">
+              <BulkActionsBar
+                selectedCount={selectedIds.length}
+                onClear={clearSelection}
+                actions={[
+                  {
+                    label: `В архив выбранные (${selectedIds.length})`,
+                    variant: 'warning',
+                    onClick: async () => {
+                      if (
+                        window.confirm(
+                          `Отправить в архив выбранные статьи (${selectedIds.length})?`
+                        )
+                      ) {
+                        await bulkArchiveArticles(selectedIds);
+                        clearSelection();
+                      }
+                    },
                   },
-                },
-              ]}
-            />
+                ]}
+              />
+            </ProtectedAction>
           </>
         </Card>
       </div>

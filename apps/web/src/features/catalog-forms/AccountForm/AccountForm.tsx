@@ -6,6 +6,7 @@ import {
 } from '@/store/api/catalogsApi';
 import { Account } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 export const AccountForm = ({
   account,
@@ -24,6 +25,12 @@ export const AccountForm = ({
 
   const [create, { isLoading: isCreating }] = useCreateAccountMutation();
   const [update, { isLoading: isUpdating }] = useUpdateAccountMutation();
+  const { canCreate, canUpdate } = usePermissions();
+
+  // Определяем, можем ли редактировать форму
+  const isEditing = !!account;
+  const canEdit = isEditing ? canUpdate('accounts') : canCreate('accounts');
+
   useEffect(() => {
     if (account) {
       setName(account.name || '');
@@ -68,11 +75,13 @@ export const AccountForm = ({
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
+        disabled={!canEdit}
       />
       <Input
         label="Номер счета"
         value={number}
         onChange={(e) => setNumber(e.target.value)}
+        disabled={!canEdit}
       />
       <Select
         label="Валюта"
@@ -84,6 +93,7 @@ export const AccountForm = ({
           { value: 'EUR', label: 'EUR' },
         ]}
         required
+        disabled={!canEdit}
       />
       <Input
         label="Начальный остаток"
@@ -91,17 +101,19 @@ export const AccountForm = ({
         step="0.01"
         value={openingBalance}
         onChange={(e) => setOpeningBalance(e.target.value)}
+        disabled={!canEdit}
       />
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
+          disabled={!canEdit}
         />
         <span className="text-sm">Активен</span>
       </label>
       <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
+        <Button type="submit" disabled={isCreating || isUpdating || !canEdit}>
           {account ? 'Сохранить' : 'Создать'}
         </Button>
         <Button type="button" variant="secondary" onClick={onClose}>

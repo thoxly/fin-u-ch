@@ -49,23 +49,66 @@ jest.mock('../hooks/useNavigationIcons', () => ({
 // Mock the useGetMeQuery hook
 jest.mock('../../store/api/authApi', () => ({
   useGetMeQuery: () => ({
-    data: { email: 'test@example.com' },
+    data: { email: 'test@example.com', id: 'user-1', isSuperAdmin: false },
     isLoading: false,
   }),
 }));
+
+// Mock usePermissions hook
+jest.mock('../hooks/usePermissions', () => ({
+  usePermissions: () => {
+    const checkPermission = () => true;
+    return {
+      hasPermission: checkPermission,
+      isLoading: false,
+      permissions: {
+        articles: ['read', 'create', 'update', 'delete'],
+        accounts: ['read', 'create', 'update', 'delete'],
+        departments: ['read', 'create', 'update', 'delete'],
+        counterparties: ['read', 'create', 'update', 'delete'],
+        deals: ['read', 'create', 'update', 'delete'],
+        salaries: ['read', 'create', 'update', 'delete'],
+        operations: ['read', 'create', 'update', 'delete'],
+        plans: ['read', 'create', 'update', 'delete'],
+        budgets: ['read', 'create', 'update', 'delete'],
+        reports: ['read'],
+        users: ['read', 'create', 'update', 'delete'],
+      },
+      canRead: checkPermission,
+      canCreate: checkPermission,
+      canUpdate: checkPermission,
+      canDelete: checkPermission,
+      canManageRoles: checkPermission,
+    };
+  },
+}));
+
+// Mock companiesApi
+jest.mock('../../store/api/companiesApi', () => ({
+  useGetUiSettingsQuery: () => ({
+    data: { navigationIcons: {} },
+    isLoading: false,
+  }),
+  useUpdateUiSettingsMutation: () => [
+    jest.fn().mockResolvedValue({ unwrap: jest.fn() }),
+    { isLoading: false },
+  ],
+}));
+
+import { apiSlice } from '../../store/api/apiSlice';
 
 // Create a mock store
 const createMockStore = () => {
   return configureStore({
     reducer: {
+      [apiSlice.reducerPath]: apiSlice.reducer,
       auth: (state = { user: null, token: null }) => state,
-      api: (state = {}) => state,
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
         serializableCheck: false,
         immutableCheck: false,
-      }),
+      }).concat(apiSlice.middleware),
   });
 };
 

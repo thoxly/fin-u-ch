@@ -9,6 +9,7 @@ import {
 import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
+import rolesService from '../roles/roles.service';
 
 export interface RegisterDTO {
   email: string;
@@ -61,17 +62,62 @@ export class AuthService {
         },
       });
 
+      console.log('Создана компания при регистрации:', {
+        id: company.id,
+        name: company.name,
+        currencyBase: company.currencyBase,
+        createdAt: company.createdAt,
+      });
+
+      // Проверяем, является ли это первым пользователем компании
+      const usersCount = await tx.user.count({
+        where: { companyId: company.id },
+      });
+
+      const isFirstUser = usersCount === 0;
+
+      console.log(
+        '[AuthService.register] Проверка первого пользователя компании:',
+        {
+          companyId: company.id,
+          usersCount,
+          isFirstUser,
+        }
+      );
+
       const user = await tx.user.create({
         data: {
           email: data.email,
           passwordHash,
           companyId: company.id,
+          isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
         },
       });
 
-      // Создаем начальные данные для компании
+      console.log('Создан пользователь при регистрации:', {
+        id: user.id,
+        email: user.email,
+        companyId: user.companyId,
+        isActive: user.isActive,
+        isSuperAdmin: user.isSuperAdmin,
+        createdAt: user.createdAt,
+        isFirstUser,
+      });
+
+      if (isFirstUser) {
+        console.log(
+          '[AuthService.register] Первый пользователь компании назначен супер-администратором:',
+          {
+            userId: user.id,
+            email: user.email,
+            companyId: company.id,
+          }
+        );
+      }
+
+      // Создаем начальные данные для компании (передаём userId первого пользователя)
       try {
-        await seedInitialData(tx, company.id);
+        await seedInitialData(tx, company.id, user.id);
       } catch (error) {
         logger.error('Failed to seed initial data', {
           companyId: company.id,
@@ -82,6 +128,39 @@ export class AuthService {
 
       return { user, company };
     });
+
+    // Получаем активные роли компании после регистрации
+    console.log(
+      '[AuthService.register] Получение активных ролей компании после регистрации',
+      {
+        companyId: result.company.id,
+      }
+    );
+    try {
+      const roles = await rolesService.getAllRoles(result.company.id);
+      console.log(
+        '[AuthService.register] Активные роли компании после регистрации:',
+        {
+          companyId: result.company.id,
+          rolesCount: roles.length,
+          roles: roles.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })),
+        }
+      );
+    } catch (error) {
+      console.log(
+        '[AuthService.register] Ошибка при получении ролей (возможно, роли еще не созданы):',
+        {
+          companyId: result.company.id,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
 
     const accessToken = generateAccessToken({
       userId: result.user.id,
@@ -127,6 +206,39 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new AppError('Invalid email or password', 401);
+    }
+
+    // Получаем активные роли компании при авторизации
+    console.log(
+      '[AuthService.login] Получение активных ролей компании при авторизации',
+      {
+        companyId: user.companyId,
+        userId: user.id,
+      }
+    );
+    try {
+      const roles = await rolesService.getAllRoles(user.companyId);
+      console.log(
+        '[AuthService.login] Активные роли компании при авторизации:',
+        {
+          companyId: user.companyId,
+          userId: user.id,
+          rolesCount: roles.length,
+          roles: roles.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })),
+        }
+      );
+    } catch (error) {
+      console.log('[AuthService.login] Ошибка при получении ролей:', {
+        companyId: user.companyId,
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     const accessToken = generateAccessToken({

@@ -47,7 +47,8 @@ test.describe('OffCanvas Component', () => {
 
     // Navigate to a page that might have offcanvas
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for offcanvas elements
     const offcanvasElements = page.locator(
@@ -71,7 +72,8 @@ test.describe('OffCanvas Component', () => {
 
     // Navigate to operations page
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for trigger buttons (like "Add" buttons)
     const triggerButtons = page.locator(
@@ -107,7 +109,8 @@ test.describe('OffCanvas Component', () => {
 
     // Navigate to operations page
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for trigger buttons
     const triggerButtons = page.locator(

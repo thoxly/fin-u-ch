@@ -19,6 +19,7 @@ interface AuthResponse {
     firstName?: string;
     lastName?: string;
     companyName?: string;
+    isSuperAdmin?: boolean;
   };
   accessToken: string;
   refreshToken: string;
@@ -44,6 +45,7 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: credentials,
       }),
+      invalidatesTags: ['User'],
     }),
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (data) => ({
@@ -51,6 +53,7 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      invalidatesTags: ['User'],
     }),
     getMe: builder.query<AuthResponse['user'], void>({
       query: () => '/users/me',

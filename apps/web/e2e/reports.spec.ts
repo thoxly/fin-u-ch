@@ -16,7 +16,8 @@ test.describe('Reports Page', () => {
 
     // Navigate to reports page
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Check that we're on reports page
     await expect(page).toHaveURL(/\/reports/);
@@ -40,7 +41,8 @@ test.describe('Reports Page', () => {
 
     // Navigate to reports page
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for tab navigation
     const tabs = page.locator(
@@ -59,7 +61,8 @@ test.describe('Reports Page', () => {
 
     // Navigate to reports page
     await page.goto('/reports');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for date filters
     const dateInputs = page.locator('input[type="date"]');
@@ -89,7 +92,8 @@ test.describe('Reports Page', () => {
     const content = page.locator('.report-content, .table, .chart');
 
     // Wait for either loading to finish or content to appear
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Should have some content after loading
     const hasContent = (await content.count()) > 0;

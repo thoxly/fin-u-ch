@@ -32,7 +32,9 @@ export const RegisterPage = () => {
         companyName,
       }).unwrap();
       dispatch(setCredentials(response));
-      navigate('/dashboard');
+      // Редирект будет выполнен компонентом RedirectToFirstAvailable
+      // после загрузки прав пользователя
+      navigate('/redirect', { replace: true });
     } catch (err) {
       setError('Ошибка регистрации. Возможно, пользователь уже существует');
     }

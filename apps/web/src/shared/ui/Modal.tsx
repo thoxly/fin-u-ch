@@ -6,7 +6,8 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'viewport';
+  customSize?: string; // Кастомный размер через className или inline стили
 }
 
 export const Modal = ({
@@ -15,6 +16,7 @@ export const Modal = ({
   title,
   children,
   size = 'md',
+  customSize,
 }: ModalProps) => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -39,7 +41,20 @@ export const Modal = ({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    viewport: '', // Для viewport используем inline стили
   };
+
+  const modalSizeClass =
+    customSize ||
+    (size && size !== 'viewport' ? sizeClasses[size] : sizeClasses.md);
+
+  // Для viewport размера используем проценты от экрана
+  const modalStyle =
+    size === 'viewport'
+      ? { width: '95vw', maxWidth: '95vw', maxHeight: '100vh', height: '100vh' }
+      : customSize
+        ? undefined
+        : undefined;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -53,8 +68,9 @@ export const Modal = ({
       <div
         className={classNames(
           'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4',
-          sizeClasses[size]
+          modalSizeClass
         )}
+        style={modalStyle}
       >
         {/* Header */}
         {title && (
@@ -84,7 +100,14 @@ export const Modal = ({
         )}
 
         {/* Content */}
-        <div className="px-6 py-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+        <div
+          className={classNames(
+            'px-6 py-4 overflow-y-auto',
+            size === 'viewport'
+              ? 'max-h-[calc(100vh-80px)]'
+              : 'max-h-[calc(100vh-200px)]'
+          )}
+        >
           {children}
         </div>
       </div>

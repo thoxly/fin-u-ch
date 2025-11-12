@@ -84,6 +84,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             filenameBase="weekly_flow"
             buildRows={buildExportRows}
             columns={['date', 'category', 'amount', 'type']}
+            entity="reports"
           />
         </div>
 

@@ -22,6 +22,7 @@ import {
   formatAmountInput,
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
+import { usePermissions } from '../../shared/hooks/usePermissions';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -107,6 +108,11 @@ export const OperationForm = ({
     useUpdateOperationMutation();
 
   const { showSuccess, showError } = useNotification();
+  const { canCreate, canUpdate } = usePermissions();
+
+  // Определяем, можем ли редактировать форму
+  const isEditing = operation?.id && !isCopy;
+  const canEdit = isEditing ? canUpdate('operations') : canCreate('operations');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -192,6 +198,7 @@ export const OperationForm = ({
           onChange={(e) => setType(e.target.value as OperationType)}
           options={typeOptions}
           required
+          disabled={!canEdit}
         />
 
         <Input
@@ -200,6 +207,7 @@ export const OperationForm = ({
           value={operationDate}
           onChange={(e) => setOperationDate(e.target.value)}
           required
+          disabled={!canEdit}
         />
 
         <Input
@@ -210,6 +218,7 @@ export const OperationForm = ({
           onChange={(e) => setAmount(formatAmountInput(e.target.value))}
           placeholder="0"
           required
+          disabled={!canEdit}
         />
 
         <Select
@@ -218,6 +227,7 @@ export const OperationForm = ({
           onChange={(e) => setCurrency(e.target.value)}
           options={currencyOptions}
           required
+          disabled={!canEdit}
         />
       </div>
 
@@ -230,6 +240,7 @@ export const OperationForm = ({
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             required
+            disabled={!canEdit}
           />
           <Select
             label="Счет зачисления"
@@ -238,6 +249,7 @@ export const OperationForm = ({
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             required
+            disabled={!canEdit}
           />
         </div>
       ) : (
@@ -250,6 +262,7 @@ export const OperationForm = ({
               .filter((a) => a.type === type)
               .map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите статью"
+            disabled={!canEdit}
           />
 
           <Select
@@ -258,6 +271,7 @@ export const OperationForm = ({
             onChange={(e) => setAccountId(e.target.value)}
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
+            disabled={!canEdit}
           />
         </>
       )}
@@ -269,6 +283,7 @@ export const OperationForm = ({
           onChange={(e) => setCounterpartyId(e.target.value)}
           options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
           placeholder="Не выбран"
+          disabled={!canEdit}
         />
 
         <Select
@@ -277,6 +292,7 @@ export const OperationForm = ({
           onChange={(e) => setDealId(e.target.value)}
           options={deals.map((d) => ({ value: d.id, label: d.name }))}
           placeholder="Не выбрана"
+          disabled={!canEdit}
         />
 
         <Select
@@ -285,6 +301,7 @@ export const OperationForm = ({
           onChange={(e) => setDepartmentId(e.target.value)}
           options={departments.map((d) => ({ value: d.id, label: d.name }))}
           placeholder="Не выбрано"
+          disabled={!canEdit}
         />
       </div>
 
@@ -293,6 +310,7 @@ export const OperationForm = ({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Дополнительная информация"
+        disabled={!canEdit}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -301,6 +319,7 @@ export const OperationForm = ({
           value={repeat}
           onChange={(e) => setRepeat(e.target.value as Periodicity)}
           options={repeatOptions}
+          disabled={!canEdit}
         />
 
         {repeat !== Periodicity.NONE && (
@@ -310,12 +329,13 @@ export const OperationForm = ({
             value={recurrenceEndDate}
             onChange={(e) => setRecurrenceEndDate(e.target.value)}
             placeholder="Не указана (бесконечно)"
+            disabled={!canEdit}
           />
         )}
       </div>
 
       <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating}>
+        <Button type="submit" disabled={isCreating || isUpdating || !canEdit}>
           {operation?.id && !isCopy ? 'Сохранить' : 'Создать'}
         </Button>
         <Button type="button" variant="secondary" onClick={onClose}>

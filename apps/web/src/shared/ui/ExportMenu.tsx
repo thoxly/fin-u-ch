@@ -2,12 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download } from 'lucide-react';
 import { downloadCsv, ExportRow } from '../lib/exportData';
 import { downloadExcelXml } from '../lib/exportExcelXml';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface ExportMenuProps {
   filenameBase: string;
   buildRows: () => ExportRow[];
   columns?: string[];
   className?: string;
+  entity?: string; // Сущность для проверки прав на экспорт (например, 'reports', 'operations')
 }
 
 export const ExportMenu: React.FC<ExportMenuProps> = ({
@@ -15,9 +17,11 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
   buildRows,
   columns,
   className = '',
+  entity = 'reports', // По умолчанию проверяем права на экспорт отчётов
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { canExport } = usePermissions();
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -40,6 +44,11 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
     downloadExcelXml(rows, `${filenameBase}.xlsx`, columns);
     setOpen(false);
   };
+
+  // Если нет прав на экспорт, не показываем меню
+  if (!canExport(entity)) {
+    return null;
+  }
 
   return (
     <div className={`relative ${className}`} ref={ref}>

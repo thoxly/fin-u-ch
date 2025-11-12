@@ -5,6 +5,8 @@ import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
+import { usePermissions } from '../../shared/hooks/usePermissions';
+import { ProtectedAction } from '../../shared/components/ProtectedAction';
 import {
   useGetDealsQuery,
   useDeleteDealMutation,
@@ -17,7 +19,10 @@ import { DealForm } from '@/features/catalog-forms/index';
 export const DealsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Deal | null>(null);
-  const { data: deals = [], isLoading } = useGetDealsQuery();
+  const { canRead } = usePermissions();
+  const { data: deals = [], isLoading } = useGetDealsQuery(undefined, {
+    skip: !canRead('deals'),
+  });
   const [deleteDeal] = useDeleteDealMutation();
 
   const columns = [
@@ -34,23 +39,51 @@ export const DealsPage = () => {
       header: 'Действия',
       render: (d: Deal) => (
         <div className="flex gap-2">
-          <button
-            onClick={() => {
-              setEditing(d);
-              setIsFormOpen(true);
-            }}
-            className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
-            title="Изменить"
+          <ProtectedAction
+            entity="deals"
+            action="update"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на редактирование"
+              >
+                <Pencil size={16} />
+              </button>
+            }
           >
-            <Pencil size={16} />
-          </button>
-          <button
-            onClick={() => window.confirm('Удалить?') && deleteDeal(d.id)}
-            className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
-            title="Удалить"
+            <button
+              onClick={() => {
+                setEditing(d);
+                setIsFormOpen(true);
+              }}
+              className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
+              title="Изменить"
+            >
+              <Pencil size={16} />
+            </button>
+          </ProtectedAction>
+          <ProtectedAction
+            entity="deals"
+            action="delete"
+            fallback={
+              <button
+                disabled
+                className="text-gray-400 p-1 rounded cursor-not-allowed"
+                title="Нет прав на удаление"
+              >
+                <Trash2 size={16} />
+              </button>
+            }
           >
-            <Trash2 size={16} />
-          </button>
+            <button
+              onClick={() => window.confirm('Удалить?') && deleteDeal(d.id)}
+              className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+              title="Удалить"
+            >
+              <Trash2 size={16} />
+            </button>
+          </ProtectedAction>
         </div>
       ),
     },
@@ -63,14 +96,16 @@ export const DealsPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Сделки
           </h1>
-          <Button
-            onClick={() => {
-              setEditing(null);
-              setIsFormOpen(true);
-            }}
-          >
-            Создать сделку
-          </Button>
+          <ProtectedAction entity="deals" action="create">
+            <Button
+              onClick={() => {
+                setEditing(null);
+                setIsFormOpen(true);
+              }}
+            >
+              Создать сделку
+            </Button>
+          </ProtectedAction>
         </div>
         <Card>
           <Table
