@@ -60,13 +60,13 @@ describe('SmartLoginButton', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/login');
   });
 
-  it('should navigate to /dashboard when user is authenticated', () => {
+  it('should navigate to /redirect when user is authenticated', () => {
     renderWithProviders(<SmartLoginButton>Войти</SmartLoginButton>, true);
 
     const button = screen.getByText('Войти');
     fireEvent.click(button);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+    expect(mockNavigate).toHaveBeenCalledWith('/redirect', { replace: true });
   });
 
   it('should render with correct props', () => {
