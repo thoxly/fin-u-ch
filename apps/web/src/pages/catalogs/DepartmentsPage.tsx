@@ -6,6 +6,7 @@ import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { ProtectedAction } from '../../shared/components/ProtectedAction';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetDepartmentsQuery,
   useDeleteDepartmentMutation,
@@ -24,7 +25,24 @@ export const DepartmentsPage = () => {
       skip: !canRead('departments'),
     }
   );
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
+    isOpen: false,
+    id: null,
+  });
   const [deleteDepartment] = useDeleteDepartmentMutation();
+
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteDepartment(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null });
+  };
 
   const columns = [
     { key: 'name', header: 'Название' },
@@ -72,9 +90,7 @@ export const DepartmentsPage = () => {
             }
           >
             <button
-              onClick={() =>
-                window.confirm('Удалить?') && deleteDepartment(d.id)
-              }
+              onClick={() => handleDelete(d.id)}
               className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
               title="Удалить"
             >
@@ -123,6 +139,14 @@ export const DepartmentsPage = () => {
           onClose={() => setIsFormOpen(false)}
         />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, id: null })}
+        onConfirm={confirmDelete}
+        message="Вы уверены, что хотите удалить это подразделение?"
+        confirmText="Удалить"
+      />
     </Layout>
   );
 };

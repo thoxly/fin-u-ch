@@ -1,11 +1,6 @@
-import { useState, FormEvent } from 'react';
-import { Input } from '../../shared/ui/Input';
-import { Select } from '../../shared/ui/Select';
-import { Button } from '../../shared/ui/Button';
-import {
-  useCreateOperationMutation,
-  useUpdateOperationMutation,
-} from '../../store/api/operationsApi';
+import { FormEvent, useEffect } from 'react';
+import { OperationFormFields } from './OperationFormFields';
+import { OperationFormActions } from './OperationFormActions';
 import {
   useGetArticlesQuery,
   useGetAccountsQuery,
@@ -13,8 +8,7 @@ import {
   useGetDealsQuery,
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
-import { toISODate } from '../../shared/lib/date';
-import type { Operation, CreateOperationDTO } from '@fin-u-ch/shared';
+import type { Operation } from '@fin-u-ch/shared';
 import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
@@ -23,6 +17,10 @@ import {
   parseAmountInputToNumber,
 } from '../../shared/lib/numberInput';
 import { usePermissions } from '../../shared/hooks/usePermissions';
+import { useOperationValidation } from './useOperationValidation';
+import { useFilteredDeals } from './useFilteredDeals';
+import { useOperationSubmit } from './useOperationSubmit';
+import { useOperationFormState } from './useOperationFormState';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -35,66 +33,58 @@ export const OperationForm = ({
   isCopy = false,
   onClose,
 }: OperationFormProps) => {
-  const [type, setType] = useState<OperationType>(
-    operation?.type || OperationType.EXPENSE
-  );
+  // Управление состоянием формы
+  const { formState, formSetters } = useOperationFormState(operation);
+  const {
+    type,
+    operationDate,
+    amount,
+    currency,
+    articleId,
+    accountId,
+    sourceAccountId,
+    targetAccountId,
+    counterpartyId,
+    dealId,
+    departmentId,
+    description,
+    repeat,
+    recurrenceEndDate,
+    updateScope,
+  } = formState;
 
-  // Обрабатываем дату: может быть Date или строка (приходит с API как строка)
-  const getInitialDate = (): string => {
-    if (!operation?.operationDate) return toISODate(new Date());
-    const date = operation.operationDate;
-    // RTK Query возвращает даты как строки, но тип определен как Date
-    // Проверяем оба варианта
-    if (date instanceof Date) {
-      return toISODate(date);
-    }
-    // Если это строка (что обычно происходит при десериализации JSON)
-    const dateStr = date as unknown as string;
-    if (typeof dateStr === 'string') {
-      return dateStr.split('T')[0];
-    }
-    return toISODate(new Date());
-  };
+  const {
+    setType,
+    setOperationDate,
+    setAmount,
+    setCurrency,
+    setArticleId,
+    setAccountId,
+    setSourceAccountId,
+    setTargetAccountId,
+    setCounterpartyId,
+    setDealId,
+    setDepartmentId,
+    setDescription,
+    setRepeat,
+    setRecurrenceEndDate,
+    setUpdateScope,
+  } = formSetters;
 
-  const getInitialEndDate = (): string => {
-    if (!operation?.recurrenceEndDate) return '';
-    const date = operation.recurrenceEndDate;
-    if (date instanceof Date) {
-      return toISODate(date);
-    }
-    const dateStr = date as unknown as string;
-    if (typeof dateStr === 'string') {
-      return dateStr.split('T')[0];
-    }
-    return '';
-  };
+  const {
+    validationErrors,
+    validateOperation,
+    clearValidationError,
+    clearAllValidationErrors,
+  } = useOperationValidation();
 
-  const [operationDate, setOperationDate] = useState(getInitialDate());
-  const [amount, setAmount] = useState(
-    operation?.amount != null ? formatAmountInput(String(operation.amount)) : ''
-  );
-  const [currency, setCurrency] = useState(operation?.currency || 'RUB');
-  const [articleId, setArticleId] = useState(operation?.articleId || '');
-  const [accountId, setAccountId] = useState(operation?.accountId || '');
-  const [sourceAccountId, setSourceAccountId] = useState(
-    operation?.sourceAccountId || ''
-  );
-  const [targetAccountId, setTargetAccountId] = useState(
-    operation?.targetAccountId || ''
-  );
-  const [counterpartyId, setCounterpartyId] = useState(
-    operation?.counterpartyId || ''
-  );
-  const [dealId, setDealId] = useState(operation?.dealId || '');
-  const [departmentId, setDepartmentId] = useState(
-    operation?.departmentId || ''
-  );
-  const [description, setDescription] = useState(operation?.description || '');
-  const [repeat, setRepeat] = useState<Periodicity>(
-    operation?.repeat || Periodicity.NONE
-  );
-  const [recurrenceEndDate, setRecurrenceEndDate] =
-    useState(getInitialEndDate());
+  const { submitOperation, isCreating, isUpdating, isChildOperation } =
+    useOperationSubmit({
+      operation,
+      isCopy,
+      onClose,
+      validateOperation,
+    });
 
   const { data: articles = [] } = useGetArticlesQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
@@ -102,10 +92,7 @@ export const OperationForm = ({
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
 
-  const [createOperation, { isLoading: isCreating }] =
-    useCreateOperationMutation();
-  const [updateOperation, { isLoading: isUpdating }] =
-    useUpdateOperationMutation();
+  const filteredDeals = useFilteredDeals(counterpartyId, deals);
 
   const { showSuccess, showError } = useNotification();
   const { canCreate, canUpdate } = usePermissions();
@@ -113,235 +100,119 @@ export const OperationForm = ({
   // Определяем, можем ли редактировать форму
   const isEditing = operation?.id && !isCopy;
   const canEdit = isEditing ? canUpdate('operations') : canCreate('operations');
+  // Сброс сделки при изменении контрагента
+  useEffect(() => {
+    if (counterpartyId && dealId) {
+      const currentDeal = deals.find((d) => d.id === dealId);
+      if (currentDeal && currentDeal.counterpartyId !== counterpartyId) {
+        setDealId('');
+      }
+    }
+  }, [counterpartyId, dealId, deals, setDealId]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
-    const amountNumber = parseAmountInputToNumber(amount);
-    const operationData: CreateOperationDTO = {
-      type: type as OperationType,
-      operationDate: new Date(operationDate).toISOString(),
-      amount: amountNumber,
-      currency,
-      articleId: articleId || undefined,
-      accountId:
-        type !== OperationType.TRANSFER ? accountId || undefined : undefined,
-      sourceAccountId:
-        type === OperationType.TRANSFER
-          ? sourceAccountId || undefined
-          : undefined,
-      targetAccountId:
-        type === OperationType.TRANSFER
-          ? targetAccountId || undefined
-          : undefined,
-      counterpartyId: counterpartyId || undefined,
-      dealId: dealId || undefined,
-      departmentId: departmentId || undefined,
-      description: description || undefined,
-      repeat: repeat as Periodicity,
-      recurrenceEndDate: recurrenceEndDate
-        ? new Date(recurrenceEndDate).toISOString()
-        : undefined,
-    };
-
-    try {
-      // Если это копирование или нет operation.id, создаем новую операцию
-      if (operation?.id && !isCopy) {
-        await updateOperation({
-          id: operation.id,
-          data: operationData,
-        }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.OPERATION.UPDATE_SUCCESS);
-      } else {
-        await createOperation(operationData).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.OPERATION.CREATE_SUCCESS);
-      }
-      onClose();
-    } catch (error) {
-      console.error('Failed to save operation:', error);
-      showError(
-        operation?.id && !isCopy
-          ? NOTIFICATION_MESSAGES.OPERATION.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.OPERATION.CREATE_ERROR
-      );
-    }
+    clearAllValidationErrors();
+    await submitOperation(formState);
   };
 
-  const typeOptions = [
-    { value: 'income', label: 'Поступление' },
-    { value: 'expense', label: 'Списание' },
-    { value: 'transfer', label: 'Перевод' },
-  ];
+  const handleTypeChange = (value: string) => {
+    setType(value as OperationType);
+    clearAllValidationErrors();
+  };
 
-  const currencyOptions = [
-    { value: 'RUB', label: 'RUB' },
-    { value: 'USD', label: 'USD' },
-    { value: 'EUR', label: 'EUR' },
-  ];
+  const handleDateChange = (value: string) => {
+    setOperationDate(value);
+    clearValidationError('operationDate');
+  };
 
-  const repeatOptions = [
-    { value: 'none', label: 'Не повторяется' },
-    { value: 'daily', label: 'Ежедневно' },
-    { value: 'weekly', label: 'Еженедельно' },
-    { value: 'monthly', label: 'Ежемесячно' },
-    { value: 'quarterly', label: 'Ежеквартально' },
-    { value: 'semiannual', label: 'Раз в полгода' },
-    { value: 'annual', label: 'Ежегодно' },
-  ];
+  const handleAmountChange = (value: string) => {
+    setAmount(formatAmountInput(value));
+    clearValidationError('amount');
+  };
+
+  const handleCurrencyChange = (value: string) => {
+    setCurrency(value);
+    clearValidationError('currency');
+  };
+
+  const handleArticleChange = (value: string) => {
+    setArticleId(value);
+    clearValidationError('articleId');
+  };
+
+  const handleAccountChange = (value: string) => {
+    setAccountId(value);
+    clearValidationError('accountId');
+  };
+
+  const handleSourceAccountChange = (value: string) => {
+    setSourceAccountId(value);
+    clearValidationError('sourceAccountId');
+  };
+
+  const handleTargetAccountChange = (value: string) => {
+    setTargetAccountId(value);
+    clearValidationError('targetAccountId');
+  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Тип операции"
-          value={type}
-          onChange={(e) => setType(e.target.value as OperationType)}
-          options={typeOptions}
-          required
-          disabled={!canEdit}
-        />
-
-        <Input
-          label="Дата"
-          type="date"
-          value={operationDate}
-          onChange={(e) => setOperationDate(e.target.value)}
-          required
-          disabled={!canEdit}
-        />
-
-        <Input
-          label="Сумма"
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(formatAmountInput(e.target.value))}
-          placeholder="0"
-          required
-          disabled={!canEdit}
-        />
-
-        <Select
-          label="Валюта"
-          value={currency}
-          onChange={(e) => setCurrency(e.target.value)}
-          options={currencyOptions}
-          required
-          disabled={!canEdit}
-        />
-      </div>
-
-      {type === OperationType.TRANSFER ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            label="Счет списания"
-            value={sourceAccountId}
-            onChange={(e) => setSourceAccountId(e.target.value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-            required
-            disabled={!canEdit}
-          />
-          <Select
-            label="Счет зачисления"
-            value={targetAccountId}
-            onChange={(e) => setTargetAccountId(e.target.value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-            required
-            disabled={!canEdit}
-          />
-        </div>
-      ) : (
-        <>
-          <Select
-            label="Статья"
-            value={articleId}
-            onChange={(e) => setArticleId(e.target.value)}
-            options={articles
-              .filter((a) => a.type === type)
-              .map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите статью"
-            disabled={!canEdit}
-          />
-
-          <Select
-            label="Счет"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
-            placeholder="Выберите счет"
-            disabled={!canEdit}
-          />
-        </>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Select
-          label="Контрагент"
-          value={counterpartyId}
-          onChange={(e) => setCounterpartyId(e.target.value)}
-          options={counterparties.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder="Не выбран"
-          disabled={!canEdit}
-        />
-
-        <Select
-          label="Сделка"
-          value={dealId}
-          onChange={(e) => setDealId(e.target.value)}
-          options={deals.map((d) => ({ value: d.id, label: d.name }))}
-          placeholder="Не выбрана"
-          disabled={!canEdit}
-        />
-
-        <Select
-          label="Подразделение"
-          value={departmentId}
-          onChange={(e) => setDepartmentId(e.target.value)}
-          options={departments.map((d) => ({ value: d.id, label: d.name }))}
-          placeholder="Не выбрано"
-          disabled={!canEdit}
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="flex flex-col h-full min-h-0 px-6 py-4"
+    >
+      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
+        <OperationFormFields
+          type={type}
+          operationDate={operationDate}
+          amount={amount}
+          currency={currency}
+          articleId={articleId}
+          accountId={accountId}
+          sourceAccountId={sourceAccountId}
+          targetAccountId={targetAccountId}
+          counterpartyId={counterpartyId}
+          dealId={dealId}
+          departmentId={departmentId}
+          description={description}
+          repeat={repeat}
+          recurrenceEndDate={recurrenceEndDate}
+          validationErrors={validationErrors}
+          articles={articles}
+          accounts={accounts}
+          counterparties={counterparties}
+          deals={deals}
+          filteredDeals={filteredDeals}
+          departments={departments}
+          onTypeChange={handleTypeChange}
+          onDateChange={handleDateChange}
+          onAmountChange={handleAmountChange}
+          onCurrencyChange={handleCurrencyChange}
+          onArticleChange={handleArticleChange}
+          onAccountChange={handleAccountChange}
+          onSourceAccountChange={handleSourceAccountChange}
+          onTargetAccountChange={handleTargetAccountChange}
+          onCounterpartyChange={setCounterpartyId}
+          onDealChange={setDealId}
+          onDepartmentChange={setDepartmentId}
+          onDescriptionChange={setDescription}
+          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onEndDateChange={setRecurrenceEndDate}
+          onValidationErrorClear={clearValidationError}
         />
       </div>
 
-      <Input
-        label="Описание"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        placeholder="Дополнительная информация"
-        disabled={!canEdit}
+      <OperationFormActions
+        operation={operation}
+        isCopy={isCopy}
+        isChildOperation={isChildOperation}
+        updateScope={updateScope}
+        isCreating={isCreating}
+        isUpdating={isUpdating}
+        onUpdateScopeChange={setUpdateScope}
+        onClose={onClose}
       />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select
-          label="Периодичность"
-          value={repeat}
-          onChange={(e) => setRepeat(e.target.value as Periodicity)}
-          options={repeatOptions}
-          disabled={!canEdit}
-        />
-
-        {repeat !== Periodicity.NONE && (
-          <Input
-            label="Дата окончания повторов"
-            type="date"
-            value={recurrenceEndDate}
-            onChange={(e) => setRecurrenceEndDate(e.target.value)}
-            placeholder="Не указана (бесконечно)"
-            disabled={!canEdit}
-          />
-        )}
-      </div>
-
-      <div className="flex gap-4 pt-4">
-        <Button type="submit" disabled={isCreating || isUpdating || !canEdit}>
-          {operation?.id && !isCopy ? 'Сохранить' : 'Создать'}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Отмена
-        </Button>
-      </div>
     </form>
   );
 };

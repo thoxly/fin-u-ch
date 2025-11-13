@@ -10,6 +10,8 @@ import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
+import { sendVerificationEmail } from '../../services/mail/mail.service';
+import tokenService from '../../services/mail/token.service';
 
 export interface RegisterDTO {
   email: string;
@@ -91,6 +93,7 @@ export class AuthService {
           passwordHash,
           companyId: company.id,
           isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
+          isEmailVerified: false,
         },
       });
 
@@ -171,6 +174,21 @@ export class AuthService {
       userId: result.user.id,
       email: result.user.email,
     });
+
+    // Отправляем письмо подтверждения email
+    try {
+      const verificationToken = await tokenService.createToken({
+        userId: result.user.id,
+        type: 'email_verification',
+      });
+      await sendVerificationEmail(result.user.email, verificationToken);
+    } catch (error) {
+      logger.error('Failed to send verification email', {
+        userId: result.user.id,
+        error,
+      });
+      // Не блокируем регистрацию, если письмо не отправилось
+    }
 
     return {
       accessToken,
@@ -297,6 +315,64 @@ export class AuthService {
       };
     } catch (error) {
       throw new AppError('Invalid refresh token', 401);
+    }
+  }
+
+  async verifyEmail(token: string): Promise<void> {
+    const validation = await tokenService.validateToken(
+      token,
+      'email_verification'
+    );
+
+    if (!validation.valid || !validation.userId) {
+      throw new AppError(validation.error || 'Invalid token', 400);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: validation.userId },
+        data: { isEmailVerified: true },
+      });
+
+      await tokenService.markTokenAsUsed(token);
+    });
+
+    logger.info(`Email verified for user ${validation.userId}`);
+  }
+
+  async resendVerificationEmail(email: string): Promise<void> {
+    validateEmail(email);
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // Не раскрываем, существует ли пользователь
+      return;
+    }
+
+    if (user.isEmailVerified) {
+      throw new AppError('Email already verified', 400);
+    }
+
+    if (!user.isActive) {
+      throw new AppError('User account is inactive', 403);
+    }
+
+    try {
+      const verificationToken = await tokenService.createToken({
+        userId: user.id,
+        type: 'email_verification',
+      });
+      await sendVerificationEmail(user.email, verificationToken);
+      logger.info(`Verification email resent to ${user.email}`);
+    } catch (error) {
+      logger.error('Failed to resend verification email', {
+        userId: user.id,
+        error,
+      });
+      throw new AppError('Failed to send verification email', 500);
     }
   }
 }

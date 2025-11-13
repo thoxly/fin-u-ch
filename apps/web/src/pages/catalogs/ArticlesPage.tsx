@@ -8,6 +8,7 @@ import { Table } from '../../shared/ui/Table';
 import { Select } from '../../shared/ui/Select';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { ProtectedAction } from '../../shared/components/ProtectedAction';
+import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetArticlesQuery,
   useDeleteArticleMutation,
@@ -24,6 +25,18 @@ import { BulkActionsBar } from '../../shared/ui/BulkActionsBar';
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
+
+  // Состояния для модалок подтверждения
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    type: 'delete' | 'archive' | 'bulk';
+    ids?: string[];
+  }>({
+    isOpen: false,
+    id: null,
+    type: 'delete',
+  });
 
   // Фильтры
   const [typeFilter, setTypeFilter] = useState<'income' | 'expense' | ''>('');
@@ -75,15 +88,40 @@ export const ArticlesPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту статью?')) {
-      await deleteArticle(id);
-    }
+  const handleDelete = (id: string) => {
+    setDeleteModal({ isOpen: true, id, type: 'delete' });
   };
 
-  const handleArchive = async (id: string) => {
-    if (window.confirm('Вы уверены, что хотите архивировать эту статью?')) {
-      await archiveArticle(id);
+  const handleArchive = (id: string) => {
+    setDeleteModal({ isOpen: true, id, type: 'archive' });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
+    await deleteArticle(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
+  };
+
+  const confirmArchive = async () => {
+    if (!deleteModal.id) return;
+    await archiveArticle(deleteModal.id);
+    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
+  };
+
+  const confirmBulkArchive = async () => {
+    if (!deleteModal.ids || deleteModal.ids.length === 0) return;
+    await bulkArchiveArticles(deleteModal.ids);
+    clearSelection();
+    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
+  };
+
+  const handleModalConfirm = async () => {
+    if (deleteModal.type === 'delete') {
+      await confirmDelete();
+    } else if (deleteModal.type === 'archive') {
+      await confirmArchive();
+    } else if (deleteModal.type === 'bulk') {
+      await confirmBulkArchive();
     }
   };
 
@@ -241,8 +279,8 @@ export const ArticlesPage = () => {
                 <Select
                   label="Тип"
                   value={typeFilter}
-                  onChange={(e) =>
-                    setTypeFilter(e.target.value as 'income' | 'expense' | '')
+                  onChange={(value) =>
+                    setTypeFilter(value as 'income' | 'expense' | '')
                   }
                   options={[
                     { value: '', label: 'Все типы' },
@@ -257,13 +295,9 @@ export const ArticlesPage = () => {
                 <Select
                   label="Деятельность"
                   value={activityFilter}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setActivityFilter(
-                      e.target.value as
-                        | 'operating'
-                        | 'investing'
-                        | 'financing'
-                        | ''
+                      value as 'operating' | 'investing' | 'financing' | ''
                     )
                   }
                   options={[
@@ -286,8 +320,7 @@ export const ArticlesPage = () => {
                         ? 'true'
                         : 'false'
                   }
-                  onChange={(e) => {
-                    const value = e.target.value;
+                  onChange={(value) => {
                     setIsActiveFilter(
                       value === '' ? undefined : value === 'true'
                     );
@@ -328,15 +361,13 @@ export const ArticlesPage = () => {
                   {
                     label: `В архив выбранные (${selectedIds.length})`,
                     variant: 'warning',
-                    onClick: async () => {
-                      if (
-                        window.confirm(
-                          `Отправить в архив выбранные статьи (${selectedIds.length})?`
-                        )
-                      ) {
-                        await bulkArchiveArticles(selectedIds);
-                        clearSelection();
-                      }
+                    onClick: () => {
+                      setDeleteModal({
+                        isOpen: true,
+                        id: null,
+                        type: 'bulk',
+                        ids: selectedIds,
+                      });
                     },
                   },
                 ]}
@@ -352,6 +383,40 @@ export const ArticlesPage = () => {
       >
         <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
       </OffCanvas>
+
+      <ConfirmDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() =>
+          setDeleteModal({ isOpen: false, id: null, type: 'delete' })
+        }
+        onConfirm={handleModalConfirm}
+        title={
+          deleteModal.type === 'archive'
+            ? 'Подтверждение архивирования'
+            : deleteModal.type === 'bulk'
+              ? 'Подтверждение архивирования'
+              : 'Подтверждение удаления'
+        }
+        message={
+          deleteModal.type === 'archive'
+            ? 'Вы уверены, что хотите архивировать эту статью?'
+            : deleteModal.type === 'bulk'
+              ? `Отправить в архив выбранные статьи (${deleteModal.ids?.length || 0})?`
+              : 'Вы уверены, что хотите удалить эту статью?'
+        }
+        confirmText={
+          deleteModal.type === 'archive'
+            ? 'Архивировать'
+            : deleteModal.type === 'bulk'
+              ? `В архив (${deleteModal.ids?.length || 0})`
+              : 'Удалить'
+        }
+        variant={
+          deleteModal.type === 'archive' || deleteModal.type === 'bulk'
+            ? 'warning'
+            : 'delete'
+        }
+      />
     </Layout>
   );
 };

@@ -37,63 +37,91 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Вход в систему
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Или{' '}
-            <Link
-              to="/register"
-              className="font-medium text-primary-600 dark:text-primary-500 hover:text-primary-500 dark:hover:text-primary-400"
-            >
-              создайте новый аккаунт
-            </Link>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-100 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full">
+        {/* Logo and Header */}
+        <div className="text-center mb-8">
+          <Link to="/" className="inline-block mb-6">
+            <img
+              src="/images/logo.png"
+              alt="Fin-U-CH"
+              className="h-10 sm:h-12 w-auto mx-auto"
+            />
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            Добро пожаловать
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Войдите в свой аккаунт для продолжения
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 p-4">
-              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-            </div>
-          )}
+        {/* Form Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl dark:shadow-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-10">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4">
+                <p className="text-sm text-red-800 dark:text-red-300 text-center">
+                  {error}
+                </p>
+              </div>
+            )}
 
-          <div className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
+            <div className="space-y-5">
+              <Input
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="transition-all"
+              />
 
-            <Input
-              label="Пароль"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          {/* <><div>
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              inchange={(e)} => setPassword(e.target.value
+              <div>
+                <Input
+                  label="Пароль"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="transition-all"
+                />
+                <div className="mt-2 text-right">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm font-medium text-primary-600 dark:text-primary-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+                  >
+                    Забыли пароль?
+                  </Link>
                 </div>
-              
-              </Input></div></> */}
+              </div>
+            </div>
 
-          <Button type="submit" fullWidth disabled={isLoading}>
-            {isLoading ? 'Вход...' : 'Войти'}
-          </Button>
-        </form>
+            <Button
+              type="submit"
+              fullWidth
+              disabled={isLoading}
+              className="mt-8 py-3 text-base font-semibold"
+            >
+              {isLoading ? 'Вход...' : 'Войти'}
+            </Button>
+          </form>
+
+          {/* Sign up link */}
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Нет аккаунта?{' '}
+              <Link
+                to="/register"
+                className="font-semibold text-primary-600 dark:text-primary-500 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+              >
+                Зарегистрироваться
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

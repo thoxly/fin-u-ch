@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
-import { PeriodFilters } from '../shared/ui/PeriodFilters';
+import { DateRangePicker } from '../shared/ui/DateRangePicker';
 import { IncomeExpenseChart } from '../shared/ui/IncomeExpenseChart';
 import { WeeklyFlowChart } from '../shared/ui/WeeklyFlowChart';
 import { AccountBalancesChart } from '../shared/ui/AccountBalancesChart';
@@ -13,9 +13,39 @@ import {
 } from '../store/api/reportsApi';
 import { useGetOperationsQuery } from '../store/api/operationsApi';
 import { formatMoney } from '../shared/lib/money';
-import { PeriodFiltersState } from '@fin-u-ch/shared';
-import { getPeriodRange } from '../shared/lib/period';
 import { usePermissions } from '../shared/hooks/usePermissions';
+import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
+import {
+  getPeriodRange,
+  getNextPeriod,
+  getPreviousPeriod,
+} from '../shared/lib/period';
+import {
+  ArrowDownCircleIcon,
+  ArrowUpCircleIcon,
+  ChartBarIcon,
+} from '@heroicons/react/24/outline';
+
+// Автоматически определяет формат периода на основе диапазона дат
+const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  const daysDiff =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
+
+  if (daysDiff === 1) {
+    return 'day';
+  } else if (daysDiff <= 7) {
+    return 'week';
+  } else if (daysDiff <= 31) {
+    return 'month';
+  } else if (daysDiff <= 93) {
+    return 'quarter';
+  } else {
+    return 'year';
+  }
+};
 
 export const DashboardPage = () => {
   const today = new Date();
@@ -36,6 +66,52 @@ export const DashboardPage = () => {
   const canViewAccounts = canRead('accounts');
 
   // Получаем данные дашборда из API (только если есть права на просмотр)
+  // Обработчики навигации по периодам
+  const handlePreviousPeriod = () => {
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getPreviousPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format: newFormat,
+      range: newRange,
+    });
+  };
+
+  const handleNextPeriod = () => {
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getNextPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format: newFormat,
+      range: newRange,
+    });
+  };
+
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    const formatDateForAPI = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const newRange = {
+      from: formatDateForAPI(startDate),
+      to: formatDateForAPI(endDate),
+    };
+    const format = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format,
+      range: newRange,
+    });
+  };
+
+  // Получаем данные дашборда из API
   const {
     data: dashboardData,
     isLoading,
@@ -80,7 +156,24 @@ export const DashboardPage = () => {
       const result: {
         date: string;
         label: string;
-        [accountName: string]: string | number;
+        [key: string]:
+          | string
+          | number
+          | boolean
+          | Array<{
+              id: string;
+              type: string;
+              amount: number;
+              description: string | null;
+              accountId: string | null;
+              sourceAccountId: string | null;
+              targetAccountId: string | null;
+              article: {
+                id: string;
+                name: string;
+              } | null;
+            }>
+          | undefined;
         operations?: Array<{
           id: string;
           type: string;
@@ -98,8 +191,29 @@ export const DashboardPage = () => {
       } = {
         date: series.date,
         label: series.label,
-        operations: series.operations,
-        hasOperations: series.hasOperations,
+        ...('operations' in series && {
+          operations: (
+            series as typeof series & {
+              operations?: Array<{
+                id: string;
+                type: string;
+                amount: number;
+                description: string | null;
+                accountId: string | null;
+                sourceAccountId: string | null;
+                targetAccountId: string | null;
+                article: {
+                  id: string;
+                  name: string;
+                } | null;
+              }>;
+            }
+          ).operations,
+        }),
+        ...('hasOperations' in series && {
+          hasOperations: (series as typeof series & { hasOperations?: boolean })
+            .hasOperations,
+        }),
       };
 
       // Добавляем данные по каждому счету
@@ -114,6 +228,13 @@ export const DashboardPage = () => {
       return result;
     }) || [];
 
+  const startDate = periodFilters.range.from
+    ? new Date(periodFilters.range.from)
+    : new Date();
+  const endDate = periodFilters.range.to
+    ? new Date(periodFilters.range.to)
+    : new Date();
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -123,9 +244,120 @@ export const DashboardPage = () => {
           </h1>
         </div>
 
-        {/* Фильтры периода */}
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
-          <PeriodFilters value={periodFilters} onChange={setPeriodFilters} />
+        {/* Компактная панель: фильтр периода + метрики */}
+        <Card className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+          {/* Навигация и фильтр периода */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Кнопка "Назад" */}
+            <button
+              type="button"
+              onClick={handlePreviousPeriod}
+              className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Предыдущий период"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
+
+            {/* Фильтр периода */}
+            <div className="flex-shrink-0">
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onChange={handleDateRangeChange}
+              />
+            </div>
+
+            {/* Кнопка "Вперёд" */}
+            <button
+              type="button"
+              onClick={handleNextPeriod}
+              className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Следующий период"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Метрики в виде мини-карточек */}
+          {dashboardData && (
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Поступления */}
+              <div className="flex items-center gap-1 text-sm">
+                {/* Иконка для мобильных */}
+                <ArrowDownCircleIcon className="w-5 h-5 text-green-500 dark:text-green-400 sm:hidden" />
+                {/* Текст для десктопа */}
+                <span className="hidden sm:inline text-gray-400 dark:text-gray-500">
+                  Поступления:
+                </span>
+                <span className="font-semibold text-green-500 dark:text-green-400">
+                  {formatMoney(dashboardData.summary.income)}
+                </span>
+              </div>
+
+              {/* Списания */}
+              <div className="flex items-center gap-1 text-sm">
+                {/* Иконка для мобильных */}
+                <ArrowUpCircleIcon className="w-5 h-5 text-red-500 dark:text-red-400 sm:hidden" />
+                {/* Текст для десктопа */}
+                <span className="hidden sm:inline text-gray-400 dark:text-gray-500">
+                  Списания:
+                </span>
+                <span className="font-semibold text-red-500 dark:text-red-400">
+                  {formatMoney(dashboardData.summary.expense)}
+                </span>
+              </div>
+
+              {/* Чистый поток */}
+              <div className="flex items-center gap-1 text-sm">
+                {/* Иконка для мобильных */}
+                <ChartBarIcon
+                  className={`w-5 h-5 sm:hidden ${
+                    dashboardData.summary.netProfit >= 0
+                      ? 'text-blue-500 dark:text-blue-400'
+                      : 'text-red-500 dark:text-red-400'
+                  }`}
+                />
+                {/* Текст для десктопа */}
+                <span className="hidden sm:inline text-gray-400 dark:text-gray-500">
+                  Чистый поток:
+                </span>
+                <span
+                  className={`font-semibold ${
+                    dashboardData.summary.netProfit >= 0
+                      ? 'text-blue-500 dark:text-blue-400'
+                      : 'text-red-500 dark:text-red-400'
+                  }`}
+                >
+                  {dashboardData.summary.netProfit >= 0 ? '+' : ''}
+                  {formatMoney(dashboardData.summary.netProfit)}
+                </span>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Loading state */}

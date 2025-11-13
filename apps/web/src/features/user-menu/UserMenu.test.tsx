@@ -16,6 +16,9 @@ const createMockStore = () => {
         },
         isAuthenticated: true,
       }),
+      notification: () => ({
+        notifications: [],
+      }),
     },
   });
 };

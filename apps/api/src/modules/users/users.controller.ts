@@ -7,7 +7,7 @@ import auditLogService from '../audit/audit.service';
 export class UsersController {
   async getMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await usersService.getMe(req.userId!);
+      const result = await usersService.getMe(req.userId!, req.companyId!);
       res.json(result);
     } catch (error) {
       next(error);
@@ -25,8 +25,31 @@ export class UsersController {
 
   async updateMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await usersService.updateMe(req.userId!, req.body);
+      const result = await usersService.updateMe(
+        req.userId!,
+        req.companyId!,
+        req.body
+      );
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Изменить пароль пользователя
+   * POST /api/users/change-password
+   */
+  async changePassword(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      await usersService.changePassword(
+        req.userId!,
+        req.companyId!,
+        currentPassword,
+        newPassword
+      );
+      res.json({ message: 'Password changed successfully' });
     } catch (error) {
       next(error);
     }
@@ -304,6 +327,69 @@ export class UsersController {
       });
 
       res.status(200).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Запросить смену email
+   * POST /api/users/request-email-change
+   */
+  async requestEmailChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { newEmail } = req.body;
+      await usersService.requestEmailChange(
+        req.userId!,
+        req.companyId!,
+        newEmail
+      );
+      res.json({
+        message: 'Verification email sent to your current email address',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Подтвердить старый email для смены
+   * POST /api/users/confirm-old-email-change
+   */
+  async confirmOldEmailForChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { token } = req.body;
+      await usersService.confirmOldEmailForChange(token, req.companyId!);
+      res.json({
+        message:
+          'Old email confirmed. Verification email sent to new email address',
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Подтвердить смену email
+   * POST /api/users/confirm-email-change
+   */
+  async confirmEmailChange(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { token } = req.body;
+      await usersService.confirmEmailChangeWithEmail(token, req.companyId!);
+      res.json({ message: 'Email changed successfully' });
     } catch (error) {
       next(error);
     }

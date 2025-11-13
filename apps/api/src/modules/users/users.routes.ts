@@ -276,4 +276,118 @@ router.delete(
 // Пользователь может получить свои права без проверки, для других нужна проверка
 router.get('/:id/permissions', usersController.getUserPermissions);
 
+/**
+ * @swagger
+ * /api/users/me/change-password:
+ *   post:
+ *     summary: Change password
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *       400:
+ *         description: Current password is incorrect
+ */
+router.post('/me/change-password', usersController.changePassword);
+
+/**
+ * @swagger
+ * /api/users/me/request-email-change:
+ *   post:
+ *     summary: Request email change
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - newEmail
+ *             properties:
+ *               newEmail:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Verification email sent
+ *       409:
+ *         description: Email already in use
+ */
+router.post('/me/request-email-change', usersController.requestEmailChange);
+
+/**
+ * @swagger
+ * /api/users/me/confirm-email-change-old:
+ *   post:
+ *     summary: Confirm old email for email change
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Old email confirmed, verification email sent to new email
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post(
+  '/me/confirm-email-change-old',
+  usersController.confirmOldEmailForChange
+);
+
+/**
+ * @swagger
+ * /api/users/me/confirm-email-change:
+ *   post:
+ *     summary: Confirm new email and complete email change
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email changed successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post('/me/confirm-email-change', usersController.confirmEmailChange);
+
 export default router;

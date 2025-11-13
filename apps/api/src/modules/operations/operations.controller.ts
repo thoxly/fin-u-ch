@@ -18,8 +18,12 @@ export class OperationsController {
         dealId: req.query.dealId as string,
         departmentId: req.query.departmentId as string,
         counterpartyId: req.query.counterpartyId as string,
+        accountId: req.query.accountId as string,
         isConfirmed: req.query.isConfirmed
           ? req.query.isConfirmed === 'true'
+          : undefined,
+        isTemplate: req.query.isTemplate
+          ? req.query.isTemplate === 'true'
           : undefined,
         limit: req.query.limit
           ? parseInt(req.query.limit as string, 10)

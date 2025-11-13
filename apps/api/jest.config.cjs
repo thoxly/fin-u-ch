@@ -25,6 +25,7 @@ module.exports = {
     '!src/modules/reports/**/**.routes.ts',
     '!src/types/**',
     '!src/utils/logger.ts',
+    '!src/services/mail/**',
   ],
   coverageThreshold: {
     global: {

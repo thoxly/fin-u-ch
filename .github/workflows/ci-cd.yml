@@ -743,10 +743,13 @@ jobs:
           echo "=== Creating demo user for production ==="
           docker compose -f docker-compose.prod.yml run --rm api npx tsx ../../scripts/setup-demo-user.ts || echo "Demo user creation failed, continuing deployment..."
 
-          # Stop and remove old containers
+          # Stop and remove old containers (including manually created ones)
           echo "=== Stopping and removing old containers ==="
-          docker compose -f docker-compose.prod.yml stop api web worker nginx
-          docker compose -f docker-compose.prod.yml rm -f api web worker nginx
+          # Force remove containers by name (works for both compose and manually created)
+          docker rm -f fin-u-ch-api fin-u-ch-web fin-u-ch-worker fin-u-ch-nginx 2>/dev/null || true
+          # Also try through compose
+          docker compose -f docker-compose.prod.yml stop api web worker nginx 2>/dev/null || true
+          docker compose -f docker-compose.prod.yml rm -f api web worker nginx 2>/dev/null || true
 
           # Start with new images
           echo "=== Starting containers with new images ==="

@@ -86,7 +86,7 @@ export const AccountForm = ({
       <Select
         label="Валюта"
         value={currency}
-        onChange={(e) => setCurrency(e.target.value)}
+        onChange={(value) => setCurrency(value)}
         options={[
           { value: 'RUB', label: 'RUB' },
           { value: 'USD', label: 'USD' },

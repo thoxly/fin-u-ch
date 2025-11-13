@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatMoney } from '../lib/money';
 import { Operation } from '@shared/types/operations';
 
@@ -11,6 +12,8 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
   operations,
   className = '',
 }) => {
+  const navigate = useNavigate();
+
   const formatDate = (date: Date | string) => {
     const d = new Date(date);
     return d.toLocaleDateString('ru-RU', {
@@ -94,7 +97,10 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
       </div>
       {operations.length > 0 && (
         <div className="mt-4 text-center">
-          <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium">
+          <button
+            onClick={() => navigate('/operations')}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium"
+          >
             → Все операции
           </button>
         </div>

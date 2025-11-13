@@ -16,6 +16,7 @@ const createMockStore = (isAuthenticated: boolean) => {
   return configureStore({
     reducer: {
       auth: authReducer,
+      notification: (state = { notifications: [] }) => state,
     },
     preloadedState: {
       auth: {
@@ -25,6 +26,9 @@ const createMockStore = (isAuthenticated: boolean) => {
         accessToken: isAuthenticated ? 'token' : null,
         refreshToken: isAuthenticated ? 'refresh' : null,
         isAuthenticated,
+      },
+      notification: {
+        notifications: [],
       },
     },
   });

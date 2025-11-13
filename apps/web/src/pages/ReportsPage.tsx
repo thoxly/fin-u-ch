@@ -3,9 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
-import { PeriodFilters } from '../shared/ui/PeriodFilters';
-import { Select } from '../shared/ui/Select';
 import { usePermissions } from '../shared/hooks/usePermissions';
+import { DateRangePicker } from '../shared/ui/DateRangePicker';
 import {
   useGetCashflowReportQuery,
   useGetBddsReportQuery,
@@ -14,21 +13,47 @@ import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
 import { CashflowTable } from '../widgets/CashflowTable';
 import type { Budget, CashflowReport, BDDSReport } from '@fin-u-ch/shared';
-import { PeriodFiltersState } from '@fin-u-ch/shared';
-import { getPeriodRange } from '../shared/lib/period';
+import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
+import {
+  getPeriodRange,
+  getNextPeriod,
+  getPreviousPeriod,
+} from '../shared/lib/period';
 import { skipToken } from '@reduxjs/toolkit/query';
 
 type ReportType = 'cashflow';
 
 type ReportMode = 'fact' | 'plan' | 'both';
 
+// Автоматически определяет формат периода на основе диапазона дат
+const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+  const daysDiff =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
+
+  if (daysDiff === 1) {
+    return 'day';
+  } else if (daysDiff <= 7) {
+    return 'week';
+  } else if (daysDiff <= 31) {
+    return 'month';
+  } else if (daysDiff <= 93) {
+    return 'quarter';
+  } else {
+    return 'year';
+  }
+};
+
 export const ReportsPage = () => {
   const [searchParams] = useSearchParams();
   const today = new Date();
 
   // Читаем тип отчета из URL параметров (используется для будущего расширения)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const reportType = (searchParams.get('type') as ReportType) || 'cashflow';
+  // Suppress unused variable warning - reserved for future use
+  void reportType;
 
   // Инициализируем фильтры периода
   const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
@@ -42,7 +67,9 @@ export const ReportsPage = () => {
   const [reportMode, setReportMode] = useState<ReportMode>('fact');
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
-  const budgetButtonRef = useRef<HTMLButtonElement>(null);
+  const planButtonRef = useRef<HTMLButtonElement>(null);
+  const bothButtonRef = useRef<HTMLButtonElement>(null);
+  const budgetMenuRef = useRef<HTMLDivElement>(null);
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
@@ -97,12 +124,58 @@ export const ReportsPage = () => {
 
   const handleModeChange = (mode: ReportMode) => {
     setReportMode(mode);
+    setShowBudgetMenu(false); // Закрываем поповер при переключении режима
     if (mode === 'fact') {
       setSelectedBudget(null);
     } else if (budgets.length > 0 && !selectedBudget) {
       // Если выбран режим с планом, но бюджет не выбран, выбираем первый доступный
       setSelectedBudget(budgets[0]);
     }
+  };
+
+  // Обработчики навигации по периодам
+  const handlePreviousPeriod = () => {
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getPreviousPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format: newFormat,
+      range: newRange,
+    });
+  };
+
+  const handleNextPeriod = () => {
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getNextPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format: newFormat,
+      range: newRange,
+    });
+  };
+
+  const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    const formatDateForAPI = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    const newRange = {
+      from: formatDateForAPI(startDate),
+      to: formatDateForAPI(endDate),
+    };
+    const format = detectPeriodFormat(newRange.from, newRange.to);
+    setPeriodFilters({
+      format,
+      range: newRange,
+    });
   };
 
   // Автоматически устанавливаем даты плана при выборе бюджета
@@ -124,19 +197,18 @@ export const ReportsPage = () => {
     }
   }, [selectedBudget]);
 
-  // Refs для dropdown меню
-  const budgetMenuRef = useRef<HTMLDivElement>(null);
-
   // Закрываем меню при клике вне
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
 
-      // Закрываем меню бюджетов если клик вне кнопки и меню
+      // Закрываем меню бюджетов если клик вне кнопок и меню
       if (
         showBudgetMenu &&
-        budgetButtonRef.current &&
-        !budgetButtonRef.current.contains(target) &&
+        planButtonRef.current &&
+        !planButtonRef.current.contains(target) &&
+        bothButtonRef.current &&
+        !bothButtonRef.current.contains(target) &&
         budgetMenuRef.current &&
         !budgetMenuRef.current.contains(target)
       ) {
@@ -173,95 +245,205 @@ export const ReportsPage = () => {
           Отчеты
         </h1>
 
-        {/* Фильтры */}
-        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
-          <div className="space-y-4">
-            {/* Базовые фильтры периода */}
-            <PeriodFilters value={periodFilters} onChange={setPeriodFilters} />
+        {/* Компактные фильтры */}
+        <Card className="flex flex-wrap items-center justify-start gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
+          {/* Навигация и фильтр периода */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Кнопка "Назад" */}
+            <button
+              type="button"
+              onClick={handlePreviousPeriod}
+              className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Предыдущий период"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+            </button>
 
-            {/* Режим отчёта */}
-            <div className="flex flex-wrap gap-4 items-end pt-2 border-t border-gray-200 dark:border-gray-700">
-              {hasPlans ? (
-                <>
-                  {/* Если есть планы - показываем селектор режима */}
-                  <div className="w-48">
-                    <Select
-                      label="Режим"
-                      value={reportMode}
-                      onChange={(e) =>
-                        handleModeChange(e.target.value as ReportMode)
-                      }
-                      options={[
-                        { value: 'fact', label: 'Факт' },
-                        { value: 'plan', label: 'План' },
-                        { value: 'both', label: 'План-Факт' },
-                      ]}
-                    />
-                  </div>
-
-                  {/* Селектор бюджета (показывается только если режим не "Факт") */}
-                  {reportMode !== 'fact' && (
-                    <div className="relative flex-1 min-w-[200px]">
-                      <label className="label mb-1">План</label>
-                      <div className="relative">
-                        <button
-                          ref={budgetButtonRef}
-                          onClick={() => setShowBudgetMenu(!showBudgetMenu)}
-                          className="w-full flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors justify-between"
-                        >
-                          <span className="font-medium">
-                            {selectedBudget
-                              ? selectedBudget.name
-                              : 'Выберите бюджет'}
-                          </span>
-                          <ChevronDown className="w-4 h-4" />
-                        </button>
-                        {showBudgetMenu && (
-                          <div
-                            ref={budgetMenuRef}
-                            className="absolute top-full mt-2 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto"
-                          >
-                            {budgets.map((budget) => (
-                              <button
-                                key={budget.id}
-                                onClick={() => handleBudgetClick(budget)}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
-                              >
-                                {budget.name}
-                              </button>
-                            ))}
-                            <button
-                              onClick={() => handleBudgetClick(null)}
-                              className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors border-t border-gray-200 dark:border-gray-700"
-                            >
-                              Нет
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  {/* Если планов нет - показываем только режим "Факт" как disabled селектор с подсказкой */}
-                  <div className="w-48 relative group">
-                    <Select
-                      label="Режим"
-                      value="fact"
-                      disabled
-                      options={[{ value: 'fact', label: 'Факт' }]}
-                    />
-                    {/* Tooltip при наведении */}
-                    <div className="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                      💡 Чтобы сравнивать факт с планом, создайте План ДДС в
-                      разделе «Бюджеты».
-                    </div>
-                  </div>
-                </>
-              )}
+            {/* Фильтр периода */}
+            <div className="flex-shrink-0">
+              <DateRangePicker
+                startDate={new Date(periodFilters.range.from)}
+                endDate={new Date(periodFilters.range.to)}
+                onChange={handleDateRangeChange}
+              />
             </div>
+
+            {/* Кнопка "Вперёд" */}
+            <button
+              type="button"
+              onClick={handleNextPeriod}
+              className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Следующий период"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </button>
           </div>
+
+          {/* Режим отчёта */}
+          {hasPlans ? (
+            <>
+              {/* Если есть планы - показываем кнопки режима */}
+              <div className="flex items-center gap-1">
+                {/* Подпись для десктопа (скрыта на мобильных <640px) */}
+                <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 mr-2">
+                  Режим:
+                </span>
+                {/* Группа кнопок режима */}
+                <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleModeChange('fact')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                      reportMode === 'fact'
+                        ? 'bg-primary-600 text-white dark:bg-primary-500'
+                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Факт
+                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      ref={planButtonRef}
+                      onClick={() => {
+                        if (reportMode === 'plan') {
+                          setShowBudgetMenu(!showBudgetMenu);
+                        } else {
+                          handleModeChange('plan');
+                        }
+                      }}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                        reportMode === 'plan'
+                          ? 'bg-primary-600 text-white dark:bg-primary-500'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      План
+                      {reportMode === 'plan' && (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                    {showBudgetMenu && reportMode === 'plan' && (
+                      <div
+                        ref={budgetMenuRef}
+                        className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto"
+                      >
+                        {budgets.map((budget) => (
+                          <button
+                            key={budget.id}
+                            onClick={() => handleBudgetClick(budget)}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            {budget.name}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => handleBudgetClick(null)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors border-t border-gray-200 dark:border-gray-700"
+                        >
+                          Нет
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      ref={bothButtonRef}
+                      onClick={() => {
+                        if (reportMode === 'both') {
+                          setShowBudgetMenu(!showBudgetMenu);
+                        } else {
+                          handleModeChange('both');
+                        }
+                      }}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors flex items-center gap-1 ${
+                        reportMode === 'both'
+                          ? 'bg-primary-600 text-white dark:bg-primary-500'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      План-Факт
+                      {reportMode === 'both' && (
+                        <ChevronDown className="w-3 h-3" />
+                      )}
+                    </button>
+                    {showBudgetMenu && reportMode === 'both' && (
+                      <div
+                        ref={budgetMenuRef}
+                        className="absolute top-full mt-1 left-0 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-2 z-50 min-w-[200px] max-h-[300px] overflow-y-auto"
+                      >
+                        {budgets.map((budget) => (
+                          <button
+                            key={budget.id}
+                            onClick={() => handleBudgetClick(budget)}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
+                          >
+                            {budget.name}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => handleBudgetClick(null)}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors border-t border-gray-200 dark:border-gray-700"
+                        >
+                          Нет
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Если планов нет - показываем только режим "Факт" как disabled кнопка с подсказкой */}
+              <div className="flex items-center gap-1 relative group">
+                {/* Подпись для десктопа (скрыта на мобильных <640px) */}
+                <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400 mr-2">
+                  Режим:
+                </span>
+                {/* Группа кнопок режима (только Факт активен) */}
+                <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-0.5">
+                  <button
+                    type="button"
+                    disabled
+                    className="px-2.5 py-1 text-xs font-medium rounded-md bg-primary-600 text-white dark:bg-primary-500 opacity-75 cursor-not-allowed"
+                  >
+                    Факт
+                  </button>
+                </div>
+                {/* Tooltip при наведении */}
+                <div className="absolute left-0 top-full mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl px-3 py-2 text-xs text-gray-700 dark:text-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                  💡 Чтобы сравнивать факт с планом, создайте План ДДС в разделе
+                  «Бюджеты».
+                </div>
+              </div>
+            </>
+          )}
         </Card>
 
         {/* Контент отчетов */}

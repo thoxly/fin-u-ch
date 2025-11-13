@@ -169,6 +169,7 @@ model Operation {
   recurrenceParentId String?
   recurrenceEndDate DateTime?
   isConfirmed       Boolean   @default(true)
+  isTemplate        Boolean   @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -187,6 +188,7 @@ model Operation {
   @@index([companyId, articleId, operationDate])
   @@index([companyId, accountId, operationDate])
   @@index([companyId, repeat, isConfirmed])
+  @@index([companyId, repeat, isTemplate])
   @@index([recurrenceParentId, operationDate])
   @@map("operations")
 }
