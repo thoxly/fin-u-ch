@@ -33,20 +33,6 @@ model Company {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  companyId    String
-  email        String   @unique
-  passwordHash String
-  firstName    String?
-  lastName     String?
-  isActive     Boolean  @default(true)
-  isSuperAdmin Boolean  @default(false) // Флаг супер-администратора компании
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userRoles UserRole[]
-  auditLogs AuditLog[]
   id              String   @id @default(uuid())
   companyId       String
   email           String   @unique
@@ -54,11 +40,14 @@ model User {
   firstName       String?
   lastName        String?
   isActive        Boolean  @default(true)
+  isSuperAdmin    Boolean  @default(false) // Флаг супер-администратора компании
   isEmailVerified Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userRoles   UserRole[]
+  auditLogs   AuditLog[]
   emailTokens EmailToken[]
 
   @@index([companyId])
@@ -358,6 +347,8 @@ model AuditLog {
   @@index([companyId, userId])
   @@index([companyId, createdAt])
   @@map("audit_logs")
+}
+
 model EmailToken {
   id        String   @id @default(uuid())
   userId    String
