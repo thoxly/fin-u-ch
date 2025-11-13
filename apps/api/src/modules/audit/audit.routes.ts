@@ -4,7 +4,7 @@ import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
 import auditLogController from './audit.controller';
 
-const router = Router();
+const router: Router = Router();
 
 /**
  * @swagger

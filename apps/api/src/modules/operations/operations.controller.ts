@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
+import { AppError } from '../../middlewares/error';
 import operationsService from './operations.service';
 import auditLogService from '../audit/audit.service';
 
@@ -89,6 +90,10 @@ export class OperationsController {
         req.companyId!,
         req.body
       );
+
+      if (!result) {
+        throw new AppError('Операция не найдена', 404);
+      }
 
       // Логируем действие
       await auditLogService.logAction({
