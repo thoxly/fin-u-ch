@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
+import { requirePermission } from '../../middlewares/permissions';
 import operationsController from './operations.controller';
 
 const router: Router = Router();
@@ -35,13 +36,37 @@ router.use(extractTenant);
  *       200:
  *         description: List of operations
  */
-router.get('/', operationsController.getAll);
+router.get(
+  '/',
+  requirePermission('operations', 'read'),
+  operationsController.getAll
+);
 
-router.get('/:id', operationsController.getById);
-router.post('/', operationsController.create);
-router.patch('/:id/confirm', operationsController.confirm);
-router.patch('/:id', operationsController.update);
-router.delete('/:id', operationsController.delete);
+router.get(
+  '/:id',
+  requirePermission('operations', 'read'),
+  operationsController.getById
+);
+router.post(
+  '/',
+  requirePermission('operations', 'create'),
+  operationsController.create
+);
+router.patch(
+  '/:id/confirm',
+  requirePermission('operations', 'confirm'),
+  operationsController.confirm
+);
+router.patch(
+  '/:id',
+  requirePermission('operations', 'update'),
+  operationsController.update
+);
+router.delete(
+  '/:id',
+  requirePermission('operations', 'delete'),
+  operationsController.delete
+);
 
 /**
  * @swagger
@@ -66,6 +91,10 @@ router.delete('/:id', operationsController.delete);
  *       200:
  *         description: DeleteMany result
  */
-router.post('/bulk-delete', operationsController.bulkDelete);
+router.post(
+  '/bulk-delete',
+  requirePermission('operations', 'delete'),
+  operationsController.bulkDelete
+);
 
 export default router;

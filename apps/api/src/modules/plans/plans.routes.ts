@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
+import { requirePermission } from '../../middlewares/permissions';
 import plansController from './plans.controller';
 
 const router: Router = Router();
@@ -20,11 +21,32 @@ router.use(extractTenant);
  *       200:
  *         description: List of plan items
  */
-router.get('/', plansController.getAll);
+// Plans относятся к operations, используем те же права
+router.get(
+  '/',
+  requirePermission('operations', 'read'),
+  plansController.getAll
+);
 
-router.get('/:id', plansController.getById);
-router.post('/', plansController.create);
-router.patch('/:id', plansController.update);
-router.delete('/:id', plansController.delete);
+router.get(
+  '/:id',
+  requirePermission('operations', 'read'),
+  plansController.getById
+);
+router.post(
+  '/',
+  requirePermission('operations', 'create'),
+  plansController.create
+);
+router.patch(
+  '/:id',
+  requirePermission('operations', 'update'),
+  plansController.update
+);
+router.delete(
+  '/:id',
+  requirePermission('operations', 'delete'),
+  plansController.delete
+);
 
 export default router;

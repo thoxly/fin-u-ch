@@ -20,7 +20,10 @@ import operationsRoutes from './modules/operations/operations.routes';
 import plansRoutes from './modules/plans/plans.routes';
 import budgetsRoutes from './modules/budgets/budgets.routes';
 import reportsRoutes from './modules/reports/reports.routes';
+import rolesRoutes from './modules/roles/roles.routes';
+import auditLogRoutes from './modules/audit/audit.routes';
 import demoRoutes from './modules/demo/demo.routes';
+import importsRoutes from './modules/imports/imports.routes';
 
 const app: Application = express();
 
@@ -32,6 +35,22 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
+  if (req.path.includes('/auth/register')) {
+    console.log('[app.ts] Запрос на регистрацию', {
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      body: req.body
+        ? {
+            email: req.body.email,
+            companyName: req.body.companyName,
+            hasPassword: !!req.body.password,
+          }
+        : undefined,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+  }
   logger.info(`${req.method} ${req.path}`);
   next();
 });
@@ -58,7 +77,10 @@ app.use('/api/operations', operationsRoutes);
 app.use('/api/plans', plansRoutes);
 app.use('/api/budgets', budgetsRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/roles', rolesRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/imports', importsRoutes);
 
 // Error handling
 app.use(errorHandler);

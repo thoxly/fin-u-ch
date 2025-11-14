@@ -59,7 +59,7 @@ export class CounterpartiesService {
     await this.getById(id, companyId);
 
     return prisma.counterparty.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -68,7 +68,7 @@ export class CounterpartiesService {
     await this.getById(id, companyId);
 
     return prisma.counterparty.delete({
-      where: { id },
+      where: { id, companyId },
     });
   }
 }

@@ -2,7 +2,7 @@ import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { OperationBasicInfo } from './OperationBasicInfo';
 import { OperationFinancialParams } from './OperationFinancialParams';
 import { OperationRecurrenceSection } from './OperationRecurrenceSection';
-import { OperationType, Periodicity } from '@fin-u-ch/shared';
+import { OperationType, Periodicity, type Deal } from '@fin-u-ch/shared';
 
 interface Article {
   id: string;
@@ -18,12 +18,6 @@ interface Account {
 interface Counterparty {
   id: string;
   name: string;
-}
-
-interface Deal {
-  id: string;
-  name: string;
-  counterpartyId: string;
 }
 
 interface Department {
@@ -68,6 +62,10 @@ interface OperationFormFieldsProps {
   onRepeatChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
+  onOpenCreateModal?: (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => void;
 }
 
 export const OperationFormFields = ({
@@ -107,6 +105,7 @@ export const OperationFormFields = ({
   onRepeatChange,
   onEndDateChange,
   onValidationErrorClear,
+  onOpenCreateModal,
 }: OperationFormFieldsProps) => {
   return (
     <>
@@ -122,6 +121,7 @@ export const OperationFormFields = ({
           onAmountChange={onAmountChange}
           onCurrencyChange={onCurrencyChange}
           onValidationErrorClear={onValidationErrorClear}
+          onOpenCreateModal={onOpenCreateModal}
         />
       </ErrorBoundary>
 
@@ -150,6 +150,7 @@ export const OperationFormFields = ({
           onDealChange={onDealChange}
           onDepartmentChange={onDepartmentChange}
           onValidationErrorClear={onValidationErrorClear}
+          onOpenCreateModal={onOpenCreateModal}
         />
       </ErrorBoundary>
 

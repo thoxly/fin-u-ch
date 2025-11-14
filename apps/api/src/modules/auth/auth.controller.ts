@@ -4,10 +4,35 @@ import passwordResetService from './password-reset.service';
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
+    console.log('[AuthController.register] Получен запрос на регистрацию', {
+      method: req.method,
+      url: req.url,
+      body: {
+        email: req.body?.email,
+        companyName: req.body?.companyName,
+        hasPassword: !!req.body?.password,
+      },
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+
     try {
+      console.log('[AuthController.register] Вызов authService.register');
       const result = await authService.register(req.body);
+      console.log('[AuthController.register] Регистрация успешна', {
+        userId: result.user.id,
+        email: result.user.email,
+        companyId: result.user.companyId,
+        hasAccessToken: !!result.accessToken,
+      });
       res.status(201).json(result);
     } catch (error) {
+      console.error('[AuthController.register] Ошибка при регистрации', {
+        error: error instanceof Error ? error.message : String(error),
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }

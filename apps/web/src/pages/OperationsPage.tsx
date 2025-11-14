@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Trash2, X, Copy, Check } from 'lucide-react';
-
+import { Pencil, Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
@@ -14,6 +13,9 @@ import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
+import { usePermissions } from '../shared/hooks/usePermissions';
+import { ProtectedAction } from '../shared/components/ProtectedAction';
+import { MappingRules } from '../features/bank-import/MappingRules';
 import {
   useLazyGetOperationsQuery,
   useDeleteOperationMutation,
@@ -27,6 +29,7 @@ import {
   useGetDepartmentsQuery,
   useGetAccountsQuery,
 } from '../store/api/catalogsApi';
+import { useGetCompanyQuery } from '../store/api/companiesApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
@@ -36,6 +39,7 @@ import { useBulkSelection } from '../shared/hooks/useBulkSelection';
 import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
+import { BankImportModal } from '../features/bank-import/BankImportModal';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -67,6 +71,7 @@ export const OperationsPage = () => {
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -97,12 +102,26 @@ export const OperationsPage = () => {
   const [accountIdFilter, setAccountIdFilter] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // Загружаем справочники для фильтров
-  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
-  const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  const { data: deals = [] } = useGetDealsQuery();
-  const { data: departments = [] } = useGetDepartmentsQuery();
-  const { data: accounts = [] } = useGetAccountsQuery();
+  const { canRead } = usePermissions();
+
+  // Загружаем справочники для фильтров (только если есть права на просмотр операций)
+  const { data: articles = [] } = useGetArticlesQuery(
+    { isActive: true },
+    { skip: !canRead('operations') }
+  );
+  const { data: counterparties = [] } = useGetCounterpartiesQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: deals = [] } = useGetDealsQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: departments = [] } = useGetDepartmentsQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: accounts = [] } = useGetAccountsQuery(undefined, {
+    skip: !canRead('operations'),
+  });
+  const { data: company } = useGetCompanyQuery();
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -174,6 +193,11 @@ export const OperationsPage = () => {
 
   // Extract data reloading logic to avoid duplication
   const reloadOperationsData = useCallback(async () => {
+    if (!canRead('operations')) {
+      setItems([]);
+      setHasMore(false);
+      return;
+    }
     setItems([]);
     setOffset(0);
     setHasMore(true);
@@ -187,11 +211,11 @@ export const OperationsPage = () => {
     setItems(result as OperationWithRelations[]);
     setHasMore(result.length === PAGE_SIZE);
     setOffset(result.length);
-  }, [hasActiveFilters, filters, trigger, clearSelection]);
+  }, [hasActiveFilters, filters, trigger, clearSelection, canRead]);
 
   // Memoize loadMore callback to prevent unnecessary re-renders
   const loadMore = useCallback(async () => {
-    if (isFetching || !hasMore) return;
+    if (isFetching || !hasMore || !canRead('operations')) return;
     const params: OpsQuery = {
       ...(hasActiveFilters ? filters : {}),
       limit: PAGE_SIZE,
@@ -207,7 +231,15 @@ export const OperationsPage = () => {
     });
     setOffset((prevOffset) => prevOffset + page.length);
     setHasMore(page.length === PAGE_SIZE);
-  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
+  }, [
+    isFetching,
+    hasMore,
+    hasActiveFilters,
+    filters,
+    offset,
+    trigger,
+    canRead,
+  ]);
 
   // Initial and filters-changed load with proper dependencies
   useEffect(() => {
@@ -222,11 +254,16 @@ export const OperationsPage = () => {
         setHasMore(true);
       }
     };
-    load();
+    if (canRead('operations')) {
+      load();
+    } else {
+      setItems([]);
+      setHasMore(false);
+    }
     return () => {
       cancelled = true;
     };
-  }, [reloadOperationsData]);
+  }, [reloadOperationsData, canRead]);
 
   // Use IntersectionObserver hook for infinite scroll
   const sentinelRef = useIntersectionObserver(
@@ -255,13 +292,16 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const {
       id: _id,
       createdAt: _createdAt,
       updatedAt: _updatedAt,
       ...operationData
     } = operation;
+    // Suppress unused variable warnings - these are intentionally destructured
+    void _id;
+    void _createdAt;
+    void _updatedAt;
     // Use structuredClone for deep copy to ensure nested objects are properly copied
     const operationCopy = structuredClone(operationData) as Operation;
     setEditingOperation(operationCopy);
@@ -349,6 +389,15 @@ export const OperationsPage = () => {
     }
   };
 
+  const handleImportClick = () => {
+    if (!company?.inn) {
+      showError(
+        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+      );
+    }
+    setIsImportModalOpen(true);
+  };
+
   const getOperationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       income: 'Поступление',
@@ -434,18 +483,26 @@ export const OperationsPage = () => {
     }
   }, [counterpartyIdFilter, dealIdFilter, deals]);
 
+  // Автоматически открываем модальное окно импорта, если есть флаг в sessionStorage
+  useEffect(() => {
+    const shouldOpen = sessionStorage.getItem('openImportModal');
+    const tab = sessionStorage.getItem('importModalTab');
+
+    if (shouldOpen === 'true') {
+      setIsImportModalOpen(true);
+      sessionStorage.removeItem('openImportModal');
+      sessionStorage.removeItem('importModalTab');
+    }
+  }, []);
+
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
     setDateRangeStart(startDate);
     setDateRangeEnd(endDate);
-    // Форматируем даты в формат YYYY-MM-DD для API
-    const formatDateForAPI = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    setDateFromFilter(formatDateForAPI(startDate));
-    setDateToFilter(formatDateForAPI(endDate));
+
+    // Отправляем полные ISO даты с временем вместо формата YYYY-MM-DD
+    // Это гарантирует правильную обработку часовых поясов на backend
+    setDateFromFilter(startDate.toISOString());
+    setDateToFilter(endDate.toISOString());
   };
 
   const columns = [
@@ -518,49 +575,153 @@ export const OperationsPage = () => {
         <div className="flex gap-2">
           {!op.isConfirmed ? (
             <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleConfirm(op.id);
-                }}
-                className="text-green-600 hover:text-green-800 dark:text-green-500 dark:hover:text-green-400 p-1 rounded hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
-                title="Подтвердить"
+              <ProtectedAction entity="operations" action="confirm">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfirm(op.id);
+                  }}
+                  className="text-green-600 hover:text-green-800 dark:text-green-500 dark:hover:text-green-400 p-1 rounded hover:bg-green-50 dark:hover:bg-green-900/30 transition-colors"
+                  title="Подтвердить"
+                >
+                  <Check size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction entity="operations" action="reject">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleReject(op.id);
+                  }}
+                  className="text-orange-600 hover:text-orange-800 dark:text-orange-500 dark:hover:text-orange-400 p-1 rounded hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors"
+                  title="Отклонить"
+                >
+                  <X size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction
+                entity="operations"
+                action="update"
+                fallback={
+                  <button
+                    disabled
+                    className="text-gray-400 p-1 rounded cursor-not-allowed"
+                    title="Нет прав на редактирование"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
               >
-                <Check size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleReject(op.id);
-                }}
-                className="text-orange-600 hover:text-orange-800 dark:text-orange-500 dark:hover:text-orange-400 p-1 rounded hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors"
-                title="Отклонить"
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(op);
+                  }}
+                  className="text-primary-600 hover:text-primary-800 p-1 rounded hover:bg-primary-50 transition-colors"
+                  title="Изменить"
+                >
+                  <Pencil size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction entity="operations" action="create">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(op);
+                  }}
+                  className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50 transition-colors"
+                  title="Копировать"
+                >
+                  <Copy size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction
+                entity="operations"
+                action="delete"
+                fallback={
+                  <button
+                    disabled
+                    className="text-gray-400 p-1 rounded cursor-not-allowed"
+                    title="Нет прав на удаление"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                }
               >
-                <X size={16} />
-              </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(op.id);
+                  }}
+                  className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                  title="Удалить"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </ProtectedAction>
             </>
           ) : (
             <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopy(op);
-                }}
-                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-                title="Копировать"
+              <ProtectedAction
+                entity="operations"
+                action="update"
+                fallback={
+                  <button
+                    disabled
+                    className="text-gray-400 p-1 rounded cursor-not-allowed"
+                    title="Нет прав на редактирование"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                }
               >
-                <Copy size={16} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(op.id);
-                }}
-                className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-                title="Удалить"
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEdit(op);
+                  }}
+                  className="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 p-1 rounded hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                  title="Изменить"
+                >
+                  <Pencil size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction entity="operations" action="create">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy(op);
+                  }}
+                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                  title="Копировать"
+                >
+                  <Copy size={16} />
+                </button>
+              </ProtectedAction>
+              <ProtectedAction
+                entity="operations"
+                action="delete"
+                fallback={
+                  <button
+                    disabled
+                    className="text-gray-400 p-1 rounded cursor-not-allowed"
+                    title="Нет прав на удаление"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                }
               >
-                <Trash2 size={16} />
-              </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(op.id);
+                  }}
+                  className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                  title="Удалить"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </ProtectedAction>
             </>
           )}
         </div>
@@ -576,17 +737,42 @@ export const OperationsPage = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
             Операции
           </h1>
-          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-            <RecurringOperations onEdit={handleEdit} />
-            <Button
-              onClick={handleCreate}
-              size="sm"
-              className="text-sm sm:text-base whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">Создать операцию</span>
-              <span className="sm:hidden">Создать</span>
-            </Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ProtectedAction entity="operations" action="read">
+              <RecurringOperations onEdit={handleEdit} />
+            </ProtectedAction>
+            <ProtectedAction entity="operations" action="create">
+              <Button
+                onClick={handleCreate}
+                size="sm"
+                className="text-sm sm:text-base whitespace-nowrap"
+              >
+                <span className="hidden sm:inline">Создать операцию</span>
+                <span className="sm:hidden">Создать</span>
+              </Button>
+            </ProtectedAction>
           </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
+          <RecurringOperations onEdit={handleEdit} />
+          <MappingRules />
+          <Button
+            onClick={handleImportClick}
+            size="sm"
+            variant="secondary"
+            className="p-2"
+            title="Импорт выписки"
+          >
+            <FileUp size={18} />
+          </Button>
+          <Button
+            onClick={handleCreate}
+            size="sm"
+            className="p-2"
+            title="Добавить операцию"
+          >
+            <Plus size={18} />
+          </Button>
         </div>
 
         <Card>
@@ -880,24 +1066,26 @@ export const OperationsPage = () => {
               onRowClick={handleEdit}
             />
           )}
-          <BulkActionsBar
-            selectedCount={selectedIds.length}
-            onClear={clearSelection}
-            actions={[
-              {
-                label: `Удалить выбранные (${selectedIds.length})`,
-                variant: 'danger',
-                onClick: () => {
-                  setDeleteModal({
-                    isOpen: true,
-                    id: null,
-                    type: 'bulk',
-                    ids: selectedIds,
-                  });
+          <ProtectedAction entity="operations" action="delete">
+            <BulkActionsBar
+              selectedCount={selectedIds.length}
+              onClear={clearSelection}
+              actions={[
+                {
+                  label: `Удалить выбранные (${selectedIds.length})`,
+                  variant: 'danger',
+                  onClick: () => {
+                    setDeleteModal({
+                      isOpen: true,
+                      id: null,
+                      type: 'bulk',
+                      ids: selectedIds,
+                    });
+                  },
                 },
-              },
-            ]}
-          />
+              ]}
+            />
+          </ProtectedAction>
           <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
@@ -911,7 +1099,7 @@ export const OperationsPage = () => {
                 ? 'Редактировать операцию'
                 : 'Создать операцию'
           }
-          size="2xl"
+          size="xl"
         >
           <OperationForm
             operation={editingOperation}
@@ -948,6 +1136,15 @@ export const OperationsPage = () => {
                 : 'Удалить'
           }
           variant={deleteModal.type === 'reject' ? 'warning' : 'delete'}
+        />
+
+        <BankImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => {
+            setIsImportModalOpen(false);
+            // Перезагружаем операции после закрытия модального окна импорта
+            reloadOperationsData();
+          }}
         />
       </div>
     </Layout>

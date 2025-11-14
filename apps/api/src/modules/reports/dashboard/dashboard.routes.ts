@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth';
 import { extractTenant } from '../../../middlewares/tenant';
+import { requirePermission } from '../../../middlewares/permissions';
 import dashboardController from './dashboard.controller';
 
 const router: Router = Router();
@@ -36,7 +37,11 @@ router.use(extractTenant);
  *       200:
  *         description: Dashboard data
  */
-router.get('/', dashboardController.getDashboard);
+router.get(
+  '/',
+  requirePermission('dashboard', 'read'),
+  dashboardController.getDashboard
+);
 
 /**
  * @swagger
@@ -71,6 +76,10 @@ router.get('/', dashboardController.getDashboard);
  *       200:
  *         description: Cumulative cash flow data
  */
-router.get('/cumulative-cash-flow', dashboardController.getCumulativeCashFlow);
+router.get(
+  '/cumulative-cash-flow',
+  requirePermission('dashboard', 'read'),
+  dashboardController.getCumulativeCashFlow
+);
 
 export default router;

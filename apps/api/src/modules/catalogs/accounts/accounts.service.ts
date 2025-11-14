@@ -45,7 +45,7 @@ export class AccountsService {
     await this.getById(id, companyId);
 
     return prisma.account.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -54,7 +54,7 @@ export class AccountsService {
     await this.getById(id, companyId);
 
     return prisma.account.update({
-      where: { id },
+      where: { id, companyId },
       data: { isActive: false },
     });
   }

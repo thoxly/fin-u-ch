@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import type {
   CashflowReport,
   BDDSReport,
   ActivityGroup,
 } from '@fin-u-ch/shared';
 import { formatNumber } from '../../shared/lib/money';
+import { ExportMenu } from '../../shared/ui/ExportMenu';
+import { type ExportRow } from '../../shared/lib/exportData';
 
 interface CashflowTableProps {
   data: CashflowReport | BDDSReport;
@@ -137,17 +139,26 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return map;
   }, [planData]);
 
-  const getPlanAmount = (articleId: string, month: string) => {
-    return planLookups.articleMonth.get(`${articleId}__${month}`) ?? 0;
-  };
+  const getPlanAmount = useCallback(
+    (articleId: string, month: string) => {
+      return planLookups.articleMonth.get(`${articleId}__${month}`) ?? 0;
+    },
+    [planLookups]
+  );
 
-  const getPlanActivityNet = (activity: string, month: string) => {
-    return planLookups.activityMonth.get(`${activity}__${month}`) ?? 0;
-  };
+  const getPlanActivityNet = useCallback(
+    (activity: string, month: string) => {
+      return planLookups.activityMonth.get(`${activity}__${month}`) ?? 0;
+    },
+    [planLookups]
+  );
 
-  const getPlanMonthNet = (month: string) => {
-    return planLookups.monthlyNet.get(month) ?? 0;
-  };
+  const getPlanMonthNet = useCallback(
+    (month: string) => {
+      return planLookups.monthlyNet.get(month) ?? 0;
+    },
+    [planLookups]
+  );
 
   const columnWidths = useMemo(() => {
     const articleColumnWidth = 240;
@@ -204,7 +215,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       balance += getPlanMonthNet(month);
       return { month, balance };
     });
-  }, [planData, allMonths, planLookups, getPlanMonthNet]);
+  }, [planData, allMonths, getPlanMonthNet]);
 
   const totalNetCashflow = data.activities.reduce(
     (sum, activity) => sum + activity.netCashflow,
@@ -216,9 +227,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     0
   );
 
-  const activitiesToRender = hasFactData
-    ? data.activities
-    : planData?.activities || [];
+  const activitiesToRender = useMemo(() => {
+    return hasFactData ? data.activities : planData?.activities || [];
+  }, [hasFactData, data.activities, planData?.activities]);
 
   const formatMonthLabel = (month: string) =>
     new Date(`${month}-01`)
@@ -235,6 +246,108 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return names[activity] || activity;
   };
 
+  // Функция для построения данных экспорта
+  const buildExportRows = useMemo(() => {
+    return (): ExportRow[] => {
+      const rows: ExportRow[] = [];
+
+      for (const activity of activitiesToRender) {
+        // Добавляем строку с итогом по деятельности
+        const activityRow: ExportRow = {
+          'Вид деятельности': getActivityDisplayName(activity.activity),
+          Тип: 'Итого',
+        };
+        for (const month of allMonths) {
+          const factNet = hasFactData
+            ? activity.incomeGroups.reduce((sum, group) => {
+                const monthData = group.months.find((m) => m.month === month);
+                return sum + (monthData?.amount || 0);
+              }, 0) -
+              activity.expenseGroups.reduce((sum, group) => {
+                const monthData = group.months.find((m) => m.month === month);
+                return sum + (monthData?.amount || 0);
+              }, 0)
+            : 0;
+          const planNet = getPlanActivityNet(activity.activity, month);
+          if (showPlan) {
+            activityRow[`${formatMonthLabel(month)} (План)`] = planNet;
+            activityRow[`${formatMonthLabel(month)} (Факт)`] = factNet;
+          } else {
+            activityRow[formatMonthLabel(month)] = factNet;
+          }
+        }
+        activityRow['Итого'] = hasFactData
+          ? activity.netCashflow
+          : (planData?.activities.find((a) => a.activity === activity.activity)
+              ?.netCashflow ?? activity.netCashflow);
+        rows.push(activityRow);
+
+        // Добавляем строки по статьям доходов
+        for (const group of activity.incomeGroups) {
+          const articleName = group.articleName;
+          const groupRow: ExportRow = {
+            'Вид деятельности': getActivityDisplayName(activity.activity),
+            Тип: 'Поступления',
+            Статья: articleName,
+          };
+          for (const month of allMonths) {
+            const factAmount = hasFactData
+              ? group.months.find((m) => m.month === month)?.amount || 0
+              : 0;
+            const planAmount = getPlanAmount(group.articleId, month);
+            if (showPlan) {
+              groupRow[`${formatMonthLabel(month)} (План)`] = planAmount;
+              groupRow[`${formatMonthLabel(month)} (Факт)`] = factAmount;
+            } else {
+              groupRow[formatMonthLabel(month)] = factAmount;
+            }
+          }
+          const total = hasFactData
+            ? group.months.reduce((sum, m) => sum + m.amount, 0)
+            : 0;
+          groupRow['Итого'] = total;
+          rows.push(groupRow);
+        }
+
+        // Добавляем строки по статьям расходов
+        for (const group of activity.expenseGroups) {
+          const articleName = group.articleName;
+          const groupRow: ExportRow = {
+            'Вид деятельности': getActivityDisplayName(activity.activity),
+            Тип: 'Списания',
+            Статья: articleName,
+          };
+          for (const month of allMonths) {
+            const factAmount = hasFactData
+              ? group.months.find((m) => m.month === month)?.amount || 0
+              : 0;
+            const planAmount = getPlanAmount(group.articleId, month);
+            if (showPlan) {
+              groupRow[`${formatMonthLabel(month)} (План)`] = planAmount;
+              groupRow[`${formatMonthLabel(month)} (Факт)`] = factAmount;
+            } else {
+              groupRow[formatMonthLabel(month)] = factAmount;
+            }
+          }
+          const total = hasFactData
+            ? group.months.reduce((sum, m) => sum + m.amount, 0)
+            : 0;
+          groupRow['Итого'] = total;
+          rows.push(groupRow);
+        }
+      }
+
+      return rows;
+    };
+  }, [
+    activitiesToRender,
+    allMonths,
+    hasFactData,
+    showPlan,
+    planData,
+    getPlanAmount,
+    getPlanActivityNet,
+  ]);
   const getActivityColor = (activity: string) => {
     const colors: Record<string, string> = {
       operating: 'bg-blue-50 dark:bg-[#1F1F1F]',
@@ -298,13 +411,18 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
-      <div className="bg-zinc-50 dark:bg-zinc-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
+      <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {title || 'Отчет о движении денежных средств'}:{' '}
           {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
           {new Date(periodTo).toLocaleDateString('ru-RU')}
         </div>
+        <ExportMenu
+          filenameBase={`cashflow_${periodFrom}_${periodTo}`}
+          buildRows={buildExportRows}
+          entity="reports"
+        />
       </div>
 
       <div className="w-full overflow-x-auto overflow-y-visible max-h-[calc(100vh-380px)] md:max-h-[80vh]">
@@ -790,7 +908,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               {cumulativeBalances.map(({ month, balance }, idx) => {
                 const planBalance = planCumulativeBalances[idx]?.balance ?? 0;
                 const isPositive = balance >= 0;
-                const _isPlanPositive = planBalance >= 0;
 
                 if (showPlan) {
                   return (

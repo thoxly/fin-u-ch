@@ -7,6 +7,7 @@ interface User {
   firstName?: string;
   lastName?: string;
   companyName?: string;
+  isSuperAdmin?: boolean;
 }
 
 interface AuthState {

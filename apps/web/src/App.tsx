@@ -16,7 +16,14 @@ import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
+import { AdminPage } from './pages/AdminPage';
+import { RolesPage } from './pages/admin/RolesPage';
+import { UsersPage } from './pages/admin/UsersPage';
+import { AuditLogsPage } from './pages/admin/AuditLogsPage';
+import { CompanySettingsPage } from './pages/admin/CompanySettingsPage';
 import { PrivateRoute } from './components/PrivateRoute';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
 import { useDarkMode } from './shared/hooks/useDarkMode';
 import { NotificationContainer } from './components/Notification';
 
@@ -36,12 +43,24 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Private routes */}
+        {/* Redirect route - определяет первую доступную страницу после логина */}
+        <Route
+          path="/redirect"
+          element={
+            <PrivateRoute>
+              <RedirectToFirstAvailable />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Private routes with permission checks */}
         <Route
           path="/dashboard"
           element={
             <PrivateRoute>
-              <DashboardPage />
+              <ProtectedRoute entity="dashboard" action="read">
+                <DashboardPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -49,7 +68,9 @@ function App() {
           path="/operations"
           element={
             <PrivateRoute>
-              <OperationsPage />
+              <ProtectedRoute entity="operations" action="read">
+                <OperationsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -57,7 +78,9 @@ function App() {
           path="/budgets"
           element={
             <PrivateRoute>
-              <BudgetsPage />
+              <ProtectedRoute entity="budgets" action="read">
+                <BudgetsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -65,7 +88,9 @@ function App() {
           path="/budgets/:budgetId"
           element={
             <PrivateRoute>
-              <BudgetDetailsPage />
+              <ProtectedRoute entity="budgets" action="read">
+                <BudgetDetailsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -73,7 +98,9 @@ function App() {
           path="/reports"
           element={
             <PrivateRoute>
-              <ReportsPage />
+              <ProtectedRoute entity="reports" action="read">
+                <ReportsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -81,7 +108,9 @@ function App() {
           path="/catalogs/articles"
           element={
             <PrivateRoute>
-              <ArticlesPage />
+              <ProtectedRoute entity="articles" action="read">
+                <ArticlesPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -89,7 +118,9 @@ function App() {
           path="/catalogs/accounts"
           element={
             <PrivateRoute>
-              <AccountsPage />
+              <ProtectedRoute entity="accounts" action="read">
+                <AccountsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -97,7 +128,9 @@ function App() {
           path="/catalogs/departments"
           element={
             <PrivateRoute>
-              <DepartmentsPage />
+              <ProtectedRoute entity="departments" action="read">
+                <DepartmentsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -105,7 +138,9 @@ function App() {
           path="/catalogs/counterparties"
           element={
             <PrivateRoute>
-              <CounterpartiesPage />
+              <ProtectedRoute entity="counterparties" action="read">
+                <CounterpartiesPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -113,7 +148,9 @@ function App() {
           path="/catalogs/deals"
           element={
             <PrivateRoute>
-              <DealsPage />
+              <ProtectedRoute entity="deals" action="read">
+                <DealsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />
@@ -121,7 +158,59 @@ function App() {
           path="/catalogs/salaries"
           element={
             <PrivateRoute>
-              <SalariesPage />
+              <ProtectedRoute entity="salaries" action="read">
+                <SalariesPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="users" action="read">
+                <AdminPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/roles"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="users" action="manage_roles">
+                <RolesPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="users" action="read">
+                <UsersPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/audit-logs"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="audit" action="read">
+                <AuditLogsPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/admin/company-settings"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="users" action="read">
+                <CompanySettingsPage />
+              </ProtectedRoute>
             </PrivateRoute>
           }
         />

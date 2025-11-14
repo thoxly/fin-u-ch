@@ -122,6 +122,7 @@ export class DemoUserService {
           passwordHash,
           companyId: company.id,
           isActive: true,
+          isSuperAdmin: true, // Демо-пользователь также является супер-администратором
         },
       });
 

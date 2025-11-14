@@ -1,7 +1,30 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
 import { CashflowTable } from './CashflowTable';
 import { CashflowReport, BDDSReport } from '@fin-u-ch/shared';
+import { apiSlice } from '../../store/api/apiSlice';
+
+// Mock RTK Query hooks used by ExportMenu
+jest.mock('../../store/api/authApi', () => ({
+  useGetMeQuery: () => ({
+    data: {
+      id: '1',
+      email: 'test@test.com',
+      companyId: '1',
+      isSuperAdmin: true,
+    },
+    isLoading: false,
+  }),
+}));
+
+jest.mock('../../store/api/usersApi', () => ({
+  useGetUserPermissionsQuery: () => ({
+    data: {},
+    isLoading: false,
+  }),
+}));
 
 // Mock data for testing
 const mockCashflowData: CashflowReport = {
@@ -57,6 +80,29 @@ const mockPlanData: BDDSReport = {
   ],
 };
 
+// Create a mock store with API slice
+const createMockStore = () => {
+  return configureStore({
+    reducer: {
+      [apiSlice.reducerPath]: apiSlice.reducer,
+      auth: (
+        state = { user: null, accessToken: null, isAuthenticated: false }
+      ) => state,
+      notification: (state = { notifications: [] }) => state,
+    },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware({
+        serializableCheck: false,
+        immutableCheck: false,
+      }).concat(apiSlice.middleware),
+  });
+};
+
+const renderWithProvider = (component: React.ReactElement) => {
+  const store = createMockStore();
+  return render(<Provider store={store}>{component}</Provider>);
+};
+
 describe('CashflowTable', () => {
   const defaultProps = {
     data: mockCashflowData,
@@ -65,7 +111,7 @@ describe('CashflowTable', () => {
   };
 
   it('renders table with correct headers', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     // Check for header text (can be uppercase in the component)
     expect(screen.getByText(/статья/i)).toBeInTheDocument();
@@ -76,13 +122,13 @@ describe('CashflowTable', () => {
   });
 
   it('renders activity rows with correct names', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     expect(screen.getByText('Операционная деятельность')).toBeInTheDocument();
   });
 
   it('shows plan/fact columns when showPlan is true', () => {
-    render(
+    renderWithProvider(
       <CashflowTable
         {...defaultProps}
         showPlan={true}
@@ -95,7 +141,7 @@ describe('CashflowTable', () => {
   });
 
   it('toggles section expansion when clicked', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     const activityRow = screen.getByText('Операционная деятельность');
     fireEvent.click(activityRow);
@@ -106,7 +152,7 @@ describe('CashflowTable', () => {
   });
 
   it('displays correct period information', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     expect(
       screen.getByText(/Отчет о движении денежных средств/)
@@ -116,14 +162,16 @@ describe('CashflowTable', () => {
   });
 
   it('renders total cashflow row', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     expect(screen.getByText('Общий денежный поток')).toBeInTheDocument();
     expect(screen.getByText('Остаток на конец периода')).toBeInTheDocument();
   });
 
   it('applies correct CSS classes for styling', () => {
-    const { container } = render(<CashflowTable {...defaultProps} />);
+    const { container } = renderWithProvider(
+      <CashflowTable {...defaultProps} />
+    );
 
     // Check for scroll container
     const scrollContainer = container.querySelector('.overflow-x-auto');
@@ -145,7 +193,7 @@ describe('CashflowTable', () => {
       activities: [],
     };
 
-    render(<CashflowTable {...defaultProps} data={emptyData} />);
+    renderWithProvider(<CashflowTable {...defaultProps} data={emptyData} />);
 
     // Check for header text (can be uppercase in the component)
     expect(screen.getByText(/статья/i)).toBeInTheDocument();
@@ -153,14 +201,14 @@ describe('CashflowTable', () => {
   });
 
   it('formats money values correctly', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     // Check for formatted money values (assuming formatMoney returns formatted strings)
     expect(screen.getAllByText(/100 000/).length).toBeGreaterThan(0);
   });
 
   it('shows cumulative balance calculation', () => {
-    render(<CashflowTable {...defaultProps} />);
+    renderWithProvider(<CashflowTable {...defaultProps} />);
 
     // The cumulative balance should be calculated and displayed
     expect(screen.getByText('Остаток на конец периода')).toBeInTheDocument();

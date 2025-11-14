@@ -9,6 +9,7 @@ import {
 import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
+import rolesService from '../roles/roles.service';
 import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 
@@ -35,6 +36,14 @@ export interface TokensResponse {
 
 export class AuthService {
   async register(data: RegisterDTO): Promise<TokensResponse> {
+    console.log('[AuthService.register] Начало регистрации', {
+      email: data.email,
+      companyName: data.companyName,
+      hasPassword: !!data.password,
+      passwordLength: data.password?.length,
+    });
+
+    console.log('[AuthService.register] Валидация данных');
     validateRequired({
       email: data.email,
       password: data.password,
@@ -42,18 +51,32 @@ export class AuthService {
     });
     validateEmail(data.email);
     validatePassword(data.password);
+    console.log('[AuthService.register] Валидация пройдена');
 
     // Check if user already exists
+    console.log('[AuthService.register] Проверка существующего пользователя', {
+      email: data.email,
+    });
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
     });
+    console.log('[AuthService.register] Результат проверки пользователя', {
+      exists: !!existingUser,
+      userId: existingUser?.id,
+    });
 
     if (existingUser) {
+      console.log('[AuthService.register] Пользователь уже существует', {
+        email: data.email,
+        userId: existingUser.id,
+      });
       throw new AppError('User with this email already exists', 409);
     }
 
     // Create company and user in a transaction
+    console.log('[AuthService.register] Хеширование пароля');
     const passwordHash = await hashPassword(data.password);
+    console.log('[AuthService.register] Пароль захеширован, начало транзакции');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {
@@ -63,18 +86,63 @@ export class AuthService {
         },
       });
 
+      console.log('Создана компания при регистрации:', {
+        id: company.id,
+        name: company.name,
+        currencyBase: company.currencyBase,
+        createdAt: company.createdAt,
+      });
+
+      // Проверяем, является ли это первым пользователем компании
+      const usersCount = await tx.user.count({
+        where: { companyId: company.id },
+      });
+
+      const isFirstUser = usersCount === 0;
+
+      console.log(
+        '[AuthService.register] Проверка первого пользователя компании:',
+        {
+          companyId: company.id,
+          usersCount,
+          isFirstUser,
+        }
+      );
+
       const user = await tx.user.create({
         data: {
           email: data.email,
           passwordHash,
           companyId: company.id,
+          isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
           isEmailVerified: false,
         },
       });
 
-      // Создаем начальные данные для компании
+      console.log('Создан пользователь при регистрации:', {
+        id: user.id,
+        email: user.email,
+        companyId: user.companyId,
+        isActive: user.isActive,
+        isSuperAdmin: user.isSuperAdmin,
+        createdAt: user.createdAt,
+        isFirstUser,
+      });
+
+      if (isFirstUser) {
+        console.log(
+          '[AuthService.register] Первый пользователь компании назначен супер-администратором:',
+          {
+            userId: user.id,
+            email: user.email,
+            companyId: company.id,
+          }
+        );
+      }
+
+      // Создаем начальные данные для компании (передаём userId первого пользователя)
       try {
-        await seedInitialData(tx, company.id);
+        await seedInitialData(tx, company.id, user.id);
       } catch (error) {
         logger.error('Failed to seed initial data', {
           companyId: company.id,
@@ -85,6 +153,39 @@ export class AuthService {
 
       return { user, company };
     });
+
+    // Получаем активные роли компании после регистрации
+    console.log(
+      '[AuthService.register] Получение активных ролей компании после регистрации',
+      {
+        companyId: result.company.id,
+      }
+    );
+    try {
+      const roles = await rolesService.getAllRoles(result.company.id);
+      console.log(
+        '[AuthService.register] Активные роли компании после регистрации:',
+        {
+          companyId: result.company.id,
+          rolesCount: roles.length,
+          roles: roles.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })),
+        }
+      );
+    } catch (error) {
+      console.log(
+        '[AuthService.register] Ошибка при получении ролей (возможно, роли еще не созданы):',
+        {
+          companyId: result.company.id,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
 
     const accessToken = generateAccessToken({
       userId: result.user.id,
@@ -98,15 +199,34 @@ export class AuthService {
 
     // Отправляем письмо подтверждения email
     try {
+      logger.info('Creating verification token for user', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
+
       const verificationToken = await tokenService.createToken({
         userId: result.user.id,
         type: 'email_verification',
       });
+
+      logger.info('Verification token created, sending email', {
+        userId: result.user.id,
+        email: result.user.email,
+        tokenLength: verificationToken.length,
+      });
+
       await sendVerificationEmail(result.user.email, verificationToken);
+
+      logger.info('Verification email sent successfully', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
     } catch (error) {
       logger.error('Failed to send verification email', {
         userId: result.user.id,
-        error,
+        email: result.user.email,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       // Не блокируем регистрацию, если письмо не отправилось
     }
@@ -145,6 +265,39 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new AppError('Invalid email or password', 401);
+    }
+
+    // Получаем активные роли компании при авторизации
+    console.log(
+      '[AuthService.login] Получение активных ролей компании при авторизации',
+      {
+        companyId: user.companyId,
+        userId: user.id,
+      }
+    );
+    try {
+      const roles = await rolesService.getAllRoles(user.companyId);
+      console.log(
+        '[AuthService.login] Активные роли компании при авторизации:',
+        {
+          companyId: user.companyId,
+          userId: user.id,
+          rolesCount: roles.length,
+          roles: roles.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })),
+        }
+      );
+    } catch (error) {
+      console.log('[AuthService.login] Ошибка при получении ролей:', {
+        companyId: user.companyId,
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     const accessToken = generateAccessToken({
