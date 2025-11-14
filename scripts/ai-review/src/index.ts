@@ -1,9 +1,25 @@
 #!/usr/bin/env node
 
-import { validateConfig } from './config.js';
-import { loadProjectContext } from './context-loader.js';
+import { validateConfig, CONFIG } from './config.js';
 import { GitHubClient } from './github-client.js';
-import { ClaudeReviewer } from './claude-reviewer.js';
+import { AiReviewer } from './ai-reviewer.js';
+import { getDistilledContext } from './distilled-context.js';
+
+function buildBatchDiff(files: { filename: string; patch?: string }[]): string {
+  const parts: string[] = [];
+
+  for (const file of files) {
+    if (!file.patch) continue;
+
+    parts.push(
+      [`diff --git a/${file.filename} b/${file.filename}`, file.patch].join(
+        '\n'
+      )
+    );
+  }
+
+  return parts.join('\n\n');
+}
 
 async function main() {
   console.log('🤖 AI Code Review Agent\n');
@@ -31,14 +47,13 @@ async function main() {
   try {
     // Initialize clients
     const githubClient = new GitHubClient();
-    const claudeReviewer = new ClaudeReviewer();
+    const aiReviewer = new AiReviewer();
 
-    // Load project context
-    const projectContext = await loadProjectContext();
+    // Load distilled project context (with Redis caching)
+    const distilledContext = await getDistilledContext();
 
-    // Get PR files and diff
+    // Get PR files
     const files = await githubClient.getPullRequestFiles(prNumber);
-    const diff = await githubClient.getPullRequestDiff(prNumber);
 
     // Filter files (skip package-lock, generated files, etc.)
     const relevantFiles = files.filter((file) => {
@@ -65,12 +80,38 @@ async function main() {
       return;
     }
 
-    // Get AI review
-    const comments = await claudeReviewer.reviewCode(
-      relevantFiles,
-      diff,
-      projectContext
-    );
+    // Get AI review in batches to avoid context limits on large PRs
+    const maxPerBatch = CONFIG.review.maxFilesPerBatch || 10;
+    const allComments: typeof githubClient extends { createReview: any }
+      ? Awaited<ReturnType<AiReviewer['reviewCode']>>
+      : any[] = [];
+
+    const totalBatches = Math.ceil(relevantFiles.length / maxPerBatch);
+
+    for (let i = 0; i < relevantFiles.length; i += maxPerBatch) {
+      const batchIndex = i / maxPerBatch + 1;
+      const batchFiles = relevantFiles.slice(i, i + maxPerBatch);
+
+      console.log(
+        `\n--- Running AI review for batch ${batchIndex}/${totalBatches} (${batchFiles.length} files) ---`
+      );
+
+      const batchDiff = buildBatchDiff(batchFiles);
+
+      const batchComments = await aiReviewer.reviewCode(
+        batchFiles,
+        batchDiff,
+        distilledContext
+      );
+
+      console.log(
+        `Batch ${batchIndex}/${totalBatches}: found ${batchComments.length} issues\n`
+      );
+
+      allComments.push(...batchComments);
+    }
+
+    const comments = allComments;
 
     console.log(`Found ${comments.length} issues\n`);
 
