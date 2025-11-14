@@ -39,6 +39,8 @@ import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
+import { ExportMenu } from '../shared/ui/ExportMenu';
+import type { ExportRow } from '../shared/lib/exportData';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -46,6 +48,9 @@ export const OperationsPage = () => {
     account?: { name?: string } | null;
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
+    counterparty?: { name?: string } | null;
+    deal?: { name?: string } | null;
+    department?: { name?: string } | null;
     recurrenceParent?: {
       id: string;
       repeat: string;
@@ -356,7 +361,9 @@ export const OperationsPage = () => {
 
   const handleImportClick = () => {
     if (!company?.inn) {
-      showError('Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)');
+      showError(
+        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+      );
     }
     setIsImportModalOpen(true);
   };
@@ -400,6 +407,55 @@ export const OperationsPage = () => {
     };
     return labels[op.repeat] || op.repeat;
   };
+
+  // Определение колонок для экспорта
+  const exportColumns = [
+    'Дата',
+    'Тип',
+    'Сумма',
+    'Валюта',
+    'Статья',
+    'Счет',
+    'Контрагент',
+    'Сделка',
+    'Отдел',
+    'Описание',
+    'Периодичность',
+    'Статус подтверждения',
+  ];
+
+  // Функция для преобразования операций в формат экспорта
+  const buildExportRows = useCallback((): ExportRow[] => {
+    return items.map((op) => {
+      // Форматируем счет в зависимости от типа операции
+      let accountDisplay = '-';
+      if (op.type === 'transfer') {
+        const source = op.sourceAccount?.name || '-';
+        const target = op.targetAccount?.name || '-';
+        accountDisplay = `${source} → ${target}`;
+      } else {
+        accountDisplay = op.account?.name || '-';
+      }
+
+      return {
+        Дата: formatDate(op.operationDate),
+        Тип: getOperationTypeLabel(op.type),
+        Сумма: op.amount,
+        Валюта: op.currency,
+        Статья: op.article?.name || '-',
+        Счет: accountDisplay,
+        Контрагент: op.counterparty?.name || '-',
+        Сделка: op.deal?.name || '-',
+        Отдел: op.department?.name || '-',
+        Описание: op.description || '-',
+        Периодичность: getPeriodicityLabel(op),
+        'Статус подтверждения': op.isConfirmed
+          ? 'Подтверждена'
+          : 'Не подтверждена',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const handleClearFilters = () => {
     setTypeFilter('');
@@ -450,7 +506,7 @@ export const OperationsPage = () => {
   useEffect(() => {
     const shouldOpen = sessionStorage.getItem('openImportModal');
     const tab = sessionStorage.getItem('importModalTab');
-    
+
     if (shouldOpen === 'true') {
       setIsImportModalOpen(true);
       sessionStorage.removeItem('openImportModal');
@@ -461,12 +517,61 @@ export const OperationsPage = () => {
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
     setDateRangeStart(startDate);
     setDateRangeEnd(endDate);
-    
+
     // Отправляем полные ISO даты с временем вместо формата YYYY-MM-DD
     // Это гарантирует правильную обработку часовых поясов на backend
     setDateFromFilter(startDate.toISOString());
     setDateToFilter(endDate.toISOString());
   };
+
+  // Определение колонок для экспорта
+  const exportColumns = [
+    'Дата',
+    'Тип',
+    'Сумма',
+    'Валюта',
+    'Статья',
+    'Счет',
+    'Контрагент',
+    'Сделка',
+    'Отдел',
+    'Описание',
+    'Периодичность',
+    'Статус подтверждения',
+  ];
+
+  // Функция для преобразования операций в формат экспорта
+  const buildExportRows = useCallback((): ExportRow[] => {
+    return items.map((op) => {
+      // Форматируем счет в зависимости от типа операции
+      let accountDisplay = '-';
+      if (op.type === 'transfer') {
+        const source = op.sourceAccount?.name || '-';
+        const target = op.targetAccount?.name || '-';
+        accountDisplay = `${source} → ${target}`;
+      } else {
+        accountDisplay = op.account?.name || '-';
+      }
+
+      return {
+        Дата: formatDate(op.operationDate),
+        Тип: getOperationTypeLabel(op.type),
+        Сумма: op.amount,
+        Валюта: op.currency,
+        Статья: op.article?.name || '-',
+        Счет: accountDisplay,
+        Контрагент: op.counterparty?.name || '-',
+        Сделка: op.deal?.name || '-',
+        Отдел: op.department?.name || '-',
+        Описание: op.description || '-',
+        Периодичность: getPeriodicityLabel(op),
+        'Статус подтверждения': op.isConfirmed
+          ? 'Подтверждена'
+          : 'Не подтверждена',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
 
   const columns = [
     {
@@ -592,26 +697,36 @@ export const OperationsPage = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-end gap-2 sm:gap-3">
-          <RecurringOperations onEdit={handleEdit} />
-          <MappingRules />
-          <Button
-            onClick={handleImportClick}
-            size="sm"
-            variant="secondary"
-            className="p-2"
-            title="Импорт выписки"
-          >
-            <FileUp size={18} />
-          </Button>
-          <Button
-            onClick={handleCreate}
-            size="sm"
-            className="p-2"
-            title="Добавить операцию"
-          >
-            <Plus size={18} />
-          </Button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Операции
+          </h1>
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+            <RecurringOperations onEdit={handleEdit} />
+            <MappingRules />
+            <ExportMenu
+              filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
+              buildRows={buildExportRows}
+              columns={exportColumns}
+            />
+            <Button
+              onClick={handleImportClick}
+              size="sm"
+              variant="secondary"
+              className="p-2"
+              title="Импорт выписки"
+            >
+              <FileUp size={18} />
+            </Button>
+            <Button
+              onClick={handleCreate}
+              size="sm"
+              className="p-2"
+              title="Добавить операцию"
+            >
+              <Plus size={18} />
+            </Button>
+          </div>
         </div>
 
         <Card>
