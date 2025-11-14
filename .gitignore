@@ -53,6 +53,7 @@ Thumbs.db
 .cache/
 .temp/
 .tmp/
+.distilled-context.cache
 
 # SSL certificates (never commit private keys!)
 ops/nginx/ssl/*.pem

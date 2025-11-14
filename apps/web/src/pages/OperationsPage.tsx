@@ -36,6 +36,8 @@ import { useBulkSelection } from '../shared/hooks/useBulkSelection';
 import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
+import { ExportMenu } from '../shared/ui/ExportMenu';
+import type { ExportRow } from '../shared/lib/exportData';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -43,6 +45,9 @@ export const OperationsPage = () => {
     account?: { name?: string } | null;
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
+    counterparty?: { name?: string } | null;
+    deal?: { name?: string } | null;
+    department?: { name?: string } | null;
     recurrenceParent?: {
       id: string;
       repeat: string;
@@ -448,6 +453,55 @@ export const OperationsPage = () => {
     setDateToFilter(formatDateForAPI(endDate));
   };
 
+  // Определение колонок для экспорта
+  const exportColumns = [
+    'Дата',
+    'Тип',
+    'Сумма',
+    'Валюта',
+    'Статья',
+    'Счет',
+    'Контрагент',
+    'Сделка',
+    'Отдел',
+    'Описание',
+    'Периодичность',
+    'Статус подтверждения',
+  ];
+
+  // Функция для преобразования операций в формат экспорта
+  const buildExportRows = useCallback((): ExportRow[] => {
+    return items.map((op) => {
+      // Форматируем счет в зависимости от типа операции
+      let accountDisplay = '-';
+      if (op.type === 'transfer') {
+        const source = op.sourceAccount?.name || '-';
+        const target = op.targetAccount?.name || '-';
+        accountDisplay = `${source} → ${target}`;
+      } else {
+        accountDisplay = op.account?.name || '-';
+      }
+
+      return {
+        Дата: formatDate(op.operationDate),
+        Тип: getOperationTypeLabel(op.type),
+        Сумма: op.amount,
+        Валюта: op.currency,
+        Статья: op.article?.name || '-',
+        Счет: accountDisplay,
+        Контрагент: op.counterparty?.name || '-',
+        Сделка: op.deal?.name || '-',
+        Отдел: op.department?.name || '-',
+        Описание: op.description || '-',
+        Периодичность: getPeriodicityLabel(op),
+        'Статус подтверждения': op.isConfirmed
+          ? 'Подтверждена'
+          : 'Не подтверждена',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
   const columns = [
     {
       key: 'select',
@@ -578,6 +632,11 @@ export const OperationsPage = () => {
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
             <RecurringOperations onEdit={handleEdit} />
+            <ExportMenu
+              filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
+              buildRows={buildExportRows}
+              columns={exportColumns}
+            />
             <Button
               onClick={handleCreate}
               size="sm"
