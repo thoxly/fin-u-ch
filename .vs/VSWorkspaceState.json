@@ -1,5 +1,10 @@
 {
-  "ExpandedNodes": [""],
-  "SelectedNode": "\\README.md",
+  "ExpandedNodes": [
+    "",
+    "\\apps",
+    "\\apps\\worker",
+    "\\apps\\worker\\src",
+    "\\apps\\worker\\src\\jobs"
+  ],
   "PreviewInSolutionExplorer": false
 }

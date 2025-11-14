@@ -1,0 +1,15 @@
+apiVersion: 1
+
+# ������ datasources ��� �������������� ���������
+datasources:
+  - name: Prometheus
+    type: prometheus # ��� datasource - Prometheus
+    access: proxy # Grafana ����� ������������ �������
+    url: http://prometheus:9090 # URL Prometheus � Docker ����
+    isDefault: true # ������������ �� ���������
+    editable: true # ��������� �������������� � UI
+    # �������������� ���������:
+    jsonData:
+      timeInterval: 15s # �������� ��������
+      queryTimeout: 60s # ������� ��������
+      httpMethod: POST # ����� �������
