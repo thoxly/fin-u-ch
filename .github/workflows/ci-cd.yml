@@ -149,7 +149,9 @@ jobs:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
           MCP_PORT: 3030
-          REDIS_URL: redis://redis:6379
+          # В GitHub Actions сервисы доступны через localhost:порт,
+          # а не по имени контейнера. Иначе получаем getaddrinfo EAI_AGAIN redis.
+          REDIS_URL: redis://localhost:6379
         run: pnpm start
 
   # ============================================

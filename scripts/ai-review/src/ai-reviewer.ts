@@ -66,6 +66,12 @@ export class AiReviewer {
           messages,
           tools,
           tool_choice: 'auto',
+          // DeepSeek supports JSON output mode and is OpenAI-compatible.
+          // This forces the final assistant message to be strict JSON,
+          // which removes flakiness with markdown wrappers and stray text.
+          response_format: {
+            type: 'json_object',
+          } as any,
         });
 
         const message = completion.choices[0]?.message;
@@ -467,8 +473,14 @@ Begin your review:`;
       return issues;
     } catch (error) {
       console.error('Failed to parse LLM response as JSON:', error);
-      console.log('Response was:', response);
-      return [];
+      // Логируем только начало ответа, чтобы не засорять логи огромными строками
+      const preview =
+        response.length > 2000
+          ? `${response.slice(0, 2000)}... [truncated]`
+          : response;
+      console.log('Response was (preview):', preview);
+      // Не проглатываем проблему — пусть упадёт батч/джоба, чтобы не терять найденные issues
+      throw new Error('LLM response was not valid JSON; see logs for details.');
     }
   }
 
