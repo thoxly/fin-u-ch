@@ -55,20 +55,53 @@ function replaceVariables(
 }
 
 export async function sendEmail(options: EmailOptions): Promise<void> {
+  // Проверяем настройки SMTP
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+    const missingConfig = [];
+    if (!env.SMTP_HOST) missingConfig.push('SMTP_HOST');
+    if (!env.SMTP_USER) missingConfig.push('SMTP_USER');
+    if (!env.SMTP_PASS) missingConfig.push('SMTP_PASS');
+
+    logger.error('SMTP configuration is missing', {
+      missing: missingConfig,
+      smtpHost: env.SMTP_HOST || 'not set',
+      smtpUser: env.SMTP_USER || 'not set',
+      smtpPass: env.SMTP_PASS ? '***' : 'not set',
+    });
+    throw new Error(
+      `SMTP configuration is incomplete. Missing: ${missingConfig.join(', ')}`
+    );
+  }
+
   try {
+    logger.info('Attempting to send email', {
+      to: options.to,
+      template: options.template,
+      smtpHost: env.SMTP_HOST,
+      smtpPort: env.SMTP_PORT,
+      smtpUser: env.SMTP_USER,
+    });
+
     const template = loadTemplate(options.template);
     const html = replaceVariables(template, options.variables);
 
-    await transporter.sendMail({
+    const result = await transporter.sendMail({
       from: `"Vecta — Финучёт" <${env.SMTP_FROM}>`,
       to: options.to,
       subject: options.subject,
       html,
     });
 
-    logger.info(`Email sent to ${options.to}`, { template: options.template });
+    logger.info(`Email sent successfully to ${options.to}`, {
+      template: options.template,
+      messageId: result.messageId,
+    });
   } catch (error) {
-    logger.error(`Failed to send email to ${options.to}`, error);
+    logger.error(`Failed to send email to ${options.to}`, {
+      template: options.template,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   }
 }

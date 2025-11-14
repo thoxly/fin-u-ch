@@ -38,9 +38,7 @@ export const RegisterPage = () => {
         companyName,
       }).unwrap();
       dispatch(setCredentials(response));
-      // Редирект будет выполнен компонентом RedirectToFirstAvailable
-      // после загрузки прав пользователя
-      navigate('/redirect', { replace: true });
+      // Показываем сообщение об успешной регистрации на этой же странице
       setShowVerificationMessage(true);
     } catch (err) {
       setError('Ошибка регистрации. Возможно, пользователь уже существует');

@@ -177,15 +177,34 @@ export class AuthService {
 
     // Отправляем письмо подтверждения email
     try {
+      logger.info('Creating verification token for user', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
+
       const verificationToken = await tokenService.createToken({
         userId: result.user.id,
         type: 'email_verification',
       });
+
+      logger.info('Verification token created, sending email', {
+        userId: result.user.id,
+        email: result.user.email,
+        tokenLength: verificationToken.length,
+      });
+
       await sendVerificationEmail(result.user.email, verificationToken);
+
+      logger.info('Verification email sent successfully', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
     } catch (error) {
       logger.error('Failed to send verification email', {
         userId: result.user.id,
-        error,
+        email: result.user.email,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       // Не блокируем регистрацию, если письмо не отправилось
     }
