@@ -5,6 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 import { errorHandler } from './middlewares/error';
 import logger from './config/logger';
 import { swaggerSpec } from './config/swagger';
+import promBundle from 'express-prom-bundle';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -24,7 +25,22 @@ import demoRoutes from './modules/demo/demo.routes';
 
 const app: Application = express();
 
+// Metrics
+const metricsMiddleware = promBundle({
+  iincludeMethod: true,
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: { project: 'fin-u-ch' },
+  promClient: {
+    collectDefaultMetrics: {
+      timeout: 10000,
+    },
+  },
+});
+
 // Middleware
+app.use(metricsMiddleware);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());

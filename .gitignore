@@ -67,3 +67,5 @@ ops/nginx/ssl/*.pem
 
 apps/api/.env
 apps/worker/.env
+
+ops/nginx/conf/.htpasswd
