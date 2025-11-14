@@ -40,24 +40,26 @@ describe('parseClientBankExchange', () => {
       const content = readFileSync(filePath);
       const result = parseClientBankExchange(content);
 
-      expect(result).toHaveLength(2);
+      expect(result.documents).toHaveLength(2);
 
       // Проверяем первую операцию
-      expect(result[0].date).toBeInstanceOf(Date);
-      expect(result[0].number).toBe('115');
-      expect(result[0].amount).toBe(8263.0);
-      expect(result[0].payer).toBe('ООО АКСОН');
-      expect(result[0].payerInn).toBe('5262382878');
-      expect(result[0].payerAccount).toBe('40702810068000001468');
-      expect(result[0].receiver).toBe('ФНС России');
-      expect(result[0].receiverInn).toBe('7727406020');
-      expect(result[0].receiverAccount).toBe('03100643000000018500');
-      expect(result[0].purpose).toBe('Единый налоговый платеж');
+      expect(result.documents[0].date).toBeInstanceOf(Date);
+      expect(result.documents[0].number).toBe('115');
+      expect(result.documents[0].amount).toBe(8263.0);
+      expect(result.documents[0].payer).toBe('ООО АКСОН');
+      expect(result.documents[0].payerInn).toBe('5262382878');
+      expect(result.documents[0].payerAccount).toBe('40702810068000001468');
+      expect(result.documents[0].receiver).toBe('ФНС России');
+      expect(result.documents[0].receiverInn).toBe('7727406020');
+      expect(result.documents[0].receiverAccount).toBe('03100643000000018500');
+      expect(result.documents[0].purpose).toBe('Единый налоговый платеж');
 
       // Проверяем вторую операцию
-      expect(result[1].number).toBe('116');
-      expect(result[1].amount).toBe(15000.5);
-      expect(result[1].purpose).toBe('Оплата по счету №123 от 20.10.2025');
+      expect(result.documents[1].number).toBe('116');
+      expect(result.documents[1].amount).toBe(15000.5);
+      expect(result.documents[1].purpose).toBe(
+        'Оплата по счету №123 от 20.10.2025'
+      );
     });
 
     it('должен успешно распарсить файл с UTF-8 кодировкой', () => {
@@ -65,10 +67,10 @@ describe('parseClientBankExchange', () => {
       const content = readFileSync(filePath);
       const result = parseClientBankExchange(content);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].number).toBe('200');
-      expect(result[0].amount).toBe(5000.0); // Запятая должна быть заменена на точку
-      expect(result[0].receiver).toBe('ООО Клиент');
+      expect(result.documents).toHaveLength(1);
+      expect(result.documents[0].number).toBe('200');
+      expect(result.documents[0].amount).toBe(5000.0); // Запятая должна быть заменена на точку
+      expect(result.documents[0].receiver).toBe('ООО Клиент');
     });
 
     it('должен успешно распарсить файл из строки', () => {
@@ -84,9 +86,9 @@ describe('parseClientBankExchange', () => {
 
       const result = parseClientBankExchange(content);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].amount).toBe(1000.0);
-      expect(result[0].date).toBeInstanceOf(Date);
+      expect(result.documents).toHaveLength(1);
+      expect(result.documents[0].amount).toBe(1000.0);
+      expect(result.documents[0].date).toBeInstanceOf(Date);
     });
   });
 
@@ -126,10 +128,10 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].date).toBeInstanceOf(Date);
-      expect(result[0].date.getFullYear()).toBe(2025);
-      expect(result[0].date.getMonth()).toBe(2); // месяцы начинаются с 0
-      expect(result[0].date.getDate()).toBe(15);
+      expect(result.documents[0].date).toBeInstanceOf(Date);
+      expect(result.documents[0].date.getFullYear()).toBe(2025);
+      expect(result.documents[0].date.getMonth()).toBe(2); // месяцы начинаются с 0
+      expect(result.documents[0].date.getDate()).toBe(15);
     });
 
     it('должен выбросить ошибку для невалидной даты', () => {
@@ -170,7 +172,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].amount).toBe(1234.56);
+      expect(result.documents[0].amount).toBe(1234.56);
     });
 
     it('должен корректно парсить сумму с запятой', () => {
@@ -184,7 +186,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].amount).toBe(1234.56);
+      expect(result.documents[0].amount).toBe(1234.56);
     });
 
     it('должен выбросить ошибку для отрицательной суммы', () => {
@@ -239,7 +241,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerInn).toBe('1234567890');
+      expect(result.documents[0].payerInn).toBe('1234567890');
     });
 
     it('должен корректно парсить ИНН из 12 цифр', () => {
@@ -254,7 +256,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerInn).toBe('123456789012');
+      expect(result.documents[0].payerInn).toBe('123456789012');
     });
 
     it('должен игнорировать ИНН с неправильной длиной', () => {
@@ -269,7 +271,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerInn).toBeUndefined();
+      expect(result.documents[0].payerInn).toBeUndefined();
     });
 
     it('должен убирать пробелы из ИНН', () => {
@@ -284,7 +286,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerInn).toBe('1234567890');
+      expect(result.documents[0].payerInn).toBe('1234567890');
     });
   });
 
@@ -301,7 +303,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerAccount).toBe('12345678901234567890');
+      expect(result.documents[0].payerAccount).toBe('12345678901234567890');
     });
 
     it('должен игнорировать номер счета с неправильной длиной', () => {
@@ -316,7 +318,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerAccount).toBeUndefined();
+      expect(result.documents[0].payerAccount).toBeUndefined();
     });
 
     it('должен убирать пробелы из номера счета', () => {
@@ -331,7 +333,7 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result[0].payerAccount).toBe('12345678901234567890');
+      expect(result.documents[0].payerAccount).toBe('12345678901234567890');
     });
   });
 
@@ -352,8 +354,8 @@ describe('parseClientBankExchange', () => {
 
       const result = parseClientBankExchange(content);
       // Должен быть только один валидный документ
-      expect(result).toHaveLength(1);
-      expect(result[0].purpose).toBe('Валидный документ');
+      expect(result.documents).toHaveLength(1);
+      expect(result.documents[0].purpose).toBe('Валидный документ');
     });
 
     it('должен обрабатывать документы с пустыми полями', () => {
@@ -369,9 +371,9 @@ describe('parseClientBankExchange', () => {
 КонецДокумента`;
 
       const result = parseClientBankExchange(content);
-      expect(result).toHaveLength(1);
-      expect(result[0].number).toBeUndefined();
-      expect(result[0].payer).toBeUndefined();
+      expect(result.documents).toHaveLength(1);
+      expect(result.documents[0].number).toBeUndefined();
+      expect(result.documents[0].payer).toBeUndefined();
     });
   });
 
@@ -380,7 +382,7 @@ describe('parseClientBankExchange', () => {
       const content =
         '\uFEFF1CClientBankExchange\nВерсияФормата=1.03\n\nСекцияДокумент=Платежное поручение\nДата=01.01.2025\nСумма=1000.00\nНазначениеПлатежа=Тест\nКонецДокумента';
       const result = parseClientBankExchange(content);
-      expect(result).toHaveLength(1);
+      expect(result.documents).toHaveLength(1);
     });
   });
 });

@@ -48,7 +48,7 @@ import {
 } from '../matching.service';
 import { ParsedDocument } from '../../parsers/clientBankExchange.parser';
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockPrisma = prisma as any;
 
 describe('matching.service', () => {
   beforeEach(() => {
@@ -112,7 +112,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Test',
+      purpose: 'Test',
       payer: 'ООО Поставщик',
       payerInn: '1234567890',
       receiver: 'ООО Клиент',
@@ -299,7 +299,6 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Оплата налогов',
       purpose: 'Единый налоговый платеж',
     };
 
@@ -411,7 +410,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Test',
+      purpose: 'Test',
       payerAccount: '40702810068000001468',
       receiverAccount: '40817810099910004312',
     };
@@ -496,7 +495,6 @@ describe('matching.service', () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        description: 'Оплата налогов',
         purpose: 'Единый налоговый платеж',
         payer: 'ООО АКСОН',
         payerInn: '1234567890',
@@ -543,7 +541,7 @@ describe('matching.service', () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        description: 'Test',
+        purpose: 'Test',
       };
 
       const result = await autoMatch(companyId, operation, null);

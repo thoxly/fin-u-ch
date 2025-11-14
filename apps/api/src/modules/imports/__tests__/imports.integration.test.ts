@@ -82,7 +82,7 @@ import { autoMatch } from '../services/matching.service';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockPrisma = prisma as any;
 const mockAutoMatch = autoMatch as jest.MockedFunction<typeof autoMatch>;
 
 describe('ImportsService Integration Tests', () => {
@@ -203,15 +203,15 @@ describe('ImportsService Integration Tests', () => {
 
       // Мокаем парсер, чтобы вернуть 1001 операцию
       const parserModule = await import('../parsers/clientBankExchange.parser');
-      jest.spyOn(parserModule, 'parseClientBankExchange').mockReturnValueOnce(
-        Array(1001)
+      jest.spyOn(parserModule, 'parseClientBankExchange').mockReturnValueOnce({
+        documents: Array(1001)
           .fill(null)
           .map((_, i) => ({
             date: new Date(),
             amount: 1000,
-            description: `Operation ${i}`,
-          }))
-      );
+            purpose: `Operation ${i}`,
+          })),
+      } as any);
 
       await expect(
         importsService.uploadStatement(
