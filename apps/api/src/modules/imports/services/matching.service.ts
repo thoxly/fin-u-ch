@@ -1,6 +1,7 @@
 import prisma from '../../../config/db';
 import { compareTwoStrings } from 'string-similarity';
 import { ParsedDocument } from '../parsers/clientBankExchange.parser';
+import logger from '../../../config/logger';
 
 export interface MatchingResult {
   matchedArticleId?: string;
@@ -21,29 +22,49 @@ export async function determineDirection(
 ): Promise<'income' | 'expense' | 'transfer' | null> {
   // Если ИНН компании не указан, возвращаем null (требует ручного выбора)
   if (!companyInn) {
+    logger.debug('determineDirection: Company INN not set', {
+      payerInn,
+      receiverInn,
+    });
     return null;
   }
 
   // Нормализуем ИНН (убираем пробелы)
-  const normalizedCompanyInn = companyInn.replace(/\s/g, '');
-  const normalizedPayerInn = payerInn?.replace(/\s/g, '') || null;
-  const normalizedReceiverInn = receiverInn?.replace(/\s/g, '') || null;
+  const normalizedCompanyInn = companyInn.replace(/\s/g, '').trim();
+  const normalizedPayerInn = payerInn?.replace(/\s/g, '').trim() || null;
+  const normalizedReceiverInn = receiverInn?.replace(/\s/g, '').trim() || null;
 
   // Если плательщик и получатель - одна и та же компания
   if (
+    normalizedPayerInn &&
+    normalizedReceiverInn &&
     normalizedPayerInn === normalizedCompanyInn &&
     normalizedReceiverInn === normalizedCompanyInn
   ) {
+    logger.debug('determineDirection: Transfer detected (same company as payer and receiver)');
     return 'transfer';
   }
 
-  // Если плательщик - наша компания
-  if (normalizedPayerInn === normalizedCompanyInn) {
+  // Если плательщик - наша компания (и получатель - не наша компания)
+  if (
+    normalizedPayerInn && 
+    normalizedPayerInn === normalizedCompanyInn &&
+    normalizedReceiverInn !== normalizedCompanyInn
+  ) {
+    logger.debug('determineDirection: Expense detected (company is payer)', {
+      payerInn: normalizedPayerInn,
+      companyInn: normalizedCompanyInn,
+      receiverInn: normalizedReceiverInn,
+    });
     return 'expense';
   }
 
-  // Если получатель - наша компания
-  if (normalizedReceiverInn === normalizedCompanyInn) {
+  // Если получатель - наша компания (и плательщик - не наша компания)
+  if (
+    normalizedReceiverInn && 
+    normalizedReceiverInn === normalizedCompanyInn &&
+    normalizedPayerInn !== normalizedCompanyInn
+  ) {
     return 'income';
   }
 
@@ -92,47 +113,76 @@ export async function matchCounterparty(
     : operation.payer;
 
   if (nameToSearch) {
-    // Проверяем правила типа alias для контрагентов
-    const aliasRule = await prisma.mappingRule.findFirst({
+    const sourceField = direction === 'expense' ? 'receiver' : 'payer';
+    
+    // Приоритет 1: equals (самый точный)
+    const equalsRules = await prisma.mappingRule.findMany({
       where: {
         companyId,
         targetType: 'counterparty',
-        ruleType: 'alias',
-        sourceField: direction === 'expense' ? 'receiver' : 'payer',
+        ruleType: 'equals',
+        sourceField,
       },
     });
 
-    if (aliasRule && nameToSearch.toLowerCase().includes(aliasRule.pattern.toLowerCase())) {
-      if (aliasRule.targetId) {
+    for (const rule of equalsRules) {
+      if (nameToSearch.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
+        await prisma.mappingRule.update({
+          where: { id: rule.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
+
         return {
-          id: aliasRule.targetId,
+          id: rule.targetId,
           matchedBy: 'rule',
-          ruleId: aliasRule.id,
+          ruleId: rule.id,
         };
       }
     }
 
-    // Проверяем правила типа contains и equals
-    const rules = await prisma.mappingRule.findMany({
+    // Приоритет 2: alias (специальный тип для контрагентов)
+    const aliasRules = await prisma.mappingRule.findMany({
       where: {
         companyId,
         targetType: 'counterparty',
-        ruleType: { in: ['contains', 'equals'] },
-        sourceField: direction === 'expense' ? 'receiver' : 'payer',
+        ruleType: 'alias',
+        sourceField,
       },
     });
 
-    for (const rule of rules) {
-      let matches = false;
+    for (const rule of aliasRules) {
+      if (nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
+        await prisma.mappingRule.update({
+          where: { id: rule.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
 
-      if (rule.ruleType === 'equals') {
-        matches = nameToSearch.toLowerCase() === rule.pattern.toLowerCase();
-      } else if (rule.ruleType === 'contains') {
-        matches = nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase());
+        return {
+          id: rule.targetId,
+          matchedBy: 'rule',
+          ruleId: rule.id,
+        };
       }
+    }
 
-      if (matches && rule.targetId) {
-        // Обновляем счетчик использования правила
+    // Приоритет 3: contains (самый широкий)
+    const containsRules = await prisma.mappingRule.findMany({
+      where: {
+        companyId,
+        targetType: 'counterparty',
+        ruleType: 'contains',
+        sourceField,
+      },
+    });
+
+    for (const rule of containsRules) {
+      if (nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
@@ -205,35 +255,20 @@ export async function matchArticle(
 
   const purpose = operation.purpose || '';
 
-  // 1. Сопоставление по правилам маппинга
-  const rules = await prisma.mappingRule.findMany({
+  // 1. Сопоставление по правилам маппинга (с правильным приоритетом)
+  
+  // Приоритет 1: equals (самый точный)
+  const equalsRules = await prisma.mappingRule.findMany({
     where: {
       companyId,
       targetType: 'article',
       sourceField: 'description',
-      ruleType: { in: ['contains', 'equals', 'regex'] },
+      ruleType: 'equals',
     },
   });
 
-  for (const rule of rules) {
-    let matches = false;
-
-    if (rule.ruleType === 'equals') {
-      matches = purpose.toLowerCase() === rule.pattern.toLowerCase();
-    } else if (rule.ruleType === 'contains') {
-      matches = purpose.toLowerCase().includes(rule.pattern.toLowerCase());
-    } else if (rule.ruleType === 'regex') {
-      try {
-        const regex = new RegExp(rule.pattern, 'i');
-        matches = regex.test(purpose);
-      } catch (e) {
-        // Невалидное регулярное выражение - пропускаем
-        continue;
-      }
-    }
-
-    if (matches && rule.targetId) {
-      // Проверяем, что статья соответствует типу
+  for (const rule of equalsRules) {
+    if (purpose.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
       const article = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
@@ -244,7 +279,90 @@ export async function matchArticle(
       });
 
       if (article) {
-        // Обновляем счетчик использования правила
+        await prisma.mappingRule.update({
+          where: { id: rule.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
+
+        return {
+          id: article.id,
+          matchedBy: 'rule',
+          ruleId: rule.id,
+        };
+      }
+    }
+  }
+
+  // Приоритет 2: regex (гибкий, но точный)
+  const regexRules = await prisma.mappingRule.findMany({
+    where: {
+      companyId,
+      targetType: 'article',
+      sourceField: 'description',
+      ruleType: 'regex',
+    },
+  });
+
+  for (const rule of regexRules) {
+    try {
+      const regex = new RegExp(rule.pattern, 'i');
+      if (regex.test(purpose) && rule.targetId) {
+        const article = await prisma.article.findFirst({
+          where: {
+            id: rule.targetId,
+            companyId,
+            type: articleType,
+            isActive: true,
+          },
+        });
+
+        if (article) {
+          await prisma.mappingRule.update({
+            where: { id: rule.id },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          });
+
+          return {
+            id: article.id,
+            matchedBy: 'rule',
+            ruleId: rule.id,
+          };
+        }
+      }
+    } catch (e) {
+      // Невалидное регулярное выражение - пропускаем
+      continue;
+    }
+  }
+
+  // Приоритет 3: contains (самый широкий)
+  const containsRules = await prisma.mappingRule.findMany({
+    where: {
+      companyId,
+      targetType: 'article',
+      sourceField: 'description',
+      ruleType: 'contains',
+    },
+  });
+
+  for (const rule of containsRules) {
+    if (purpose.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
+      const article = await prisma.article.findFirst({
+        where: {
+          id: rule.targetId,
+          companyId,
+          type: articleType,
+          isActive: true,
+        },
+      });
+
+      if (article) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
@@ -263,10 +381,79 @@ export async function matchArticle(
   }
 
   // 2. Сопоставление по ключевым словам (предустановленные правила)
-  const keywordRules: Array<{ keywords: string[]; articleName: string }> = [
-    { keywords: ['налог', 'фнс', 'пфр', 'фсс'], articleName: 'Налоги' },
-    { keywords: ['зарплата', 'отпускные', 'аванс'], articleName: 'Зарплата' },
-    { keywords: ['оплата по счету', 'выручка'], articleName: 'Выручка от продаж' },
+  const keywordRules: Array<{ keywords: string[]; articleNames: string[] }> = [
+    {
+      keywords: ['налог', 'фнс', 'пфр', 'фсс', 'ндс', 'налоги', 'пенсионный фонд'],
+      articleNames: ['Налоги', 'Обязательные платежи', 'Отчисления в фонды']
+    },
+    {
+      keywords: ['зарплата', 'отпускные', 'аванс', 'премия', 'заработная плата'],
+      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ']
+    },
+    {
+      keywords: ['оплата по счету', 'выручка', 'поступление от клиента', 'оплата покупателя', 'доход', 'продажа'],
+      articleNames: ['Выручка от продаж', 'Доход от реализации', 'Поступления от клиентов']
+    },
+    {
+      keywords: ['предоплата', 'аванс от клиента'],
+      articleNames: ['Авансы от покупателей', 'Предоплата от клиентов']
+    },
+    {
+      keywords: ['поставщик', 'счет на оплату', 'закуп', 'оплата поставщику', 'покупка', 'товар', 'сырье'],
+      articleNames: ['Закупка товаров и материалов', 'Оплата поставщикам', 'Закуп сырья и комплектующих']
+    },
+    {
+      keywords: ['услуги', 'работы', 'аутсорсинг', 'подрядчик'],
+      articleNames: ['Оплата услуг и подрядчиков', 'Услуги сторонних организаций', 'Прочие услуги']
+    },
+    {
+      keywords: ['транспорт', 'доставка', 'логистика', 'топливо'],
+      articleNames: ['Транспортные расходы', 'Доставка и логистика', 'Топливо и ГСМ']
+    },
+    {
+      keywords: ['аренда', 'офис', 'помещение'],
+      articleNames: ['Аренда офиса', 'Аренда помещений', 'Оренда недвижимости']
+    },
+    {
+      keywords: ['интернет', 'телефон', 'связь', 'сотовая связь'],
+      articleNames: ['Связь и интернет', 'Мобильная связь', 'Телефония']
+    },
+    {
+      keywords: ['канцелярия', 'бумага', 'принтер', 'картридж'],
+      articleNames: ['Хозяйственные расходы', 'Канцелярские товары', 'Расходные материалы']
+    },
+    {
+      keywords: ['банк', 'комиссия', 'эквайринг', 'обслуживание счета'],
+      articleNames: ['Банковские комиссии', 'Комиссии банка', 'Расходы на обслуживание счета']
+    },
+    {
+      keywords: ['проценты', 'кредит', 'займ', 'депозит'],
+      articleNames: ['Финансовые расходы', 'Проценты по кредитам', 'Расходы по займам']
+    },
+    {
+      keywords: ['страховка', 'страхование'],
+      articleNames: ['Страхование', 'Добровольное страхование', 'ОСАГО / КАСКО']
+    },
+    {
+      keywords: ['командировка', 'проезд', 'гостиница'],
+      articleNames: ['Командировочные расходы', 'Проезд и проживание', 'Транспорт и гостиницы']
+    },
+    {
+      keywords: ['обучение', 'курсы', 'тренинг', 'повышение квалификации'],
+      articleNames: ['Обучение и развитие персонала', 'Повышение квалификации', 'Расходы на обучение']
+    },
+    {
+      keywords: ['реклама', 'маркетинг', 'продвижение', 'google ads', 'яндекс'],
+      articleNames: ['Реклама и маркетинг', 'Продвижение', 'Интернет-реклама']
+    },
+    {
+      keywords: ['наличные', 'снятие', 'внесение'],
+      articleNames: ['Операции с наличными', 'Инкассация', 'Снятие / внесение средств']
+    },
+    {
+      keywords: ['дивиденды', 'выплата собственнику'],
+      articleNames: ['Выплата дивидендов', 'Распределение прибыли', 'Выплаты учредителям']
+    }
   ];
 
   for (const keywordRule of keywordRules) {
@@ -275,20 +462,23 @@ export async function matchArticle(
     );
 
     if (hasKeyword) {
-      const article = await prisma.article.findFirst({
-        where: {
-          companyId,
-          name: { contains: keywordRule.articleName, mode: 'insensitive' },
-          type: articleType,
-          isActive: true,
-        },
-      });
+      // Ищем статью по любому из возможных названий
+      for (const articleName of keywordRule.articleNames) {
+        const article = await prisma.article.findFirst({
+          where: {
+            companyId,
+            name: { contains: articleName, mode: 'insensitive' },
+            type: articleType,
+            isActive: true,
+          },
+        });
 
-      if (article) {
-        return {
-          id: article.id,
-          matchedBy: 'keyword',
-        };
+        if (article) {
+          return {
+            id: article.id,
+            matchedBy: 'keyword',
+          };
+        }
       }
     }
   }
@@ -302,7 +492,8 @@ export async function matchArticle(
 export async function matchAccount(
   companyId: string,
   operation: ParsedDocument,
-  direction: 'income' | 'expense' | 'transfer' | null
+  direction: 'income' | 'expense' | 'transfer' | null,
+  companyAccountNumber?: string
 ): Promise<{
   id?: string;
   matchedBy?: string;
@@ -318,11 +509,30 @@ export async function matchAccount(
     ? operation.payerAccount 
     : operation.receiverAccount;
 
+  // Сначала пробуем найти счет по номеру из операции
   if (accountNumber) {
     const account = await prisma.account.findFirst({
       where: {
         companyId,
         number: accountNumber,
+        isActive: true,
+      },
+    });
+
+    if (account) {
+      return {
+        id: account.id,
+        matchedBy: 'account_number',
+      };
+    }
+  }
+
+  // Если счет не найден по номеру из операции, пробуем использовать счет из заголовка файла
+  if (companyAccountNumber) {
+    const account = await prisma.account.findFirst({
+      where: {
+        companyId,
+        number: companyAccountNumber,
         isActive: true,
       },
     });
@@ -344,7 +554,8 @@ export async function matchAccount(
 export async function autoMatch(
   companyId: string,
   operation: ParsedDocument,
-  companyInn: string | null | undefined
+  companyInn: string | null | undefined,
+  companyAccountNumber?: string
 ): Promise<MatchingResult> {
   // 1. Определяем направление
   const direction = await determineDirection(
@@ -360,12 +571,11 @@ export async function autoMatch(
   const articleMatch = await matchArticle(companyId, operation, direction);
 
   // 4. Сопоставляем счет
-  const accountMatch = await matchAccount(companyId, operation, direction);
+  const accountMatch = await matchAccount(companyId, operation, direction, companyAccountNumber);
 
   // Определяем matchedBy только если все обязательные поля сопоставлены
-  // Обязательные поля: контрагент, статья, счет
+  // Обязательные поля: статья, счет (контрагент не обязателен, как в обычной форме)
   const isFullyMatched = !!(
-    counterpartyMatch?.id &&
     articleMatch?.id &&
     accountMatch?.id
   );

@@ -1,7 +1,7 @@
 import prisma from '../../config/db';
 import logger from '../../config/logger';
 import { AppError } from '../../middlewares/error';
-import { parseClientBankExchange, ParsedDocument } from './parsers/clientBankExchange.parser';
+import { parseClientBankExchange, ParsedDocument, ParsedFile } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
 import operationsService from '../operations/operations.service';
 import articlesService from '../catalogs/articles/articles.service';
@@ -36,7 +36,7 @@ export class ImportsService {
     }
 
     // Парсинг файла
-    let documents: ParsedDocument[];
+    let parsedFile: ParsedFile;
     try {
       // Логируем начало парсинга
       const filePreview = fileBuffer.slice(0, 500).toString('utf8').replace(/\0/g, '');
@@ -46,11 +46,12 @@ export class ImportsService {
         preview: filePreview.substring(0, 200),
       });
       
-      documents = parseClientBankExchange(fileBuffer);
+      parsedFile = parseClientBankExchange(fileBuffer);
       
       logger.info('File parsed successfully', {
         fileName,
-        documentsCount: documents.length,
+        documentsCount: parsedFile.documents.length,
+        companyAccountNumber: parsedFile.companyAccountNumber,
       });
     } catch (error: any) {
       // Логируем ошибку парсинга с деталями
@@ -70,6 +71,9 @@ export class ImportsService {
         400
       );
     }
+
+    const documents = parsedFile.documents;
+    const companyAccountNumber = parsedFile.companyAccountNumber;
 
     // Валидация количества операций (максимум 1000)
     if (documents.length > 1000) {
@@ -103,55 +107,91 @@ export class ImportsService {
     });
 
     // Применяем автосопоставление и создаем черновики операций
+    // Используем батчинг для больших файлов (по 100 операций за раз)
     const importedOperations = [];
+    const BATCH_SIZE = 100;
+    const batches = [];
 
-    for (const doc of documents) {
+    // Разбиваем документы на батчи
+    for (let i = 0; i < documents.length; i += BATCH_SIZE) {
+      batches.push(documents.slice(i, i + BATCH_SIZE));
+    }
+
+    // Обрабатываем каждый батч в транзакции
+    for (const batch of batches) {
       try {
-        // Автосопоставление
-        const matchingResult = await autoMatch(companyId, doc, company?.inn || null);
+        await prisma.$transaction(async (tx) => {
+          for (const doc of batch) {
+            try {
+              // Автосопоставление
+              const matchingResult = await autoMatch(companyId, doc, company?.inn || null, companyAccountNumber);
 
-        // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
-        // Валюта по умолчанию RUB, но для полного сопоставления нужны все поля
-        const isFullyMatched = !!(
-          matchingResult.matchedCounterpartyId &&
-          matchingResult.matchedArticleId &&
-          matchingResult.matchedAccountId &&
-          matchingResult.direction // направление обязательно
-        );
+              // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+              // Валюта по умолчанию RUB, но для полного сопоставления нужны все поля
+              const isFullyMatched = !!(
+                matchingResult.matchedArticleId &&
+                matchingResult.matchedAccountId &&
+                matchingResult.direction // направление обязательно
+              );
 
-        // Создаем черновик операции
-        const importedOp = await prisma.importedOperation.create({
-          data: {
-            importSessionId: session.id,
-            companyId,
-            date: doc.date,
-            number: doc.number,
-            amount: doc.amount,
-            description: doc.purpose || '',
-            direction: matchingResult.direction || null,
-            payer: doc.payer,
-            payerInn: doc.payerInn,
-            payerAccount: doc.payerAccount,
-            receiver: doc.receiver,
-            receiverInn: doc.receiverInn,
-            receiverAccount: doc.receiverAccount,
-            matchedArticleId: matchingResult.matchedArticleId,
-            matchedCounterpartyId: matchingResult.matchedCounterpartyId,
-            matchedAccountId: matchingResult.matchedAccountId,
-            currency: 'RUB', // По умолчанию RUB
-            // Устанавливаем matchedBy только если операция полностью сопоставлена
-            matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
-            matchedRuleId: isFullyMatched ? matchingResult.matchedRuleId : null,
-            confirmed: false,
-            processed: false,
-            draft: true,
-          },
+              // Создаем черновик операции
+              const operationData = {
+                importSessionId: session.id,
+                companyId,
+                date: doc.date,
+                number: doc.number,
+                amount: doc.amount,
+                description: doc.purpose || '',
+                direction: matchingResult.direction || null,
+                payer: doc.payer,
+                payerInn: doc.payerInn,
+                payerAccount: doc.payerAccount,
+                receiver: doc.receiver,
+                receiverInn: doc.receiverInn,
+                receiverAccount: doc.receiverAccount,
+                matchedArticleId: matchingResult.matchedArticleId,
+                matchedCounterpartyId: matchingResult.matchedCounterpartyId,
+                matchedAccountId: matchingResult.matchedAccountId,
+                currency: 'RUB', // По умолчанию RUB
+                // Устанавливаем matchedBy только если операция полностью сопоставлена
+                matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
+                matchedRuleId: isFullyMatched ? matchingResult.matchedRuleId : null,
+                confirmed: false,
+                processed: false,
+                draft: true,
+              };
+
+              const importedOp = await tx.importedOperation.create({
+                data: operationData,
+              });
+
+              importedOperations.push(importedOp);
+            } catch (error: any) {
+              // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
+              logger.error('Failed to process document during import', {
+                fileName,
+                sessionId: session.id,
+                document: {
+                  date: doc.date,
+                  amount: doc.amount,
+                  number: doc.number,
+                  purpose: doc.purpose,
+                },
+                error: error?.message || String(error),
+                stack: error?.stack,
+              });
+            }
+          }
         });
-
-        importedOperations.push(importedOp);
       } catch (error: any) {
-        // Логируем ошибку, но продолжаем обработку остальных операций
-        console.error(`Failed to process document: ${error.message}`);
+        // Логируем ошибку батча, но продолжаем обработку следующих батчей
+        logger.error('Failed to process batch during import', {
+          fileName,
+          sessionId: session.id,
+          batchSize: batch.length,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
       }
     }
 
@@ -475,14 +515,23 @@ export class ImportsService {
             // Устанавливаем matchedBy только если операция полностью сопоставлена
             matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
             matchedRuleId: isFullyMatched ? matchingResult.matchedRuleId : null,
-            direction: matchingResult.direction || op.direction,
+            // Используем новое значение direction, если оно определено, иначе сохраняем старое
+            direction: matchingResult.direction !== null && matchingResult.direction !== undefined 
+              ? matchingResult.direction 
+              : op.direction,
           },
         });
 
         updated++;
-      } catch (error) {
-        // Продолжаем обработку остальных
-        console.error(`Failed to apply rules to operation ${op.id}:`, error);
+      } catch (error: any) {
+        // Логируем ошибку с деталями, но продолжаем обработку остальных
+        logger.error('Failed to apply rules to operation', {
+          sessionId,
+          companyId,
+          operationId: op.id,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
       }
     }
 
@@ -528,7 +577,7 @@ export class ImportsService {
     }
 
     // Проверяем, что все операции полностью сопоставлены
-    // Операция считается сопоставленной, если указаны: контрагент, статья, счет и валюта
+    // Операция считается сопоставленной, если указаны: статья, счет и валюта
     const unmatchedOperations: string[] = [];
     for (const op of operations) {
       if (!op.direction) {
@@ -537,9 +586,6 @@ export class ImportsService {
       }
 
       // Проверяем обязательные поля
-      if (!op.matchedCounterpartyId) {
-        unmatchedOperations.push(`Операция ${op.number || op.id}: не указан контрагент`);
-      }
       if (!op.matchedArticleId) {
         unmatchedOperations.push(`Операция ${op.number || op.id}: не указана статья`);
       }
@@ -570,8 +616,20 @@ export class ImportsService {
     let created = 0;
     let errors = 0;
 
-    // Создаем операции в транзакции
-    for (const op of operations) {
+    // Используем батчинг для больших объемов (по 50 операций за раз)
+    const BATCH_SIZE = 50;
+    const batches = [];
+
+    // Разбиваем операции на батчи
+    for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+      batches.push(operations.slice(i, i + BATCH_SIZE));
+    }
+
+    // Обрабатываем каждый батч в транзакции
+    for (const batch of batches) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const op of batch) {
       try {
         // Проверяем обязательные поля
         if (!op.direction) {
@@ -637,7 +695,7 @@ export class ImportsService {
         await operationsService.create(companyId, operationData);
 
         // Помечаем как обработанную
-        await prisma.importedOperation.update({
+        await tx.importedOperation.update({
           where: { id: op.id },
           data: { processed: true },
         });
@@ -684,10 +742,33 @@ export class ImportsService {
           }
         }
 
-        created++;
+            created++;
+          } catch (error: any) {
+            errors++;
+            logger.error('Failed to import operation', {
+              sessionId,
+              companyId,
+              operationId: op.id,
+              operationNumber: op.number,
+              operationDate: op.date,
+              error: error?.message || String(error),
+              stack: error?.stack,
+            });
+            // Продолжаем обработку остальных операций в батче
+          }
+        }
+      });
       } catch (error: any) {
-        errors++;
-        console.error(`Failed to import operation ${op.id}:`, error.message);
+        // Логируем ошибку батча, но продолжаем обработку следующих батчей
+        logger.error('Failed to import batch', {
+          sessionId,
+          companyId,
+          batchSize: batch.length,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
+        // Помечаем все операции в батче как ошибки
+        errors += batch.length;
       }
     }
 

@@ -12,6 +12,7 @@ interface CounterpartyFormProps {
   onSuccess?: (createdId: string) => void;
   initialName?: string;
   initialInn?: string;
+  initialAccountId?: string; // ID счета для автоматической установки после создания
 }
 
 export const CounterpartyForm = ({
@@ -20,6 +21,7 @@ export const CounterpartyForm = ({
   onSuccess,
   initialName = '',
   initialInn = '',
+  initialAccountId,
 }: CounterpartyFormProps) => {
   const [name, setName] = useState(counterparty?.name || initialName);
   const [inn, setInn] = useState(counterparty?.inn || initialInn);

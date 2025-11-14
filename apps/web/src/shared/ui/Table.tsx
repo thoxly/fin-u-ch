@@ -43,7 +43,7 @@ export function Table<T>({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-visible">
       <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr>
@@ -53,7 +53,7 @@ export function Table<T>({
                 <th
                   key={column.key}
                   style={column.width ? { width: column.width } : undefined}
-                  className={`overflow-hidden ${isRulesColumn ? '!text-center' : ''}`}
+                  className={`overflow-visible ${isRulesColumn ? '!text-center' : ''}`}
                 >
                   {isRulesColumn ? (
                     <div className="flex justify-center items-center">
@@ -86,7 +86,7 @@ export function Table<T>({
                   return (
                     <td
                       key={column.key}
-                      className={`overflow-hidden ${isRulesColumn ? 'text-center' : ''}`}
+                      className={`overflow-visible relative ${isRulesColumn ? 'text-center' : ''}`}
                     >
                       {column.render
                         ? column.render(item)

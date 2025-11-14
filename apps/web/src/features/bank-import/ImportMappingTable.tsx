@@ -5,11 +5,11 @@
  * Тесты должны покрывать: загрузку файла, редактирование маппинга, импорт операций
  */
 import { useState } from 'react';
-import { Check, Download, FileCheck, AlertCircle } from 'lucide-react';
+import { Check, Download, FileCheck, AlertCircle, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import { Select } from '../../shared/ui/Select';
-import { Modal } from '../../shared/ui/Modal';
+import { OffCanvas } from '../../shared/ui/OffCanvas';
 import {
   useGetImportedOperationsQuery,
   useBulkUpdateImportedOperationsMutation,
@@ -20,7 +20,9 @@ import {
   useGetDealsQuery,
   useGetDepartmentsQuery,
   useGetArticlesQuery,
+  useGetAccountsQuery,
 } from '../../store/api/catalogsApi';
+import { useGetCompanyQuery } from '../../store/api/companiesApi';
 import { formatDate } from '../../shared/lib/date';
 import { formatMoney } from '../../shared/lib/money';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -29,15 +31,22 @@ import { ImportMappingRow } from './ImportMappingRow';
 import { SaveRulesCell } from './SaveRulesCell';
 import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
 import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
+import { AccountForm } from '../catalog-forms/AccountForm/AccountForm';
+import { DealForm } from '../catalog-forms/DealForm/DealForm';
+import { DepartmentForm } from '../catalog-forms/DepartmentForm/DepartmentForm';
 
 interface ImportMappingTableProps {
   sessionId: string;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onCollapseChange?: (collapsed: boolean) => void;
 }
 
 export const ImportMappingTable = ({
   sessionId,
   onClose,
+  isCollapsed = false,
+  onCollapseChange,
 }: ImportMappingTableProps) => {
   const [page, setPage] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -49,7 +58,7 @@ export const ImportMappingTable = ({
   // Состояние для модалки создания
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;
-    field: 'counterparty' | 'article' | null;
+    field: 'counterparty' | 'article' | 'account' | 'deal' | 'department' | 'currency' | null;
     operation: ImportedOperation | null;
   }>({
     isOpen: false,
@@ -69,6 +78,8 @@ export const ImportMappingTable = ({
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
+  const { data: accounts = [] } = useGetAccountsQuery();
+  const { data: company } = useGetCompanyQuery();
 
   const [bulkUpdate] = useBulkUpdateImportedOperationsMutation();
   const [importOperations, { isLoading: isImporting }] =
@@ -81,7 +92,10 @@ export const ImportMappingTable = ({
   const unmatchedCount = data?.unmatched || 0;
 
   // Функция для открытия модалки создания
-  const handleOpenCreateModal = (field: 'counterparty' | 'article', operation: ImportedOperation) => {
+  const handleOpenCreateModal = (
+    field: 'counterparty' | 'article' | 'account' | 'deal' | 'department' | 'currency',
+    operation: ImportedOperation
+  ) => {
     setCreateModal({
       isOpen: true,
       field,
@@ -105,6 +119,11 @@ export const ImportMappingTable = ({
         const updateData: any = {};
         if (createModal.field === 'counterparty') {
           updateData.matchedCounterpartyId = createdId;
+          // Автоматически устанавливаем счет, если он был найден в операции
+          const account = getAccountFromOperation(createModal.operation);
+          if (account) {
+            updateData.matchedAccountId = account.id;
+          }
         } else if (createModal.field === 'article') {
           updateData.matchedArticleId = createdId;
           // Автоматически устанавливаем тип операции из статьи
@@ -112,6 +131,14 @@ export const ImportMappingTable = ({
           if (article && article.type) {
             updateData.direction = article.type as 'income' | 'expense' | 'transfer';
           }
+        } else if (createModal.field === 'account') {
+          updateData.matchedAccountId = createdId;
+        } else if (createModal.field === 'deal') {
+          updateData.matchedDealId = createdId;
+        } else if (createModal.field === 'department') {
+          updateData.matchedDepartmentId = createdId;
+        } else if (createModal.field === 'currency') {
+          updateData.currency = createdId;
         }
         
         await updateImportedOperation({
@@ -128,12 +155,21 @@ export const ImportMappingTable = ({
   };
 
   // Функция для получения паттерна для предзаполнения
-  const getPatternForRule = (operation: ImportedOperation, field: 'counterparty' | 'article') => {
+  const getPatternForRule = (
+    operation: ImportedOperation,
+    field: 'counterparty' | 'article' | 'account' | 'deal' | 'department'
+  ) => {
     switch (field) {
       case 'counterparty':
         return operation.direction === 'expense' ? operation.receiver : operation.payer;
       case 'article':
         return operation.description;
+      case 'account':
+        return operation.payerAccount || operation.receiverAccount || '';
+      case 'deal':
+        return operation.description;
+      case 'department':
+        return '';
       default:
         return null;
     }
@@ -144,13 +180,24 @@ export const ImportMappingTable = ({
     return operation.direction === 'expense' ? operation.receiverInn : operation.payerInn;
   };
 
+  // Функция для получения счета из операции (по номеру счета)
+  const getAccountFromOperation = (operation: ImportedOperation) => {
+    const accountNumber = operation.direction === 'expense' 
+      ? operation.payerAccount 
+      : operation.receiverAccount;
+    
+    if (accountNumber) {
+      return accounts.find((a) => a.number === accountNumber && a.isActive);
+    }
+    return null;
+  };
+
   // Проверяем, все ли операции сопоставлены
   const checkOperationMatched = (op: ImportedOperation): boolean => {
     if (!op.direction) return false;
     
     const currency = op.currency || 'RUB';
     const hasRequiredFields = !!(
-      op.matchedCounterpartyId &&
       op.matchedArticleId &&
       op.matchedAccountId &&
       currency
@@ -170,13 +217,20 @@ export const ImportMappingTable = ({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(operations.map((op) => op.id));
+      // Выбираем только необработанные операции
+      setSelectedIds(operations.filter((op) => !op.processed).map((op) => op.id));
     } else {
       setSelectedIds([]);
     }
   };
 
   const handleSelectOne = (id: string, checked: boolean) => {
+    // Не позволяем выбирать обработанные операции
+    const operation = operations.find((op) => op.id === id);
+    if (operation?.processed) {
+      return;
+    }
+    
     if (checked) {
       setSelectedIds([...selectedIds, id]);
     } else {
@@ -251,7 +305,9 @@ export const ImportMappingTable = ({
         <input
           type="checkbox"
           checked={
-            operations.length > 0 && selectedIds.length === operations.length
+            operations.length > 0 && 
+            operations.filter((op) => !op.processed).length > 0 &&
+            selectedIds.length === operations.filter((op) => !op.processed).length
           }
           onChange={(e) => handleSelectAll(e.target.checked)}
           className="rounded border-gray-300"
@@ -262,7 +318,9 @@ export const ImportMappingTable = ({
           type="checkbox"
           checked={selectedIds.includes(op.id)}
           onChange={(e) => handleSelectOne(op.id, e.target.checked)}
-          className="rounded border-gray-300"
+          disabled={op.processed}
+          className="rounded border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          title={op.processed ? 'Операция распределена' : ''}
         />
       ),
       width: '50px',
@@ -296,16 +354,50 @@ export const ImportMappingTable = ({
       width: '120px',
     },
     {
+      key: 'payer',
+      header: 'Плательщик',
+      render: (op: ImportedOperation) => (
+        <div className="text-xs">
+          <div className="truncate" title={op.payer || ''}>
+            {op.payer || '-'}
+          </div>
+          {op.payerInn && (
+            <div className="text-gray-500 dark:text-gray-400 mt-1">
+              ИНН: {op.payerInn}
+            </div>
+          )}
+        </div>
+      ),
+      width: '180px',
+    },
+    {
+      key: 'receiver',
+      header: 'Получатель',
+      render: (op: ImportedOperation) => (
+        <div className="text-xs">
+          <div className="truncate" title={op.receiver || ''}>
+            {op.receiver || '-'}
+          </div>
+          {op.receiverInn && (
+            <div className="text-gray-500 dark:text-gray-400 mt-1">
+              ИНН: {op.receiverInn}
+            </div>
+          )}
+        </div>
+      ),
+      width: '180px',
+    },
+    {
       key: 'direction',
       header: 'Тип операции',
       render: (op: ImportedOperation) => (
-        <span
-          className={`px-2 py-1 rounded text-xs font-medium ${getDirectionBadgeColor(
-            op.direction
-          )}`}
-        >
-          {getDirectionLabel(op.direction)}
-        </span>
+        <ImportMappingRow
+          operation={op}
+          field="direction"
+          sessionId={sessionId}
+          onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
+        />
       ),
       width: '120px',
     },
@@ -318,6 +410,7 @@ export const ImportMappingTable = ({
           field="counterparty"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '180px',
@@ -331,6 +424,7 @@ export const ImportMappingTable = ({
           field="article"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '180px',
@@ -344,6 +438,7 @@ export const ImportMappingTable = ({
           field="account"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '150px',
@@ -357,6 +452,7 @@ export const ImportMappingTable = ({
           field="deal"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '150px',
@@ -370,6 +466,7 @@ export const ImportMappingTable = ({
           field="department"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '150px',
@@ -383,22 +480,10 @@ export const ImportMappingTable = ({
           field="currency"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          disabled={op.processed}
         />
       ),
       width: '100px',
-    },
-    {
-      key: 'repeat',
-      header: 'Периодичность',
-      render: (op: ImportedOperation) => (
-        <ImportMappingRow
-          operation={op}
-          field="repeat"
-          sessionId={sessionId}
-          onOpenCreateModal={handleOpenCreateModal}
-        />
-      ),
-      width: '130px',
     },
     {
       key: 'rules',
@@ -408,6 +493,7 @@ export const ImportMappingTable = ({
           operation={op} 
           sessionId={sessionId}
           onToggle={handleToggleRuleSave}
+          disabled={op.processed}
         />
       ),
       width: '150px',
@@ -447,8 +533,55 @@ export const ImportMappingTable = ({
     },
   ];
 
+  if (isCollapsed) {
+    return (
+      <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileCheck size={20} className="text-primary-600 dark:text-primary-400" />
+            <h3 className="text-lg font-semibold">Импортированные операции</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onCollapseChange?.(false)}
+              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              title="Развернуть"
+            >
+              <ChevronUp size={20} />
+            </button>
+            <Button onClick={onClose} variant="secondary" size="sm">
+              Закрыть
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+          Таблица маппинга свернута. Нажмите, чтобы развернуть.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* Заголовок с кнопкой сворачивания */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Импортированные операции</h2>
+        <div className="flex items-center gap-2">
+          {onCollapseChange && (
+            <button
+              onClick={() => onCollapseChange(true)}
+              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+              title="Свернуть"
+            >
+              <ChevronDown size={20} />
+            </button>
+          )}
+          <Button onClick={onClose} variant="secondary" size="sm">
+            Закрыть
+          </Button>
+        </div>
+      </div>
+
       {/* Статистика и фильтры */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4 text-sm">
@@ -489,37 +622,41 @@ export const ImportMappingTable = ({
           data={operations}
           keyExtractor={(op) => op.id}
           rowClassName={(op) =>
-            !op.confirmed
-              ? 'bg-yellow-50 dark:bg-yellow-900/10'
-              : op.processed
-                ? 'bg-green-50 dark:bg-green-900/10'
+            op.processed
+              ? 'bg-gray-100 dark:bg-gray-800/50 opacity-60'
+              : !op.confirmed
+                ? 'bg-yellow-50 dark:bg-yellow-900/10'
                 : ''
           }
         />
       </div>
 
       {/* Пагинация */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Страница {page + 1} из {Math.ceil(total / limit)}
+      {Math.ceil(total / limit) > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Страница {page + 1} из {Math.ceil(total / limit)}
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              className="btn-secondary"
+              title="Предыдущая страница"
+            >
+              <ChevronLeft size={20} />
+            </Button>
+            <Button
+              onClick={() => setPage(Math.min(Math.ceil(total / limit) - 1, page + 1))}
+              disabled={page >= Math.ceil(total / limit) - 1}
+              className="btn-secondary"
+              title="Следующая страница"
+            >
+              <ChevronRight size={20} />
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-            className="btn-secondary"
-          >
-            Назад
-          </Button>
-          <Button
-            onClick={() => setPage(Math.min(Math.ceil(total / limit) - 1, page + 1))}
-            disabled={page >= Math.ceil(total / limit) - 1}
-            className="btn-secondary"
-          >
-            Вперед
-          </Button>
-        </div>
-      </div>
+      )}
 
             {/* Действия */}
             <div className="flex items-center justify-end gap-4 pt-4 border-t">
@@ -532,7 +669,7 @@ export const ImportMappingTable = ({
                 className="btn-primary"
                 title={
                   !isSelectedMatched
-                    ? 'Не все операции сопоставлены. Убедитесь, что у всех операций указаны: тип операции, контрагент, статья, счет и валюта (или счета для переводов)'
+                    ? 'Не все операции сопоставлены. Убедитесь, что у всех операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
                     : undefined
                 }
               >
@@ -541,12 +678,25 @@ export const ImportMappingTable = ({
               </Button>
             </div>
 
-      {/* Модалка для создания контрагентов и статей */}
-      <Modal
+      {/* OffCanvas для создания контрагентов, статей, счетов, сделок, подразделений и валют */}
+      <OffCanvas
         isOpen={createModal.isOpen && !!createModal.field && !!createModal.operation}
-        title={createModal.field === 'counterparty' ? 'Создание контрагента' : 'Создание статьи'}
+        title={
+          createModal.field === 'counterparty'
+            ? 'Создание контрагента'
+            : createModal.field === 'article'
+              ? 'Создание статьи'
+              : createModal.field === 'account'
+                ? 'Создание счета'
+                : createModal.field === 'deal'
+                  ? 'Создание сделки'
+                  : createModal.field === 'department'
+                    ? 'Создание подразделения'
+                    : createModal.field === 'currency'
+                      ? 'Создание валюты'
+                      : ''
+        }
         onClose={handleCloseModal}
-        size="md"
       >
         {createModal.field === 'counterparty' && createModal.operation ? (
           <CounterpartyForm
@@ -555,6 +705,7 @@ export const ImportMappingTable = ({
             onSuccess={handleCreateSuccess}
             initialName={getPatternForRule(createModal.operation, 'counterparty') || ''}
             initialInn={getInnFromOperation(createModal.operation) || ''}
+            initialAccountId={getAccountFromOperation(createModal.operation)?.id}
           />
         ) : createModal.field === 'article' && createModal.operation ? (
           <ArticleForm
@@ -564,8 +715,36 @@ export const ImportMappingTable = ({
             initialName={getPatternForRule(createModal.operation, 'article') || ''}
             initialType={createModal.operation.direction as 'income' | 'expense' | 'transfer' || 'expense'}
           />
+        ) : createModal.field === 'account' && createModal.operation ? (
+          <AccountForm
+            account={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+            initialNumber={getPatternForRule(createModal.operation, 'account') || ''}
+          />
+        ) : createModal.field === 'deal' && createModal.operation ? (
+          <DealForm
+            deal={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'department' ? (
+          <DepartmentForm
+            department={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'currency' && createModal.operation ? (
+          <div className="p-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Валюты выбираются из предопределенного списка. Для добавления новой валюты обратитесь к администратору.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Текущая валюта операции: {createModal.operation.currency || 'RUB'}
+            </p>
+          </div>
         ) : null}
-      </Modal>
+      </OffCanvas>
     </div>
   );
 };

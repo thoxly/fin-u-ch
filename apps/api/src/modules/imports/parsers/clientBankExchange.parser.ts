@@ -19,6 +19,11 @@ export interface ParsedDocument {
   purpose?: string;
 }
 
+export interface ParsedFile {
+  documents: ParsedDocument[];
+  companyAccountNumber?: string; // РасчСчет из заголовка файла
+}
+
 /**
  * Парсит файл формата 1С ClientBankExchange
  * 
@@ -28,9 +33,9 @@ export interface ParsedDocument {
  * Тестовые файлы должны быть в: apps/api/src/modules/imports/__tests__/fixtures/
  * 
  * @param content - содержимое файла (Buffer или строка)
- * @returns массив распарсенных документов
+ * @returns объект с массивом распарсенных документов и метаданными файла
  */
-export function parseClientBankExchange(content: Buffer | string): ParsedDocument[] {
+export function parseClientBankExchange(content: Buffer | string): ParsedFile {
   let text: string;
 
   // Преобразуем Buffer в строку с учетом кодировки
@@ -128,6 +133,7 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
 
   const documents: ParsedDocument[] = [];
   const fileLines = text.split(/\r?\n/);
+  let companyAccountNumber: string | undefined;
   
   // Логируем первые несколько строк для отладки
   logger.info('Parser: First 20 lines after decoding', {
@@ -156,6 +162,7 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
   
   let currentDocument: Partial<ParsedDocument> | null = null;
   let inDocument = false;
+  let inHeader = true; // Флаг для обработки заголовка файла
   let documentTypesFound: string[] = [];
   let documentsStarted = 0;
   let documentsSkipped = 0;
@@ -167,12 +174,35 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
     // Пропускаем пустые строки
     if (!line) continue;
 
+    // Обработка заголовка файла (до первой секции документа)
+    if (inHeader) {
+      const equalIndex = line.indexOf('=');
+      if (equalIndex > 0) {
+        const key = line.substring(0, equalIndex).trim();
+        const value = line.substring(equalIndex + 1).trim();
+        const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
+        
+        // Обрабатываем РасчСчет из заголовка
+        if (normalizedKey === 'расчсчет' || normalizedKey === 'расчетныйсчет') {
+          const validatedAccount = validateAccountNumber(value);
+          if (validatedAccount) {
+            companyAccountNumber = validatedAccount;
+            logger.info('Parser: Found company account number in header', {
+              accountNumber: companyAccountNumber,
+            });
+          }
+        }
+      }
+    }
+
     // Начало документа - ищем различные варианты написания
     // Может быть "СекцияДокумент=" или "СекцияДокумент =" или "СекцияДокумент=Платежное поручение"
     // Также ищем без учета регистра и пробелов
     const normalizedLine = line.toLowerCase().replace(/\s+/g, '');
     
     if (normalizedLine.includes('секциядокумент')) {
+      // Заголовок закончился, начинается документ
+      inHeader = false;
       const equalIndex = line.indexOf('=');
       if (equalIndex > 0 || equalIndex === -1) {
         // Если есть =, берем тип документа после него, иначе пустая строка
@@ -216,14 +246,20 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
       if (inDocument && currentDocument) {
         // Валидация обязательных полей
         if (!currentDocument.date || !currentDocument.amount) {
-          logger.warn(`Parser: Document at line ${i + 1} missing required fields`, {
+          const missingFields = [];
+          if (!currentDocument.date) missingFields.push('Дата');
+          if (!currentDocument.amount) missingFields.push('Сумма');
+          
+          logger.warn(`Parser: Document at line ${i + 1} missing required fields: ${missingFields.join(', ')}`, {
+            lineNumber: i + 1,
             hasDate: !!currentDocument.date,
             hasAmount: !!currentDocument.amount,
+            missingFields,
             document: currentDocument,
           });
           documentsInvalid++;
         } else {
-          documents.push({
+          const parsedDoc = {
             date: currentDocument.date,
             number: currentDocument.number,
             amount: currentDocument.amount,
@@ -234,8 +270,16 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
             receiverInn: currentDocument.receiverInn,
             receiverAccount: currentDocument.receiverAccount,
             purpose: currentDocument.purpose,
+          };
+          documents.push(parsedDoc);
+          logger.info(`Parser: Successfully parsed document at line ${i + 1}`, {
+            lineNumber: i + 1,
+            receiver: parsedDoc.receiver,
+            receiverInn: parsedDoc.receiverInn,
+            payer: parsedDoc.payer,
+            payerInn: parsedDoc.payerInn,
+            amount: parsedDoc.amount,
           });
-          logger.debug(`Parser: Successfully parsed document at line ${i + 1}`);
         }
       }
       inDocument = false;
@@ -248,17 +292,35 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
       const equalIndex = line.indexOf('=');
       if (equalIndex > 0) {
         const key = line.substring(0, equalIndex).trim();
-        const value = line.substring(equalIndex + 1).trim();
+        let value = line.substring(equalIndex + 1).trim();
+        
+        // Убираем кавычки в начале и конце, если они есть
+        if ((value.startsWith('"') && value.endsWith('"')) || 
+            (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1).trim();
+        }
 
         // Используем более гибкое сравнение ключей (учитываем возможные пробелы и варианты)
         const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
+        
+        // Дополнительная проверка для ПолучательИНН - может быть написано по-разному
+        const isReceiverInn = normalizedKey === 'получателинн' || 
+                              normalizedKey === 'получательинн' ||
+                              normalizedKey.includes('получатель') && normalizedKey.includes('инн');
+        const isPayerInn = normalizedKey === 'плательщикинн' || 
+                          normalizedKey === 'плательщикинн' ||
+                          normalizedKey.includes('плательщик') && normalizedKey.includes('инн');
         
         switch (normalizedKey) {
           case 'дата':
             try {
               currentDocument.date = parseDate(value);
-            } catch (error) {
-              logger.warn(`Parser: Failed to parse date "${value}" at line ${i + 1}`, { error });
+            } catch (error: any) {
+              logger.warn(`Parser: Failed to parse date "${value}" at line ${i + 1}`, { 
+                lineNumber: i + 1,
+                value,
+                error: error?.message || String(error),
+              });
             }
             break;
           case 'номер':
@@ -267,8 +329,12 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
           case 'сумма':
             try {
               currentDocument.amount = parseAmount(value);
-            } catch (error) {
-              logger.warn(`Parser: Failed to parse amount "${value}" at line ${i + 1}`, { error });
+            } catch (error: any) {
+              logger.warn(`Parser: Failed to parse amount "${value}" at line ${i + 1}`, { 
+                lineNumber: i + 1,
+                value,
+                error: error?.message || String(error),
+              });
             }
             break;
           case 'плательщик':
@@ -284,13 +350,25 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
             currentDocument.receiver = value || undefined;
             break;
           case 'получателинн':
-            currentDocument.receiverInn = validateInn(value) || undefined;
+          case 'получательинн':
+            const validatedReceiverInn = validateInn(value);
+            currentDocument.receiverInn = validatedReceiverInn || undefined;
             break;
           case 'получательсчет':
             currentDocument.receiverAccount = validateAccountNumber(value) || undefined;
             break;
           case 'назначениеплатежа':
             currentDocument.purpose = value || undefined;
+            break;
+          default:
+            // Fallback для полей с ИНН, которые могли не попасть в switch
+            if (isReceiverInn && !currentDocument.receiverInn) {
+              const validatedReceiverInn = validateInn(value);
+              currentDocument.receiverInn = validatedReceiverInn || undefined;
+            } else if (isPayerInn && !currentDocument.payerInn) {
+              const validatedPayerInn = validateInn(value);
+              currentDocument.payerInn = validatedPayerInn || undefined;
+            }
             break;
         }
       }
@@ -324,7 +402,10 @@ export function parseClientBankExchange(content: Buffer | string): ParsedDocumen
     throw new AppError(errorMessage, 400);
   }
 
-  return documents;
+  return {
+    documents,
+    companyAccountNumber,
+  };
 }
 
 /**
@@ -384,9 +465,11 @@ function parseAmount(amountStr: string): number {
  * Валидирует ИНН (10 или 12 цифр)
  */
 function validateInn(inn: string | undefined): string | null {
-  if (!inn) return null;
+  if (!inn) {
+    return null;
+  }
   
-  const cleaned = inn.replace(/\s/g, '');
+  const cleaned = inn.replace(/\s/g, '').trim();
   
   if (cleaned.length !== 10 && cleaned.length !== 12) {
     return null; // Возвращаем null вместо ошибки, чтобы не блокировать импорт

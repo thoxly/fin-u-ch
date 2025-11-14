@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
 import {
   useGetCounterpartiesQuery,
   useGetArticlesQuery,
@@ -11,15 +10,18 @@ import {
   useUpdateImportedOperationMutation,
 } from '../../store/api/importsApi';
 import { Select } from '../../shared/ui/Select';
-import { Button } from '../../shared/ui/Button';
 import { useNotification } from '../../shared/hooks/useNotification';
 import type { ImportedOperation } from '@shared/types/imports';
 
 interface ImportMappingRowProps {
   operation: ImportedOperation;
-  field: 'counterparty' | 'article' | 'account' | 'deal' | 'department' | 'currency' | 'repeat';
+  field: 'counterparty' | 'article' | 'account' | 'deal' | 'department' | 'currency' | 'repeat' | 'direction';
   sessionId: string;
-  onOpenCreateModal: (field: 'counterparty' | 'article', operation: ImportedOperation) => void;
+  onOpenCreateModal: (
+    field: 'counterparty' | 'article' | 'account' | 'deal' | 'department' | 'currency',
+    operation: ImportedOperation
+  ) => void;
+  disabled?: boolean;
 }
 
 export const ImportMappingRow = ({
@@ -27,6 +29,7 @@ export const ImportMappingRow = ({
   field,
   sessionId,
   onOpenCreateModal,
+  disabled = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
 
@@ -55,6 +58,8 @@ export const ImportMappingRow = ({
         return operation.currency || 'RUB';
       case 'repeat':
         return operation.repeat || 'none';
+      case 'direction':
+        return operation.direction || '';
       default:
         return '';
     }
@@ -76,9 +81,20 @@ export const ImportMappingRow = ({
         return operation.currency || 'RUB';
       case 'repeat':
         return getPeriodicityLabel(operation.repeat || 'none');
+      case 'direction':
+        return getDirectionLabel(operation.direction);
       default:
         return '-';
     }
+  };
+
+  const getDirectionLabel = (direction: string | null | undefined) => {
+    const labels: Record<string, string> = {
+      income: 'Поступление',
+      expense: 'Расход',
+      transfer: 'Перевод',
+    };
+    return direction ? labels[direction] || direction : 'Не определено';
   };
 
   const getPeriodicityLabel = (repeat: string) => {
@@ -95,56 +111,93 @@ export const ImportMappingRow = ({
   };
 
   const getOptions = () => {
+    const baseOptions = [];
     switch (field) {
       case 'counterparty':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
-          ...counterparties.map((c) => ({ value: c.id, label: c.name })),
-        ];
+          ...counterparties.map((c) => ({ value: c.id, label: c.name }))
+        );
+        break;
       case 'article':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
-          ...articles.map((a) => ({ value: a.id, label: a.name })),
-        ];
+          ...articles.map((a) => ({ value: a.id, label: a.name }))
+        );
+        break;
       case 'account':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
-            .map((a) => ({ value: a.id, label: a.name })),
-        ];
+            .map((a) => ({ value: a.id, label: a.name }))
+        );
+        break;
       case 'deal':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
-          ...deals.map((d) => ({ value: d.id, label: d.name })),
-        ];
+          ...deals.map((d) => ({ value: d.id, label: d.name }))
+        );
+        break;
       case 'department':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
-          ...departments.map((d) => ({ value: d.id, label: d.name })),
-        ];
+          ...departments.map((d) => ({ value: d.id, label: d.name }))
+        );
+        break;
       case 'currency':
-        return [
+        baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: 'RUB', label: 'RUB' },
           { value: 'USD', label: 'USD' },
-          { value: 'EUR', label: 'EUR' },
-        ];
+          { value: 'EUR', label: 'EUR' }
+        );
+        break;
       case 'repeat':
-        return [
+        baseOptions.push(
           { value: 'none', label: 'Нет' },
           { value: 'daily', label: 'Ежедневно' },
           { value: 'weekly', label: 'Еженедельно' },
           { value: 'monthly', label: 'Ежемесячно' },
           { value: 'quarterly', label: 'Ежеквартально' },
           { value: 'semiannual', label: 'Раз в полгода' },
-          { value: 'annual', label: 'Ежегодно' },
-        ];
-      default:
-        return [];
+          { value: 'annual', label: 'Ежегодно' }
+        );
+        break;
+      case 'direction':
+        baseOptions.push(
+          { value: '', label: 'Не определено' },
+          { value: 'income', label: 'Поступление' },
+          { value: 'expense', label: 'Расход' },
+          { value: 'transfer', label: 'Перевод' }
+        );
+        break;
     }
+    return baseOptions;
   };
 
   const handleChange = async (value: string) => {
+    // Если выбрана опция создания, открываем offcanvas
+    if (value === '__create__') {
+      if (
+        field === 'counterparty' ||
+        field === 'article' ||
+        field === 'account' ||
+        field === 'deal' ||
+        field === 'department' ||
+        field === 'currency'
+      ) {
+        onOpenCreateModal(field, operation);
+        setIsEditing(false);
+      }
+      return;
+    }
+
     try {
       const updateData: any = {};
       
@@ -168,6 +221,8 @@ export const ImportMappingRow = ({
         updateData.currency = value;
       } else if (field === 'repeat') {
         updateData.repeat = value;
+      } else if (field === 'direction') {
+        updateData.direction = value || null;
       }
 
       await updateOperation({
@@ -182,32 +237,69 @@ export const ImportMappingRow = ({
     }
   };
 
-  const handleCreateClick = () => {
-    if (field === 'counterparty' || field === 'article') {
-      onOpenCreateModal(field, operation);
-      setIsEditing(false);
-    }
-  };
-
-  if (isEditing) {
-    const showCreateButton = ['counterparty', 'article'].includes(field);
-
+  if (isEditing && !disabled) {
     return (
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="relative w-full">
         <Select
           value={getCurrentValue()}
-          onChange={(e) => handleChange(e.target.value)}
+          onChange={handleChange}
           options={getOptions()}
-          className="w-full max-w-[200px]"
+          className="w-full"
         />
-        {showCreateButton && (
-          <Button
-            onClick={handleCreateClick}
-            className="btn-secondary p-1"
-            title="Создать новый"
-          >
-            <Plus size={16} />
-          </Button>
+      </div>
+    );
+  }
+
+  // Для direction показываем badge, для остальных полей - обычный текст
+  if (field === 'direction') {
+    const direction = operation.direction;
+    const badgeColor = 
+      direction === 'income' 
+        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+        : direction === 'expense'
+        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+        : direction === 'transfer'
+        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+        : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    
+    return (
+      <div
+        className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${badgeColor} ${
+          disabled 
+            ? 'opacity-60 cursor-not-allowed' 
+            : 'cursor-pointer hover:opacity-80'
+        }`}
+        onClick={() => !disabled && setIsEditing(true)}
+        title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
+      >
+        {getDisplayValue()}
+      </div>
+    );
+  }
+
+  // Для account показываем номер счета серым текстом
+  if (field === 'account') {
+    const accountNumber = operation.direction === 'expense' 
+      ? operation.payerAccount 
+      : operation.receiverAccount;
+    
+    return (
+      <div
+        className={`px-2 py-1 rounded ${
+          disabled 
+            ? 'opacity-60 cursor-not-allowed' 
+            : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
+        }`}
+        onClick={() => !disabled && setIsEditing(true)}
+        title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
+      >
+        <div className="truncate">
+          {getDisplayValue()}
+        </div>
+        {accountNumber && (
+          <div className="text-gray-500 dark:text-gray-400 mt-1 text-xs">
+            {accountNumber}
+          </div>
         )}
       </div>
     );
@@ -215,9 +307,13 @@ export const ImportMappingRow = ({
 
   return (
     <div
-      className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 px-2 py-1 rounded truncate"
-      onClick={() => setIsEditing(true)}
-      title="Нажмите для редактирования"
+      className={`px-2 py-1 rounded truncate ${
+        disabled 
+          ? 'opacity-60 cursor-not-allowed' 
+          : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
+      }`}
+      onClick={() => !disabled && setIsEditing(true)}
+      title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
     >
       {getDisplayValue()}
     </div>
