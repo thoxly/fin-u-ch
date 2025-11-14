@@ -175,10 +175,7 @@ export const BudgetsPage = () => {
 
   return (
     <Layout>
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Бюджеты
-        </h1>
+      <div className="mb-6 flex justify-end items-center">
         <Button onClick={handleCreate}>Создать бюджет</Button>
       </div>
 

@@ -13,6 +13,10 @@ interface OperationBasicInfoProps {
   onAmountChange: (value: string) => void;
   onCurrencyChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
+  onOpenCreateModal?: (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => void;
 }
 
 const typeOptions = [
@@ -38,6 +42,7 @@ export const OperationBasicInfo = ({
   onAmountChange,
   onCurrencyChange,
   onValidationErrorClear,
+  onOpenCreateModal,
 }: OperationBasicInfoProps) => {
   return (
     <div className="space-y-4 mb-6">
@@ -83,10 +88,17 @@ export const OperationBasicInfo = ({
           label="Валюта"
           value={currency}
           onChange={(value) => {
-            onCurrencyChange(value);
-            onValidationErrorClear('currency');
+            if (value === '__create__' && onOpenCreateModal) {
+              onOpenCreateModal('currency');
+            } else {
+              onCurrencyChange(value);
+              onValidationErrorClear('currency');
+            }
           }}
-          options={currencyOptions}
+          options={[
+            ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
+            ...currencyOptions,
+          ]}
           error={validationErrors.currency}
           required
         />

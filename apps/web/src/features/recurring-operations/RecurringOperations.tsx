@@ -112,25 +112,22 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
     return labels[repeat] || repeat;
   };
 
-  if (recurringTemplates.length === 0) {
-    return null;
-  }
-
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center gap-2"
+        className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
         title="Повторяющиеся операции"
       >
         <Calendar
-          size={16}
-          className="text-primary-600 dark:text-primary-400 sm:w-[18px] sm:h-[18px]"
+          size={18}
+          className="text-primary-600 dark:text-primary-400"
         />
-        <span className="hidden sm:inline">Повторяющиеся</span>
-        <span className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 bg-primary-600 dark:bg-primary-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-          {recurringTemplates.length}
-        </span>
+        {recurringTemplates.length > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 bg-primary-600 dark:bg-primary-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+            {recurringTemplates.length}
+          </span>
+        )}
       </button>
 
       {isOpen && (
@@ -165,14 +162,99 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
 
                 {/* Список операций */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                  {recurringTemplates.map((op) => (
+                  {recurringTemplates.length === 0 ? (
+                    <div className="p-6 text-center">
+                      <Calendar
+                        size={48}
+                        className="mx-auto mb-4 text-gray-400 dark:text-gray-500"
+                      />
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                        Нет повторяющихся операций
+                      </h4>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
+                        Повторяющиеся операции позволяют автоматически создавать операции по расписанию (например, ежемесячная аренда или зарплата).
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500">
+                        Чтобы создать повторяющуюся операцию, создайте обычную операцию и выберите периодичность в настройках.
+                      </p>
+                    </div>
+                  ) : (
+                    recurringTemplates.map((op) => (
+                      <div
+                        key={op.id}
+                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                {formatMoney(op.amount, op.currency)}
+                              </span>
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
+                                {getPeriodicityLabel(op.repeat)}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
+                              {op.description || 'Без описания'}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                              С {formatDate(op.operationDate)}
+                              {op.recurrenceEndDate &&
+                                ` до ${formatDate(op.recurrenceEndDate)}`}
+                            </div>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button
+                              onClick={(e) => handleEdit(op, e)}
+                              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                              title="Редактировать"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              onClick={(e) => handleDisableRecurrence(op, e)}
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                              title="Отключить"
+                            >
+                              <XCircle size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Десктопная версия - выпадающее меню
+            <div className="absolute z-50 right-0 mt-2 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
+              <div className="p-2 space-y-1">
+                {recurringTemplates.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <Calendar
+                      size={40}
+                      className="mx-auto mb-3 text-gray-400 dark:text-gray-500"
+                    />
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      Нет повторяющихся операций
+                    </h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                      Повторяющиеся операции позволяют автоматически создавать операции по расписанию (например, ежемесячная аренда или зарплата).
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                      Чтобы создать повторяющуюся операцию, создайте обычную операцию и выберите периодичность в настройках.
+                    </p>
+                  </div>
+                ) : (
+                  recurringTemplates.map((op) => (
                     <div
                       key={op.id}
-                      className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                          <div className="flex items-center gap-1.5 mb-1">
                             <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
                               {formatMoney(op.amount, op.currency)}
                             </span>
@@ -180,7 +262,7 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
                               {getPeriodicityLabel(op.repeat)}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
                             {op.description || 'Без описания'}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
@@ -192,72 +274,23 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
                         <div className="flex gap-1 flex-shrink-0">
                           <button
                             onClick={(e) => handleEdit(op, e)}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                             title="Редактировать"
                           >
-                            <Edit size={16} />
+                            <Edit size={14} />
                           </button>
                           <button
                             onClick={(e) => handleDisableRecurrence(op, e)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                             title="Отключить"
                           >
-                            <XCircle size={16} />
+                            <XCircle size={14} />
                           </button>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Десктопная версия - выпадающее меню
-            <div className="absolute z-50 right-0 mt-2 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
-              <div className="p-2 space-y-1">
-                {recurringTemplates.map((op) => (
-                  <div
-                    key={op.id}
-                    className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                            {formatMoney(op.amount, op.currency)}
-                          </span>
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
-                            {getPeriodicityLabel(op.repeat)}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                          {op.description || 'Без описания'}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-                          С {formatDate(op.operationDate)}
-                          {op.recurrenceEndDate &&
-                            ` до ${formatDate(op.recurrenceEndDate)}`}
-                        </div>
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <button
-                          onClick={(e) => handleEdit(op, e)}
-                          className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                          title="Редактировать"
-                        >
-                          <Edit size={14} />
-                        </button>
-                        <button
-                          onClick={(e) => handleDisableRecurrence(op, e)}
-                          className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          title="Отключить"
-                        >
-                          <XCircle size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}
