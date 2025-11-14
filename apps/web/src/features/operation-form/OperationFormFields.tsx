@@ -62,6 +62,10 @@ interface OperationFormFieldsProps {
   onRepeatChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
+  onOpenCreateModal?: (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => void;
 }
 
 export const OperationFormFields = ({
@@ -101,6 +105,7 @@ export const OperationFormFields = ({
   onRepeatChange,
   onEndDateChange,
   onValidationErrorClear,
+  onOpenCreateModal,
 }: OperationFormFieldsProps) => {
   return (
     <>
@@ -116,6 +121,7 @@ export const OperationFormFields = ({
           onAmountChange={onAmountChange}
           onCurrencyChange={onCurrencyChange}
           onValidationErrorClear={onValidationErrorClear}
+          onOpenCreateModal={onOpenCreateModal}
         />
       </ErrorBoundary>
 
@@ -144,6 +150,7 @@ export const OperationFormFields = ({
           onDealChange={onDealChange}
           onDepartmentChange={onDepartmentChange}
           onValidationErrorClear={onValidationErrorClear}
+          onOpenCreateModal={onOpenCreateModal}
         />
       </ErrorBoundary>
 

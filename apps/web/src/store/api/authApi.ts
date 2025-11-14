@@ -20,6 +20,12 @@ interface AuthResponse {
     lastName?: string;
     companyName?: string;
     isSuperAdmin?: boolean;
+    company?: {
+      id: string;
+      name: string;
+      currencyBase: string;
+      inn?: string | null;
+    };
   };
   accessToken: string;
   refreshToken: string;

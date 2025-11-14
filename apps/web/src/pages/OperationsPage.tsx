@@ -1,6 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Pencil, Trash2, X, Copy, Check } from 'lucide-react';
-
+import { Pencil, Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
@@ -16,6 +15,7 @@ import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { ProtectedAction } from '../shared/components/ProtectedAction';
+import { MappingRules } from '../features/bank-import/MappingRules';
 import {
   useLazyGetOperationsQuery,
   useDeleteOperationMutation,
@@ -29,6 +29,7 @@ import {
   useGetDepartmentsQuery,
   useGetAccountsQuery,
 } from '../store/api/catalogsApi';
+import { useGetCompanyQuery } from '../store/api/companiesApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
@@ -38,6 +39,7 @@ import { useBulkSelection } from '../shared/hooks/useBulkSelection';
 import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
+import { BankImportModal } from '../features/bank-import/BankImportModal';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -69,6 +71,7 @@ export const OperationsPage = () => {
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -118,6 +121,7 @@ export const OperationsPage = () => {
   const { data: accounts = [] } = useGetAccountsQuery(undefined, {
     skip: !canRead('operations'),
   });
+  const { data: company } = useGetCompanyQuery();
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -385,6 +389,15 @@ export const OperationsPage = () => {
     }
   };
 
+  const handleImportClick = () => {
+    if (!company?.inn) {
+      showError(
+        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+      );
+    }
+    setIsImportModalOpen(true);
+  };
+
   const getOperationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       income: 'Поступление',
@@ -470,18 +483,26 @@ export const OperationsPage = () => {
     }
   }, [counterpartyIdFilter, dealIdFilter, deals]);
 
+  // Автоматически открываем модальное окно импорта, если есть флаг в sessionStorage
+  useEffect(() => {
+    const shouldOpen = sessionStorage.getItem('openImportModal');
+    const tab = sessionStorage.getItem('importModalTab');
+
+    if (shouldOpen === 'true') {
+      setIsImportModalOpen(true);
+      sessionStorage.removeItem('openImportModal');
+      sessionStorage.removeItem('importModalTab');
+    }
+  }, []);
+
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
     setDateRangeStart(startDate);
     setDateRangeEnd(endDate);
-    // Форматируем даты в формат YYYY-MM-DD для API
-    const formatDateForAPI = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    setDateFromFilter(formatDateForAPI(startDate));
-    setDateToFilter(formatDateForAPI(endDate));
+
+    // Отправляем полные ISO даты с временем вместо формата YYYY-MM-DD
+    // Это гарантирует правильную обработку часовых поясов на backend
+    setDateFromFilter(startDate.toISOString());
+    setDateToFilter(endDate.toISOString());
   };
 
   const columns = [
@@ -731,6 +752,27 @@ export const OperationsPage = () => {
               </Button>
             </ProtectedAction>
           </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
+          <RecurringOperations onEdit={handleEdit} />
+          <MappingRules />
+          <Button
+            onClick={handleImportClick}
+            size="sm"
+            variant="secondary"
+            className="p-2"
+            title="Импорт выписки"
+          >
+            <FileUp size={18} />
+          </Button>
+          <Button
+            onClick={handleCreate}
+            size="sm"
+            className="p-2"
+            title="Добавить операцию"
+          >
+            <Plus size={18} />
+          </Button>
         </div>
 
         <Card>
@@ -1094,6 +1136,15 @@ export const OperationsPage = () => {
                 : 'Удалить'
           }
           variant={deleteModal.type === 'reject' ? 'warning' : 'delete'}
+        />
+
+        <BankImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => {
+            setIsImportModalOpen(false);
+            // Перезагружаем операции после закрытия модального окна импорта
+            reloadOperationsData();
+          }}
         />
       </div>
     </Layout>

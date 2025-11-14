@@ -189,6 +189,7 @@ export class UsersService {
             id: true,
             name: true,
             currencyBase: true,
+            inn: true,
           },
         },
       },
@@ -232,7 +233,7 @@ export class UsersService {
       isActive?: boolean;
     }
   ) {
-    console.log('[UsersService.updateUser] Обновление пользователя', {
+    logger.debug('[UsersService.updateUser] Обновление пользователя', {
       userId,
       companyId,
       data,
@@ -277,7 +278,7 @@ export class UsersService {
       },
     });
 
-    console.log('[UsersService.updateUser] Пользователь успешно обновлён', {
+    logger.debug('[UsersService.updateUser] Пользователь успешно обновлён', {
       userId,
       companyId,
       changes: data,
@@ -290,7 +291,7 @@ export class UsersService {
    * Удалить пользователя
    */
   async deleteUser(userId: string, companyId: string, deletedBy: string) {
-    console.log('[UsersService.deleteUser] Удаление пользователя', {
+    logger.debug('[UsersService.deleteUser] Удаление пользователя', {
       userId,
       companyId,
       deletedBy,
@@ -328,7 +329,7 @@ export class UsersService {
       },
     });
 
-    console.log('[UsersService.deleteUser] Пользователь успешно удалён', {
+    logger.debug('[UsersService.deleteUser] Пользователь успешно удалён', {
       userId,
       companyId,
       email: user.email,
@@ -346,7 +347,7 @@ export class UsersService {
     roleIds: string[],
     invitedBy: string
   ) {
-    console.log('[UsersService.inviteUser] Приглашение пользователя', {
+    logger.debug('[UsersService.inviteUser] Приглашение пользователя', {
       companyId,
       email,
       roleIds,
@@ -430,7 +431,7 @@ export class UsersService {
       });
     }
 
-    console.log('[UsersService.inviteUser] Пользователь успешно приглашён', {
+    logger.debug('[UsersService.inviteUser] Пользователь успешно приглашён', {
       userId: newUser.id,
       email,
       roleIds,
@@ -778,7 +779,7 @@ export class UsersService {
     companyId: string,
     assignedBy: string
   ) {
-    console.log(
+    logger.debug(
       '[UsersService.assignRole] Начало назначения роли пользователю',
       {
         userId,
@@ -841,11 +842,14 @@ export class UsersService {
     });
 
     if (existingUserRole) {
-      console.log('[UsersService.assignRole] Роль уже назначена пользователю', {
-        userId,
-        roleId,
-        userRoleId: existingUserRole.id,
-      });
+      logger.debug(
+        '[UsersService.assignRole] Роль уже назначена пользователю',
+        {
+          userId,
+          roleId,
+          userRoleId: existingUserRole.id,
+        }
+      );
       throw new AppError('Role is already assigned to this user', 409);
     }
 
@@ -869,7 +873,7 @@ export class UsersService {
       },
     });
 
-    console.log(
+    logger.debug(
       '[UsersService.assignRole] Роль успешно назначена пользователю',
       {
         userRoleId: userRole.id,
@@ -887,11 +891,14 @@ export class UsersService {
    * Снять роль с пользователя
    */
   async removeRole(userId: string, roleId: string, companyId: string) {
-    console.log('[UsersService.removeRole] Начало снятия роли с пользователя', {
-      userId,
-      roleId,
-      companyId,
-    });
+    logger.debug(
+      '[UsersService.removeRole] Начало снятия роли с пользователя',
+      {
+        userId,
+        roleId,
+        companyId,
+      }
+    );
 
     // Проверка существования пользователя и принадлежности к компании
     const user = await prisma.user.findUnique({
@@ -923,7 +930,7 @@ export class UsersService {
 
     // Проверка, что роль не системная (нельзя снимать системные роли)
     if (role.isSystem) {
-      console.log('[UsersService.removeRole] Попытка снять системную роль', {
+      logger.debug('[UsersService.removeRole] Попытка снять системную роль', {
         userId,
         roleId,
         roleName: role.name,
@@ -950,12 +957,15 @@ export class UsersService {
       where: { id: userRole.id },
     });
 
-    console.log('[UsersService.removeRole] Роль успешно снята с пользователя', {
-      userRoleId: userRole.id,
-      userId,
-      roleId,
-      roleName: role.name,
-    });
+    logger.debug(
+      '[UsersService.removeRole] Роль успешно снята с пользователя',
+      {
+        userRoleId: userRole.id,
+        userId,
+        roleId,
+        roleName: role.name,
+      }
+    );
 
     return { success: true };
   }
@@ -964,7 +974,7 @@ export class UsersService {
    * Получить роли пользователя
    */
   async getUserRoles(userId: string, companyId: string) {
-    console.log('[UsersService.getUserRoles] Получение ролей пользователя', {
+    logger.debug('[UsersService.getUserRoles] Получение ролей пользователя', {
       userId,
       companyId,
     });
@@ -1008,7 +1018,7 @@ export class UsersService {
       },
     });
 
-    console.log('[UsersService.getUserRoles] Роли пользователя получены', {
+    logger.debug('[UsersService.getUserRoles] Роли пользователя получены', {
       userId,
       companyId,
       rolesCount: userRoles.length,

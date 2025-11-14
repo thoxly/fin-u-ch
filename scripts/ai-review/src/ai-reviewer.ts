@@ -1,8 +1,9 @@
 import OpenAI from 'openai';
 import { CONFIG } from './config.js';
 import { ReviewComment, PullRequestFile } from './github-client.js';
+import { callMcpTool } from './mcp-client.js';
 
-interface ClaudeIssue {
+interface Finding {
   file: string;
   line: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -17,7 +18,15 @@ interface ClaudeIssue {
   suggestion?: string;
 }
 
-export class ClaudeReviewer {
+type ToolCall = {
+  id: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+};
+
+export class AiReviewer {
   private openai: OpenAI;
 
   constructor() {
@@ -30,35 +39,95 @@ export class ClaudeReviewer {
   async reviewCode(
     files: PullRequestFile[],
     diff: string,
-    projectContext: string
+    distilledContext: string
   ): Promise<ReviewComment[]> {
-    console.log('Sending code to DeepSeek for review...');
+    console.log('Sending code to LLM (with tools) for review...');
 
-    const prompt = this.buildPrompt(files, diff, projectContext);
+    const systemPrompt =
+      'You are an expert AI code reviewer with access to tools for reading project files, listing files, and searching the codebase. Use tools when you need additional context beyond the diff.';
+
+    const userPrompt = this.buildPrompt(files, diff, distilledContext);
+
+    const tools = this.buildTools();
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
 
     try {
-      const completion = await this.openai.chat.completions.create({
-        model: CONFIG.deepseek.model,
-        max_tokens: CONFIG.deepseek.maxTokens,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      });
+      // Tool calling loop (limited by LLM behaviour; stops when no tool calls requested)
+      let awaitingToolCalls = true;
 
-      const responseText = completion.choices[0]?.message?.content || '';
+      while (awaitingToolCalls) {
+        const completion = await this.openai.chat.completions.create({
+          model: CONFIG.deepseek.model,
+          max_tokens: CONFIG.deepseek.maxTokens,
+          messages,
+          tools,
+          tool_choice: 'auto',
+        });
 
-      console.log('  DeepSeek review completed\n');
-      console.log('DeepSeek response:');
-      console.log(responseText);
-      console.log('\n');
+        const message = completion.choices[0]?.message;
 
-      const issues = this.parseClaudeResponse(responseText);
-      return this.convertToReviewComments(issues, files);
+        if (!message) {
+          throw new Error('LLM returned empty response');
+        }
+
+        const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
+
+        if (toolCalls && toolCalls.length > 0) {
+          console.log(`  LLM requested ${toolCalls.length} tool call(s)`);
+
+          for (const toolCall of toolCalls) {
+            const { name, arguments: argsJson } = toolCall.function;
+
+            let parsedArgs: any;
+            try {
+              parsedArgs = JSON.parse(argsJson || '{}');
+            } catch (err) {
+              console.warn(
+                `  ⚠ Failed to parse tool arguments for ${name}:`,
+                err
+              );
+              parsedArgs = {};
+            }
+
+            const result = await this.callTool(name, parsedArgs);
+
+            messages.push({
+              role: 'assistant',
+              content: null,
+              tool_calls: [toolCall] as any,
+            } as any);
+
+            messages.push({
+              role: 'tool',
+              tool_call_id: toolCall.id,
+              content: JSON.stringify(result),
+            } as any);
+          }
+
+          // Continue loop – LLM will receive tool results and may call tools again or produce final answer
+          continue;
+        }
+
+        awaitingToolCalls = false;
+
+        const responseText = message.content || '';
+
+        console.log('  LLM review completed\n');
+        console.log('LLM response:');
+        console.log(responseText);
+        console.log('\n');
+
+        const issues = this.parseFindings(responseText);
+        return this.convertToReviewComments(issues, files);
+      }
+
+      throw new Error('LLM finished without producing a final response');
     } catch (error) {
-      console.error('Error calling DeepSeek API:', error);
+      console.error('Error calling LLM API:', error);
       throw error;
     }
   }
@@ -66,15 +135,15 @@ export class ClaudeReviewer {
   private buildPrompt(
     files: PullRequestFile[],
     diff: string,
-    projectContext: string
+    distilledContext: string
   ): string {
     const basePrompt = `You are an expert code reviewer for the Fin-U-CH financial management system.
 
-# PROJECT CONTEXT
+# DISTILLED PROJECT CONTEXT
 
-${projectContext}
+${distilledContext}
 
-# YOUR TASK
+# YOUR TASK (MULTI-LEVEL REVIEW WITH TOOLS)
 
 Review the following pull request changes and identify issues at THREE LEVELS:
 
@@ -267,7 +336,122 @@ Begin your review:`;
     return basePrompt;
   }
 
-  private parseClaudeResponse(response: string): ClaudeIssue[] {
+  private buildTools(): OpenAI.Chat.Completions.ChatCompletionTool[] {
+    return [
+      {
+        type: 'function',
+        function: {
+          name: 'read_file',
+          description:
+            'Read the full contents of a file in the repository by relative path from project root.',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: {
+                type: 'string',
+                description:
+                  'Relative path to the file from repository root, e.g. "apps/api/src/main.ts".',
+              },
+            },
+            required: ['path'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'read_file_range',
+          description:
+            'Read a range of lines from a file in the repository. Use this when you only need part of a large file.',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: {
+                type: 'string',
+                description:
+                  'Relative path to the file from repository root, e.g. "apps/web/src/App.tsx".',
+              },
+              start: {
+                type: 'number',
+                description: 'Start line number (1-based, inclusive).',
+              },
+              end: {
+                type: 'number',
+                description: 'End line number (1-based, inclusive).',
+              },
+            },
+            required: ['path', 'start', 'end'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'list_files',
+          description:
+            'List files in the repository matching a glob pattern from the project root.',
+          parameters: {
+            type: 'object',
+            properties: {
+              pattern: {
+                type: 'string',
+                description:
+                  'Glob pattern relative to project root, e.g. "apps/api/src/**/*.ts".',
+              },
+            },
+            required: ['pattern'],
+          },
+        },
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'search',
+          description:
+            'Search for a text query across the codebase. Use this to find related modules, services, or usages.',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description:
+                  'Search phrase, e.g. "companyId" or "OperationService".',
+              },
+            },
+            required: ['query'],
+          },
+        },
+      },
+    ];
+  }
+
+  private async callTool(name: string, args: any): Promise<unknown> {
+    switch (name) {
+      case 'read_file':
+        return callMcpTool('read_file', {
+          path: args.path,
+        });
+      case 'read_file_range':
+        return callMcpTool('read_file_range', {
+          path: args.path,
+          start: args.start,
+          end: args.end,
+        });
+      case 'list_files':
+        return callMcpTool('list_files', {
+          pattern: args.pattern,
+        });
+      case 'search':
+        return callMcpTool('search', {
+          query: args.query,
+        });
+      default:
+        console.warn(`  ⚠ Unknown tool requested: ${name}`);
+        return { error: `Unknown tool: ${name}` };
+    }
+  }
+
+  private parseFindings(response: string): Finding[] {
     try {
       // Extract JSON from markdown code blocks if present
       const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
@@ -276,20 +460,20 @@ Begin your review:`;
       const issues = JSON.parse(jsonStr.trim());
 
       if (!Array.isArray(issues)) {
-        console.warn('Claude response is not an array, returning empty');
+        console.warn('LLM response is not an array, returning empty');
         return [];
       }
 
       return issues;
     } catch (error) {
-      console.error('Failed to parse Claude response as JSON:', error);
+      console.error('Failed to parse LLM response as JSON:', error);
       console.log('Response was:', response);
       return [];
     }
   }
 
   private convertToReviewComments(
-    issues: ClaudeIssue[],
+    issues: Finding[],
     files: PullRequestFile[]
   ): ReviewComment[] {
     const comments: ReviewComment[] = [];

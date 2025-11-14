@@ -20,6 +20,9 @@ export const CONFIG = {
     owner: process.env.GITHUB_REPOSITORY_OWNER || '',
     repo: process.env.GITHUB_REPOSITORY_NAME || '',
   },
+  mcp: {
+    port: parseInt(process.env.MCP_PORT || '3030', 10),
+  },
   // Используем существующие документы + новые AI-specific файлы
   contextPaths: [
     'docs/PROJECT_OVERVIEW.md',

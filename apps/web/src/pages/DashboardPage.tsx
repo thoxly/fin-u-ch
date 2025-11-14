@@ -94,15 +94,10 @@ export const DashboardPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    const formatDateForAPI = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+    // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
     const newRange = {
-      from: formatDateForAPI(startDate),
-      to: formatDateForAPI(endDate),
+      from: startDate.toISOString(),
+      to: endDate.toISOString(),
     };
     const format = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
@@ -238,12 +233,6 @@ export const DashboardPage = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Дашборд
-          </h1>
-        </div>
-
         {/* Компактная панель: фильтр периода + метрики */}
         <Card className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
           {/* Навигация и фильтр периода */}

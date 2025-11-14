@@ -11,9 +11,13 @@ import { usePermissions } from '../../../shared/hooks/usePermissions';
 export const AccountForm = ({
   account,
   onClose,
+  onSuccess,
+  initialNumber,
 }: {
   account: Account | null;
   onClose: () => void;
+  onSuccess?: (createdId: string) => void;
+  initialNumber?: string;
 }) => {
   const [name, setName] = useState(account?.name || '');
   const [number, setNumber] = useState(account?.number || '');
@@ -41,12 +45,12 @@ export const AccountForm = ({
     } else {
       // Сброс при создании нового счета
       setName('');
-      setNumber('');
+      setNumber(initialNumber || '');
       setCurrency('RUB');
       setOpeningBalance('0');
       setIsActive(true);
     }
-  }, [account]);
+  }, [account, initialNumber]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const data = {
@@ -59,10 +63,15 @@ export const AccountForm = ({
     try {
       if (account) {
         await update({ id: account.id, data }).unwrap();
+        onClose();
       } else {
-        await create(data).unwrap();
+        const result = await create(data).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
       }
-      onClose();
     } catch (error) {
       console.error('Failed to save account:', error);
     }

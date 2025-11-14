@@ -11,9 +11,11 @@ import { useState, useEffect } from 'react';
 export const DealForm = ({
   deal,
   onClose,
+  onSuccess,
 }: {
   deal: Deal | null;
   onClose: () => void;
+  onSuccess?: (createdId: string) => void;
 }) => {
   const [name, setName] = useState(deal?.name || '');
   const [amount, setAmount] = useState(deal?.amount?.toString() || '');
@@ -45,10 +47,15 @@ export const DealForm = ({
     try {
       if (deal) {
         await update({ id: deal.id, data }).unwrap();
+        onClose();
       } else {
-        await create(data).unwrap();
+        const result = await create(data).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
       }
-      onClose();
     } catch (error) {
       console.error('Failed to save deal:', error);
     }

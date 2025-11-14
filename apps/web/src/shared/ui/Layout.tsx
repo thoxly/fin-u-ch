@@ -10,6 +10,7 @@ import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
 import { usePermissions } from '../hooks/usePermissions';
+import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
 
 interface LayoutProps {
   children: ReactNode;
@@ -584,6 +585,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           </div>
         </OffCanvas>
       )}
+
+      {/* Свернутые секции импорта на всех роутах */}
+      <CollapsedImportSections />
     </div>
   );
 };

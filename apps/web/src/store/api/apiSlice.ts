@@ -128,6 +128,8 @@ export const apiSlice = createApi({
     'Role',
     'Permission',
     'AuditLog',
+    'Import',
+    'MappingRule',
   ],
   endpoints: () => ({}),
 });
