@@ -92,6 +92,16 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.base_ref != 'main'
     timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     permissions:
       contents: read
       pull-requests: write
@@ -119,6 +129,17 @@ jobs:
       - name: Build AI Review script
         run: pnpm --filter @fin-u-ch/ai-review build
 
+      - name: Start MCP server
+        working-directory: scripts/ai-review
+        env:
+          MCP_PORT: 3030
+        run: |
+          node dist/mcp-server.js > mcp-server.log 2>&1 &
+          echo $! > mcp-server.pid
+          echo "MCP server started with PID $(cat mcp-server.pid)"
+          # Give the server a moment to start
+          sleep 2
+
       - name: Run AI Code Review
         working-directory: scripts/ai-review
         env:
@@ -127,6 +148,8 @@ jobs:
           GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          MCP_PORT: 3030
+          REDIS_URL: redis://redis:6379
         run: pnpm start
 
   # ============================================
