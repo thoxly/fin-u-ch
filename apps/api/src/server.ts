@@ -8,7 +8,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // From apps/api/src/server.ts -> apps/api/src -> apps/api -> apps -> root
-const projectRoot = path.resolve(__dirname, '../..');
+const projectRoot = path.resolve(__dirname, '../../..');
 dotenv.config({ path: path.resolve(projectRoot, '.env') });
 
 import app from './app';

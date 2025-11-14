@@ -27,18 +27,8 @@ model Company {
   planItems      PlanItem[]
   salaries       Salary[]
   budgets        Budget[]
-  roles          Role[]
-  auditLogs      AuditLog[]
-  users              User[]
-  accounts           Account[]
-  departments        Department[]
-  counterparties     Counterparty[]
-  deals              Deal[]
-  articles           Article[]
-  operations         Operation[]
-  planItems          PlanItem[]
-  salaries           Salary[]
-  budgets            Budget[]
+  roles              Role[]
+  auditLogs          AuditLog[]
   importSessions     ImportSession[]
   importedOperations ImportedOperation[]
   mappingRules       MappingRule[]
@@ -47,17 +37,6 @@ model Company {
 }
 
 model User {
-  id              String   @id @default(uuid())
-  companyId       String
-  email           String   @unique
-  passwordHash    String
-  firstName       String?
-  lastName        String?
-  isActive        Boolean  @default(true)
-  isSuperAdmin    Boolean  @default(false) // Флаг супер-администратора компании
-  isEmailVerified Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
   id                  String   @id @default(uuid())
   companyId           String
   email               String   @unique
@@ -65,6 +44,7 @@ model User {
   firstName           String?
   lastName            String?
   isActive            Boolean  @default(true)
+  isSuperAdmin        Boolean  @default(false) // Флаг супер-администратора компании
   onboardingCompleted Boolean  @default(false)
   isEmailVerified     Boolean  @default(false)
   createdAt           DateTime @default(now())
@@ -377,6 +357,8 @@ model AuditLog {
   @@index([companyId, userId])
   @@index([companyId, createdAt])
   @@map("audit_logs")
+}
+
 model ImportSession {
   id             String   @id @default(uuid())
   companyId      String

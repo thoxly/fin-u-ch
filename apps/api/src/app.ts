@@ -35,6 +35,22 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request logging
 app.use((req, res, next) => {
+  if (req.path.includes('/auth/register')) {
+    console.log('[app.ts] Запрос на регистрацию', {
+      method: req.method,
+      path: req.path,
+      url: req.url,
+      body: req.body
+        ? {
+            email: req.body.email,
+            companyName: req.body.companyName,
+            hasPassword: !!req.body.password,
+          }
+        : undefined,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+  }
   logger.info(`${req.method} ${req.path}`);
   next();
 });

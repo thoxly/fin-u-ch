@@ -36,6 +36,14 @@ export interface TokensResponse {
 
 export class AuthService {
   async register(data: RegisterDTO): Promise<TokensResponse> {
+    console.log('[AuthService.register] Начало регистрации', {
+      email: data.email,
+      companyName: data.companyName,
+      hasPassword: !!data.password,
+      passwordLength: data.password?.length,
+    });
+
+    console.log('[AuthService.register] Валидация данных');
     validateRequired({
       email: data.email,
       password: data.password,
@@ -43,18 +51,32 @@ export class AuthService {
     });
     validateEmail(data.email);
     validatePassword(data.password);
+    console.log('[AuthService.register] Валидация пройдена');
 
     // Check if user already exists
+    console.log('[AuthService.register] Проверка существующего пользователя', {
+      email: data.email,
+    });
     const existingUser = await prisma.user.findUnique({
       where: { email: data.email },
     });
+    console.log('[AuthService.register] Результат проверки пользователя', {
+      exists: !!existingUser,
+      userId: existingUser?.id,
+    });
 
     if (existingUser) {
+      console.log('[AuthService.register] Пользователь уже существует', {
+        email: data.email,
+        userId: existingUser.id,
+      });
       throw new AppError('User with this email already exists', 409);
     }
 
     // Create company and user in a transaction
+    console.log('[AuthService.register] Хеширование пароля');
     const passwordHash = await hashPassword(data.password);
+    console.log('[AuthService.register] Пароль захеширован, начало транзакции');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await prisma.$transaction(async (tx: any) => {

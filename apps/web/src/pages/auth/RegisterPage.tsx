@@ -26,21 +26,42 @@ export const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
+    console.log('[RegisterPage] Начало регистрации', {
+      email,
+      companyName,
+      passwordLength: password.length,
+    });
+
     if (password.length < 6) {
       setError('Пароль должен быть не менее 6 символов');
       return;
     }
 
     try {
+      console.log('[RegisterPage] Вызов register mutation', {
+        email,
+        companyName,
+      });
       const response = await register({
         email,
         password,
         companyName,
       }).unwrap();
+      console.log('[RegisterPage] Регистрация успешна', {
+        userId: response.user?.id,
+        email: response.user?.email,
+        hasAccessToken: !!response.accessToken,
+      });
       dispatch(setCredentials(response));
       // Показываем сообщение об успешной регистрации на этой же странице
       setShowVerificationMessage(true);
     } catch (err) {
+      console.error('[RegisterPage] Ошибка регистрации', {
+        error: err,
+        errorType: err instanceof Error ? err.constructor.name : typeof err,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined,
+      });
       setError('Ошибка регистрации. Возможно, пользователь уже существует');
     }
   };
