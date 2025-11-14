@@ -53,7 +53,7 @@ export class DealsService {
     await this.getById(id, companyId);
 
     return prisma.deal.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -62,7 +62,7 @@ export class DealsService {
     await this.getById(id, companyId);
 
     return prisma.deal.delete({
-      where: { id },
+      where: { id, companyId },
     });
   }
 }

@@ -10,6 +10,7 @@ import { autoMatch } from './services/matching.service';
 import operationsService from '../operations/operations.service';
 import articlesService from '../catalogs/articles/articles.service';
 import counterpartiesService from '../catalogs/counterparties/counterparties.service';
+import { isValidCurrencyCode } from '@fin-u-ch/shared';
 
 export interface ImportFilters {
   confirmed?: boolean;
@@ -128,6 +129,16 @@ export class ImportsService {
     for (const batch of batches) {
       try {
         await prisma.$transaction(async (tx) => {
+          // Валидация companyId в начале транзакции для предотвращения cross-tenant доступа
+          const companyCheck = await tx.company.findFirst({
+            where: { id: companyId },
+            select: { id: true },
+          });
+
+          if (!companyCheck) {
+            throw new AppError('Company not found', 404);
+          }
+
           for (const doc of batch) {
             try {
               // Автосопоставление
@@ -174,6 +185,11 @@ export class ImportsService {
                 processed: false,
                 draft: true,
               };
+
+              // Валидация: убеждаемся, что companyId в данных соответствует переданному companyId
+              if (operationData.companyId !== companyId) {
+                throw new AppError('Company ID mismatch in transaction', 400);
+              }
 
               const importedOp = await tx.importedOperation.create({
                 data: operationData,
@@ -604,6 +620,14 @@ export class ImportsService {
     // Операция считается сопоставленной, если указаны: статья, счет и валюта
     const unmatchedOperations: string[] = [];
     for (const op of operations) {
+      // Валидация companyId для каждой операции
+      if (op.companyId !== companyId) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не принадлежит указанной компании`
+        );
+        continue;
+      }
+
       if (!op.direction) {
         unmatchedOperations.push(
           `Операция ${op.number || op.id}: не указан тип операции`
@@ -625,6 +649,24 @@ export class ImportsService {
       if (!op.currency) {
         unmatchedOperations.push(
           `Операция ${op.number || op.id}: не указана валюта`
+        );
+      } else if (!isValidCurrencyCode(op.currency)) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: недопустимый код валюты "${op.currency}"`
+        );
+      }
+
+      // Валидация суммы
+      if (op.amount === null || op.amount === undefined || op.amount <= 0) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: недопустимая сумма`
+        );
+      }
+
+      // Валидация даты
+      if (!op.date) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не указана дата`
         );
       }
 
@@ -661,8 +703,26 @@ export class ImportsService {
     for (const batch of batches) {
       try {
         await prisma.$transaction(async (tx) => {
+          // Валидация companyId в начале транзакции для предотвращения cross-tenant доступа
+          const companyCheck = await tx.company.findFirst({
+            where: { id: companyId },
+            select: { id: true },
+          });
+
+          if (!companyCheck) {
+            throw new AppError('Company not found', 404);
+          }
+
           for (const op of batch) {
             try {
+              // Валидация companyId для каждой операции
+              if (op.companyId !== companyId) {
+                throw new AppError(
+                  `Operation ${op.id} does not belong to the specified company`,
+                  403
+                );
+              }
+
               // Проверяем обязательные поля
               if (!op.direction) {
                 throw new AppError(`Operation ${op.id} has no direction`, 400);
@@ -688,20 +748,47 @@ export class ImportsService {
                 );
               }
 
+              // Валидация валюты
+              const currency = op.currency || 'RUB';
+              if (!isValidCurrencyCode(currency)) {
+                throw new AppError(
+                  `Operation ${op.id} has invalid currency code: ${currency}`,
+                  400
+                );
+              }
+
+              // Валидация суммы
+              if (
+                op.amount === null ||
+                op.amount === undefined ||
+                op.amount <= 0
+              ) {
+                throw new AppError(
+                  `Operation ${op.id} has invalid amount: ${op.amount}`,
+                  400
+                );
+              }
+
+              // Валидация даты
+              if (!op.date) {
+                throw new AppError(`Operation ${op.id} has no date`, 400);
+              }
+
               // Создаем операцию
               const operationData: any = {
                 type: op.direction,
                 operationDate: op.date,
                 amount: op.amount,
-                currency: op.currency || 'RUB',
+                currency: currency,
                 description: op.description,
                 repeat: op.repeat || 'none',
               };
 
               if (op.direction === 'transfer') {
                 // Для переводов нужно найти счета по номерам
+                // Используем tx вместо prisma для обеспечения изоляции транзакции
                 const sourceAccount = op.payerAccount
-                  ? await prisma.account.findFirst({
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.payerAccount,
@@ -711,7 +798,7 @@ export class ImportsService {
                   : null;
 
                 const targetAccount = op.receiverAccount
-                  ? await prisma.account.findFirst({
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.receiverAccount,

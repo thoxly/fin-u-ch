@@ -92,7 +92,7 @@ export class BudgetsService {
     }
 
     const result = await prisma.budget.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
 
@@ -106,8 +106,8 @@ export class BudgetsService {
     await this.getById(id, companyId);
 
     // Check if budget has plan items
-    const budget = await prisma.budget.findUnique({
-      where: { id },
+    const budget = await prisma.budget.findFirst({
+      where: { id, companyId },
       include: {
         _count: {
           select: { planItems: true },
@@ -123,7 +123,7 @@ export class BudgetsService {
     }
 
     const result = await prisma.budget.delete({
-      where: { id },
+      where: { id, companyId },
     });
 
     // Инвалидируем кэш отчетов после удаления бюджета
