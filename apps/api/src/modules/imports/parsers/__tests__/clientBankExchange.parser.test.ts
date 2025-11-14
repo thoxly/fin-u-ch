@@ -29,7 +29,7 @@ jest.mock('../../../config/logger', () => ({
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { parseClientBankExchange } from '../clientBankExchange.parser';
-import { AppError } from '../../../middlewares/error';
+import { AppError } from '../../../../middlewares/error';
 
 describe('parseClientBankExchange', () => {
   const fixturesDir = join(__dirname, 'fixtures');

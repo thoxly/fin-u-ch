@@ -96,8 +96,8 @@ export class ImportsService {
       );
     }
 
-    // Получаем ИНН компании
-    const company = await prisma.company.findUnique({
+    // Получаем ИНН компании (с явной проверкой companyId для безопасности)
+    const company = await prisma.company.findFirst({
       where: { id: companyId },
       select: { inn: true },
     });
@@ -486,8 +486,8 @@ export class ImportsService {
       where: { importSessionId: sessionId, companyId },
     });
 
-    // Получаем ИНН компании
-    const company = await prisma.company.findUnique({
+    // Получаем ИНН компании (с явной проверкой companyId для безопасности)
+    const company = await prisma.company.findFirst({
       where: { id: companyId },
       select: { inn: true },
     });
@@ -838,7 +838,7 @@ export class ImportsService {
     });
 
     await prisma.importSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, companyId },
       data: {
         processedCount,
         status:
@@ -872,7 +872,7 @@ export class ImportsService {
     });
 
     await prisma.importSession.delete({
-      where: { id: sessionId },
+      where: { id: sessionId, companyId },
     });
 
     return { deleted: deletedCount + 1 };
@@ -954,7 +954,7 @@ export class ImportsService {
     }
 
     return prisma.mappingRule.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -972,7 +972,7 @@ export class ImportsService {
     }
 
     return prisma.mappingRule.delete({
-      where: { id },
+      where: { id, companyId },
     });
   }
 
