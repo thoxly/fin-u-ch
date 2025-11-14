@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 
 interface Column<T> {
   key: string;
-  header: string;
+  header: string | ReactNode;
   render?: (item: T) => ReactNode;
   width?: string;
 }
@@ -43,18 +43,28 @@ export function Table<T>({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="table">
+    <div className="overflow-x-auto overflow-y-visible">
+      <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
         <thead>
           <tr>
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                style={column.width ? { width: column.width } : undefined}
-              >
-                {column.header}
-              </th>
-            ))}
+            {columns.map((column) => {
+              const isRulesColumn = column.key === 'rules';
+              return (
+                <th
+                  key={column.key}
+                  style={column.width ? { width: column.width } : undefined}
+                  className={`overflow-visible ${isRulesColumn ? '!text-center' : ''}`}
+                >
+                  {isRulesColumn ? (
+                    <div className="flex justify-center items-center">
+                      {column.header}
+                    </div>
+                  ) : (
+                    column.header
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -71,15 +81,21 @@ export function Table<T>({
                 onClick={() => onRowClick?.(item)}
                 className={className}
               >
-                {columns.map((column) => (
-                  <td key={column.key}>
-                    {column.render
-                      ? column.render(item)
-                      : String(
-                          (item as Record<string, unknown>)[column.key] ?? ''
-                        )}
-                  </td>
-                ))}
+                {columns.map((column) => {
+                  const isRulesColumn = column.key === 'rules';
+                  return (
+                    <td
+                      key={column.key}
+                      className={`overflow-visible relative ${isRulesColumn ? 'text-center' : ''}`}
+                    >
+                      {column.render
+                        ? column.render(item)
+                        : String(
+                            (item as Record<string, unknown>)[column.key] ?? ''
+                          )}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}

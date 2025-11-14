@@ -25,6 +25,7 @@ export const UserProfileForm = ({
     firstName: '',
     lastName: '',
     companyName: '',
+    companyInn: '',
     currencyBase: 'RUB',
   });
 
@@ -49,6 +50,7 @@ export const UserProfileForm = ({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         companyName: user.companyName || '',
+        companyInn: user.company?.inn || '',
         currencyBase: user.company?.currencyBase || 'RUB',
       });
     }
@@ -72,6 +74,7 @@ export const UserProfileForm = ({
       // Обновляем данные компании
       await updateCompany({
         name: formData.companyName,
+        inn: formData.companyInn || undefined,
         currencyBase: formData.currencyBase,
       }).unwrap();
 
@@ -135,10 +138,12 @@ export const UserProfileForm = ({
         firstName={formData.firstName}
         lastName={formData.lastName}
         companyName={formData.companyName}
+        companyInn={formData.companyInn}
         currencyBase={formData.currencyBase}
         onFirstNameChange={(value) => handleInputChange('firstName', value)}
         onLastNameChange={(value) => handleInputChange('lastName', value)}
         onCompanyNameChange={(value) => handleInputChange('companyName', value)}
+        onCompanyInnChange={(value) => handleInputChange('companyInn', value)}
         onCurrencyBaseChange={(value) =>
           handleInputChange('currencyBase', value)
         }

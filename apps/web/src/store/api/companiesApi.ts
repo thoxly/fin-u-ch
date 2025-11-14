@@ -8,6 +8,7 @@ export interface Company {
   id: string;
   name: string;
   currencyBase: string;
+  inn?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,6 +16,7 @@ export interface Company {
 export interface UpdateCompanyRequest {
   name?: string;
   currencyBase?: string;
+  inn?: string;
 }
 
 export interface UiSettings {
