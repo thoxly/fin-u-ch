@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { validateConfig, CONFIG } from './config.js';
-import { GitHubClient } from './github-client.js';
-import { AiReviewer } from './ai-reviewer.js';
+import { GitHubClient, ReviewComment } from './github-client.js';
+import { AiReviewer, Finding } from './ai-reviewer.js';
 import { getDistilledContext } from './distilled-context.js';
 
 function buildBatchDiff(files: { filename: string; patch?: string }[]): string {
@@ -82,9 +82,9 @@ async function main() {
 
     // Get AI review in batches to avoid context limits on large PRs
     const maxPerBatch = CONFIG.review.maxFilesPerBatch || 10;
-    const allComments: typeof githubClient extends { createReview: any }
-      ? Awaited<ReturnType<AiReviewer['reviewCode']>>
-      : any[] = [];
+    const allComments: ReviewComment[] = [];
+    const allIssues: Finding[] = [];
+    const allIssuesWithoutInline: Finding[] = [];
 
     const totalBatches = Math.ceil(relevantFiles.length / maxPerBatch);
 
@@ -98,24 +98,29 @@ async function main() {
 
       const batchDiff = buildBatchDiff(batchFiles);
 
-      const batchComments = await aiReviewer.reviewCode(
-        batchFiles,
-        batchDiff,
-        distilledContext
-      );
+      const {
+        comments: batchComments,
+        issues: batchIssues,
+        issuesWithoutInline: batchIssuesWithoutInline,
+      } = await aiReviewer.reviewCode(batchFiles, batchDiff, distilledContext);
 
       console.log(
-        `Batch ${batchIndex}/${totalBatches}: found ${batchComments.length} issues\n`
+        `Batch ${batchIndex}/${totalBatches}: model reported ${batchIssues.length} issues, ${batchComments.length} have valid inline positions, ${batchIssuesWithoutInline.length} without inline positions\n`
       );
 
       allComments.push(...batchComments);
+      allIssues.push(...batchIssues);
+      allIssuesWithoutInline.push(...batchIssuesWithoutInline);
     }
 
     const comments = allComments;
+    const issues = allIssues;
 
-    console.log(`Found ${comments.length} issues\n`);
+    console.log(
+      `Found ${issues.length} total issues (${comments.length} with inline positions)\n`
+    );
 
-    if (comments.length === 0) {
+    if (issues.length === 0) {
       console.log('✅ No issues found!');
 
       // Dismiss previous REQUEST_CHANGES reviews from this bot
@@ -141,10 +146,44 @@ async function main() {
     }
 
     // Analyze severity
-    const criticalIssues = comments.filter((c) => c.severity === 'critical');
-    const highIssues = comments.filter((c) => c.severity === 'high');
-    const mediumIssues = comments.filter((c) => c.severity === 'medium');
-    const lowIssues = comments.filter((c) => c.severity === 'low');
+    const criticalIssues = issues.filter((c) => c.severity === 'critical');
+    const highIssues = issues.filter((c) => c.severity === 'high');
+    const mediumIssues = issues.filter((c) => c.severity === 'medium');
+    const lowIssues = issues.filter((c) => c.severity === 'low');
+
+    // Build human-readable summary for issues that could not be mapped to inline diff positions.
+    const maxNonInlineInSummary = 30;
+    const uniqueNonInline: Finding[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const issue of allIssuesWithoutInline) {
+      const key = `${issue.file}:${issue.line}:${issue.message}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      uniqueNonInline.push(issue);
+      if (uniqueNonInline.length >= maxNonInlineInSummary) break;
+    }
+
+    let nonInlineSection = '';
+    if (uniqueNonInline.length > 0) {
+      const lines = uniqueNonInline.map((i) => {
+        const prefix = `[${i.severity.toUpperCase()}][${i.category}]`;
+        const suggestionPart = i.suggestion
+          ? ` — Suggestion: ${i.suggestion}`
+          : '';
+        return `- ${prefix} ${i.file}:${i.line} — ${i.message}${suggestionPart}`;
+      });
+
+      const extraCount = allIssuesWithoutInline.length - uniqueNonInline.length;
+      const truncatedNote =
+        extraCount > 0
+          ? `\n\n_(+${extraCount} more issues without inline positions not listed here)_`
+          : '';
+
+      nonInlineSection = `\n\n**Issues without inline comments (no diff mapping, e.g. unchanged lines or other batches):**\n\n${lines.join(
+        '\n'
+      )}${truncatedNote}`;
+    }
 
     console.log('Issue breakdown:');
     console.log(`  🔴 Critical: ${criticalIssues.length}`);
@@ -171,7 +210,7 @@ Found ${criticalIssues.length} critical issue(s) that must be fixed before mergi
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Please address the critical issues and request a new review.`;
+Please address the critical issues and request a new review.${nonInlineSection}`;
     } else if (highIssues.length > 0) {
       reviewEvent = isGitHubActions ? 'REQUEST_CHANGES' : 'COMMENT';
       reviewBody = `🟠 **AI Code Review: Important issues found**
@@ -183,7 +222,7 @@ Found ${highIssues.length} high-severity issue(s) that should be fixed.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Please address the issues and request a new review.`;
+Please address the issues and request a new review.${nonInlineSection}`;
     } else if (mediumIssues.length > 3) {
       reviewEvent = 'COMMENT';
       reviewBody = `🟡 **AI Code Review: Several improvements suggested**
@@ -194,7 +233,7 @@ Found ${mediumIssues.length} medium-severity suggestions.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Consider addressing these before merging.`;
+Consider addressing these before merging.${nonInlineSection}`;
     } else {
       reviewEvent = 'COMMENT';
       reviewBody = `ℹ️ **AI Code Review: Minor suggestions**
@@ -205,7 +244,7 @@ Found ${comments.length} minor suggestion(s) for improvement.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-These are optional improvements.`;
+These are optional improvements.${nonInlineSection}`;
     }
 
     // Dismiss previous REQUEST_CHANGES reviews from this bot

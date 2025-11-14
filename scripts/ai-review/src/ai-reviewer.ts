@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { ReviewComment, PullRequestFile } from './github-client.js';
 import { callMcpTool } from './mcp-client.js';
 
-interface Finding {
+export interface Finding {
   file: string;
   line: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -40,7 +40,11 @@ export class AiReviewer {
     files: PullRequestFile[],
     diff: string,
     distilledContext: string
-  ): Promise<ReviewComment[]> {
+  ): Promise<{
+    comments: ReviewComment[];
+    issues: Finding[];
+    issuesWithoutInline: Finding[];
+  }> {
     console.log('Sending code to LLM (with tools) for review...');
 
     const systemPrompt =
@@ -66,6 +70,12 @@ export class AiReviewer {
           messages,
           tools,
           tool_choice: 'auto',
+          // DeepSeek supports JSON output mode and is OpenAI-compatible.
+          // This forces the final assistant message to be strict JSON,
+          // which removes flakiness with markdown wrappers and stray text.
+          response_format: {
+            type: 'json_object',
+          } as any,
         });
 
         const message = completion.choices[0]?.message;
@@ -122,7 +132,16 @@ export class AiReviewer {
         console.log('\n');
 
         const issues = this.parseFindings(responseText);
-        return this.convertToReviewComments(issues, files);
+        const { comments, issuesWithoutInline } = this.convertToReviewComments(
+          issues,
+          files
+        );
+
+        console.log(
+          `  Parsed findings: ${issues.length} total, ${comments.length} with valid inline positions, ${issuesWithoutInline.length} without inline positions`
+        );
+
+        return { comments, issues, issuesWithoutInline };
       }
 
       throw new Error('LLM finished without producing a final response');
@@ -467,16 +486,23 @@ Begin your review:`;
       return issues;
     } catch (error) {
       console.error('Failed to parse LLM response as JSON:', error);
-      console.log('Response was:', response);
-      return [];
+      // Логируем только начало ответа, чтобы не засорять логи огромными строками
+      const preview =
+        response.length > 2000
+          ? `${response.slice(0, 2000)}... [truncated]`
+          : response;
+      console.log('Response was (preview):', preview);
+      // Не проглатываем проблему — пусть упадёт батч/джоба, чтобы не терять найденные issues
+      throw new Error('LLM response was not valid JSON; see logs for details.');
     }
   }
 
   private convertToReviewComments(
     issues: Finding[],
     files: PullRequestFile[]
-  ): ReviewComment[] {
+  ): { comments: ReviewComment[]; issuesWithoutInline: Finding[] } {
     const comments: ReviewComment[] = [];
+    const issuesWithoutInline: Finding[] = [];
 
     for (const issue of issues) {
       const file = files.find((f) => f.filename === issue.file);
@@ -485,6 +511,7 @@ Begin your review:`;
         console.warn(
           `  ⚠ Skipping issue for ${issue.file}: file not found or no patch`
         );
+        issuesWithoutInline.push(issue);
         continue;
       }
 
@@ -503,6 +530,7 @@ Begin your review:`;
         console.warn(
           `    Issue: ${issue.category} - ${issue.message.substring(0, 100)}...`
         );
+        issuesWithoutInline.push(issue);
         continue;
       }
 
@@ -518,7 +546,7 @@ Begin your review:`;
       });
     }
 
-    return comments;
+    return { comments, issuesWithoutInline };
   }
 
   private calculateDiffPosition(
