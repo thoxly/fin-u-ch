@@ -21,7 +21,8 @@ export type EmailTemplate =
   | 'password-reset'
   | 'password-changed'
   | 'email-change-old-verification'
-  | 'email-change-verification';
+  | 'email-change-verification'
+  | 'user-invitation';
 
 export interface EmailOptions {
   to: string;
@@ -173,6 +174,23 @@ export async function sendEmailChangeVerificationEmail(
     template: 'email-change-verification',
     variables: {
       verificationUrl,
+    },
+  });
+}
+
+export async function sendInvitationEmail(
+  email: string,
+  token: string,
+  companyName: string
+): Promise<void> {
+  const invitationUrl = `${env.FRONTEND_URL}/accept-invitation?token=${token}`;
+  await sendEmail({
+    to: email,
+    subject: 'Приглашение в Vecta — Финучёт',
+    template: 'user-invitation',
+    variables: {
+      invitationUrl,
+      companyName,
     },
   });
 }

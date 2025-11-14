@@ -10,6 +10,7 @@ import {
   sendPasswordChangedEmail,
   sendEmailChangeOldVerificationEmail,
   sendEmailChangeVerificationEmail,
+  sendInvitationEmail,
 } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
@@ -438,12 +439,59 @@ export class UsersService {
       invitedBy,
     });
 
-    // TODO: Отправить email с приглашением
+    // Отправляем email с приглашением
+    try {
+      // Получаем информацию о компании для письма
+      const company = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true },
+      });
+
+      if (!company) {
+        logger.error('[UsersService.inviteUser] Company not found', {
+          companyId,
+        });
+      } else {
+        logger.info('Creating invitation token for user', {
+          userId: newUser.id,
+          email: newUser.email,
+        });
+
+        // Создаём токен приглашения
+        const invitationToken = await tokenService.createToken({
+          userId: newUser.id,
+          type: 'user_invitation',
+        });
+
+        logger.info('Invitation token created, sending email', {
+          userId: newUser.id,
+          email: newUser.email,
+          tokenLength: invitationToken.length,
+        });
+
+        // Отправляем письмо с приглашением
+        await sendInvitationEmail(newUser.email, invitationToken, company.name);
+
+        logger.info('Invitation email sent successfully', {
+          userId: newUser.id,
+          email: newUser.email,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to send invitation email', {
+        userId: newUser.id,
+        email: newUser.email,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Не блокируем создание пользователя, если письмо не отправилось
+    }
 
     // Возвращаем пользователя с временным паролем (только для отображения администратору)
+    // Временный пароль больше не нужен, так как пользователь получит ссылку для установки пароля
     return {
       ...newUser,
-      tempPassword, // Временный пароль возвращаем только один раз
+      tempPassword, // Оставляем для обратной совместимости, но пользователь должен использовать токен
     };
   }
 
