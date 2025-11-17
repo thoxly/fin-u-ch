@@ -225,7 +225,8 @@ async function main() {
 
     if (relevantFiles.length === 0) {
       console.log('No relevant files to review. Exiting.');
-      return;
+      // Явно завершаем процесс, чтобы GitHub Actions/job не "залипали"
+      process.exit(0);
     }
 
     // Get AI review in batches to avoid context limits on large PRs
@@ -302,7 +303,9 @@ async function main() {
         '✅ AI Code Review: No Critical or High severity issues found. Code looks good!'
       );
 
-      return;
+      // Успешное завершение без Critical/High — явно выходим с кодом 0,
+      // чтобы GitHub Actions/job корректно завершались
+      process.exit(0);
     }
 
     // Analyze severity (only Critical and High are tracked now)
