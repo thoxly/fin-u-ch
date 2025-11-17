@@ -1343,28 +1343,35 @@ export class ImportsService {
                 operationData.departmentId = op.matchedDepartmentId;
               }
 
-              // Создаем операцию через сервис
+              // Создаем операцию напрямую через транзакцию для атомарности
+              // Используем tx.operation.create вместо operationsService.create,
+              // чтобы операция создавалась внутри транзакции и могла быть откачена при ошибке
               try {
-                await operationsService.create(companyId, operationData);
+                await tx.operation.create({
+                  data: {
+                    ...operationData,
+                    companyId,
+                    isTemplate: false,
+                    isConfirmed: true,
+                  },
+                });
               } catch (error: unknown) {
                 const errorMessage =
                   error instanceof Error ? error.message : String(error);
                 const errorStack =
                   error instanceof Error ? error.stack : undefined;
 
-                logger.error(
-                  'Failed to create operation via operationsService',
-                  {
-                    sessionId,
-                    companyId,
-                    operationId: op.id,
-                    operationData,
-                    error: errorMessage,
-                    stack: errorStack,
-                  }
-                );
+                logger.error('Failed to create operation in transaction', {
+                  sessionId,
+                  companyId,
+                  operationId: op.id,
+                  operationData,
+                  error: errorMessage,
+                  stack: errorStack,
+                });
 
                 // Пробрасываем ошибку дальше, чтобы она была обработана внешним try-catch
+                // и транзакция была откачена
                 throw error;
               }
 

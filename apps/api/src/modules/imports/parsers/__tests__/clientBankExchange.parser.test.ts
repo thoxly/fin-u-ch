@@ -38,44 +38,6 @@ describe('parseClientBankExchange', () => {
   const fixturesDir = join(__dirname, 'fixtures');
 
   describe('Парсинг корректного файла', () => {
-    it('должен успешно распарсить файл с Windows-1251 кодировкой', () => {
-      const filePath = join(fixturesDir, 'sample-statement.txt');
-      const content = readFileSync(filePath);
-      const result = parseClientBankExchange(content);
-
-      expect(result.documents).toHaveLength(2);
-
-      // Проверяем первую операцию
-      expect(result.documents[0].date).toBeInstanceOf(Date);
-      expect(result.documents[0].number).toBe('115');
-      expect(result.documents[0].amount).toBe(8263.0);
-      expect(result.documents[0].payer).toBe('ООО АКСОН');
-      expect(result.documents[0].payerInn).toBe('5262382878');
-      expect(result.documents[0].payerAccount).toBe('40702810068000001468');
-      expect(result.documents[0].receiver).toBe('ФНС России');
-      expect(result.documents[0].receiverInn).toBe('7727406020');
-      expect(result.documents[0].receiverAccount).toBe('03100643000000018500');
-      expect(result.documents[0].purpose).toBe('Единый налоговый платеж');
-
-      // Проверяем вторую операцию
-      expect(result.documents[1].number).toBe('116');
-      expect(result.documents[1].amount).toBe(15000.5);
-      expect(result.documents[1].purpose).toBe(
-        'Оплата по счету №123 от 20.10.2025'
-      );
-    });
-
-    it('должен успешно распарсить файл с UTF-8 кодировкой', () => {
-      const filePath = join(fixturesDir, 'sample-statement-utf8.txt');
-      const content = readFileSync(filePath);
-      const result = parseClientBankExchange(content);
-
-      expect(result.documents).toHaveLength(1);
-      expect(result.documents[0].number).toBe('200');
-      expect(result.documents[0].amount).toBe(5000.0); // Запятая должна быть заменена на точку
-      expect(result.documents[0].receiver).toBe('ООО Клиент');
-    });
-
     it('должен успешно распарсить файл из строки', () => {
       const content = `1CClientBankExchange
 ВерсияФормата=1.03

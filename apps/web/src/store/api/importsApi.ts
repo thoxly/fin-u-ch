@@ -151,9 +151,10 @@ export const importsApi = apiSlice.injectEndpoints({
           });
         }
 
-        // Обновляем каждый найденный запрос
+        // Обновляем каждый найденный запрос и сохраняем результаты для возможного отката
+        const patchResults: Array<{ undo: () => void }> = [];
         cacheKeys.forEach((args) => {
-          dispatch(
+          const patchResult = dispatch(
             importsApi.util.updateQueryData(
               'getImportedOperations',
               args,
@@ -206,6 +207,9 @@ export const importsApi = apiSlice.injectEndpoints({
               }
             )
           );
+          if (patchResult) {
+            patchResults.push(patchResult);
+          }
         });
 
         try {
