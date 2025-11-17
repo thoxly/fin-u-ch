@@ -1,5 +1,5 @@
 // Mock env.ts before importing anything that uses it
-jest.mock('../../../config/env', () => ({
+jest.mock('../../../../config/env', () => ({
   env: {
     NODE_ENV: 'test',
     PORT: 4000,
@@ -17,7 +17,7 @@ jest.mock('../../../config/env', () => ({
 }));
 
 // Mock logger
-jest.mock('../../../config/logger', () => ({
+jest.mock('../../../../config/logger', () => ({
   default: {
     debug: jest.fn(),
     info: jest.fn(),

@@ -177,21 +177,30 @@ describe('matching.service', () => {
 
     it('должен сопоставить контрагента по правилу типа alias', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
-      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce({
-        id: 'rule-1',
-        companyId,
-        userId: 'user-1',
-        ruleType: 'alias',
-        pattern: 'Поставщик',
-        targetType: 'counterparty',
-        targetId: 'counterparty-3',
-        targetName: null,
-        sourceField: 'payer',
-        usageCount: 0,
-        lastUsedAt: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Prisma.MappingRuleGetPayload<Record<string, never>>);
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      // Мокируем equalsRules (пустой массив, чтобы код дошел до aliasRules)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      // Мокируем aliasRules
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
+        {
+          id: 'rule-1',
+          companyId,
+          userId: 'user-1',
+          ruleType: 'alias',
+          pattern: 'Поставщик',
+          targetType: 'counterparty',
+          targetId: 'counterparty-3',
+          targetName: null,
+          sourceField: 'payer',
+          usageCount: 0,
+          lastUsedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
+      mockPrisma.mappingRule.update.mockResolvedValueOnce(
+        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
+      );
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -205,6 +214,10 @@ describe('matching.service', () => {
     it('должен сопоставить контрагента по правилу типа contains', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      // Мокируем equalsRules и aliasRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-2',
@@ -245,6 +258,8 @@ describe('matching.service', () => {
     it('должен сопоставить контрагента по fuzzy match', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      // Мокируем equalsRules и aliasRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
         {
@@ -280,6 +295,8 @@ describe('matching.service', () => {
     it('должен вернуть null, если контрагент не найден', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      // Мокируем equalsRules и aliasRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
         {
@@ -314,6 +331,9 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить статью по правилу типа contains', async () => {
+      // Мокируем regexRules (пустой массив, чтобы код дошел до containsRules)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-3',
@@ -352,6 +372,8 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить статью по ключевым словам', async () => {
+      // Мокируем regexRules и containsRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.article.findFirst.mockResolvedValueOnce({
         id: 'article-2',
@@ -370,6 +392,8 @@ describe('matching.service', () => {
     });
 
     it('должен вернуть null, если статья не найдена', async () => {
+      // Мокируем regexRules и containsRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.article.findFirst.mockResolvedValueOnce(null);
 
@@ -379,6 +403,9 @@ describe('matching.service', () => {
     });
 
     it('должен проверить тип статьи при сопоставлении по правилу', async () => {
+      // Мокируем regexRules (пустой массив)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-4',
