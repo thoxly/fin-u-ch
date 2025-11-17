@@ -100,3 +100,61 @@ export interface ImportOperationsRequest {
   operationIds?: string[];
   saveRulesForIds?: string[];
 }
+
+/**
+ * Result of duplicate check
+ */
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  duplicateOfId?: string;
+  existingOperation?: {
+    id: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Filters for importing operations
+ */
+export interface ImportFilters {
+  confirmed?: boolean;
+  matched?: boolean;
+  duplicate?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Upload statement result
+ */
+export interface UploadStatementResult {
+  sessionId: string;
+  importedCount: number;
+  duplicatesCount: number;
+  fileName: string;
+  parseStats?: {
+    documentsStarted: number;
+    documentsFound: number;
+    documentsSkipped: number;
+    documentsInvalid: number;
+    documentTypesFound: string[];
+  };
+}
+
+/**
+ * Import operations result
+ */
+export interface ImportOperationsResult {
+  imported: number;
+  created: number;
+  errors: number;
+  sessionId: string;
+}
+
+/**
+ * Apply rules result
+ */
+export interface ApplyRulesResult {
+  applied: number;
+  updated: number;
+}
