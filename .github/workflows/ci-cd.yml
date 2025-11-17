@@ -163,6 +163,15 @@ jobs:
           REDIS_URL: redis://localhost:6379
         run: pnpm start
 
+      - name: Upload AI Review Reports
+        if: always() # Сохранять даже если review failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-review-reports-pr-${{ github.event.pull_request.number }}
+          path: .ai-review-reports/
+          retention-days: 30
+          if-no-files-found: warn
+
   # ============================================
   # Сборка и тесты (объединены для оптимизации)
   # Всегда выполняется: для PR проверяет код, для push в main создает build для Docker
