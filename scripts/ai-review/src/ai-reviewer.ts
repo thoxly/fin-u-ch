@@ -191,6 +191,9 @@ ${distilledContext}
 
 # YOUR TASK (MULTI-LEVEL REVIEW WITH TOOLS)
 
+**IMPORTANT: Focus ONLY on CRITICAL and HIGH severity issues. Do NOT report Medium or Low severity issues.**
+This project is in early stages, and we want to avoid noise from minor issues.
+
 Review the following pull request changes and identify issues at THREE LEVELS:
 
 ## LEVEL 1: CODE-LEVEL REVIEW (File/Function level)
@@ -274,8 +277,8 @@ Perform a high-level architectural review. Detect issues that affect scalability
 
 - **critical** — Architecture break (wrong layer, data leakage, missing companyId)
 - **high** — Major duplication or non-reusable component that blocks maintainability
-- **medium** — Non-scalable structure, inconsistent abstraction, complexity issues
-- **low** — Naming inconsistency, minor structural improvements
+
+**Note:** Do not report medium or low severity issues. Focus only on critical and high.
 
 ## LEVEL 3: CONFIGURATION & SECURITY REVIEW
 
@@ -301,8 +304,8 @@ Check for:
 **Severity rules (Level 3):**
 - critical — leaked secrets, disabled security validation, public tokens
 - high — build or deployment bypass, unsafe env config
-- medium — bad dependency management, missing validation
-- low — naming or formatting inconsistencies
+
+**Note:** Do not report medium or low severity issues. Focus only on critical and high.
 
 # CHANGED FILES
 
@@ -328,8 +331,8 @@ Provide your review as a JSON array of issues. Each issue must have:
 
 **CRITICAL SEVERITY**: Security vulnerabilities (missing companyId, SQL injection, XSS), architecture breaks (wrong layer, data leakage)
 **HIGH SEVERITY**: Bugs, major duplication, missing error handling
-**MEDIUM SEVERITY**: Performance issues, non-scalable patterns, complexity
-**LOW SEVERITY**: Style issues, naming inconsistencies, minor improvements
+
+**IMPORTANT REMINDER**: Only report CRITICAL and HIGH severity issues. Skip medium and low severity issues entirely.
 
 Example:
 \`\`\`json
@@ -349,22 +352,6 @@ Example:
     "category": "architecture",
     "message": "Reusable Modal component defined in /pages. This violates layer separation and prevents reuse.",
     "suggestion": "Move this component to /shared/ui/Modal or use existing shared Modal component"
-  },
-  {
-    "file": "apps/web/src/features/operation-form/OperationForm.tsx",
-    "line": 78,
-    "severity": "medium",
-    "category": "architecture",
-    "message": "Duplicate date formatting logic. Same code exists in 3+ components.",
-    "suggestion": "Extract to shared/lib/formatDate.ts and import from there"
-  },
-  {
-    "file": "apps/api/src/modules/reports/complex-report.service.ts",
-    "line": 145,
-    "severity": "medium",
-    "category": "architecture",
-    "message": "Function is 67 lines long with nesting depth of 4. Too complex to maintain.",
-    "suggestion": "Break down into smaller functions: extractData(), transformData(), aggregateResults()"
   }
 ]
 \`\`\`

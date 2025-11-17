@@ -148,7 +148,7 @@ async function main() {
         const distilledContext = await getDistilledContext();
         // Get PR files
         const files = await githubClient.getPullRequestFiles(prNumber);
-        // Filter files (skip package-lock, generated files, etc.)
+        // Filter files (skip package-lock, generated files, docs, etc.)
         const relevantFiles = files.filter((file) => {
             const skipPatterns = [
                 /package-lock\.json$/,
@@ -159,6 +159,7 @@ async function main() {
                 /node_modules\//,
                 /coverage\//,
                 /\.min\./,
+                /\.md$/i, // Skip markdown files (can still read them for context via tools)
             ];
             return !skipPatterns.some((pattern) => pattern.test(file.filename));
         });
@@ -184,11 +185,15 @@ async function main() {
             allIssues.push(...batchIssues);
             allIssuesWithoutInline.push(...batchIssuesWithoutInline);
         }
-        const comments = allComments;
-        const issues = allIssues;
-        console.log(`Found ${issues.length} total issues (${comments.length} with inline positions)\n`);
+        // Filter only Critical and High severity issues (ignore Medium and Low)
+        const criticalAndHighIssues = allIssues.filter((issue) => issue.severity === 'critical' || issue.severity === 'high');
+        const criticalAndHighComments = allComments.filter((comment) => comment.severity === 'critical' || comment.severity === 'high');
+        const criticalAndHighWithoutInline = allIssuesWithoutInline.filter((issue) => issue.severity === 'critical' || issue.severity === 'high');
+        const comments = criticalAndHighComments;
+        const issues = criticalAndHighIssues;
+        console.log(`Found ${issues.length} Critical/High issues (${comments.length} with inline positions)\n`);
         if (issues.length === 0) {
-            console.log('✅ No issues found!');
+            console.log('✅ No Critical or High severity issues found!');
             // Dismiss previous REQUEST_CHANGES reviews from this bot
             await githubClient.dismissPreviousReviews(prNumber);
             const commitId = await githubClient.getLatestCommit(prNumber);
@@ -196,19 +201,17 @@ async function main() {
             const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
             const event = isGitHubActions ? 'COMMENT' : 'APPROVE';
             console.log(isGitHubActions ? 'Leaving comment...' : 'Approving PR...');
-            await githubClient.createReview(prNumber, commitId, [], event, '✅ AI Code Review: No issues found. Code looks good!');
+            await githubClient.createReview(prNumber, commitId, [], event, '✅ AI Code Review: No Critical or High severity issues found. Code looks good!');
             return;
         }
-        // Analyze severity
+        // Analyze severity (only Critical and High are tracked now)
         const criticalIssues = issues.filter((c) => c.severity === 'critical');
         const highIssues = issues.filter((c) => c.severity === 'high');
-        const mediumIssues = issues.filter((c) => c.severity === 'medium');
-        const lowIssues = issues.filter((c) => c.severity === 'low');
         // Build human-readable summary for issues that could not be mapped to inline diff positions.
         const maxNonInlineInSummary = 30;
         const uniqueNonInline = [];
         const seenKeys = new Set();
-        for (const issue of allIssuesWithoutInline) {
+        for (const issue of criticalAndHighWithoutInline) {
             const key = `${issue.file}:${issue.line}:${issue.message}`;
             if (seenKeys.has(key))
                 continue;
@@ -226,20 +229,18 @@ async function main() {
                     : '';
                 return `- ${prefix} ${i.file}:${i.line} — ${i.message}${suggestionPart}`;
             });
-            const extraCount = allIssuesWithoutInline.length - uniqueNonInline.length;
+            const extraCount = criticalAndHighWithoutInline.length - uniqueNonInline.length;
             const truncatedNote = extraCount > 0
                 ? `\n\n_(+${extraCount} more issues without inline positions not listed here)_`
                 : '';
             nonInlineSection = `\n\n**Issues without inline comments (no diff mapping, e.g. unchanged lines or other batches):**\n\n${lines.join('\n')}${truncatedNote}`;
         }
-        console.log('Issue breakdown:');
+        console.log('Issue breakdown (Critical & High only):');
         console.log(`  🔴 Critical: ${criticalIssues.length}`);
         console.log(`  🟠 High: ${highIssues.length}`);
-        console.log(`  🟡 Medium: ${mediumIssues.length}`);
-        console.log(`  🟢 Low: ${lowIssues.length}`);
         console.log('\n');
-        // Save full report to files
-        const reportPaths = await saveFullReport(prNumber, issues, comments, allIssuesWithoutInline);
+        // Save full report to files (only Critical & High)
+        const reportPaths = await saveFullReport(prNumber, issues, comments, criticalAndHighWithoutInline);
         const reportNote = process.env.GITHUB_ACTIONS === 'true'
             ? `\n\n📄 **Full report available in workflow artifacts** (check the workflow run for download links)`
             : `\n\n📄 **Full report saved locally:**\n- JSON: \`${path.relative(CONFIG.review.projectRoot, reportPaths.jsonPath)}\`\n- Markdown: \`${path.relative(CONFIG.review.projectRoot, reportPaths.markdownPath)}\``;
@@ -257,8 +258,6 @@ Found ${criticalIssues.length} critical issue(s) that must be fixed before mergi
 **Summary:**
 - 🔴 Critical: ${criticalIssues.length}
 - 🟠 High: ${highIssues.length}
-- 🟡 Medium: ${mediumIssues.length}
-- 🟢 Low: ${lowIssues.length}
 
 Please address the critical issues and request a new review.${nonInlineSection}${reportNote}`;
         }
@@ -270,34 +269,15 @@ Found ${highIssues.length} high-severity issue(s) that should be fixed.
 
 **Summary:**
 - 🟠 High: ${highIssues.length}
-- 🟡 Medium: ${mediumIssues.length}
-- 🟢 Low: ${lowIssues.length}
 
 Please address the issues and request a new review.${nonInlineSection}${reportNote}`;
         }
-        else if (mediumIssues.length > 3) {
-            reviewEvent = 'COMMENT';
-            reviewBody = `🟡 **AI Code Review: Several improvements suggested**
-
-Found ${mediumIssues.length} medium-severity suggestions.
-
-**Summary:**
-- 🟡 Medium: ${mediumIssues.length}
-- 🟢 Low: ${lowIssues.length}
-
-Consider addressing these before merging.${nonInlineSection}${reportNote}`;
-        }
         else {
+            // Should not reach here since we filter only Critical/High
             reviewEvent = 'COMMENT';
-            reviewBody = `ℹ️ **AI Code Review: Minor suggestions**
+            reviewBody = `✅ **AI Code Review**
 
-Found ${comments.length} minor suggestion(s) for improvement.
-
-**Summary:**
-- 🟡 Medium: ${mediumIssues.length}
-- 🟢 Low: ${lowIssues.length}
-
-These are optional improvements.${nonInlineSection}${reportNote}`;
+No Critical or High severity issues found.${reportNote}`;
         }
         // Dismiss previous REQUEST_CHANGES reviews from this bot
         await githubClient.dismissPreviousReviews(prNumber);

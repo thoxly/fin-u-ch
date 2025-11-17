@@ -209,7 +209,7 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
             if (validatedAccount) {
               companyAccountNumber = validatedAccount;
               logger.info('Parser: Found company account number in header', {
-                accountNumber: companyAccountNumber,
+                accountNumber: `${validatedAccount.substring(0, 4)}****${validatedAccount.substring(validatedAccount.length - 4)}`,
               });
             }
           }
@@ -363,10 +363,10 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
               {
                 lineNumber: i + 1,
                 documentNumber: documents.length,
-                receiver: parsedDoc.receiver,
-                receiverInn: parsedDoc.receiverInn,
-                payer: parsedDoc.payer,
-                payerInn: parsedDoc.payerInn,
+                hasReceiver: !!parsedDoc.receiver,
+                hasReceiverInn: !!parsedDoc.receiverInn,
+                hasPayer: !!parsedDoc.payer,
+                hasPayerInn: !!parsedDoc.payerInn,
                 amount: parsedDoc.amount,
               }
             );
@@ -537,10 +537,10 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
         'Parser: Successfully parsed final document (no closing marker)',
         {
           documentNumber: documents.length,
-          receiver: parsedDoc.receiver,
-          receiverInn: parsedDoc.receiverInn,
-          payer: parsedDoc.payer,
-          payerInn: parsedDoc.payerInn,
+          hasReceiver: !!parsedDoc.receiver,
+          hasReceiverInn: !!parsedDoc.receiverInn,
+          hasPayer: !!parsedDoc.payer,
+          hasPayerInn: !!parsedDoc.payerInn,
           amount: parsedDoc.amount,
         }
       );
@@ -618,9 +618,21 @@ function parseDate(dateStr: string): Date {
     throw new AppError(`Invalid date format: ${dateStr}`, 400);
   }
 
+  // Валидация диапазонов: день 1-31, месяц 0-11 (после вычитания 1), год > 0
+  if (day < 1 || day > 31 || month < 0 || month > 11 || year < 1) {
+    throw new AppError(`Invalid date: ${dateStr}`, 400);
+  }
+
   const date = new Date(year, month, day);
 
-  if (isNaN(date.getTime())) {
+  // Дополнительная проверка: убеждаемся, что созданная дата соответствует введенным значениям
+  // (JavaScript Date может "нормализовать" невалидные даты, например 32.01.2025 станет 01.02.2025)
+  if (
+    isNaN(date.getTime()) ||
+    date.getDate() !== day ||
+    date.getMonth() !== month ||
+    date.getFullYear() !== year
+  ) {
     throw new AppError(`Invalid date: ${dateStr}`, 400);
   }
 
