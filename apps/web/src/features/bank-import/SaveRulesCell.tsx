@@ -8,22 +8,56 @@ interface SaveRulesCellProps {
   disabled?: boolean;
 }
 
-export const SaveRulesCell = ({ operation, sessionId, onToggle, disabled = false }: SaveRulesCellProps) => {
+// Toggle switch base classes
+const TOGGLE_SWITCH_BASE_CLASSES = [
+  'w-11',
+  'h-6',
+  'bg-gray-200',
+  'peer-focus:outline-none',
+  'peer-focus:ring-4',
+  'peer-focus:ring-blue-300',
+  'dark:peer-focus:ring-blue-800',
+  'rounded-full',
+  'peer',
+  'dark:bg-gray-700',
+  'peer-checked:after:translate-x-full',
+  'peer-checked:after:border-white',
+  "after:content-['']",
+  'after:absolute',
+  'after:top-[2px]',
+  'after:left-[2px]',
+  'after:bg-white',
+  'after:border-gray-300',
+  'after:border',
+  'after:rounded-full',
+  'after:h-5',
+  'after:w-5',
+  'after:transition-all',
+  'dark:border-gray-600',
+  'peer-checked:bg-blue-600',
+].join(' ');
+
+export const SaveRulesCell = ({
+  operation,
+  sessionId,
+  onToggle,
+  disabled = false,
+}: SaveRulesCellProps) => {
   // Тогл включен по умолчанию, если операция заполнилась по правилам
-  const isMatchedByRule = operation.matchedBy === 'rule' || !!operation.matchedRuleId;
+  const isMatchedByRule =
+    operation.matchedBy === 'rule' || !!operation.matchedRuleId;
   const [shouldSave, setShouldSave] = useState(isMatchedByRule);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Обновляем состояние, если операция изменилась
   useEffect(() => {
-    const isMatched = operation.matchedBy === 'rule' || !!operation.matchedRuleId;
+    const isMatched =
+      operation.matchedBy === 'rule' || !!operation.matchedRuleId;
     setShouldSave(isMatched);
-    // Вызываем onToggle при инициализации, если операция заполнилась по правилам
-    if (!isInitialized && isMatched && onToggle) {
-      onToggle(operation.id, true);
-      setIsInitialized(true);
+    // Вызываем onToggle при изменении состояния
+    if (onToggle) {
+      onToggle(operation.id, isMatched);
     }
-  }, [operation.matchedBy, operation.matchedRuleId, operation.id, onToggle, isInitialized]);
+  }, [operation.matchedBy, operation.matchedRuleId, operation.id]);
 
   const handleToggle = (checked: boolean) => {
     setShouldSave(checked);
@@ -32,9 +66,15 @@ export const SaveRulesCell = ({ operation, sessionId, onToggle, disabled = false
     }
   };
 
+  const labelClasses = `relative inline-flex items-center flex-shrink-0 ${
+    disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+  }`;
+
+  const toggleSwitchClasses = `${TOGGLE_SWITCH_BASE_CLASSES} ${disabled ? 'opacity-60' : ''}`;
+
   return (
     <div className="flex items-center justify-center w-full min-h-[24px]">
-      <label className={`relative inline-flex items-center flex-shrink-0 ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
+      <label className={labelClasses}>
         <input
           type="checkbox"
           checked={shouldSave}
@@ -42,9 +82,11 @@ export const SaveRulesCell = ({ operation, sessionId, onToggle, disabled = false
           disabled={disabled}
           className="sr-only peer"
         />
-        <div className={`w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600 ${disabled ? 'opacity-60' : ''}`} title={disabled ? 'Операция распределена' : ''}></div>
+        <div
+          className={toggleSwitchClasses}
+          title={disabled ? 'Операция распределена' : ''}
+        ></div>
       </label>
     </div>
   );
 };
-

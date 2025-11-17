@@ -139,7 +139,7 @@ export class AuthService {
       email: result.user.email,
     });
 
-    // Отправляем письмо подтверждения email
+    // Send email verification email
     try {
       const verificationToken = await tokenService.createToken({
         userId: result.user.id,
@@ -151,7 +151,7 @@ export class AuthService {
         userId: result.user.id,
         error,
       });
-      // Не блокируем регистрацию, если письмо не отправилось
+      // Don't block registration if email sending fails
     }
 
     return {

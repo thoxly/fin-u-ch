@@ -12,7 +12,16 @@ import operationsService from '../operations/operations.service';
 import type { CreateOperationInput } from '@fin-u-ch/shared';
 
 /**
- * Результат проверки на дубликат
+ * Import session status constants
+ */
+export const IMPORT_SESSION_STATUS = {
+  DRAFT: 'draft',
+  CONFIRMED: 'confirmed',
+  PROCESSED: 'processed',
+} as const;
+
+/**
+ * Duplicate check result
  */
 interface DuplicateCheckResult {
   isDuplicate: boolean;
@@ -390,7 +399,7 @@ export class ImportsService {
         companyId,
         userId,
         fileName,
-        status: 'draft',
+        status: IMPORT_SESSION_STATUS.DRAFT,
         importedCount: documents.length,
       },
     });
@@ -472,7 +481,7 @@ export class ImportsService {
                 duplicateOfId: duplicateCheck.duplicateOfId || null,
                 confirmed: false,
                 processed: false,
-                draft: true,
+                draft: true, // All imported operations start as drafts
               };
 
               // Добавляем связи через connect
@@ -913,10 +922,10 @@ export class ImportsService {
           // Обновляем статус сессии, если все операции обработаны
           status:
             processedCount === session.importedCount
-              ? 'processed'
+              ? IMPORT_SESSION_STATUS.PROCESSED
               : confirmedCount > 0
-                ? 'confirmed'
-                : 'draft',
+                ? IMPORT_SESSION_STATUS.CONFIRMED
+                : IMPORT_SESSION_STATUS.DRAFT,
         },
       });
     }
@@ -1463,7 +1472,9 @@ export class ImportsService {
       data: {
         processedCount,
         status:
-          processedCount === session.importedCount ? 'processed' : 'confirmed',
+          processedCount === session.importedCount
+            ? IMPORT_SESSION_STATUS.PROCESSED
+            : IMPORT_SESSION_STATUS.CONFIRMED,
       },
     });
 
