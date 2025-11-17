@@ -168,7 +168,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ai-review-reports-pr-${{ github.event.pull_request.number }}
-          path: .ai-review-reports/
+          path: ${{ github.workspace }}/.ai-review-reports/
           retention-days: 30
           if-no-files-found: warn
 
