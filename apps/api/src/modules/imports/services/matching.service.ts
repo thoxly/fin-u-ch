@@ -131,7 +131,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id },
+          where: { id: rule.id, companyId },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -162,7 +162,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id },
+          where: { id: rule.id, companyId },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -193,7 +193,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id },
+          where: { id: rule.id, companyId },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -214,9 +214,26 @@ export async function matchCounterparty(
   // Возможно, стоит рассмотреть использование fuse.js для более гибкого поиска
   // См. ТЗ: раздел "Логика автосопоставления" → "3. По fuzzy match названия контрагента"
   if (nameToSearch) {
+    // Оптимизация: ограничиваем количество загружаемых контрагентов для fuzzy match
+    // Для больших компаний рекомендуется использовать полнотекстовый поиск в БД
+    const MAX_FUZZY_MATCH_COUNTERPARTIES = 1000;
     const counterparties = await prisma.counterparty.findMany({
       where: { companyId },
+      take: MAX_FUZZY_MATCH_COUNTERPARTIES,
+      select: {
+        id: true,
+        name: true,
+      },
     });
+
+    // Если контрагентов слишком много, пропускаем fuzzy match для производительности
+    if (counterparties.length >= MAX_FUZZY_MATCH_COUNTERPARTIES) {
+      logger.warn('Too many counterparties for fuzzy match, skipping', {
+        companyId,
+        count: counterparties.length,
+      });
+      return null;
+    }
 
     let bestMatch: { id: string; similarity: number } | null = null;
     const threshold = 0.8;
@@ -297,7 +314,7 @@ export async function matchArticle(
 
       if (article) {
         await prisma.mappingRule.update({
-          where: { id: rule.id },
+          where: { id: rule.id, companyId },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -338,7 +355,7 @@ export async function matchArticle(
 
         if (article) {
           await prisma.mappingRule.update({
-            where: { id: rule.id },
+            where: { id: rule.id, companyId },
             data: {
               usageCount: { increment: 1 },
               lastUsedAt: new Date(),
@@ -384,7 +401,7 @@ export async function matchArticle(
 
       if (article) {
         await prisma.mappingRule.update({
-          where: { id: rule.id },
+          where: { id: rule.id, companyId },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -402,6 +419,36 @@ export async function matchArticle(
 
   // 2. Сопоставление по ключевым словам (предустановленные правила)
   // ВАЖНО: Порядок имеет значение! Более специфичные правила должны идти раньше общих
+
+  // Оптимизация: загружаем все статьи компании один раз, чтобы избежать N+1 запросов
+  const allArticles = await prisma.article.findMany({
+    where: {
+      companyId,
+      type: articleType,
+      isActive: true,
+    },
+    select: {
+      id: true,
+      name: true,
+    },
+  });
+
+  // Создаем индекс для быстрого поиска статей по названию (case-insensitive)
+  const articlesByName = new Map<string, string>();
+  for (const article of allArticles) {
+    const normalizedName = article.name.toLowerCase().trim();
+    if (!articlesByName.has(normalizedName)) {
+      articlesByName.set(normalizedName, article.id);
+    }
+    // Также добавляем частичные совпадения для contains поиска
+    const words = normalizedName.split(/\s+/);
+    for (const word of words) {
+      if (word.length > 3 && !articlesByName.has(word)) {
+        articlesByName.set(word, article.id);
+      }
+    }
+  }
+
   const keywordRules: Array<{ keywords: string[]; articleNames: string[] }> = [
     // Специфичные правила для зарплаты (проверяем раньше налогов, чтобы "Без налога" не перехватывало)
     {
@@ -602,22 +649,44 @@ export async function matchArticle(
     );
 
     if (hasKeyword) {
-      // Ищем статью по любому из возможных названий
+      // Ищем статью по любому из возможных названий (используем предзагруженные статьи)
       for (const articleName of keywordRule.articleNames) {
-        const article = await prisma.article.findFirst({
-          where: {
-            companyId,
-            name: { contains: articleName, mode: 'insensitive' },
-            type: articleType,
-            isActive: true,
-          },
-        });
+        const normalizedSearchName = articleName.toLowerCase().trim();
 
-        if (article) {
+        // Прямое совпадение
+        const directMatch = articlesByName.get(normalizedSearchName);
+        if (directMatch) {
           return {
-            id: article.id,
+            id: directMatch,
             matchedBy: 'keyword',
           };
+        }
+
+        // Поиск по частичному совпадению (contains)
+        for (const [normalizedName, articleId] of articlesByName.entries()) {
+          if (
+            normalizedName.includes(normalizedSearchName) ||
+            normalizedSearchName.includes(normalizedName)
+          ) {
+            return {
+              id: articleId,
+              matchedBy: 'keyword',
+            };
+          }
+        }
+
+        // Fallback: поиск в полных названиях статей
+        for (const article of allArticles) {
+          const articleNameLower = article.name.toLowerCase();
+          if (
+            articleNameLower.includes(normalizedSearchName) ||
+            normalizedSearchName.includes(articleNameLower)
+          ) {
+            return {
+              id: article.id,
+              matchedBy: 'keyword',
+            };
+          }
         }
       }
     }

@@ -9,7 +9,11 @@ import {
 } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
 import operationsService from '../operations/operations.service';
-import type { CreateOperationInput } from '@fin-u-ch/shared';
+import {
+  CreateOperationSchema,
+  type CreateOperationInput,
+} from '@fin-u-ch/shared';
+import { formatZodErrors } from '../../utils/validation';
 
 /**
  * Import session status constants
@@ -335,9 +339,10 @@ export class ImportsService {
 
     if (documents.length > 0) {
       // 1. Собираем все хэши из распарсенных документов
+      // Фильтруем null/undefined значения, чтобы гарантировать, что hashes содержит только строки
       const hashes = documents
         .map((doc) => doc.hash)
-        .filter((h): h is string => !!h);
+        .filter((hash): hash is string => hash !== null && hash !== undefined);
 
       logger.debug('Checking duplicates: collected hashes', {
         fileName,
@@ -345,11 +350,12 @@ export class ImportsService {
       });
 
       // 2. Ищем в базе все операции с такими хэшами
+      // hashes уже отфильтрован и содержит только строки, поэтому null значений нет
       const existingOperations = await prisma.operation.findMany({
         where: {
           companyId,
           sourceHash: {
-            in: hashes,
+            in: hashes.length > 0 ? hashes : [],
           },
         },
         select: {
@@ -358,10 +364,11 @@ export class ImportsService {
         },
       });
 
+      // Фильтруем null значения из sourceHash, так как поле может быть null в базе
       const existingHashes = new Set(
         existingOperations
           .map((op) => op.sourceHash)
-          .filter((hash): hash is string => hash !== null)
+          .filter((hash): hash is string => hash !== null && hash !== undefined)
       );
 
       logger.debug('Checking duplicates: found existing operations', {
@@ -1282,14 +1289,14 @@ export class ImportsService {
 
               // Создаем операцию
               // Преобразуем данные в формат, ожидаемый operationsService.create
-              const operationData: CreateOperationInput = {
+              const operationData: Record<string, unknown> = {
                 type: op.direction as 'income' | 'expense' | 'transfer',
                 operationDate: op.date,
                 amount: op.amount,
                 currency: op.currency || 'RUB',
                 description: op.description,
                 repeat: op.repeat || 'none',
-              } as CreateOperationInput;
+              };
 
               if (op.direction === 'transfer') {
                 // Для переводов нужно найти счета по номерам
@@ -1323,12 +1330,21 @@ export class ImportsService {
                 operationData.sourceAccountId = sourceAccount.id;
                 operationData.targetAccountId = targetAccount.id;
               } else {
-                if (op.matchedAccountId) {
-                  operationData.accountId = op.matchedAccountId;
+                // Для income/expense операций accountId и articleId обязательны
+                if (!op.matchedAccountId) {
+                  throw new AppError(
+                    `Operation ${op.id} is missing required accountId for income/expense operation`,
+                    400
+                  );
                 }
-                if (op.matchedArticleId) {
-                  operationData.articleId = op.matchedArticleId;
+                if (!op.matchedArticleId) {
+                  throw new AppError(
+                    `Operation ${op.id} is missing required articleId for income/expense operation`,
+                    400
+                  );
                 }
+                operationData.accountId = op.matchedAccountId;
+                operationData.articleId = op.matchedArticleId;
               }
 
               if (op.matchedCounterpartyId) {
@@ -1343,13 +1359,27 @@ export class ImportsService {
                 operationData.departmentId = op.matchedDepartmentId;
               }
 
+              // Валидируем данные с помощью Zod схемы перед созданием операции
+              const validationResult =
+                CreateOperationSchema.safeParse(operationData);
+
+              if (!validationResult.success) {
+                const errorMessage = formatZodErrors(validationResult.error);
+                throw new AppError(
+                  `Validation error for operation ${op.id}: ${errorMessage}`,
+                  400
+                );
+              }
+
+              const validatedData = validationResult.data;
+
               // Создаем операцию напрямую через транзакцию для атомарности
               // Используем tx.operation.create вместо operationsService.create,
               // чтобы операция создавалась внутри транзакции и могла быть откачена при ошибке
               try {
                 await tx.operation.create({
                   data: {
-                    ...operationData,
+                    ...validatedData,
                     companyId,
                     isTemplate: false,
                     isConfirmed: true,

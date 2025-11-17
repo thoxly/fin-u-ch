@@ -29,19 +29,19 @@ describe('Button', () => {
   it('should apply medium size by default', () => {
     render(<Button>Medium</Button>);
     const button = screen.getByText('Medium');
-    expect(button).toHaveClass('px-4');
+    expect(button).toHaveClass('px-3.5');
   });
 
   it('should apply small size', () => {
     render(<Button size="sm">Small</Button>);
     const button = screen.getByText('Small');
-    expect(button).toHaveClass('px-3');
+    expect(button).toHaveClass('px-2.5');
   });
 
   it('should apply large size', () => {
     render(<Button size="lg">Large</Button>);
     const button = screen.getByText('Large');
-    expect(button).toHaveClass('px-6');
+    expect(button).toHaveClass('px-5');
   });
 
   it('should apply full width class', () => {
