@@ -299,6 +299,9 @@ These are optional improvements.${nonInlineSection}`;
       console.log('\n❌ Critical/High issues found - failing check');
       process.exit(1);
     }
+
+    // Явно завершаем процесс с успешным кодом
+    process.exit(0);
   } catch (error) {
     console.error('\n❌ Error during review:', error);
     process.exit(1);

@@ -640,6 +640,55 @@ export const OperationsPage = () => {
     setDateToFilter(endDate.toISOString());
   };
 
+  // Определение колонок для экспорта
+  const exportColumns = [
+    'Дата',
+    'Тип',
+    'Сумма',
+    'Валюта',
+    'Статья',
+    'Счет',
+    'Контрагент',
+    'Сделка',
+    'Отдел',
+    'Описание',
+    'Периодичность',
+    'Статус подтверждения',
+  ];
+
+  // Функция для преобразования операций в формат экспорта
+  const buildExportRows = useCallback((): ExportRow[] => {
+    return items.map((op) => {
+      // Форматируем счет в зависимости от типа операции
+      let accountDisplay = '-';
+      if (op.type === 'transfer') {
+        const source = op.sourceAccount?.name || '-';
+        const target = op.targetAccount?.name || '-';
+        accountDisplay = `${source} → ${target}`;
+      } else {
+        accountDisplay = op.account?.name || '-';
+      }
+
+      return {
+        Дата: formatDate(op.operationDate),
+        Тип: getOperationTypeLabel(op.type),
+        Сумма: op.amount,
+        Валюта: op.currency,
+        Статья: op.article?.name || '-',
+        Счет: accountDisplay,
+        Контрагент: op.counterparty?.name || '-',
+        Сделка: op.deal?.name || '-',
+        Отдел: op.department?.name || '-',
+        Описание: op.description || '-',
+        Периодичность: getPeriodicityLabel(op),
+        'Статус подтверждения': op.isConfirmed
+          ? 'Подтверждена'
+          : 'Не подтверждена',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
   const columns = [
     {
       key: 'select',
@@ -788,57 +837,37 @@ export const OperationsPage = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Операции
-            </h1>
-            <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-              <RecurringOperations onEdit={handleEdit} />
-              <MappingRules />
-              <ExportMenu
-                filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
-                buildRows={buildExportRows}
-                columns={exportColumns}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Операции
+          </h1>
+          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+            <RecurringOperations onEdit={handleEdit} />
+            <MappingRules />
+            <ExportMenu
+              filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
+              buildRows={buildExportRows}
+              columns={exportColumns}
+            />
+            <button
+              onClick={handleImportClick}
+              className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+              title="Импорт выписки"
+            >
+              <FileUp
+                size={18}
+                className="text-primary-600 dark:text-primary-400"
               />
-              <button
-                onClick={handleImportClick}
-                className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
-                title="Импорт выписки"
-              >
-                <FileUp
-                  size={18}
-                  className="text-primary-600 dark:text-primary-400"
-                />
-              </button>
-              <button
-                onClick={handleCreate}
-                className="relative p-2 border border-primary-500 dark:border-primary-400 rounded-lg bg-primary-500 dark:bg-primary-600 text-white hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors flex items-center justify-center"
-                title="Добавить операцию"
-              >
-                <Plus size={18} />
-              </button>
-            </div>
+            </button>
+            <Button
+              onClick={handleCreate}
+              size="sm"
+              className="text-sm sm:text-base whitespace-nowrap"
+            >
+              <span className="hidden sm:inline">Создать операцию</span>
+              <span className="sm:hidden">Создать</span>
+            </Button>
           </div>
-          <BulkActionsBar
-            selectedCount={selectedIds.length}
-            onClear={clearSelection}
-            className="sticky top-4 z-30 shadow-sm"
-            actions={[
-              {
-                label: `Удалить выбранные (${selectedIds.length})`,
-                variant: 'danger',
-                onClick: () => {
-                  setDeleteModal({
-                    isOpen: true,
-                    id: null,
-                    type: 'bulk',
-                    ids: selectedIds,
-                  });
-                },
-              },
-            ]}
-          />
         </div>
 
         <Card>
@@ -1160,6 +1189,25 @@ export const OperationsPage = () => {
               onSort={handleSort}
             />
           )}
+          <BulkActionsBar
+            selectedCount={selectedIds.length}
+            onClear={clearSelection}
+            className="sticky top-4 z-30 shadow-sm"
+            actions={[
+              {
+                label: `Удалить выбранные (${selectedIds.length})`,
+                variant: 'danger',
+                onClick: () => {
+                  setDeleteModal({
+                    isOpen: true,
+                    id: null,
+                    type: 'bulk',
+                    ids: selectedIds,
+                  });
+                },
+              },
+            ]}
+          />
           <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
