@@ -1,0 +1,353 @@
+import OpenAI from 'openai';
+import { CONFIG } from './config.js';
+export class ClaudeReviewer {
+    openai;
+    constructor() {
+        this.openai = new OpenAI({
+            apiKey: CONFIG.deepseek.apiKey,
+            baseURL: 'https://api.deepseek.com/v1',
+        });
+    }
+    async reviewCode(files, diff, projectContext) {
+        console.log('Sending code to DeepSeek for review...');
+        const prompt = this.buildPrompt(files, diff, projectContext);
+        try {
+            const completion = await this.openai.chat.completions.create({
+                model: CONFIG.deepseek.model,
+                max_tokens: CONFIG.deepseek.maxTokens,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+            });
+            const responseText = completion.choices[0]?.message?.content || '';
+            console.log('  DeepSeek review completed\n');
+            console.log('DeepSeek response:');
+            console.log(responseText);
+            console.log('\n');
+            const issues = this.parseClaudeResponse(responseText);
+            return this.convertToReviewComments(issues, files);
+        }
+        catch (error) {
+            console.error('Error calling DeepSeek API:', error);
+            throw error;
+        }
+    }
+    buildPrompt(files, diff, projectContext) {
+        const basePrompt = `You are an expert code reviewer for the Fin-U-CH financial management system.
+
+# PROJECT CONTEXT
+
+${projectContext}
+
+# YOUR TASK
+
+Review the following pull request changes and identify issues at THREE LEVELS:
+
+## LEVEL 1: CODE-LEVEL REVIEW (File/Function level)
+
+Identify issues based on:
+1. Style Guide rules (TypeScript, React, API patterns)
+2. Security vulnerabilities (OWASP Top 10, multi-tenancy)
+3. Common pitfalls specific to this project
+4. Performance issues (N+1 queries, missing indexes, no pagination)
+5. Missing error handling or validation
+6. Breaking changes or technical debt
+
+## LEVEL 2: ARCHITECTURAL & SYSTEM REVIEW (Project structure)
+
+Perform a high-level architectural review. Detect issues that affect scalability, maintainability, or violate project structure.
+
+### Context: Monorepo Structure
+
+**Frontend Structure (apps/web/src/):**
+- \`pages/\` → routing screens only, no reusable components
+- \`features/\` → reusable forms & widgets (operation-form, plan-editor, salary-wizard)
+- \`entities/\` → domain UI elements (article, account, operation, plan)
+- \`widgets/\` → large blocks like tables/dashboards
+- \`shared/\` → reusable utilities:
+  - \`shared/api/\` → axios instance, REST helpers, hooks
+  - \`shared/ui/\` → base UI components (Button, Modal, Offcanvas, Toast, etc.)
+  - \`shared/lib/\` → utilities (date/money/number formatting, validation)
+  - \`shared/hooks/\` → custom React hooks
+
+**Backend Structure (apps/api/src/):**
+- \`modules/{domain}/\` → domain services (auth, operations, plans, reports, etc.)
+  - Each module: \`{domain}.model.ts\`, \`{domain}.service.ts\`, \`{domain}.controller.ts\`, \`{domain}.routes.ts\`
+- \`modules/catalogs/\` → sub-modules: articles, accounts, departments, counterparties, deals
+- Multi-tenant: EVERY query must include \`companyId\` filter
+- Domain models follow DOMAIN_MODEL.md (Operation, PlanItem, Article, Account, etc.)
+
+### What to Check (Level 2):
+
+#### 1. Folder & Layer Placement
+- Is the file in the correct layer according to ARCHITECTURE.md?
+- **Violations:**
+  - Reusable UI components in \`/pages\` (must be in \`/features\`, \`/entities\`, or \`/shared/ui\`)
+  - Backend business logic outside domain modules
+  - Utilities not extracted to \`/shared\`
+
+#### 2. Reusability & Duplication
+- Is there duplicated logic that should be extracted?
+- **Look for:**
+  - Duplicate UI components → extract to \`shared/ui\`
+  - Duplicate utility functions (date/money formatting) → extract to \`shared/lib\`
+  - Duplicate API calls or hooks → extract to \`shared/api\` or \`shared/hooks\`
+  - Custom Modal/Offcanvas/Toast instead of using shared components
+
+#### 3. Complexity & Maintainability
+- **Flag as too complex:**
+  - Functions >40 lines
+  - Nesting depth >3 levels
+  - Missing separation of concerns (e.g., API calls inside UI components)
+  - Non-scalable patterns (hardcoded values, no extensibility)
+
+#### 4. UI/UX Consistency
+- Follow current design patterns:
+  - Use **Offcanvas** for editing entity details, not Modal
+  - Use **Toast** for notifications
+  - Naming: PascalCase for components, camelCase for hooks
+  - Consistent form validation and error handling
+
+#### 5. Domain Model Consistency
+- File names, imports, and models must match DOMAIN_MODEL.md
+- **Check:**
+  - Operations reference \`articleId\`, \`accountId\`, \`companyId\` (not arbitrary IDs)
+  - Correct enums: \`type\` (income/expense/transfer), \`activity\` (operating/investing/financing)
+  - Correct indicators: for expense (payroll, opex, taxes, etc.), for income (revenue, other_income)
+
+#### 6. Security & Multi-Tenancy
+- **Critical:** Every backend query must filter by \`companyId\`
+- No data leakage between companies
+- JWT validation in protected routes
+
+### Severity Guide (Level 2)
+
+- **critical** — Architecture break (wrong layer, data leakage, missing companyId)
+- **high** — Major duplication or non-reusable component that blocks maintainability
+- **medium** — Non-scalable structure, inconsistent abstraction, complexity issues
+- **low** — Naming inconsistency, minor structural improvements
+
+## LEVEL 3: CONFIGURATION & SECURITY REVIEW
+
+If any of the changed files are configuration or infrastructure files 
+(e.g. \`.env\`, \`.env.example\`, \`package.json\`, \`tsconfig.json\`, 
+\`vite.config.ts\`, \`docker-compose.yml\`, \`.github/workflows/*\`, \`.eslintrc\`, 
+\`nodemon.json\`, or files inside \`/ops\` or \`/infra\` folders), 
+perform a dedicated configuration review.
+
+Check for:
+1. Security risks:
+   - Hardcoded secrets or tokens
+   - Disabled validation, lint, or type checking
+   - Insecure CORS or HTTPS settings
+2. Dependency and environment integrity:
+   - Downgraded or replaced dependencies
+   - Modified versions of runtime (Node, pnpm, etc.)
+   - Broken or removed build steps
+3. Deployment and CI/CD risks:
+   - Removed test/build/lint stages
+   - Changed Docker or workflow commands that affect safety
+
+**Severity rules (Level 3):**
+- critical — leaked secrets, disabled security validation, public tokens
+- high — build or deployment bypass, unsafe env config
+- medium — bad dependency management, missing validation
+- low — naming or formatting inconsistencies
+
+# CHANGED FILES
+
+${files.map((f) => `- ${f.filename} (+${f.additions}/-${f.deletions})`).join('\n')}
+
+# CODE DIFF
+
+\`\`\`diff
+${diff}
+\`\`\`
+
+# OUTPUT FORMAT
+
+Provide your review as a JSON array of issues. Each issue must have:
+- file: filename
+- line: line number in the NEW file (not diff line)
+- severity: "low" | "medium" | "high" | "critical"
+- category: one of "security", "performance", "bug", "style", "best-practice", **"architecture"**
+- message: clear description of the issue
+- suggestion: (optional) how to fix it
+
+**Use "architecture" category for Level 2 issues** (wrong placement, duplication, complexity, domain inconsistency)
+
+**CRITICAL SEVERITY**: Security vulnerabilities (missing companyId, SQL injection, XSS), architecture breaks (wrong layer, data leakage)
+**HIGH SEVERITY**: Bugs, major duplication, missing error handling
+**MEDIUM SEVERITY**: Performance issues, non-scalable patterns, complexity
+**LOW SEVERITY**: Style issues, naming inconsistencies, minor improvements
+
+Example:
+\`\`\`json
+[
+  {
+    "file": "apps/api/src/modules/operations/operations.service.ts",
+    "line": 42,
+    "severity": "critical",
+    "category": "security",
+    "message": "Missing companyId filter in Prisma query - this will leak data between tenants!",
+    "suggestion": "Add 'where: { companyId }' to the findMany call"
+  },
+  {
+    "file": "apps/web/src/pages/DashboardPage/CustomModal.tsx",
+    "line": 15,
+    "severity": "high",
+    "category": "architecture",
+    "message": "Reusable Modal component defined in /pages. This violates layer separation and prevents reuse.",
+    "suggestion": "Move this component to /shared/ui/Modal or use existing shared Modal component"
+  },
+  {
+    "file": "apps/web/src/features/operation-form/OperationForm.tsx",
+    "line": 78,
+    "severity": "medium",
+    "category": "architecture",
+    "message": "Duplicate date formatting logic. Same code exists in 3+ components.",
+    "suggestion": "Extract to shared/lib/formatDate.ts and import from there"
+  },
+  {
+    "file": "apps/api/src/modules/reports/complex-report.service.ts",
+    "line": 145,
+    "severity": "medium",
+    "category": "architecture",
+    "message": "Function is 67 lines long with nesting depth of 4. Too complex to maintain.",
+    "suggestion": "Break down into smaller functions: extractData(), transformData(), aggregateResults()"
+  }
+]
+\`\`\`
+
+**IMPORTANT**: 
+- Only output the JSON array, no other text
+- If no issues found, return empty array []
+- Perform ALL THREE LEVELS: Level 1 (code), Level 2 (architecture), and Level 3 (configuration & security)
+- Be specific about line numbers and file paths
+- For architecture issues, reference the correct folder structure from ARCHITECTURE.md
+- For configuration files, always check for security risks and dependency changes
+
+Begin your review:`;
+        return basePrompt;
+    }
+    parseClaudeResponse(response) {
+        try {
+            // Extract JSON from markdown code blocks if present
+            const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
+            const jsonStr = jsonMatch ? jsonMatch[1] : response;
+            const issues = JSON.parse(jsonStr.trim());
+            if (!Array.isArray(issues)) {
+                console.warn('Claude response is not an array, returning empty');
+                return [];
+            }
+            return issues;
+        }
+        catch (error) {
+            console.error('Failed to parse Claude response as JSON:', error);
+            console.log('Response was:', response);
+            return [];
+        }
+    }
+    convertToReviewComments(issues, files) {
+        const comments = [];
+        for (const issue of issues) {
+            const file = files.find((f) => f.filename === issue.file);
+            if (!file || !file.patch) {
+                console.warn(`  ⚠ Skipping issue for ${issue.file}: file not found or no patch`);
+                continue;
+            }
+            // Calculate position in the diff
+            const position = this.calculateDiffPosition(file.patch, issue.line, issue.file);
+            if (position === null) {
+                console.warn(`  ⚠ Skipping issue at ${issue.file}:${issue.line}: line not found in diff (may be already fixed or outside changed blocks)`);
+                // Log the issue details for debugging
+                console.warn(`    Issue: ${issue.category} - ${issue.message.substring(0, 100)}...`);
+                continue;
+            }
+            const body = `**${issue.category}**: ${issue.message}${issue.suggestion ? `\n\n💡 **Suggestion**: ${issue.suggestion}` : ''}`;
+            comments.push({
+                path: issue.file,
+                position,
+                body,
+                severity: issue.severity,
+            });
+        }
+        return comments;
+    }
+    calculateDiffPosition(patch, targetLine, filename) {
+        const lines = patch.split('\n');
+        // Position in the unified diff for this file. GitHub expects a 1-based index
+        // across the entire file patch, including hunk headers.
+        let diffPosition = 0;
+        // Tracks the current line number in the NEW file (+ side) across all hunks.
+        let newFileLineNumber = 0;
+        // Track if we're inside a hunk (to skip lines before first hunk)
+        let insideHunk = false;
+        // Track hunk ranges for debugging
+        const hunkRanges = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            diffPosition++;
+            // Hunk header: @@ -old_start,old_count +new_start,new_count @@
+            if (line.startsWith('@@')) {
+                insideHunk = true;
+                const match = line.match(/\+(\d+),?(\d*)/);
+                if (match) {
+                    const hunkStart = parseInt(match[1], 10);
+                    const hunkCount = match[2] ? parseInt(match[2], 10) : 1;
+                    // Reset to the starting line number of this hunk (minus 1, will be incremented)
+                    newFileLineNumber = hunkStart - 1;
+                    hunkRanges.push({
+                        start: hunkStart,
+                        end: hunkStart + hunkCount - 1,
+                        diffStart: diffPosition,
+                    });
+                }
+                // Continue; header counts toward position, but not a commentable line itself.
+                continue;
+            }
+            // Only process lines inside hunks
+            if (!insideHunk) {
+                continue;
+            }
+            if (line.startsWith('+')) {
+                // Added line exists in the new file; can be commented on.
+                newFileLineNumber++;
+                if (newFileLineNumber === targetLine) {
+                    return diffPosition;
+                }
+            }
+            else if (line.startsWith(' ')) {
+                // Context (unchanged) line also exists in the new file; can be commented on.
+                newFileLineNumber++;
+                if (newFileLineNumber === targetLine) {
+                    return diffPosition;
+                }
+            }
+            else if (line.startsWith('-')) {
+                // Deletion; does not advance new file line number and cannot be commented via position.
+                // But we still need to track diffPosition for it.
+                continue;
+            }
+            else {
+                // Any other line (shouldn't normally occur) — treat conservatively.
+                continue;
+            }
+        }
+        // Target line not present in the diff for this file (likely unchanged outside hunks).
+        // Log warning for debugging with more context
+        console.warn(`  ⚠ Could not find line ${targetLine} in ${filename}. Last tracked line was ${newFileLineNumber}`);
+        if (hunkRanges.length > 0) {
+            console.warn(`    Hunk ranges in diff: ${hunkRanges.map((r) => `${r.start}-${r.end}`).join(', ')}`);
+            const isInRange = hunkRanges.some((r) => targetLine >= r.start && targetLine <= r.end);
+            if (!isInRange) {
+                console.warn(`    Line ${targetLine} is outside all hunk ranges - may indicate issue was already fixed or AI is referencing old code`);
+            }
+        }
+        return null;
+    }
+}
+//# sourceMappingURL=claude-reviewer.js.map
