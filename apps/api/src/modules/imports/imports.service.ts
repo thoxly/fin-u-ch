@@ -1285,7 +1285,7 @@ export class ImportsService {
               if (op.direction === 'transfer') {
                 // Для переводов нужно найти счета по номерам
                 const sourceAccount = op.payerAccount
-                  ? await prisma.account.findFirst({
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.payerAccount,
@@ -1295,7 +1295,7 @@ export class ImportsService {
                   : null;
 
                 const targetAccount = op.receiverAccount
-                  ? await prisma.account.findFirst({
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.receiverAccount,
@@ -1335,7 +1335,29 @@ export class ImportsService {
               }
 
               // Создаем операцию через сервис
-              await operationsService.create(companyId, operationData);
+              try {
+                await operationsService.create(companyId, operationData);
+              } catch (error: unknown) {
+                const errorMessage =
+                  error instanceof Error ? error.message : String(error);
+                const errorStack =
+                  error instanceof Error ? error.stack : undefined;
+
+                logger.error(
+                  'Failed to create operation via operationsService',
+                  {
+                    sessionId,
+                    companyId,
+                    operationId: op.id,
+                    operationData,
+                    error: errorMessage,
+                    stack: errorStack,
+                  }
+                );
+
+                // Пробрасываем ошибку дальше, чтобы она была обработана внешним try-catch
+                throw error;
+              }
 
               // Помечаем как обработанную
               await tx.importedOperation.update({
