@@ -104,7 +104,7 @@ export class AuthService {
         // Unique constraint violation - race condition
         logger.error('Race condition detected during user registration', {
           email: data.email,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
         throw new AppError('User with this email already exists', 409);
       }

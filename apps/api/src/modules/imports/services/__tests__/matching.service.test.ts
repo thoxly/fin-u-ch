@@ -50,7 +50,9 @@ import {
 } from '../matching.service';
 import { ParsedDocument } from '../../parsers/clientBankExchange.parser';
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+// Используем правильную типизацию моков
+// Моки созданы через jest.mock, поэтому используем as any для обхода проблем типизации
+const mockPrisma = prisma as any;
 
 describe('matching.service', () => {
   beforeEach(() => {
@@ -114,7 +116,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Test',
+      purpose: 'Test',
       payer: 'ООО Поставщик',
       payerInn: '1234567890',
       receiver: 'ООО Клиент',
@@ -303,8 +305,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Оплата налогов',
-      purpose: 'Единый налоговый платеж',
+      purpose: 'Оплата налогов',
     };
 
     it('должен вернуть null, если направление не определено', async () => {
@@ -417,7 +418,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      description: 'Test',
+      purpose: 'Test',
       payerAccount: '40702810068000001468',
       receiverAccount: '40817810099910004312',
     };
@@ -502,8 +503,7 @@ describe('matching.service', () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        description: 'Оплата налогов',
-        purpose: 'Единый налоговый платеж',
+        purpose: 'Оплата налогов',
         payer: 'ООО АКСОН',
         payerInn: '1234567890',
         payerAccount: '40702810068000001468',
@@ -548,7 +548,7 @@ describe('matching.service', () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        description: 'Test',
+        purpose: 'Test',
       };
 
       const result = await autoMatch(companyId, operation, null);
