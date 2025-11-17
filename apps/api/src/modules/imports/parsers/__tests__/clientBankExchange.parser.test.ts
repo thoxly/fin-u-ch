@@ -17,13 +17,16 @@ jest.mock('../../../../config/env', () => ({
 }));
 
 // Mock logger
+const mockLogger = {
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+};
+
 jest.mock('../../../../config/logger', () => ({
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
+  __esModule: true,
+  default: mockLogger,
 }));
 
 import { readFileSync } from 'fs';

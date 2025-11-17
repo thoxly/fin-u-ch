@@ -258,7 +258,8 @@ describe('matching.service', () => {
     it('должен сопоставить контрагента по fuzzy match', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
-      // Мокируем equalsRules и aliasRules (пустые массивы)
+      // Мокируем equalsRules, aliasRules и containsRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
@@ -295,7 +296,8 @@ describe('matching.service', () => {
     it('должен вернуть null, если контрагент не найден', async () => {
       mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
-      // Мокируем equalsRules и aliasRules (пустые массивы)
+      // Мокируем equalsRules, aliasRules и containsRules (пустые массивы)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
@@ -424,6 +426,8 @@ describe('matching.service', () => {
         },
       ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
       mockPrisma.article.findFirst.mockResolvedValueOnce(null); // Статья не найдена, т.к. тип не совпадает
+      // Мокируем поиск по ключевым словам (пустой результат)
+      mockPrisma.article.findFirst.mockResolvedValueOnce(null);
 
       const operationWithRevenue: ParsedDocument = {
         ...operation,
@@ -542,25 +546,31 @@ describe('matching.service', () => {
       // Mock determineDirection
       jest
         .spyOn(matchingService, 'determineDirection')
-        .mockResolvedValueOnce('expense');
+        .mockImplementation(async () => 'expense');
 
       // Mock matchCounterparty
-      jest.spyOn(matchingService, 'matchCounterparty').mockResolvedValueOnce({
-        id: 'counterparty-1',
-        matchedBy: 'inn',
-      });
+      jest
+        .spyOn(matchingService, 'matchCounterparty')
+        .mockImplementation(async () => ({
+          id: 'counterparty-1',
+          matchedBy: 'inn',
+        }));
 
       // Mock matchArticle
-      jest.spyOn(matchingService, 'matchArticle').mockResolvedValueOnce({
-        id: 'article-1',
-        matchedBy: 'keyword',
-      });
+      jest
+        .spyOn(matchingService, 'matchArticle')
+        .mockImplementation(async () => ({
+          id: 'article-1',
+          matchedBy: 'keyword',
+        }));
 
       // Mock matchAccount
-      jest.spyOn(matchingService, 'matchAccount').mockResolvedValueOnce({
-        id: 'account-1',
-        matchedBy: 'account_number',
-      });
+      jest
+        .spyOn(matchingService, 'matchAccount')
+        .mockImplementation(async () => ({
+          id: 'account-1',
+          matchedBy: 'account_number',
+        }));
 
       const result = await autoMatch(companyId, operation, companyInn);
 
