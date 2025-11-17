@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from 'fs/promises';
+import path from 'path';
 import { validateConfig, CONFIG } from './config.js';
 import { GitHubClient, ReviewComment } from './github-client.js';
 import { AiReviewer, Finding } from './ai-reviewer.js';
@@ -19,6 +21,151 @@ function buildBatchDiff(files: { filename: string; patch?: string }[]): string {
   }
 
   return parts.join('\n\n');
+}
+
+async function saveFullReport(
+  prNumber: number,
+  allIssues: Finding[],
+  allComments: ReviewComment[],
+  allIssuesWithoutInline: Finding[]
+): Promise<{ jsonPath: string; markdownPath: string }> {
+  const reportDir = path.join(CONFIG.review.projectRoot, '.ai-review-reports');
+  await fs.mkdir(reportDir, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const jsonPath = path.join(reportDir, `pr-${prNumber}-${timestamp}.json`);
+  const markdownPath = path.join(reportDir, `pr-${prNumber}-${timestamp}.md`);
+
+  // Group issues by severity
+  const criticalIssues = allIssues.filter((i) => i.severity === 'critical');
+  const highIssues = allIssues.filter((i) => i.severity === 'high');
+  const mediumIssues = allIssues.filter((i) => i.severity === 'medium');
+  const lowIssues = allIssues.filter((i) => i.severity === 'low');
+
+  // Save JSON report
+  const jsonReport = {
+    prNumber,
+    timestamp: new Date().toISOString(),
+    summary: {
+      total: allIssues.length,
+      critical: criticalIssues.length,
+      high: highIssues.length,
+      medium: mediumIssues.length,
+      low: lowIssues.length,
+      withInlinePositions: allComments.length,
+      withoutInlinePositions: allIssuesWithoutInline.length,
+    },
+    issues: allIssues,
+    comments: allComments,
+    issuesWithoutInline: allIssuesWithoutInline,
+  };
+
+  await fs.writeFile(jsonPath, JSON.stringify(jsonReport, null, 2), 'utf-8');
+
+  // Generate Markdown report
+  const markdownLines: string[] = [
+    `# AI Code Review Report - PR #${prNumber}`,
+    '',
+    `**Generated:** ${new Date().toISOString()}`,
+    '',
+    '## Summary',
+    '',
+    `- 🔴 **Critical:** ${criticalIssues.length}`,
+    `- 🟠 **High:** ${highIssues.length}`,
+    `- 🟡 **Medium:** ${mediumIssues.length}`,
+    `- 🟢 **Low:** ${lowIssues.length}`,
+    '',
+    `**Total Issues:** ${allIssues.length}`,
+    `- With inline positions: ${allComments.length}`,
+    `- Without inline positions: ${allIssuesWithoutInline.length}`,
+    '',
+    '---',
+    '',
+  ];
+
+  // Add issues grouped by severity
+  const severityGroups = [
+    { name: 'Critical Issues', issues: criticalIssues, emoji: '🔴' },
+    { name: 'High Issues', issues: highIssues, emoji: '🟠' },
+    { name: 'Medium Issues', issues: mediumIssues, emoji: '🟡' },
+    { name: 'Low Issues', issues: lowIssues, emoji: '🟢' },
+  ];
+
+  for (const group of severityGroups) {
+    if (group.issues.length === 0) continue;
+
+    markdownLines.push(
+      `## ${group.emoji} ${group.name} (${group.issues.length})`,
+      ''
+    );
+
+    // Group by file
+    const issuesByFile = new Map<string, Finding[]>();
+    for (const issue of group.issues) {
+      if (!issuesByFile.has(issue.file)) {
+        issuesByFile.set(issue.file, []);
+      }
+      issuesByFile.get(issue.file)!.push(issue);
+    }
+
+    for (const [file, fileIssues] of issuesByFile.entries()) {
+      markdownLines.push(`### \`${file}\``, '');
+      for (const issue of fileIssues) {
+        const category = issue.category.toUpperCase();
+        const suggestion = issue.suggestion
+          ? `\n  💡 **Suggestion:** ${issue.suggestion}`
+          : '';
+        markdownLines.push(
+          `- **Line ${issue.line}** [${category}]: ${issue.message}${suggestion}`
+        );
+      }
+      markdownLines.push('');
+    }
+  }
+
+  // Add issues without inline positions
+  if (allIssuesWithoutInline.length > 0) {
+    markdownLines.push('---', '');
+    markdownLines.push(
+      `## Issues Without Inline Positions (${allIssuesWithoutInline.length})`,
+      ''
+    );
+    markdownLines.push(
+      '_These issues could not be mapped to specific diff positions._',
+      ''
+    );
+
+    const nonInlineByFile = new Map<string, Finding[]>();
+    for (const issue of allIssuesWithoutInline) {
+      if (!nonInlineByFile.has(issue.file)) {
+        nonInlineByFile.set(issue.file, []);
+      }
+      nonInlineByFile.get(issue.file)!.push(issue);
+    }
+
+    for (const [file, fileIssues] of nonInlineByFile.entries()) {
+      markdownLines.push(`### \`${file}\``, '');
+      for (const issue of fileIssues) {
+        const category = issue.category.toUpperCase();
+        const severity = issue.severity.toUpperCase();
+        const suggestion = issue.suggestion
+          ? `\n  💡 **Suggestion:** ${issue.suggestion}`
+          : '';
+        markdownLines.push(
+          `- **Line ${issue.line}** [${severity}][${category}]: ${issue.message}${suggestion}`
+        );
+      }
+      markdownLines.push('');
+    }
+  }
+
+  await fs.writeFile(markdownPath, markdownLines.join('\n'), 'utf-8');
+
+  console.log(`\n📄 Full report saved:`);
+  console.log(`   JSON: ${jsonPath}`);
+  console.log(`   Markdown: ${markdownPath}\n`);
+
+  return { jsonPath, markdownPath };
 }
 
 async function main() {
@@ -192,6 +339,18 @@ async function main() {
     console.log(`  🟢 Low: ${lowIssues.length}`);
     console.log('\n');
 
+    // Save full report to files
+    const reportPaths = await saveFullReport(
+      prNumber,
+      issues,
+      comments,
+      allIssuesWithoutInline
+    );
+    const reportNote =
+      process.env.GITHUB_ACTIONS === 'true'
+        ? `\n\n📄 **Full report available in workflow artifacts** (check the workflow run for download links)`
+        : `\n\n📄 **Full report saved locally:**\n- JSON: \`${path.relative(CONFIG.review.projectRoot, reportPaths.jsonPath)}\`\n- Markdown: \`${path.relative(CONFIG.review.projectRoot, reportPaths.markdownPath)}\``;
+
     // Determine review action
     // Note: Cannot REQUEST_CHANGES on your own PR, so always use COMMENT
     const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
@@ -210,7 +369,7 @@ Found ${criticalIssues.length} critical issue(s) that must be fixed before mergi
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Please address the critical issues and request a new review.${nonInlineSection}`;
+Please address the critical issues and request a new review.${nonInlineSection}${reportNote}`;
     } else if (highIssues.length > 0) {
       reviewEvent = isGitHubActions ? 'REQUEST_CHANGES' : 'COMMENT';
       reviewBody = `🟠 **AI Code Review: Important issues found**
@@ -222,7 +381,7 @@ Found ${highIssues.length} high-severity issue(s) that should be fixed.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Please address the issues and request a new review.${nonInlineSection}`;
+Please address the issues and request a new review.${nonInlineSection}${reportNote}`;
     } else if (mediumIssues.length > 3) {
       reviewEvent = 'COMMENT';
       reviewBody = `🟡 **AI Code Review: Several improvements suggested**
@@ -233,7 +392,7 @@ Found ${mediumIssues.length} medium-severity suggestions.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-Consider addressing these before merging.${nonInlineSection}`;
+Consider addressing these before merging.${nonInlineSection}${reportNote}`;
     } else {
       reviewEvent = 'COMMENT';
       reviewBody = `ℹ️ **AI Code Review: Minor suggestions**
@@ -244,7 +403,7 @@ Found ${comments.length} minor suggestion(s) for improvement.
 - 🟡 Medium: ${mediumIssues.length}
 - 🟢 Low: ${lowIssues.length}
 
-These are optional improvements.${nonInlineSection}`;
+These are optional improvements.${nonInlineSection}${reportNote}`;
     }
 
     // Dismiss previous REQUEST_CHANGES reviews from this bot

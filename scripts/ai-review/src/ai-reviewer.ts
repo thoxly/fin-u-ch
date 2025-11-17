@@ -70,12 +70,8 @@ export class AiReviewer {
           messages,
           tools,
           tool_choice: 'auto',
-          // DeepSeek supports JSON output mode and is OpenAI-compatible.
-          // This forces the final assistant message to be strict JSON,
-          // which removes flakiness with markdown wrappers and stray text.
-          response_format: {
-            type: 'json_object',
-          } as any,
+          // Note: We don't use response_format here because we need a JSON array,
+          // not a JSON object. The prompt explicitly requests an array format.
         });
 
         const message = completion.choices[0]?.message;
@@ -505,9 +501,62 @@ Begin your review:`;
     try {
       // Extract JSON from markdown code blocks if present
       const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : response;
+      let jsonStr = jsonMatch ? jsonMatch[1] : response;
 
-      const issues = JSON.parse(jsonStr.trim());
+      // Try to fix truncated JSON arrays
+      jsonStr = jsonStr.trim();
+
+      // If it looks like a truncated array (starts with [ but doesn't end with ])
+      if (jsonStr.startsWith('[') && !jsonStr.endsWith(']')) {
+        // Try to extract valid JSON objects from the array using balanced brace matching
+        const objectMatches: string[] = [];
+        let depth = 0;
+        let start = -1;
+        let inArray = false;
+        let arrayDepth = 0;
+
+        for (let i = 1; i < jsonStr.length; i++) {
+          // Start from 1 to skip opening [
+          const char = jsonStr[i];
+
+          if (char === '[') {
+            if (depth === 0) inArray = true;
+            arrayDepth++;
+          } else if (char === ']') {
+            arrayDepth--;
+            if (arrayDepth === 0) inArray = false;
+          } else if (char === '{') {
+            if (depth === 0 && !inArray) start = i;
+            depth++;
+          } else if (char === '}') {
+            depth--;
+            if (depth === 0 && start !== -1 && !inArray) {
+              const objStr = jsonStr.substring(start, i + 1);
+              objectMatches.push(objStr);
+              start = -1;
+            }
+          }
+        }
+
+        if (objectMatches.length > 0) {
+          console.warn(
+            `⚠️  Response was truncated. Extracted ${objectMatches.length} complete objects from partial JSON.`
+          );
+          // Reconstruct valid JSON array
+          jsonStr = '[' + objectMatches.join(',') + ']';
+        } else {
+          // Try to close the array manually if we can find the last complete object
+          const lastBraceIndex = jsonStr.lastIndexOf('}');
+          if (lastBraceIndex > 0) {
+            console.warn(
+              '⚠️  Response was truncated. Attempting to close JSON array manually.'
+            );
+            jsonStr = jsonStr.substring(0, lastBraceIndex + 1) + ']';
+          }
+        }
+      }
+
+      const issues = JSON.parse(jsonStr);
 
       if (!Array.isArray(issues)) {
         console.warn('LLM response is not an array, returning empty');
@@ -517,6 +566,73 @@ Begin your review:`;
       return issues;
     } catch (error) {
       console.error('Failed to parse LLM response as JSON:', error);
+
+      // Try to extract partial results from truncated JSON
+      try {
+        // Look for complete JSON objects in the response
+        // We'll try to find objects by matching balanced braces
+        const objectMatches: string[] = [];
+        let depth = 0;
+        let start = -1;
+
+        for (let i = 0; i < response.length; i++) {
+          if (response[i] === '{') {
+            if (depth === 0) start = i;
+            depth++;
+          } else if (response[i] === '}') {
+            depth--;
+            if (depth === 0 && start !== -1) {
+              const objStr = response.substring(start, i + 1);
+              // Check if it looks like a Finding object (has required fields)
+              if (
+                objStr.includes('"file"') &&
+                objStr.includes('"line"') &&
+                objStr.includes('"severity"') &&
+                objStr.includes('"category"') &&
+                objStr.includes('"message"')
+              ) {
+                objectMatches.push(objStr);
+              }
+              start = -1;
+            }
+          }
+        }
+
+        if (objectMatches && objectMatches.length > 0) {
+          console.warn(
+            `⚠️  Extracted ${objectMatches.length} issues from truncated response. Some issues may be missing.`
+          );
+          const partialIssues = objectMatches
+            .map((obj) => {
+              try {
+                return JSON.parse(obj);
+              } catch {
+                return null;
+              }
+            })
+            .filter((issue): issue is Finding => {
+              if (!issue) return false;
+              // Validate that it has all required fields
+              return (
+                typeof issue.file === 'string' &&
+                typeof issue.line === 'number' &&
+                typeof issue.severity === 'string' &&
+                typeof issue.category === 'string' &&
+                typeof issue.message === 'string'
+              );
+            });
+
+          if (partialIssues.length > 0) {
+            console.warn(
+              `⚠️  Using ${partialIssues.length} extracted issues. Original error: ${error}`
+            );
+            return partialIssues;
+          }
+        }
+      } catch (extractError) {
+        console.warn('Failed to extract partial results:', extractError);
+      }
+
       // Логируем только начало ответа, чтобы не засорять логи огромными строками
       const preview =
         response.length > 2000
