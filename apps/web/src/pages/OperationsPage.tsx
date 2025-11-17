@@ -640,55 +640,6 @@ export const OperationsPage = () => {
     setDateToFilter(endDate.toISOString());
   };
 
-  // Определение колонок для экспорта
-  const exportColumns = [
-    'Дата',
-    'Тип',
-    'Сумма',
-    'Валюта',
-    'Статья',
-    'Счет',
-    'Контрагент',
-    'Сделка',
-    'Отдел',
-    'Описание',
-    'Периодичность',
-    'Статус подтверждения',
-  ];
-
-  // Функция для преобразования операций в формат экспорта
-  const buildExportRows = useCallback((): ExportRow[] => {
-    return items.map((op) => {
-      // Форматируем счет в зависимости от типа операции
-      let accountDisplay = '-';
-      if (op.type === 'transfer') {
-        const source = op.sourceAccount?.name || '-';
-        const target = op.targetAccount?.name || '-';
-        accountDisplay = `${source} → ${target}`;
-      } else {
-        accountDisplay = op.account?.name || '-';
-      }
-
-      return {
-        Дата: formatDate(op.operationDate),
-        Тип: getOperationTypeLabel(op.type),
-        Сумма: op.amount,
-        Валюта: op.currency,
-        Статья: op.article?.name || '-',
-        Счет: accountDisplay,
-        Контрагент: op.counterparty?.name || '-',
-        Сделка: op.deal?.name || '-',
-        Отдел: op.department?.name || '-',
-        Описание: op.description || '-',
-        Периодичность: getPeriodicityLabel(op),
-        'Статус подтверждения': op.isConfirmed
-          ? 'Подтверждена'
-          : 'Не подтверждена',
-      };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
   const columns = [
     {
       key: 'select',

@@ -152,7 +152,10 @@ export const MappingRules = () => {
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                         aria-label="Закрыть"
                       >
-                        <X size={20} className="text-gray-500 dark:text-gray-400" />
+                        <X
+                          size={20}
+                          className="text-gray-500 dark:text-gray-400"
+                        />
                       </button>
                     </div>
                   </div>
@@ -169,10 +172,14 @@ export const MappingRules = () => {
                           Нет правил маппинга
                         </h4>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                          Правила маппинга автоматически заполняют операции при импорте банковских выписок на основе текста в назначении платежа, имени получателя или ИНН.
+                          Правила маппинга автоматически заполняют операции при
+                          импорте банковских выписок на основе текста в
+                          назначении платежа, имени получателя или ИНН.
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
-                          Например, можно создать правило: если назначение платежа содержит "Аренда", то автоматически выбирать статью "Аренда" и контрагента "Арендодатель".
+                          Например, можно создать правило: если назначение
+                          платежа содержит "Аренда", то автоматически выбирать
+                          статью "Аренда" и контрагента "Арендодатель".
                         </p>
                         <button
                           onClick={handleCreateNew}
@@ -198,7 +205,9 @@ export const MappingRules = () => {
                                 </span>
                               </div>
                               <div className="text-xs text-gray-600 dark:text-gray-400 break-words">
-                                <strong>{getSourceFieldLabel(rule.sourceField)}:</strong>{' '}
+                                <strong>
+                                  {getSourceFieldLabel(rule.sourceField)}:
+                                </strong>{' '}
                                 {rule.pattern}
                               </div>
                               {rule.targetName && (
@@ -256,10 +265,14 @@ export const MappingRules = () => {
                         Нет правил маппинга
                       </h4>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                        Правила маппинга автоматически заполняют операции при импорте банковских выписок на основе текста в назначении платежа, имени получателя или ИНН.
+                        Правила маппинга автоматически заполняют операции при
+                        импорте банковских выписок на основе текста в назначении
+                        платежа, имени получателя или ИНН.
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
-                        Например, можно создать правило: если назначение платежа содержит "Аренда", то автоматически выбирать статью "Аренда" и контрагента "Арендодатель".
+                        Например, можно создать правило: если назначение платежа
+                        содержит "Аренда", то автоматически выбирать статью
+                        "Аренда" и контрагента "Арендодатель".
                       </p>
                     </div>
                   ) : (
@@ -279,7 +292,9 @@ export const MappingRules = () => {
                               </span>
                             </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                              <strong>{getSourceFieldLabel(rule.sourceField)}:</strong>{' '}
+                              <strong>
+                                {getSourceFieldLabel(rule.sourceField)}:
+                              </strong>{' '}
                               {rule.pattern}
                             </div>
                             {rule.targetName && (
@@ -330,4 +345,3 @@ export const MappingRules = () => {
     </>
   );
 };
-

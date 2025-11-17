@@ -294,7 +294,8 @@ export const OperationForm = ({
         ) : createModal.field === 'currency' ? (
           <div className="p-4">
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Валюты выбираются из предопределенного списка. Для добавления новой валюты обратитесь к администратору.
+              Валюты выбираются из предопределенного списка. Для добавления
+              новой валюты обратитесь к администратору.
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-500">
               Текущая валюта: {currency || 'RUB'}

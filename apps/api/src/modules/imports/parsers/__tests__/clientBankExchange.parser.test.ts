@@ -377,10 +377,10 @@ describe('parseClientBankExchange', () => {
 
   describe('Обработка BOM (Byte Order Mark)', () => {
     it('должен корректно обрабатывать файл с BOM', () => {
-      const content = '\uFEFF1CClientBankExchange\nВерсияФормата=1.03\n\nСекцияДокумент=Платежное поручение\nДата=01.01.2025\nСумма=1000.00\nНазначениеПлатежа=Тест\nКонецДокумента';
+      const content =
+        '\uFEFF1CClientBankExchange\nВерсияФормата=1.03\n\nСекцияДокумент=Платежное поручение\nДата=01.01.2025\nСумма=1000.00\nНазначениеПлатежа=Тест\nКонецДокумента';
       const result = parseClientBankExchange(content);
       expect(result).toHaveLength(1);
     });
   });
 });
-
