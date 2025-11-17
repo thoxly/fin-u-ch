@@ -28,8 +28,27 @@ export async function readFileTool(params: ReadFileParams): Promise<string> {
     ? params.path
     : path.join(projectRoot, params.path);
 
-  const content = await fs.readFile(fullPath, 'utf-8');
-  return content;
+  try {
+    // Check if file exists first
+    await fs.access(fullPath);
+    const content = await fs.readFile(fullPath, 'utf-8');
+    return content;
+  } catch (error: any) {
+    // Return a helpful error message instead of throwing
+    if (error.code === 'ENOENT') {
+      throw new Error(
+        `File not found: ${params.path}. This file may have been deleted, moved, or doesn't exist in the repository.`
+      );
+    }
+    if (error.code === 'EACCES') {
+      throw new Error(
+        `Permission denied reading file: ${params.path}. Check file permissions.`
+      );
+    }
+    throw new Error(
+      `Failed to read file ${params.path}: ${error.message || 'Unknown error'}`
+    );
+  }
 }
 
 export async function readFileRangeTool(
@@ -84,18 +103,26 @@ export async function searchTool(
 
   for (const relativePath of files) {
     const fullPath = path.join(projectRoot, relativePath);
-    const content = await fs.readFile(fullPath, 'utf-8');
-    const lines = content.split('\n');
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      const lines = content.split('\n');
 
-    lines.forEach((line, index) => {
-      if (line.toLowerCase().includes(needle)) {
-        results.push({
-          path: relativePath,
-          line: index + 1,
-          preview: line.trim().slice(0, 300),
-        });
-      }
-    });
+      lines.forEach((line, index) => {
+        if (line.toLowerCase().includes(needle)) {
+          results.push({
+            path: relativePath,
+            line: index + 1,
+            preview: line.trim().slice(0, 300),
+          });
+        }
+      });
+    } catch (error: any) {
+      // Skip files that can't be read (e.g., deleted, permission denied, binary files)
+      console.warn(
+        `[MCP] Warning: Could not read file ${relativePath}: ${error.message}`
+      );
+      continue;
+    }
   }
 
   return results;

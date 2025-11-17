@@ -414,13 +414,14 @@ Begin your review:`;
             const errorMessage = error?.message || 'Unknown error';
             console.warn(`  ⚠ Tool call failed: ${name} - ${errorMessage}`);
             // Return a user-friendly error message that the LLM can understand
-            if (errorMessage.includes('ENOENT') || errorMessage.includes('no such file')) {
+            if (errorMessage.includes('ENOENT') ||
+                errorMessage.includes('no such file')) {
                 return {
-                    error: `File not found: ${args.path || args.pattern || 'unknown'}. This file may have been deleted, moved, or doesn't exist in the repository.`
+                    error: `File not found: ${args.path || args.pattern || 'unknown'}. This file may have been deleted, moved, or doesn't exist in the repository.`,
                 };
             }
             return {
-                error: `Failed to execute ${name}: ${errorMessage}`
+                error: `Failed to execute ${name}: ${errorMessage}`,
             };
         }
     }
