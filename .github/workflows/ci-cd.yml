@@ -656,12 +656,25 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          
+          SSH_PORT="${{ secrets.VPS_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then
+            SSH_PORT=22
+          fi
+          echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
+
+          SUDO_CMD=""
+          if [ "${{ secrets.VPS_SUDO_ENABLED }}" = "true" ]; then
+            SUDO_CMD="sudo"
+          fi
+          echo "SUDO_CMD=$SUDO_CMD" >> $GITHUB_ENV
+
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} -p $SSH_PORT >> ~/.ssh/known_hosts
 
       - name: Create backup before deployment
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'cd /opt/fin-u-ch && ${{ env.SUDO_CMD }} docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
       - name: Replace yourdomain.com with actual domain
         run: |
@@ -670,29 +683,67 @@ jobs:
 
       - name: Copy docker-compose and scripts to VPS
         run: |
-          scp -i ~/.ssh/deploy_key ops/docker/docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/docker-compose.prod.yml
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
-          scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
-          scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
+          # Создаем временную директорию для этого шага
+          TEMP_DIR="/tmp/deploy-scripts"
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p $TEMP_DIR"
+          
+          # Копируем файлы во временную директорию
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/docker/docker-compose.prod.yml \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/docker-compose.prod.yml
+
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/nginx.conf \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/nginx.conf || true
+
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/nginx-ssl.conf \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/nginx-ssl.conf || true
 
           # Copy diagnostic scripts
-          scp -i ~/.ssh/deploy_key ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
-          scp -i ~/.ssh/deploy_key ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh' || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/diagnose-deploy.sh \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/diagnose-deploy.sh || true
+
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/fix-deployment.sh \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/fix-deployment.sh || true
+
+          # Перемещаем файлы с sudo
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "${{ env.SUDO_CMD }} mkdir -p /opt/fin-u-ch/nginx && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/docker-compose.prod.yml /opt/fin-u-ch/docker-compose.prod.yml && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx.conf /opt/fin-u-ch/nginx/nginx.conf && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx-ssl.conf /opt/fin-u-ch/nginx/nginx-ssl.conf && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/diagnose-deploy.sh /opt/fin-u-ch/diagnose-deploy.sh && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/fix-deployment.sh /opt/fin-u-ch/fix-deployment.sh && \
+            ${{ env.SUDO_CMD }} chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh && \
+            ${{ env.SUDO_CMD }} rm -rf ${TEMP_DIR}"
 
       - name: Upload SSL certificate
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/ssl'
-          scp -i ~/.ssh/deploy_key -r ops/nginx/ssl/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/ssl || true
+          # Создаем директорию для SSL
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} mkdir -p /opt/fin-u-ch/nginx/ssl"
+
+          # Копируем SSL файлы через tmp (если они есть локально)
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} -r ops/nginx/ssl/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/ssl-tmp/ || true
+
+          # Переносим SSL файлы с sudo
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "${{ env.SUDO_CMD }} cp -r /tmp/ssl-tmp/* /opt/fin-u-ch/nginx/ssl/ 2>/dev/null || true && ${{ env.SUDO_CMD }} rm -rf /tmp/ssl-tmp/"
+
+          # Загружаем SSL сертификаты из секретов (если есть)
           if [ -n "${{ secrets.SSL_FULLCHAIN_B64 }}" ] && [ -n "${{ secrets.SSL_PRIVKEY_B64 }}" ]; then
-            echo "${{ secrets.SSL_FULLCHAIN_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/fullchain.pem'
-            echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
+            echo "${{ secrets.SSL_FULLCHAIN_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} \
+                ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} sh -c 'base64 -d > /opt/fin-u-ch/nginx/ssl/fullchain.pem'"
+            
+            echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} \
+                ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} sh -c 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'"
           fi
+
+          # Устанавливаем правильные права для SSL файлов (только для root)
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "${{ env.SUDO_CMD }} chmod 600 /opt/fin-u-ch/nginx/ssl/*.pem 2>/dev/null || true && \
+            ${{ env.SUDO_CMD }} chown root:root /opt/fin-u-ch/nginx/ssl/*.pem 2>/dev/null || true"
 
       - name: Ensure VPS environment variables
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /opt/fin-u-ch
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /opt/fin-u-ch && ${{ env.SUDO_CMD }} bash -c '
             # Убедимся, что DOCKER_IMAGE_PREFIX установлен правильно
             if ! grep -q "DOCKER_IMAGE_PREFIX" .env 2>/dev/null; then
               echo "DOCKER_IMAGE_PREFIX=${{ github.repository_owner }}" >> .env
@@ -707,12 +758,12 @@ jobs:
             if ! grep -q "IMAGE_TAG" .env 2>/dev/null; then
               echo "IMAGE_TAG=latest" >> .env
             fi
-          EOF
+          '"
 
       - name: Deploy to VPS
         run: |
           # Create deploy script on VPS
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /opt/fin-u-ch/deploy.sh" << 'DEPLOY_SCRIPT'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} sh -c 'cat > /opt/fin-u-ch/deploy.sh'" << 'DEPLOY_SCRIPT'
           #!/bin/bash
           set -e
 
@@ -772,12 +823,12 @@ jobs:
           DEPLOY_SCRIPT
 
           # Make script executable
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /opt/fin-u-ch/deploy.sh"
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} chmod +x /opt/fin-u-ch/deploy.sh"
 
           # Execute deploy script with environment variables
           echo "🚀 Executing deployment script..."
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            "GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' GITHUB_OWNER='${{ github.repository_owner }}' /opt/fin-u-ch/deploy.sh"
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            "${{ env.SUDO_CMD }} env GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' GITHUB_OWNER='${{ github.repository_owner }}' /opt/fin-u-ch/deploy.sh"
 
       - name: Health check
         run: |
@@ -805,18 +856,18 @@ jobs:
           echo "❌ Health check failed after 5 attempts"
           echo ""
           echo "=== Starting diagnostic... ==="
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAGNOSTIC'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAGNOSTIC'
             echo "1. Container status:"
-            docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            ${{ env.SUDO_CMD }} docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
             echo "2. API container logs (last 50 lines):"
-            docker logs --tail 50 fin-u-ch-api 2>&1 || echo "API container not found"
+            ${{ env.SUDO_CMD }} docker logs --tail 50 fin-u-ch-api 2>&1 || echo "API container not found"
             echo ""
             echo "3. NGINX container logs (last 30 lines):"
-            docker logs --tail 30 fin-u-ch-nginx 2>&1 || echo "NGINX container not found"
+            ${{ env.SUDO_CMD }} docker logs --tail 30 fin-u-ch-nginx 2>&1 || echo "NGINX container not found"
             echo ""
             echo "4. Health check from inside API container:"
-            docker exec fin-u-ch-api wget -qO- http://localhost:4000/api/health 2>&1 || echo "Failed"
+            ${{ env.SUDO_CMD }} docker exec fin-u-ch-api wget -qO- http://localhost:4000/api/health 2>&1 || echo "Failed"
             echo ""
             echo "5. Health check via NGINX (localhost):"
             curl -v http://localhost/api/health 2>&1 || echo "Failed"

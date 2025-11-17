@@ -53,6 +53,8 @@
 | ------------------- | --------------------------------------------- | -------------------------- |
 | `SSL_FULLCHAIN_B64` | Сертификат + промежуточные в кодировке base64 | `LS0tLS1CRUdJTi...S0tLQo=` |
 | `SSL_PRIVKEY_B64`   | Закрытый ключ сертификата в кодировке base64  | `LS0tCkyVmFuNmm...30tLQo=` |
+| `VPS_SSH_PORT`      | Порт SSH                                      | `22`                       |
+| `VPS_SUDO_ENABLED`  | Требуется повышение привилегий с помощью sudo | `true`                     |
 
 ### Генерация SSH ключа для VPS
 
@@ -62,6 +64,8 @@ ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github_actions
 
 # Скопировать публичный ключ на VPS
 ssh-copy-id -i ~/.ssh/github_actions.pub user@your-vps-host
+# при нестандартном порту SSH
+ssh-copy-id -i ~/.ssh/github_actions.pub -p your-vps-port user@your-vps-host
 
 # Скопировать ПРИВАТНЫЙ ключ в GitHub Secrets
 cat ~/.ssh/github_actions
@@ -73,6 +77,8 @@ cat ~/.ssh/github_actions
 ```bash
 # Проверить подключение
 ssh -i ~/.ssh/github_actions user@your-vps-host
+# при нестандартном порту SSH
+ssh -i ~/.ssh/github_actions -p your-vps-port user@your-vps-host
 
 # Если работает - ключ настроен правильно
 ```
