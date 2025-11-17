@@ -17,7 +17,11 @@ import { useNotification } from '../../shared/hooks/useNotification';
 import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
 import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
 import { AccountForm } from '../catalog-forms/AccountForm/AccountForm';
-import { MagnifyingGlassIcon, Cog6ToothIcon, CheckIcon } from '@heroicons/react/20/solid';
+import {
+  MagnifyingGlassIcon,
+  Cog6ToothIcon,
+  CheckIcon,
+} from '@heroicons/react/20/solid';
 import type { MappingRule } from '@shared/types/imports';
 
 interface MappingRuleDialogProps {
@@ -45,9 +49,13 @@ export const MappingRuleDialog = ({
   >(rule?.sourceField || 'description');
   const [patternError, setPatternError] = useState<string>('');
 
-  const { data: articles = [], refetch: refetchArticles } = useGetArticlesQuery({ isActive: true });
-  const { data: counterparties = [], refetch: refetchCounterparties } = useGetCounterpartiesQuery();
-  const { data: accounts = [], refetch: refetchAccounts } = useGetAccountsQuery();
+  const { data: articles = [], refetch: refetchArticles } = useGetArticlesQuery(
+    { isActive: true }
+  );
+  const { data: counterparties = [], refetch: refetchCounterparties } =
+    useGetCounterpartiesQuery();
+  const { data: accounts = [], refetch: refetchAccounts } =
+    useGetAccountsQuery();
 
   // Получаем операции для предпросмотра совпадений
   const { data: operationsData } = useGetImportedOperationsQuery(
@@ -95,7 +103,9 @@ export const MappingRuleDialog = ({
             fieldValue = op.payer || '';
             break;
           case 'inn':
-            fieldValue = op.inn || '';
+            // Используем оба ИНН (плательщика и получателя)
+            fieldValue =
+              [op.payerInn, op.receiverInn].filter(Boolean).join(' ') || '';
             break;
         }
 
@@ -171,8 +181,18 @@ export const MappingRuleDialog = ({
       }
 
       onClose();
-    } catch (error: any) {
-      showError(error?.data?.error || 'Ошибка при сохранении правила');
+    } catch (error: unknown) {
+      const errorMessage: string =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'error' in error.data &&
+        typeof error.data.error === 'string'
+          ? (error.data as { error: string }).error
+          : 'Ошибка при сохранении правила';
+      showError(errorMessage);
     }
   };
 
@@ -180,19 +200,16 @@ export const MappingRuleDialog = ({
     switch (targetType) {
       case 'article':
         return [
-          { value: '__create__', label: '+ Создать новую статью' },
           { value: '', label: 'Не выбрано' },
           ...articles.map((a) => ({ value: a.id, label: a.name })),
         ];
       case 'counterparty':
         return [
-          { value: '__create__', label: '+ Создать нового контрагента' },
           { value: '', label: 'Не выбрано' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name })),
         ];
       case 'account':
         return [
-          { value: '__create__', label: '+ Создать новый счет' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
@@ -204,25 +221,20 @@ export const MappingRuleDialog = ({
   };
 
   const handleTargetIdChange = (value: string) => {
-    // Если выбрана опция создания, открываем модальное окно
-    if (value === '__create__') {
-      setCreateModal({
-        isOpen: true,
-        field: targetType as 'article' | 'counterparty' | 'account',
-      });
-      return;
-    }
-
-    // Иначе просто устанавливаем значение
     setTargetId(value);
     if (value) {
-      const option = getTargetOptions().find(
-        (opt) => opt.value === value
-      );
+      const option = getTargetOptions().find((opt) => opt.value === value);
       setTargetName(option?.label || '');
     } else {
       setTargetName('');
     }
+  };
+
+  const handleCreateNew = () => {
+    setCreateModal({
+      isOpen: true,
+      field: targetType as 'article' | 'counterparty' | 'account',
+    });
   };
 
   const handleCloseCreateModal = () => {
@@ -234,7 +246,7 @@ export const MappingRuleDialog = ({
 
   const handleCreateSuccess = async (createdId: string) => {
     handleCloseCreateModal();
-    
+
     // Обновляем списки и находим созданный элемент
     if (createModal.field === 'article') {
       const { data: updatedArticles } = await refetchArticles();
@@ -245,7 +257,9 @@ export const MappingRuleDialog = ({
       }
     } else if (createModal.field === 'counterparty') {
       const { data: updatedCounterparties } = await refetchCounterparties();
-      const createdCounterparty = updatedCounterparties?.find((c) => c.id === createdId);
+      const createdCounterparty = updatedCounterparties?.find(
+        (c) => c.id === createdId
+      );
       if (createdCounterparty) {
         setTargetId(createdId);
         setTargetName(createdCounterparty.name);
@@ -276,9 +290,9 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={sourceField}
-              onChange={(e) =>
+              onChange={(value) =>
                 setSourceField(
-                  e.target.value as 'description' | 'receiver' | 'payer' | 'inn'
+                  value as 'description' | 'receiver' | 'payer' | 'inn'
                 )
               }
               options={[
@@ -297,10 +311,8 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={ruleType}
-              onChange={(e) =>
-                setRuleType(
-                  e.target.value as 'contains' | 'equals' | 'regex' | 'alias'
-                )
+              onChange={(value) =>
+                setRuleType(value as 'contains' | 'equals' | 'regex' | 'alias')
               }
               options={[
                 { value: 'contains', label: 'Содержит' },
@@ -324,14 +336,22 @@ export const MappingRuleDialog = ({
               required
               error={patternError}
               icon={<MagnifyingGlassIcon className="w-5 h-5" />}
-              className={!patternError ? '!bg-gray-50 dark:!bg-gray-700/50' : ''}
+              className={
+                !patternError ? '!bg-gray-50 dark:!bg-gray-700/50' : ''
+              }
             />
             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Можно вводить часть слова или использовать регулярные выражения (например, Аренда офиса, Сбербанк, и проч.  )
+              Можно вводить часть слова или использовать регулярные выражения
+              (например, Аренда офиса, Сбербанк, и проч. )
             </p>
             {matchCount !== null && pattern.trim() && (
               <p className="mt-1.5 text-sm text-primary-600 dark:text-primary-400 font-medium">
-                Найдено {matchCount} {matchCount === 1 ? 'операция' : matchCount < 5 ? 'операции' : 'операций'}
+                Найдено {matchCount}{' '}
+                {matchCount === 1
+                  ? 'операция'
+                  : matchCount < 5
+                    ? 'операции'
+                    : 'операций'}
               </p>
             )}
           </div>
@@ -350,9 +370,9 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={targetType}
-              onChange={(e) =>
+              onChange={(value) =>
                 setTargetType(
-                  e.target.value as
+                  value as
                     | 'article'
                     | 'counterparty'
                     | 'account'
@@ -380,6 +400,7 @@ export const MappingRuleDialog = ({
               <Select
                 value={targetId}
                 onChange={handleTargetIdChange}
+                onCreateNew={handleCreateNew}
                 options={getTargetOptions()}
                 fullWidth
               />
@@ -390,11 +411,7 @@ export const MappingRuleDialog = ({
 
       {/* Кнопки действий */}
       <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button
-          type="button"
-          onClick={onClose}
-          className="btn-secondary"
-        >
+        <Button type="button" onClick={onClose} className="btn-secondary">
           Отмена
         </Button>
         <Button
@@ -453,4 +470,3 @@ export const MappingRuleDialog = ({
     </form>
   );
 };
-

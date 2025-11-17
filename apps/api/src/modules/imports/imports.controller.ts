@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
 import importsService from './imports.service';
+import logger from '../../config/logger';
 
 export class ImportsController {
   async uploadStatement(req: TenantRequest, res: Response, next: NextFunction) {
@@ -11,6 +12,13 @@ export class ImportsController {
         return res.status(400).json({ error: 'File is required' });
       }
 
+      logger.info('Upload statement request received', {
+        fileName: file.originalname,
+        fileSize: file.buffer.length,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       const result = await importsService.uploadStatement(
         req.companyId!,
         req.userId!,
@@ -18,8 +26,23 @@ export class ImportsController {
         file.buffer
       );
 
+      logger.info('Upload statement completed successfully', {
+        sessionId: result.sessionId,
+        importedCount: result.importedCount,
+        duplicatesCount: result.duplicatesCount,
+        fileName: file.originalname,
+        companyId: req.companyId,
+      });
+
       res.status(201).json(result);
     } catch (error) {
+      logger.error('Upload statement failed', {
+        fileName: req.file?.originalname,
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
@@ -51,6 +74,25 @@ export class ImportsController {
           limit,
           offset,
         }
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAllImportedOperations(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { sessionId } = req.params;
+
+      const result = await importsService.getAllImportedOperations(
+        sessionId,
+        req.companyId!
       );
 
       res.json(result);
@@ -115,7 +157,11 @@ export class ImportsController {
     }
   }
 
-  async importOperations(req: TenantRequest, res: Response, next: NextFunction) {
+  async importOperations(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
     try {
       const { sessionId } = req.params;
       const { operationIds, saveRulesForIds } = req.body;
@@ -230,11 +276,15 @@ export class ImportsController {
       const offset = req.query.offset
         ? parseInt(req.query.offset as string)
         : 0;
+      const dateFrom = req.query.dateFrom as string | undefined;
+      const dateTo = req.query.dateTo as string | undefined;
 
       const result = await importsService.getImportSessions(req.companyId!, {
         status,
         limit,
         offset,
+        dateFrom,
+        dateTo,
       });
 
       res.json(result);
@@ -245,4 +295,3 @@ export class ImportsController {
 }
 
 export default new ImportsController();
-

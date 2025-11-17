@@ -185,6 +185,7 @@ model Operation {
   recurrenceEndDate  DateTime?
   isConfirmed        Boolean   @default(true)
   isTemplate         Boolean   @default(false)
+  sourceHash         String?   // MD5 or SHA256 hash of source data to detect duplicates on import
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -205,6 +206,7 @@ model Operation {
   @@index([companyId, repeat, isConfirmed])
   @@index([companyId, repeat, isTemplate])
   @@index([recurrenceParentId, operationDate])
+  @@index([companyId, sourceHash])
   @@map("operations")
 }
 
@@ -324,6 +326,9 @@ model ImportedOperation {
   repeat                 String   @default("none") // none|daily|weekly|monthly|quarterly|semiannual|annual
   matchedBy             String? // template|fuzzy|manual|null
   matchedRuleId         String? // ссылка на примененное правило
+  // Обнаружение дубликатов
+  isDuplicate           Boolean  @default(false) // помечено как дубликат
+  duplicateOfId         String? // ID существующей операции в operations
   // Статусы
   confirmed             Boolean  @default(false)
   processed             Boolean  @default(false)
@@ -343,6 +348,7 @@ model ImportedOperation {
 
   @@index([companyId, importSessionId])
   @@index([companyId, confirmed, processed])
+  @@index([companyId, isDuplicate])
   @@index([importSessionId])
   @@map("imported_operations")
 }

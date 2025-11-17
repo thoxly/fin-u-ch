@@ -1,6 +1,6 @@
 import { apiSlice } from './apiSlice';
+import type { RootState } from '../store';
 import type {
-  ImportSession,
   ImportedOperation,
   MappingRule,
   ImportedOperationsResponse,
@@ -11,6 +11,7 @@ import type {
 interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
+  duplicatesCount: number;
   fileName: string;
 }
 
@@ -19,6 +20,10 @@ interface BulkUpdateRequest {
   matchedArticleId?: string | null;
   matchedCounterpartyId?: string | null;
   matchedAccountId?: string | null;
+  matchedDealId?: string | null;
+  matchedDepartmentId?: string | null;
+  currency?: string;
+  direction?: 'income' | 'expense' | 'transfer' | null;
   confirmed?: boolean;
 }
 
@@ -40,10 +45,7 @@ interface DeleteSessionResponse {
 
 export const importsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
-    uploadStatement: builder.mutation<
-      UploadStatementResponse,
-      FormData
-    >({
+    uploadStatement: builder.mutation<UploadStatementResponse, FormData>({
       query: (formData) => ({
         url: '/imports/upload',
         method: 'POST',
@@ -58,6 +60,7 @@ export const importsApi = apiSlice.injectEndpoints({
         sessionId: string;
         confirmed?: boolean;
         matched?: boolean;
+        duplicate?: boolean;
         limit?: number;
         offset?: number;
       }
@@ -65,6 +68,16 @@ export const importsApi = apiSlice.injectEndpoints({
       query: ({ sessionId, ...params }) => ({
         url: `/imports/sessions/${sessionId}/operations`,
         params,
+      }),
+      providesTags: ['Import'],
+    }),
+
+    getAllImportedOperations: builder.query<
+      { operations: ImportedOperation[] },
+      { sessionId: string }
+    >({
+      query: ({ sessionId }) => ({
+        url: `/imports/sessions/${sessionId}/operations/all`,
       }),
       providesTags: ['Import'],
     }),
@@ -82,7 +95,7 @@ export const importsApi = apiSlice.injectEndpoints({
           currency?: string;
           repeat?: string;
           confirmed?: boolean;
-          direction?: 'income' | 'expense' | 'transfer';
+          direction?: 'income' | 'expense' | 'transfer' | null;
         };
       }
     >({
@@ -91,65 +104,108 @@ export const importsApi = apiSlice.injectEndpoints({
         method: 'PATCH',
         body: data,
       }),
-      async onQueryStarted({ id, data }, { dispatch, queryFulfilled, getState }) {
+      async onQueryStarted(
+        { id, data },
+        { dispatch, queryFulfilled, getState }
+      ): Promise<void> {
+        // Функция для проверки, сопоставлена ли операция
+        const checkOperationMatched = (op: ImportedOperation): boolean => {
+          if (!op.direction) return false;
+
+          const currency = op.currency || 'RUB';
+          const hasRequiredFields = !!(
+            op.matchedArticleId &&
+            op.matchedAccountId &&
+            currency
+          );
+
+          if (op.direction === 'transfer') {
+            return (
+              hasRequiredFields && !!(op.payerAccount && op.receiverAccount)
+            );
+          }
+          return hasRequiredFields;
+        };
+
         // Optimistic update - обновляем кеш локально без перезапроса
         // Находим все активные запросы getImportedOperations и обновляем их
-        const state = getState() as any;
-        const cache = importsApi.endpoints.getImportedOperations.select({} as any)(state);
-        
+        const state = getState() as RootState;
+
         // Собираем все ключи кеша для getImportedOperations
-        const cacheKeys: any[] = [];
+        const cacheKeys: Array<{ sessionId: string; [key: string]: unknown }> =
+          [];
         if (state.api?.queries) {
           Object.keys(state.api.queries).forEach((key) => {
             const query = state.api.queries[key];
-            if (query?.endpointName === 'getImportedOperations' && query?.data) {
-              cacheKeys.push(query.originalArgs || {});
+            if (
+              query?.endpointName === 'getImportedOperations' &&
+              query?.data
+            ) {
+              cacheKeys.push(
+                (query.originalArgs as {
+                  sessionId: string;
+                  [key: string]: unknown;
+                }) || { sessionId: '' }
+              );
             }
           });
         }
 
         // Обновляем каждый найденный запрос
-        const patchResults: any[] = [];
         cacheKeys.forEach((args) => {
-          const patchResult = dispatch(
-            importsApi.util.updateQueryData('getImportedOperations', args, (draft) => {
-              if (draft?.operations) {
-                const operation = draft.operations.find((op) => op.id === id);
-                if (operation) {
-                  // Обновляем поля операции
-                  if (data.matchedArticleId !== undefined) {
-                    operation.matchedArticleId = data.matchedArticleId;
+          dispatch(
+            importsApi.util.updateQueryData(
+              'getImportedOperations',
+              args,
+              (draft) => {
+                if (draft?.operations) {
+                  const operation = draft.operations.find((op) => op.id === id);
+                  if (operation) {
+                    // Обновляем поля операции
+                    if (data.matchedArticleId !== undefined) {
+                      operation.matchedArticleId = data.matchedArticleId;
+                    }
+                    if (data.matchedCounterpartyId !== undefined) {
+                      operation.matchedCounterpartyId =
+                        data.matchedCounterpartyId;
+                    }
+                    if (data.matchedAccountId !== undefined) {
+                      operation.matchedAccountId = data.matchedAccountId;
+                    }
+                    if (data.matchedDealId !== undefined) {
+                      operation.matchedDealId = data.matchedDealId;
+                    }
+                    if (data.matchedDepartmentId !== undefined) {
+                      operation.matchedDepartmentId = data.matchedDepartmentId;
+                    }
+                    if (data.currency !== undefined) {
+                      operation.currency = data.currency;
+                    }
+                    if (data.repeat !== undefined) {
+                      operation.repeat = data.repeat;
+                    }
+                    if (data.confirmed !== undefined) {
+                      operation.confirmed = data.confirmed;
+                    }
+                    if (data.direction !== undefined) {
+                      operation.direction = data.direction;
+                    }
+
+                    // Пересчитываем unmatched и duplicates после обновления операции
+                    // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
+                    draft.unmatched = draft.operations.filter(
+                      (op) => !checkOperationMatched(op)
+                    ).length;
+                    draft.duplicates = draft.operations.filter(
+                      (op) => op.isDuplicate
+                    ).length;
+
+                    // matchedBy будет обновлен из ответа сервера после успешного запроса
                   }
-                  if (data.matchedCounterpartyId !== undefined) {
-                    operation.matchedCounterpartyId = data.matchedCounterpartyId;
-                  }
-                  if (data.matchedAccountId !== undefined) {
-                    operation.matchedAccountId = data.matchedAccountId;
-                  }
-                  if (data.matchedDealId !== undefined) {
-                    operation.matchedDealId = data.matchedDealId;
-                  }
-                  if (data.matchedDepartmentId !== undefined) {
-                    operation.matchedDepartmentId = data.matchedDepartmentId;
-                  }
-                  if (data.currency !== undefined) {
-                    operation.currency = data.currency;
-                  }
-                  if (data.repeat !== undefined) {
-                    operation.repeat = data.repeat;
-                  }
-                  if (data.confirmed !== undefined) {
-                    operation.confirmed = data.confirmed;
-                  }
-                  if (data.direction !== undefined) {
-                    operation.direction = data.direction;
-                  }
-                  // matchedBy будет обновлен из ответа сервера после успешного запроса
                 }
               }
-            })
+            )
           );
-          patchResults.push(patchResult);
         });
 
         try {
@@ -157,30 +213,50 @@ export const importsApi = apiSlice.injectEndpoints({
           // После успешного обновления обновляем связанные объекты из ответа
           cacheKeys.forEach((args) => {
             dispatch(
-              importsApi.util.updateQueryData('getImportedOperations', args, (draft) => {
-                if (draft?.operations) {
-                  const operation = draft.operations.find((op) => op.id === id);
-                  const updatedOperation = result.data;
-                  if (operation && updatedOperation) {
-                    // Обновляем все поля из ответа сервера
-                    operation.matchedArticle = updatedOperation.matchedArticle;
-                    operation.matchedCounterparty = updatedOperation.matchedCounterparty;
-                    operation.matchedAccount = updatedOperation.matchedAccount;
-                    operation.matchedDeal = updatedOperation.matchedDeal;
-                    operation.matchedDepartment = updatedOperation.matchedDepartment;
-                    // Обновляем все примитивные поля из ответа
-                    if (updatedOperation.currency !== undefined) {
-                      operation.currency = updatedOperation.currency;
+              importsApi.util.updateQueryData(
+                'getImportedOperations',
+                args,
+                (draft) => {
+                  if (draft?.operations) {
+                    const operation = draft.operations.find(
+                      (op) => op.id === id
+                    );
+                    const updatedOperation = result.data;
+                    if (operation && updatedOperation) {
+                      // Обновляем все поля из ответа сервера
+                      operation.matchedArticle =
+                        updatedOperation.matchedArticle;
+                      operation.matchedCounterparty =
+                        updatedOperation.matchedCounterparty;
+                      operation.matchedAccount =
+                        updatedOperation.matchedAccount;
+                      operation.matchedDeal = updatedOperation.matchedDeal;
+                      operation.matchedDepartment =
+                        updatedOperation.matchedDepartment;
+                      // Обновляем все примитивные поля из ответа
+                      if (updatedOperation.currency !== undefined) {
+                        operation.currency = updatedOperation.currency;
+                      }
+                      if (updatedOperation.direction !== undefined) {
+                        operation.direction = updatedOperation.direction;
+                      }
+                      // matchedBy устанавливается на сервере при полном сопоставлении
+                      operation.matchedBy = updatedOperation.matchedBy ?? null;
+                      operation.matchedRuleId =
+                        updatedOperation.matchedRuleId ?? null;
+
+                      // Пересчитываем unmatched и duplicates после обновления из ответа сервера
+                      // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
+                      draft.unmatched = draft.operations.filter(
+                        (op) => !checkOperationMatched(op)
+                      ).length;
+                      draft.duplicates = draft.operations.filter(
+                        (op) => op.isDuplicate
+                      ).length;
                     }
-                    if (updatedOperation.direction !== undefined) {
-                      operation.direction = updatedOperation.direction;
-                    }
-                    // matchedBy устанавливается на сервере при полном сопоставлении
-                    operation.matchedBy = updatedOperation.matchedBy ?? null;
-                    operation.matchedRuleId = updatedOperation.matchedRuleId ?? null;
                   }
                 }
-              })
+              )
             );
           });
         } catch {
@@ -188,8 +264,8 @@ export const importsApi = apiSlice.injectEndpoints({
           patchResults.forEach((patchResult) => patchResult.undo());
         }
       },
-      // Не инвалидируем теги, чтобы не вызывать перезапрос всего списка
-      // invalidatesTags: ['Import'],
+      // Инвалидируем теги для обновления данных в истории импортов
+      invalidatesTags: ['Import'],
     }),
 
     bulkUpdateImportedOperations: builder.mutation<
@@ -207,10 +283,7 @@ export const importsApi = apiSlice.injectEndpoints({
       invalidatesTags: ['Import'],
     }),
 
-    applyRules: builder.mutation<
-      ApplyRulesResponse,
-      { sessionId: string }
-    >({
+    applyRules: builder.mutation<ApplyRulesResponse, { sessionId: string }>({
       query: ({ sessionId }) => ({
         url: `/imports/sessions/${sessionId}/apply-rules`,
         method: 'POST',
@@ -292,10 +365,7 @@ export const importsApi = apiSlice.injectEndpoints({
       invalidatesTags: ['MappingRule'],
     }),
 
-    deleteMappingRule: builder.mutation<
-      void,
-      { id: string }
-    >({
+    deleteMappingRule: builder.mutation<void, { id: string }>({
       query: ({ id }) => ({
         url: `/imports/rules/${id}`,
         method: 'DELETE',
@@ -309,6 +379,8 @@ export const importsApi = apiSlice.injectEndpoints({
         status?: string;
         limit?: number;
         offset?: number;
+        dateFrom?: string;
+        dateTo?: string;
       } | void
     >({
       query: (params) => ({
@@ -323,6 +395,8 @@ export const importsApi = apiSlice.injectEndpoints({
 export const {
   useUploadStatementMutation,
   useGetImportedOperationsQuery,
+  useGetAllImportedOperationsQuery,
+  useLazyGetAllImportedOperationsQuery,
   useUpdateImportedOperationMutation,
   useBulkUpdateImportedOperationsMutation,
   useApplyRulesMutation,
@@ -334,4 +408,3 @@ export const {
   useDeleteMappingRuleMutation,
   useGetImportSessionsQuery,
 } = importsApi;
-

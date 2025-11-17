@@ -95,17 +95,15 @@ export const OperationFinancialParams = ({
             label="Счет списания"
             value={sourceAccountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account', 'source');
-              } else {
-                onSourceAccountChange(value);
-                onValidationErrorClear('sourceAccountId');
-              }
+              onSourceAccountChange(value);
+              onValidationErrorClear('sourceAccountId');
             }}
-            options={[
-              ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'source')
+                : undefined
+            }
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.sourceAccountId}
             required
@@ -114,17 +112,15 @@ export const OperationFinancialParams = ({
             label="Счет зачисления"
             value={targetAccountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account', 'target');
-              } else {
-                onTargetAccountChange(value);
-                onValidationErrorClear('targetAccountId');
-              }
+              onTargetAccountChange(value);
+              onValidationErrorClear('targetAccountId');
             }}
-            options={[
-              ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'target')
+                : undefined
+            }
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.targetAccountId}
             required
@@ -150,17 +146,13 @@ export const OperationFinancialParams = ({
             label="Счет"
             value={accountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account');
-              } else {
-                onAccountChange(value);
-                onValidationErrorClear('accountId');
-              }
+              onAccountChange(value);
+              onValidationErrorClear('accountId');
             }}
-            options={[
-              ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('account') : undefined
+            }
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.accountId}
             required
@@ -178,20 +170,14 @@ export const OperationFinancialParams = ({
           <Select
             label="Сделка"
             value={dealId}
-            onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('deal');
-              } else {
-                onDealChange(value);
-              }
-            }}
-            options={[
-              ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
-              ...filteredDeals.map((d) => ({
-                value: d.id,
-                label: d.name,
-              })),
-            ]}
+            onChange={(value) => onDealChange(value)}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('deal') : undefined
+            }
+            options={filteredDeals.map((d) => ({
+              value: d.id,
+              label: d.name,
+            }))}
             placeholder={
               counterpartyId
                 ? 'Не выбрана'
@@ -204,20 +190,16 @@ export const OperationFinancialParams = ({
           <Select
             label="Подразделение"
             value={departmentId}
-            onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('department');
-              } else {
-                onDepartmentChange(value);
-              }
-            }}
-            options={[
-              ...(onOpenCreateModal ? [{ value: '__create__', label: '+ Добавить новый' }] : []),
-              ...departments.map((d) => ({
-                value: d.id,
-                label: d.name,
-              })),
-            ]}
+            onChange={(value) => onDepartmentChange(value)}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('department')
+                : undefined
+            }
+            options={departments.map((d) => ({
+              value: d.id,
+              label: d.name,
+            }))}
             placeholder="Не выбрано"
           />
         </div>

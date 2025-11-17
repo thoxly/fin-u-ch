@@ -39,6 +39,8 @@ jest.mock('../../../../config/db', () => ({
 }));
 
 import prisma from '../../../../config/db';
+import { Prisma } from '@prisma/client';
+import * as matchingService from '../matching.service';
 import {
   determineDirection,
   matchCounterparty,
@@ -62,27 +64,47 @@ describe('matching.service', () => {
     });
 
     it('должен вернуть "expense", если плательщик - наша компания', async () => {
-      const result = await determineDirection('1234567890', '9876543210', '1234567890');
+      const result = await determineDirection(
+        '1234567890',
+        '9876543210',
+        '1234567890'
+      );
       expect(result).toBe('expense');
     });
 
     it('должен вернуть "income", если получатель - наша компания', async () => {
-      const result = await determineDirection('1234567890', '9876543210', '9876543210');
+      const result = await determineDirection(
+        '1234567890',
+        '9876543210',
+        '9876543210'
+      );
       expect(result).toBe('income');
     });
 
     it('должен вернуть "transfer", если плательщик и получатель - одна компания', async () => {
-      const result = await determineDirection('1234567890', '1234567890', '1234567890');
+      const result = await determineDirection(
+        '1234567890',
+        '1234567890',
+        '1234567890'
+      );
       expect(result).toBe('transfer');
     });
 
     it('должен вернуть null, если направление не определено', async () => {
-      const result = await determineDirection('1111111111', '2222222222', '3333333333');
+      const result = await determineDirection(
+        '1111111111',
+        '2222222222',
+        '3333333333'
+      );
       expect(result).toBeNull();
     });
 
     it('должен убирать пробелы из ИНН', async () => {
-      const result = await determineDirection('1234 5678 90', '9876 5432 10', '1234 5678 90');
+      const result = await determineDirection(
+        '1234 5678 90',
+        '9876 5432 10',
+        '1234 5678 90'
+      );
       expect(result).toBe('expense');
     });
   });
@@ -109,7 +131,7 @@ describe('matching.service', () => {
         description: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
+      } as Prisma.CounterpartyGetPayload<Record<string, never>>);
 
       const result = await matchCounterparty(companyId, operation, 'expense');
 
@@ -135,7 +157,7 @@ describe('matching.service', () => {
         description: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
+      } as Prisma.CounterpartyGetPayload<Record<string, never>>);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -167,7 +189,7 @@ describe('matching.service', () => {
         lastUsedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
+      } as Prisma.MappingRuleGetPayload<Record<string, never>>);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -197,8 +219,10 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
-      mockPrisma.mappingRule.update.mockResolvedValueOnce({} as any);
+      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
+      mockPrisma.mappingRule.update.mockResolvedValueOnce(
+        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
+      );
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -241,7 +265,7 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ] as Prisma.CounterpartyGetPayload<Record<string, never>>[]);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -266,7 +290,7 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ] as Prisma.CounterpartyGetPayload<Record<string, never>>[]);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -305,15 +329,17 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
       mockPrisma.article.findFirst.mockResolvedValueOnce({
         id: 'article-1',
         companyId,
         name: 'Налоги',
         type: 'expense',
         isActive: true,
-      } as any);
-      mockPrisma.mappingRule.update.mockResolvedValueOnce({} as any);
+      } as Prisma.ArticleGetPayload<Record<string, never>>);
+      mockPrisma.mappingRule.update.mockResolvedValueOnce(
+        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
+      );
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -332,7 +358,7 @@ describe('matching.service', () => {
         name: 'Налоги',
         type: 'expense',
         isActive: true,
-      } as any);
+      } as Prisma.ArticleGetPayload<Record<string, never>>);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -368,7 +394,7 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as any);
+      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
       mockPrisma.article.findFirst.mockResolvedValueOnce(null); // Статья не найдена, т.к. тип не совпадает
 
       const operationWithRevenue: ParsedDocument = {
@@ -376,7 +402,11 @@ describe('matching.service', () => {
         purpose: 'Выручка от продаж',
       };
 
-      const result = await matchArticle(companyId, operationWithRevenue, 'expense');
+      const result = await matchArticle(
+        companyId,
+        operationWithRevenue,
+        'expense'
+      );
 
       expect(result).toBeNull();
     });
@@ -409,7 +439,7 @@ describe('matching.service', () => {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
+      } as Prisma.AccountGetPayload<Record<string, never>>);
 
       const result = await matchAccount(companyId, operation, 'expense');
 
@@ -438,7 +468,7 @@ describe('matching.service', () => {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
+      } as Prisma.AccountGetPayload<Record<string, never>>);
 
       const result = await matchAccount(companyId, operation, 'income');
 
@@ -483,22 +513,24 @@ describe('matching.service', () => {
       };
 
       // Mock determineDirection
-      jest.spyOn(require('../matching.service'), 'determineDirection').mockResolvedValueOnce('expense');
+      jest
+        .spyOn(matchingService, 'determineDirection')
+        .mockResolvedValueOnce('expense');
 
       // Mock matchCounterparty
-      jest.spyOn(require('../matching.service'), 'matchCounterparty').mockResolvedValueOnce({
+      jest.spyOn(matchingService, 'matchCounterparty').mockResolvedValueOnce({
         id: 'counterparty-1',
         matchedBy: 'inn',
       });
 
       // Mock matchArticle
-      jest.spyOn(require('../matching.service'), 'matchArticle').mockResolvedValueOnce({
+      jest.spyOn(matchingService, 'matchArticle').mockResolvedValueOnce({
         id: 'article-1',
         matchedBy: 'keyword',
       });
 
       // Mock matchAccount
-      jest.spyOn(require('../matching.service'), 'matchAccount').mockResolvedValueOnce({
+      jest.spyOn(matchingService, 'matchAccount').mockResolvedValueOnce({
         id: 'account-1',
         matchedBy: 'account_number',
       });
@@ -525,4 +557,3 @@ describe('matching.service', () => {
     });
   });
 });
-

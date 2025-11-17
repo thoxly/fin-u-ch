@@ -41,13 +41,15 @@ export async function determineDirection(
     normalizedPayerInn === normalizedCompanyInn &&
     normalizedReceiverInn === normalizedCompanyInn
   ) {
-    logger.debug('determineDirection: Transfer detected (same company as payer and receiver)');
+    logger.debug(
+      'determineDirection: Transfer detected (same company as payer and receiver)'
+    );
     return 'transfer';
   }
 
   // Если плательщик - наша компания (и получатель - не наша компания)
   if (
-    normalizedPayerInn && 
+    normalizedPayerInn &&
     normalizedPayerInn === normalizedCompanyInn &&
     normalizedReceiverInn !== normalizedCompanyInn
   ) {
@@ -61,7 +63,7 @@ export async function determineDirection(
 
   // Если получатель - наша компания (и плательщик - не наша компания)
   if (
-    normalizedReceiverInn && 
+    normalizedReceiverInn &&
     normalizedReceiverInn === normalizedCompanyInn &&
     normalizedPayerInn !== normalizedCompanyInn
   ) {
@@ -86,9 +88,8 @@ export async function matchCounterparty(
 } | null> {
   // 1. Сопоставление по ИНН (100% совпадение)
   if (operation.payerInn || operation.receiverInn) {
-    const innToSearch = direction === 'expense' 
-      ? operation.receiverInn 
-      : operation.payerInn;
+    const innToSearch =
+      direction === 'expense' ? operation.receiverInn : operation.payerInn;
 
     if (innToSearch) {
       const counterparty = await prisma.counterparty.findFirst({
@@ -108,13 +109,12 @@ export async function matchCounterparty(
   }
 
   // 2. Сопоставление по правилам маппинга
-  const nameToSearch = direction === 'expense' 
-    ? operation.receiver 
-    : operation.payer;
+  const nameToSearch =
+    direction === 'expense' ? operation.receiver : operation.payer;
 
   if (nameToSearch) {
     const sourceField = direction === 'expense' ? 'receiver' : 'payer';
-    
+
     // Приоритет 1: equals (самый точный)
     const equalsRules = await prisma.mappingRule.findMany({
       where: {
@@ -126,7 +126,10 @@ export async function matchCounterparty(
     });
 
     for (const rule of equalsRules) {
-      if (nameToSearch.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
+      if (
+        nameToSearch.toLowerCase() === rule.pattern.toLowerCase() &&
+        rule.targetId
+      ) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
@@ -154,7 +157,10 @@ export async function matchCounterparty(
     });
 
     for (const rule of aliasRules) {
-      if (nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
+      if (
+        nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) &&
+        rule.targetId
+      ) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
@@ -182,7 +188,10 @@ export async function matchCounterparty(
     });
 
     for (const rule of containsRules) {
-      if (nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
+      if (
+        nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) &&
+        rule.targetId
+      ) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
@@ -218,7 +227,10 @@ export async function matchCounterparty(
         counterparty.name.toLowerCase()
       );
 
-      if (similarity >= threshold && (!bestMatch || similarity > bestMatch.similarity)) {
+      if (
+        similarity >= threshold &&
+        (!bestMatch || similarity > bestMatch.similarity)
+      ) {
         bestMatch = { id: counterparty.id, similarity };
       }
     }
@@ -247,7 +259,12 @@ export async function matchArticle(
   ruleId?: string;
 } | null> {
   // Определяем тип статьи на основе направления
-  const articleType = direction === 'income' ? 'income' : direction === 'expense' ? 'expense' : null;
+  const articleType =
+    direction === 'income'
+      ? 'income'
+      : direction === 'expense'
+        ? 'expense'
+        : null;
 
   if (!articleType) {
     return null;
@@ -256,7 +273,7 @@ export async function matchArticle(
   const purpose = operation.purpose || '';
 
   // 1. Сопоставление по правилам маппинга (с правильным приоритетом)
-  
+
   // Приоритет 1: equals (самый точный)
   const equalsRules = await prisma.mappingRule.findMany({
     where: {
@@ -352,7 +369,10 @@ export async function matchArticle(
   });
 
   for (const rule of containsRules) {
-    if (purpose.toLowerCase().includes(rule.pattern.toLowerCase()) && rule.targetId) {
+    if (
+      purpose.toLowerCase().includes(rule.pattern.toLowerCase()) &&
+      rule.targetId
+    ) {
       const article = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
@@ -381,84 +401,204 @@ export async function matchArticle(
   }
 
   // 2. Сопоставление по ключевым словам (предустановленные правила)
+  // ВАЖНО: Порядок имеет значение! Более специфичные правила должны идти раньше общих
   const keywordRules: Array<{ keywords: string[]; articleNames: string[] }> = [
+    // Специфичные правила для зарплаты (проверяем раньше налогов, чтобы "Без налога" не перехватывало)
     {
-      keywords: ['налог', 'фнс', 'пфр', 'фсс', 'ндс', 'налоги', 'пенсионный фонд'],
-      articleNames: ['Налоги', 'Обязательные платежи', 'Отчисления в фонды']
+      keywords: [
+        'зарплата',
+        'отпускные',
+        'аванс',
+        'премия',
+        'заработная плата',
+        'зарплата (аванс)',
+        'зарплата за',
+      ],
+      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ'],
     },
+    // Аренда (проверяем раньше выручки, чтобы "оплата счета за аренду" не попадала в выручку)
     {
-      keywords: ['зарплата', 'отпускные', 'аванс', 'премия', 'заработная плата'],
-      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ']
+      keywords: [
+        'аренда',
+        'за аренду',
+        'аренда нежилых помещений',
+        'нежилых помещений',
+        'аренда помещений',
+        'помещений',
+        'аренда офиса',
+        'аренда недвижимости',
+        'оренда',
+      ],
+      articleNames: [
+        'Аренда офиса',
+        'Аренда помещений',
+        'Оренда недвижимости',
+        'Аренда',
+      ],
     },
+    // Выручка (проверяем раньше общих правил, но после более специфичных)
     {
-      keywords: ['оплата по счету', 'выручка', 'поступление от клиента', 'оплата покупателя', 'доход', 'продажа'],
-      articleNames: ['Выручка от продаж', 'Доход от реализации', 'Поступления от клиентов']
+      keywords: [
+        'оплата по счету',
+        'оплата счета',
+        'счет №',
+        'выручка',
+        'поступление от клиента',
+        'оплата покупателя',
+        'доход',
+        'продажа',
+        'разработка по',
+        'разработка программного обеспечения',
+        'за разработку',
+        'за разработку по',
+        'услуги по разработке',
+        'оказание услуг',
+        'оказание услуг по',
+      ],
+      articleNames: [
+        'Выручка от продаж',
+        'Доход от реализации',
+        'Поступления от клиентов',
+        'Выручка',
+      ],
+    },
+    // Налоги (общее правило, проверяем после специфичных)
+    {
+      keywords: [
+        'налог',
+        'фнс',
+        'пфр',
+        'фсс',
+        'ндс',
+        'налоги',
+        'пенсионный фонд',
+      ],
+      articleNames: [
+        'Налоги',
+        'Обязательные платежи',
+        'Отчисления в фонды',
+        'Прочие налоги',
+      ],
     },
     {
       keywords: ['предоплата', 'аванс от клиента'],
-      articleNames: ['Авансы от покупателей', 'Предоплата от клиентов']
+      articleNames: ['Авансы от покупателей', 'Предоплата от клиентов'],
     },
     {
-      keywords: ['поставщик', 'счет на оплату', 'закуп', 'оплата поставщику', 'покупка', 'товар', 'сырье'],
-      articleNames: ['Закупка товаров и материалов', 'Оплата поставщикам', 'Закуп сырья и комплектующих']
+      keywords: [
+        'поставщик',
+        'счет на оплату',
+        'закуп',
+        'оплата поставщику',
+        'покупка',
+        'товар',
+        'сырье',
+      ],
+      articleNames: [
+        'Закупка товаров и материалов',
+        'Оплата поставщикам',
+        'Закуп сырья и комплектующих',
+      ],
     },
     {
       keywords: ['услуги', 'работы', 'аутсорсинг', 'подрядчик'],
-      articleNames: ['Оплата услуг и подрядчиков', 'Услуги сторонних организаций', 'Прочие услуги']
+      articleNames: [
+        'Оплата услуг и подрядчиков',
+        'Услуги сторонних организаций',
+        'Прочие услуги',
+      ],
     },
     {
       keywords: ['транспорт', 'доставка', 'логистика', 'топливо'],
-      articleNames: ['Транспортные расходы', 'Доставка и логистика', 'Топливо и ГСМ']
-    },
-    {
-      keywords: ['аренда', 'офис', 'помещение'],
-      articleNames: ['Аренда офиса', 'Аренда помещений', 'Оренда недвижимости']
+      articleNames: [
+        'Транспортные расходы',
+        'Доставка и логистика',
+        'Топливо и ГСМ',
+      ],
     },
     {
       keywords: ['интернет', 'телефон', 'связь', 'сотовая связь'],
-      articleNames: ['Связь и интернет', 'Мобильная связь', 'Телефония']
+      articleNames: ['Связь и интернет', 'Мобильная связь', 'Телефония'],
     },
     {
       keywords: ['канцелярия', 'бумага', 'принтер', 'картридж'],
-      articleNames: ['Хозяйственные расходы', 'Канцелярские товары', 'Расходные материалы']
+      articleNames: [
+        'Хозяйственные расходы',
+        'Канцелярские товары',
+        'Расходные материалы',
+      ],
     },
     {
       keywords: ['банк', 'комиссия', 'эквайринг', 'обслуживание счета'],
-      articleNames: ['Банковские комиссии', 'Комиссии банка', 'Расходы на обслуживание счета']
+      articleNames: [
+        'Банковские комиссии',
+        'Комиссии банка',
+        'Расходы на обслуживание счета',
+      ],
     },
     {
       keywords: ['проценты', 'кредит', 'займ', 'депозит'],
-      articleNames: ['Финансовые расходы', 'Проценты по кредитам', 'Расходы по займам']
+      articleNames: [
+        'Финансовые расходы',
+        'Проценты по кредитам',
+        'Расходы по займам',
+      ],
     },
     {
       keywords: ['страховка', 'страхование'],
-      articleNames: ['Страхование', 'Добровольное страхование', 'ОСАГО / КАСКО']
+      articleNames: [
+        'Страхование',
+        'Добровольное страхование',
+        'ОСАГО / КАСКО',
+      ],
     },
     {
       keywords: ['командировка', 'проезд', 'гостиница'],
-      articleNames: ['Командировочные расходы', 'Проезд и проживание', 'Транспорт и гостиницы']
+      articleNames: [
+        'Командировочные расходы',
+        'Проезд и проживание',
+        'Транспорт и гостиницы',
+      ],
     },
     {
       keywords: ['обучение', 'курсы', 'тренинг', 'повышение квалификации'],
-      articleNames: ['Обучение и развитие персонала', 'Повышение квалификации', 'Расходы на обучение']
+      articleNames: [
+        'Обучение и развитие персонала',
+        'Повышение квалификации',
+        'Расходы на обучение',
+      ],
     },
     {
       keywords: ['реклама', 'маркетинг', 'продвижение', 'google ads', 'яндекс'],
-      articleNames: ['Реклама и маркетинг', 'Продвижение', 'Интернет-реклама']
+      articleNames: ['Реклама и маркетинг', 'Продвижение', 'Интернет-реклама'],
     },
     {
       keywords: ['наличные', 'снятие', 'внесение'],
-      articleNames: ['Операции с наличными', 'Инкассация', 'Снятие / внесение средств']
+      articleNames: [
+        'Операции с наличными',
+        'Инкассация',
+        'Снятие / внесение средств',
+      ],
     },
     {
       keywords: ['дивиденды', 'выплата собственнику'],
-      articleNames: ['Выплата дивидендов', 'Распределение прибыли', 'Выплаты учредителям']
-    }
+      articleNames: [
+        'Выплата дивидендов',
+        'Распределение прибыли',
+        'Выплаты учредителям',
+      ],
+    },
   ];
 
   for (const keywordRule of keywordRules) {
-    const hasKeyword = keywordRule.keywords.some((keyword) =>
-      purpose.toLowerCase().includes(keyword.toLowerCase())
+    // Сортируем ключевые слова по длине (от длинных к коротким) для более точного сопоставления
+    const sortedKeywords = [...keywordRule.keywords].sort(
+      (a, b) => b.length - a.length
+    );
+
+    const purposeLower = purpose.toLowerCase();
+    const hasKeyword = sortedKeywords.some((keyword) =>
+      purposeLower.includes(keyword.toLowerCase())
     );
 
     if (hasKeyword) {
@@ -505,9 +645,10 @@ export async function matchAccount(
   }
 
   // Для income/expense используем accountId
-  const accountNumber = direction === 'expense' 
-    ? operation.payerAccount 
-    : operation.receiverAccount;
+  const accountNumber =
+    direction === 'expense'
+      ? operation.payerAccount
+      : operation.receiverAccount;
 
   // Сначала пробуем найти счет по номеру из операции
   if (accountNumber) {
@@ -565,20 +706,26 @@ export async function autoMatch(
   );
 
   // 2. Сопоставляем контрагента
-  const counterpartyMatch = await matchCounterparty(companyId, operation, direction);
+  const counterpartyMatch = await matchCounterparty(
+    companyId,
+    operation,
+    direction
+  );
 
   // 3. Сопоставляем статью
   const articleMatch = await matchArticle(companyId, operation, direction);
 
   // 4. Сопоставляем счет
-  const accountMatch = await matchAccount(companyId, operation, direction, companyAccountNumber);
+  const accountMatch = await matchAccount(
+    companyId,
+    operation,
+    direction,
+    companyAccountNumber
+  );
 
   // Определяем matchedBy только если все обязательные поля сопоставлены
   // Обязательные поля: статья, счет (контрагент не обязателен, как в обычной форме)
-  const isFullyMatched = !!(
-    articleMatch?.id &&
-    accountMatch?.id
-  );
+  const isFullyMatched = !!(articleMatch?.id && accountMatch?.id);
 
   let matchedBy: string | undefined;
   let matchedRuleId: string | undefined;
@@ -609,4 +756,3 @@ export async function autoMatch(
     direction: direction || undefined,
   };
 }
-

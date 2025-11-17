@@ -46,28 +46,30 @@ export const Modal = ({
   };
 
   return (
-    <div className={classNames(
-      'fixed inset-0 z-50 flex items-center justify-center',
-      size === 'full' ? 'p-1' : 'p-4'
-    )}>
+    <div
+      className={classNames(
+        'fixed inset-0 z-50 flex items-center justify-center',
+        size === 'full' ? 'p-1' : 'p-4'
+      )}
+    >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div
         className={classNames(
-          'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full flex flex-col',
+          'relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col border border-gray-200 dark:border-gray-700',
           sizeClasses[size as keyof typeof sizeClasses] || sizeClasses[size],
           size === 'full' ? 'max-h-[95vh] h-[95vh]' : 'max-h-[90vh]'
         )}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {title}
             </h2>
             <div className="flex items-center gap-2">

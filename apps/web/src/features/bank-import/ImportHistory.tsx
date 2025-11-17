@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Trash2, Eye, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
 import { Select } from '../../shared/ui/Select';
-import { Modal } from '../../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetImportSessionsQuery,
@@ -12,16 +11,14 @@ import {
 import { formatDate } from '../../shared/lib/date';
 import { useNotification } from '../../shared/hooks/useNotification';
 import type { ImportSession } from '@shared/types/imports';
-import { ImportMappingTable } from './ImportMappingTable';
 import TableSkeleton from '../../shared/ui/TableSkeleton';
 import { EmptyState } from '../../shared/ui/EmptyState';
+import { DateRangePicker } from '../../shared/ui/DateRangePicker';
 
 interface ImportHistoryProps {
   onClose?: () => void;
   onViewingChange?: (isViewing: boolean) => void;
-  isCollapsed?: boolean;
-  onCollapseChange?: (collapsed: boolean) => void;
-  onViewSession?: (sessionId: string) => void;
+  onViewSession?: (sessionId: string, fileName?: string) => void;
   viewingSessionId?: string | null;
 }
 
@@ -35,21 +32,22 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
   confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  processed: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+  processed:
+    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
   canceled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
-export const ImportHistory = ({ 
-  onClose, 
+export const ImportHistory = ({
+  onClose,
   onViewingChange,
-  isCollapsed = false,
-  onCollapseChange,
   onViewSession,
   viewingSessionId: propViewingSessionId,
 }: ImportHistoryProps) => {
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [internalViewingSessionId, setInternalViewingSessionId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     sessionId: string | null;
@@ -58,14 +56,12 @@ export const ImportHistory = ({
     sessionId: null,
   });
 
-  const viewingSessionId = propViewingSessionId ?? internalViewingSessionId;
-
-  const limit = 20;
-
   const { data, isLoading, refetch } = useGetImportSessionsQuery({
     status: statusFilter || undefined,
-    limit,
-    offset: page * limit,
+    limit: pageSize,
+    offset: page * pageSize,
+    dateFrom: dateFrom?.toISOString(),
+    dateTo: dateTo?.toISOString(),
   });
 
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
@@ -74,16 +70,15 @@ export const ImportHistory = ({
   const sessions = data?.sessions || [];
   const total = data?.total || 0;
 
-  const handleView = (sessionId: string) => {
+  const handleRowClick = (session: ImportSession) => {
     if (onViewSession) {
-      onViewSession(sessionId);
-    } else {
-      setInternalViewingSessionId(sessionId);
+      onViewSession(session.id, session.fileName);
       onViewingChange?.(true);
     }
   };
 
-  const handleDelete = (sessionId: string) => {
+  const handleDelete = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setDeleteModal({ isOpen: true, sessionId });
   };
 
@@ -98,16 +93,6 @@ export const ImportHistory = ({
       console.error('Failed to delete session:', error);
       showError('Ошибка при удалении сессии импорта');
     }
-  };
-
-  const handleCloseView = () => {
-    if (onViewSession) {
-      onViewSession('');
-    } else {
-      setInternalViewingSessionId(null);
-    }
-    onViewingChange?.(false);
-    refetch();
   };
 
   const columns = [
@@ -137,136 +122,41 @@ export const ImportHistory = ({
           {STATUS_LABELS[session.status] || session.status}
         </span>
       ),
-      width: '130px',
-    },
-    {
-      key: 'counts',
-      header: 'Операции',
-      render: (session: ImportSession) => (
-        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
-          <div>
-            Всего: <span className="font-medium">{session.importedCount}</span>
-          </div>
-          <div>
-            Подтверждено:{' '}
-            <span className="font-medium">{session.confirmedCount}</span>
-          </div>
-          <div>
-            Обработано:{' '}
-            <span className="font-medium">{session.processedCount}</span>
-          </div>
-        </div>
-      ),
-      width: '150px',
+      width: '120px',
     },
     {
       key: 'actions',
       header: 'Действия',
-      render: (session: ImportSession) => (
-        <div className="flex gap-2">
+      render: (session: ImportSession) =>
+        session.status !== 'processed' ? (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleView(session.id);
-            }}
-            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
-            title="Просмотр"
+            onClick={(e) => handleDelete(session.id, e)}
+            className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+            title="Удалить"
           >
-            <Eye size={16} />
+            <Trash2 size={16} />
           </button>
-          {session.status !== 'processed' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(session.id);
-              }}
-              className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
-              title="Удалить"
-            >
-              <Trash2 size={16} />
-            </button>
-          )}
-        </div>
-      ),
-      width: '100px',
+        ) : null,
+      width: '80px',
     },
   ];
 
-  const totalPages = Math.ceil(total / limit);
-
-  // Если открыт просмотр сессии, показываем таблицу маппинга
-  if (viewingSessionId) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Импортированные операции</h2>
-          <Button onClick={handleCloseView} variant="secondary" size="sm">
-            Назад к истории
-          </Button>
-        </div>
-        <ImportMappingTable
-          sessionId={viewingSessionId}
-          onClose={handleCloseView}
-          isCollapsed={false}
-          onCollapseChange={undefined}
-        />
-      </div>
-    );
-  }
-
-  if (isCollapsed) {
-    return (
-      <div className="p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText size={20} className="text-primary-600 dark:text-primary-400" />
-            <h3 className="text-lg font-semibold">История импортов</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onCollapseChange?.(false)}
-              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Развернуть"
-            >
-              <ChevronUp size={20} />
-            </button>
-            {onClose && (
-              <Button onClick={onClose} variant="secondary" size="sm">
-                Закрыть
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-          История импортов свернута. Нажмите, чтобы развернуть.
-        </p>
-      </div>
-    );
-  }
+  const totalPages = Math.ceil(total / pageSize);
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">История импортов</h2>
-          {onCollapseChange && (
-            <button
-              onClick={() => onCollapseChange(true)}
-              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Свернуть"
-            >
-              <ChevronDown size={20} />
-            </button>
-          )}
-        </div>
-        {onClose && (
-          <Button onClick={onClose} variant="secondary" size="sm">
-            Закрыть
-          </Button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-4 mb-4">
+    <div className="space-y-4">
+      <div className="flex items-center gap-4 mb-4 flex-nowrap">
+        <DateRangePicker
+          startDate={dateFrom}
+          endDate={dateTo}
+          onChange={(start, end) => {
+            setDateFrom(start);
+            setDateTo(end);
+            setPage(0);
+          }}
+          placeholder="Период"
+          className="w-64"
+        />
         <Select
           value={statusFilter}
           onChange={(value) => {
@@ -280,16 +170,16 @@ export const ImportHistory = ({
             { value: 'processed', label: 'Обработано' },
             { value: 'canceled', label: 'Отменено' },
           ]}
-          placeholder="Фильтр по статусу"
-          className="w-48"
+          placeholder="Статус"
+          className="w-36"
         />
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
           Всего: <span className="font-medium">{total}</span>
         </div>
       </div>
 
       {isLoading ? (
-        <TableSkeleton rows={5} columns={5} />
+        <TableSkeleton rows={5} columns={4} />
       ) : sessions.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -304,34 +194,57 @@ export const ImportHistory = ({
                 columns={columns}
                 data={sessions}
                 keyExtractor={(session) => session.id}
+                onRowClick={handleRowClick}
               />
             </div>
           </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                Страница {page + 1} из {totalPages}
-              </div>
+          <div className="flex items-center justify-between mt-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                Страница
+              </span>
+              <Select
+                value={pageSize.toString()}
+                onChange={(value) => {
+                  setPageSize(Number(value));
+                  setPage(0);
+                }}
+                options={[
+                  { value: '5', label: '5' },
+                  { value: '10', label: '10' },
+                  { value: '50', label: '50' },
+                ]}
+                className="w-20"
+              />
+              <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap min-w-fit">
+                из {totalPages}
+              </span>
+            </div>
+            {totalPages > 1 && (
               <div className="flex gap-2">
                 <Button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
                   variant="secondary"
                   size="sm"
+                  title="Предыдущая страница"
                 >
-                  Назад
+                  <ChevronLeft size={20} />
                 </Button>
                 <Button
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages - 1, p + 1))
+                  }
                   disabled={page >= totalPages - 1}
                   variant="secondary"
                   size="sm"
+                  title="Следующая страница"
                 >
-                  Вперед
+                  <ChevronRight size={20} />
                 </Button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
@@ -348,4 +261,3 @@ export const ImportHistory = ({
     </div>
   );
 };
-

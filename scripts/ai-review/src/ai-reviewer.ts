@@ -472,28 +472,48 @@ Begin your review:`;
   }
 
   private async callTool(name: string, args: any): Promise<unknown> {
-    switch (name) {
-      case 'read_file':
-        return callMcpTool('read_file', {
-          path: args.path,
-        });
-      case 'read_file_range':
-        return callMcpTool('read_file_range', {
-          path: args.path,
-          start: args.start,
-          end: args.end,
-        });
-      case 'list_files':
-        return callMcpTool('list_files', {
-          pattern: args.pattern,
-        });
-      case 'search':
-        return callMcpTool('search', {
-          query: args.query,
-        });
-      default:
-        console.warn(`  ⚠ Unknown tool requested: ${name}`);
-        return { error: `Unknown tool: ${name}` };
+    try {
+      switch (name) {
+        case 'read_file':
+          return callMcpTool('read_file', {
+            path: args.path,
+          });
+        case 'read_file_range':
+          return callMcpTool('read_file_range', {
+            path: args.path,
+            start: args.start,
+            end: args.end,
+          });
+        case 'list_files':
+          return callMcpTool('list_files', {
+            pattern: args.pattern,
+          });
+        case 'search':
+          return callMcpTool('search', {
+            query: args.query,
+          });
+        default:
+          console.warn(`  ⚠ Unknown tool requested: ${name}`);
+          return { error: `Unknown tool: ${name}` };
+      }
+    } catch (error: any) {
+      // Return error message to LLM instead of crashing the entire review
+      const errorMessage = error?.message || 'Unknown error';
+      console.warn(`  ⚠ Tool call failed: ${name} - ${errorMessage}`);
+
+      // Return a user-friendly error message that the LLM can understand
+      if (
+        errorMessage.includes('ENOENT') ||
+        errorMessage.includes('no such file')
+      ) {
+        return {
+          error: `File not found: ${args.path || args.pattern || 'unknown'}. This file may have been deleted, moved, or doesn't exist in the repository.`,
+        };
+      }
+
+      return {
+        error: `Failed to execute ${name}: ${errorMessage}`,
+      };
     }
   }
 

@@ -839,7 +839,7 @@ export class ImportsService {
 
     // Обновляем операцию
     const updatedOperation = await prisma.importedOperation.update({
-      where: { id },
+      where: { id, companyId },
       data: updateData,
       include: {
         matchedArticle: { select: { id: true, name: true } },
@@ -866,7 +866,7 @@ export class ImportsService {
       // (если matchedBy уже есть от автосопоставления, оставляем его)
       if (!updatedOperation.matchedBy) {
         finalOperation = await prisma.importedOperation.update({
-          where: { id },
+          where: { id, companyId },
           data: { matchedBy: 'manual' },
           include: {
             matchedArticle: { select: { id: true, name: true } },
@@ -881,7 +881,7 @@ export class ImportsService {
       // Если операция не полностью сопоставлена, сбрасываем matchedBy
       if (updatedOperation.matchedBy) {
         finalOperation = await prisma.importedOperation.update({
-          where: { id },
+          where: { id, companyId },
           data: {
             matchedBy: null,
             matchedRule: { disconnect: true },
@@ -915,7 +915,7 @@ export class ImportsService {
 
     if (session) {
       await prisma.importSession.update({
-        where: { id: sessionId },
+        where: { id: sessionId, companyId },
         data: {
           confirmedCount,
           processedCount,
@@ -1122,7 +1122,7 @@ export class ImportsService {
         }
 
         await prisma.importedOperation.update({
-          where: { id: op.id },
+          where: { id: op.id, companyId },
           data: updateData,
         });
 
@@ -1370,7 +1370,7 @@ export class ImportsService {
 
               // Помечаем как обработанную
               await tx.importedOperation.update({
-                where: { id: op.id },
+                where: { id: op.id, companyId },
                 data: { processed: true },
               });
 
@@ -1468,7 +1468,7 @@ export class ImportsService {
     });
 
     await prisma.importSession.update({
-      where: { id: sessionId },
+      where: { id: sessionId, companyId },
       data: {
         processedCount,
         status:
@@ -1509,7 +1509,7 @@ export class ImportsService {
     });
 
     await prisma.importSession.delete({
-      where: { id: sessionId },
+      where: { id: sessionId, companyId },
     });
 
     return { deleted: deletedCount + 1 };
@@ -1591,7 +1591,7 @@ export class ImportsService {
     }
 
     return prisma.mappingRule.update({
-      where: { id },
+      where: { id, companyId },
       data,
     });
   }
@@ -1612,7 +1612,7 @@ export class ImportsService {
     }
 
     return prisma.mappingRule.delete({
-      where: { id },
+      where: { id, companyId },
     });
   }
 

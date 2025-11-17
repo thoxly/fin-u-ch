@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loginAsTestUser, expectAuthenticated } from './helpers/auth';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 
 test.describe('Bank Statement Import', () => {
@@ -20,14 +20,16 @@ test.describe('Bank Statement Import', () => {
     await expect(importButton.first()).toBeVisible();
   });
 
-  test('should open import modal when clicking import button', async ({ page }) => {
+  test('should open import modal when clicking import button', async ({
+    page,
+  }) => {
     await page.goto('/operations');
     await page.waitForLoadState('networkidle');
 
     // Нажимаем кнопку импорта
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Проверяем, что модальное окно открылось
@@ -37,7 +39,7 @@ test.describe('Bank Statement Import', () => {
     // Проверяем наличие вкладок
     const uploadTab = page.locator('button:has-text("Загрузка файла")');
     const historyTab = page.locator('button:has-text("История импортов")');
-    
+
     await expect(uploadTab).toBeVisible();
     await expect(historyTab).toBeVisible();
   });
@@ -47,9 +49,9 @@ test.describe('Bank Statement Import', () => {
     await page.waitForLoadState('networkidle');
 
     // Открываем модальное окно
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Переключаемся на вкладку истории
@@ -57,7 +59,9 @@ test.describe('Bank Statement Import', () => {
     await historyTab.click();
 
     // Проверяем, что отображается история импортов
-    const historyContent = page.locator('text=История импортов, h2:has-text("История импортов")');
+    const historyContent = page.locator(
+      'text=История импортов, h2:has-text("История импортов")'
+    );
     await expect(historyContent.first()).toBeVisible();
   });
 
@@ -66,9 +70,9 @@ test.describe('Bank Statement Import', () => {
     await page.waitForLoadState('networkidle');
 
     // Открываем модальное окно
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Проверяем наличие зоны загрузки файла
@@ -78,14 +82,16 @@ test.describe('Bank Statement Import', () => {
     await expect(uploadArea.first()).toBeVisible();
   });
 
-  test('should handle file upload (if file input is accessible)', async ({ page }) => {
+  test('should handle file upload (if file input is accessible)', async ({
+    page,
+  }) => {
     await page.goto('/operations');
     await page.waitForLoadState('networkidle');
 
     // Открываем модальное окно
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Создаем тестовый файл
@@ -101,33 +107,35 @@ test.describe('Bank Statement Import', () => {
 
     // Пытаемся найти input для загрузки файла
     const fileInput = page.locator('input[type="file"]');
-    
+
     if ((await fileInput.count()) > 0) {
       // Создаем временный файл и загружаем его
       const testFilePath = join(__dirname, '../test-statement.txt');
-      require('fs').writeFileSync(testFilePath, testFileContent);
+      writeFileSync(testFilePath, testFileContent);
 
-      await fileInput.setInputFiles(testFilePath);
+      try {
+        await fileInput.setInputFiles(testFilePath);
 
-      // Ждем обработки файла (может быть загрузка, парсинг)
-      await page.waitForTimeout(2000);
+        // Ждем обработки файла (может быть загрузка, парсинг)
+        await page.waitForTimeout(2000);
 
-      // Проверяем, что появилась таблица маппинга или сообщение об успехе
-      const mappingTable = page.locator(
-        'text=Импортированные операции, table, [class*="mapping"], [class*="import"]'
-      );
-      const successMessage = page.locator(
-        'text=успешно, text=загружен, [class*="success"]'
-      );
+        // Проверяем, что появилась таблица маппинга или сообщение об успехе
+        const mappingTable = page.locator(
+          'text=Импортированные операции, table, [class*="mapping"], [class*="import"]'
+        );
+        const successMessage = page.locator(
+          'text=успешно, text=загружен, [class*="success"]'
+        );
 
-      // Один из них должен быть виден
-      const hasTable = (await mappingTable.count()) > 0;
-      const hasSuccess = (await successMessage.count()) > 0;
+        // Один из них должен быть виден
+        const hasTable = (await mappingTable.count()) > 0;
+        const hasSuccess = (await successMessage.count()) > 0;
 
-      // Очищаем временный файл
-      require('fs').unlinkSync(testFilePath);
-
-      expect(hasTable || hasSuccess).toBe(true);
+        expect(hasTable || hasSuccess).toBe(true);
+      } finally {
+        // Очищаем временный файл
+        unlinkSync(testFilePath);
+      }
     }
   });
 
@@ -136,9 +144,9 @@ test.describe('Bank Statement Import', () => {
     await page.waitForLoadState('networkidle');
 
     // Открываем модальное окно
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Проверяем, что модальное окно открыто
@@ -146,9 +154,11 @@ test.describe('Bank Statement Import', () => {
     await expect(modal).toBeVisible();
 
     // Ищем кнопку закрытия
-    const closeButton = page.locator(
-      'button[aria-label*="close"], button[aria-label*="Close"], button:has([class*="X"]), [class*="close"]'
-    ).first();
+    const closeButton = page
+      .locator(
+        'button[aria-label*="close"], button[aria-label*="Close"], button:has([class*="X"]), [class*="close"]'
+      )
+      .first();
 
     if ((await closeButton.count()) > 0) {
       await closeButton.click();
@@ -167,9 +177,9 @@ test.describe('Bank Statement Import', () => {
     await page.waitForLoadState('networkidle');
 
     // Открываем модальное окно
-    const importButton = page.locator(
-      'button:has-text("Импорт выписки"), button:has-text("Импорт")'
-    ).first();
+    const importButton = page
+      .locator('button:has-text("Импорт выписки"), button:has-text("Импорт")')
+      .first();
     await importButton.click();
 
     // Переключаемся на вкладку истории
@@ -181,7 +191,9 @@ test.describe('Bank Statement Import', () => {
 
     // Проверяем наличие элементов истории (таблица или пустое состояние)
     const historyTable = page.locator('table, [class*="table"]');
-    const emptyState = page.locator('text=Нет импортов, text=пуста, [class*="empty"]');
+    const emptyState = page.locator(
+      'text=Нет импортов, text=пуста, [class*="empty"]'
+    );
 
     const hasTable = (await historyTable.count()) > 0;
     const hasEmptyState = (await emptyState.count()) > 0;
@@ -190,4 +202,3 @@ test.describe('Bank Statement Import', () => {
     expect(hasTable || hasEmptyState).toBe(true);
   });
 });
-

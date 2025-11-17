@@ -2,6 +2,20 @@
  * Import and mapping types
  */
 
+export interface ParsedDocument {
+  date: Date;
+  number?: string;
+  amount: number;
+  payer?: string;
+  payerInn?: string;
+  payerAccount?: string;
+  receiver?: string;
+  receiverInn?: string;
+  receiverAccount?: string;
+  purpose?: string;
+  hash?: string;
+}
+
 export interface ImportSession {
   id: string;
   companyId: string;
@@ -39,6 +53,8 @@ export interface ImportedOperation {
   repeat?: string; // none|daily|weekly|monthly|quarterly|semiannual|annual
   matchedBy?: string | null;
   matchedRuleId?: string | null;
+  isDuplicate: boolean;
+  duplicateOfId?: string | null;
   confirmed: boolean;
   processed: boolean;
   draft: boolean;
@@ -72,6 +88,7 @@ export interface ImportedOperationsResponse {
   total: number;
   confirmed: number;
   unmatched: number;
+  duplicates: number;
 }
 
 export interface ImportSessionsResponse {
@@ -83,4 +100,3 @@ export interface ImportOperationsRequest {
   operationIds?: string[];
   saveRulesForIds?: string[];
 }
-

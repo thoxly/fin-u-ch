@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { DateRangePicker as RDRDateRangePicker, Range } from 'react-date-range';
 import { CalendarIcon } from '@heroicons/react/20/solid';
 import { classNames } from '../lib/utils';
@@ -40,10 +40,10 @@ export const DateRangePicker = ({
   disabled = false,
 }: DateRangePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const [range, setRange] = useState<Range>({
-    startDate: startDate || today,
-    endDate: endDate || today,
+    startDate: startDate ?? today,
+    endDate: endDate ?? today,
     key: 'selection',
   });
   const [monthsCount, setMonthsCount] = useState(2);
@@ -234,15 +234,13 @@ export const DateRangePicker = ({
   ];
 
   useEffect(() => {
-    if (startDate && endDate) {
-      setRange({
-        startDate,
-        endDate,
-        key: 'selection',
-      });
-      setFocusedRange([0, 0]);
-    }
-  }, [startDate, endDate]);
+    setRange({
+      startDate: startDate ?? today,
+      endDate: endDate ?? today,
+      key: 'selection',
+    });
+    setFocusedRange([0, 0]);
+  }, [startDate, endDate, today]);
 
   // При открытии календаря обновляем ключ, чтобы календарь показал правильный месяц
   useEffect(() => {
@@ -433,7 +431,7 @@ export const DateRangePicker = ({
       // Убеждаемся, что startDate - начало дня, а endDate - конец дня
       const normalizedStartDate = startOfDay(range.startDate);
       const normalizedEndDate = endOfDay(range.endDate);
-      
+
       onChange(normalizedStartDate, normalizedEndDate);
     }
     setIsOpen(false);
@@ -443,13 +441,11 @@ export const DateRangePicker = ({
 
   const handleClose = () => {
     // Восстанавливаем исходные значения при закрытии без применения
-    if (startDate && endDate) {
-      setRange({
-        startDate,
-        endDate,
-        key: 'selection',
-      });
-    }
+    setRange({
+      startDate: startDate ?? today,
+      endDate: endDate ?? today,
+      key: 'selection',
+    });
     setIsOpen(false);
     setFocusedRange([0, 0]);
     previousFocusedRange.current = [0, 0];
@@ -472,11 +468,11 @@ export const DateRangePicker = ({
   };
 
   const displayValue =
-    range.startDate && range.endDate
-      ? isSameDate(range.startDate, range.endDate)
-        ? formatDate(range.startDate)
-        : `${formatDate(range.startDate)} — ${formatDate(range.endDate)}`
-      : placeholder || 'Выберите диапазон дат';
+    startDate && endDate
+      ? isSameDate(startDate, endDate)
+        ? formatDate(startDate)
+        : `${formatDate(startDate)} — ${formatDate(endDate)}`
+      : placeholder || 'Весь период';
 
   return (
     <div className={classNames('relative', className)}>
@@ -491,7 +487,7 @@ export const DateRangePicker = ({
             'flex items-center justify-between',
             'text-left',
             disabled && 'opacity-50 cursor-not-allowed',
-            !range.startDate && 'text-gray-400 dark:text-gray-500'
+            (!startDate || !endDate) && 'text-gray-400 dark:text-gray-500'
           )}
         >
           <span className="block truncate">{displayValue}</span>
@@ -638,11 +634,17 @@ export const DateRangePicker = ({
                       type="button"
                       className={classNames(
                         'date-range-picker-apply-btn',
-                        (!range.startDate || !range.endDate || focusedRange[1] === 1) &&
+                        (!range.startDate ||
+                          !range.endDate ||
+                          focusedRange[1] === 1) &&
                           'opacity-50 cursor-not-allowed'
                       )}
                       onClick={handleApply}
-                      disabled={!range.startDate || !range.endDate || focusedRange[1] === 1}
+                      disabled={
+                        !range.startDate ||
+                        !range.endDate ||
+                        focusedRange[1] === 1
+                      }
                     >
                       Применить
                     </button>
@@ -698,21 +700,21 @@ export const DateRangePicker = ({
                   />
 
                   {/* Текст-подсказка под календарем */}
-                  <div 
-                    className="date-range-picker-hint" 
-                    style={{ 
-                      marginTop: '8px', 
+                  <div
+                    className="date-range-picker-hint"
+                    style={{
+                      marginTop: '8px',
                       fontSize: '12px',
                       padding: '6px 8px',
                       textAlign: 'center',
-                      color: 'inherit'
+                      color: 'inherit',
                     }}
                   >
                     {focusedRange[1] === 1 && range.startDate ? (
                       // Выбирается конечная дата
                       <span className="text-gray-500 dark:text-gray-400">
-                        Выбрана дата начала: {formatDate(range.startDate)}.
-                        {' '}Выберите дату завершения
+                        Выбрана дата начала: {formatDate(range.startDate)}.{' '}
+                        Выберите дату завершения
                       </span>
                     ) : range.startDate && range.endDate ? (
                       // Обе даты выбраны
@@ -746,11 +748,17 @@ export const DateRangePicker = ({
                       type="button"
                       className={classNames(
                         'date-range-picker-desktop-apply-btn',
-                        (!range.startDate || !range.endDate || focusedRange[1] === 1) &&
+                        (!range.startDate ||
+                          !range.endDate ||
+                          focusedRange[1] === 1) &&
                           'opacity-50 cursor-not-allowed'
                       )}
                       onClick={handleApply}
-                      disabled={!range.startDate || !range.endDate || focusedRange[1] === 1}
+                      disabled={
+                        !range.startDate ||
+                        !range.endDate ||
+                        focusedRange[1] === 1
+                      }
                     >
                       Применить
                     </button>

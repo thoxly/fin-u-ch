@@ -259,10 +259,13 @@ export const BudgetDetailsPage = () => {
               <Archive className="w-4 h-4 mr-2" />
               {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
             </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="w-4 h-4 mr-2" />
+            <button
+              onClick={handleCreate}
+              className="relative px-4 py-2 border border-primary-500 dark:border-primary-400 rounded-lg bg-primary-500 dark:bg-primary-600 text-white hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus size={18} />
               Добавить позицию
-            </Button>
+            </button>
           </div>
         </div>
       </div>
