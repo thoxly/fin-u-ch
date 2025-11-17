@@ -103,7 +103,38 @@ export class AiReviewer {
               parsedArgs = {};
             }
 
+            // Детальное логирование: что именно делает нейронка
+            const formatArg = (key: string, value: any): string => {
+              if (typeof value === 'string') {
+                // Обрезаем длинные пути/строки для читаемости
+                const maxLen = 60;
+                const str =
+                  value.length > maxLen
+                    ? `${value.substring(0, maxLen)}...`
+                    : value;
+                return `${key}="${str}"`;
+              }
+              return `${key}=${JSON.stringify(value)}`;
+            };
+
+            const argsStr = Object.entries(parsedArgs)
+              .map(([key, value]) => formatArg(key, value))
+              .join(', ');
+
+            console.log(`  → ${name}(${argsStr})`);
+
             const result = await this.callTool(name, parsedArgs);
+
+            // Логируем размер результата (для понимания сколько данных получили)
+            const resultSize =
+              typeof result === 'string'
+                ? result.length
+                : JSON.stringify(result).length;
+            const resultPreview =
+              resultSize > 200
+                ? `[${resultSize} chars]`
+                : JSON.stringify(result).substring(0, 200);
+            console.log(`    ← ${resultPreview}`);
 
             messages.push({
               role: 'assistant',

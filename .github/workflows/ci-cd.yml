@@ -129,6 +129,15 @@ jobs:
       - name: Build AI Review script
         run: pnpm --filter @fin-u-ch/ai-review build
 
+      - name: Cache distilled context
+        uses: actions/cache@v3
+        id: cache-distilled-context
+        with:
+          path: .distilled-context.cache
+          key: distilled-context-${{ hashFiles('docs/ARCHITECTURE.md', 'docs/DOMAIN_MODEL.md', 'docs/ai-context/style-guide.md', 'docs/ai-context/security-checklist.md') }}
+          restore-keys: |
+            distilled-context-
+
       - name: Start MCP server
         working-directory: scripts/ai-review
         env:
