@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { DateRangePicker as RDRDateRangePicker, Range } from 'react-date-range';
 import { CalendarIcon } from '@heroicons/react/20/solid';
 import { classNames } from '../lib/utils';
@@ -40,10 +40,10 @@ export const DateRangePicker = ({
   disabled = false,
 }: DateRangePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const [range, setRange] = useState<Range>({
-    startDate: startDate || today,
-    endDate: endDate || today,
+    startDate: startDate ?? today,
+    endDate: endDate ?? today,
     key: 'selection',
   });
   const [monthsCount, setMonthsCount] = useState(2);
@@ -51,6 +51,7 @@ export const DateRangePicker = ({
   const pickerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [focusedRange, setFocusedRange] = useState<[number, number]>([0, 0]);
+  const previousFocusedRange = useRef<[number, number]>([0, 0]);
 
   // Ключ для пересоздания календаря при открытии, чтобы показать правильный месяц
   const [calendarKey, setCalendarKey] = useState(0);
@@ -233,21 +234,21 @@ export const DateRangePicker = ({
   ];
 
   useEffect(() => {
-    if (startDate && endDate) {
-      setRange({
-        startDate,
-        endDate,
-        key: 'selection',
-      });
-      setFocusedRange([0, 0]);
-    }
-  }, [startDate, endDate]);
+    setRange({
+      startDate: startDate ?? today,
+      endDate: endDate ?? today,
+      key: 'selection',
+    });
+    setFocusedRange([0, 0]);
+  }, [startDate, endDate, today]);
 
   // При открытии календаря обновляем ключ, чтобы календарь показал правильный месяц
   useEffect(() => {
     if (isOpen && range.startDate) {
       // Обновляем ключ для пересоздания календаря с правильным месяцем
       setCalendarKey((prev) => prev + 1);
+      // Сбрасываем previousFocusedRange при открытии
+      previousFocusedRange.current = [0, 0];
     }
   }, [isOpen, range.startDate]);
 
@@ -404,34 +405,12 @@ export const DateRangePicker = ({
 
     if (!selection.startDate || !selection.endDate) return;
 
-    // Логируем для отладки
-    console.log('DateRangePicker: handleSelect', {
-      isMobile,
-      start: selection.startDate.toLocaleDateString('ru-RU'),
-      end: selection.endDate.toLocaleDateString('ru-RU'),
-      sameDate: selection.startDate.getTime() === selection.endDate.getTime(),
-    });
-
     // Обновляем состояние диапазона
     setRange(selection);
 
-    // Проверяем, является ли это полным диапазоном (даты разные)
-    const isFullRange =
-      selection.startDate.getTime() !== selection.endDate.getTime();
-
-    // На десктопе: автоматически применяем когда выбран полный диапазон
-    if (!isMobile && isFullRange) {
-      console.log('DateRangePicker: Автоматическое применение (desktop)');
-      onChange(selection.startDate, selection.endDate);
-      setTimeout(() => {
-        setIsOpen(false);
-      }, 200);
-    }
-
-    // На мобильных: не применяем автоматически, ждем кнопку "Применить"
-    if (isMobile && isFullRange) {
-      console.log('DateRangePicker: Диапазон готов, нажмите "Применить"');
-    }
+    // Больше не применяем автоматически на десктопе - ждем кнопку "Применить"
+    // Сохраняем текущий focusedRange как предыдущий для следующего вызова
+    previousFocusedRange.current = focusedRange;
   };
 
   const handleQuickFilterClick = (staticRange: (typeof staticRanges)[0]) => {
@@ -442,36 +421,34 @@ export const DateRangePicker = ({
       key: 'selection',
     });
     setFocusedRange([0, 0]);
+    previousFocusedRange.current = [0, 0];
 
-    // На десктопе применяем и закрываем сразу
-    if (!isMobile) {
-      onChange(newRange.startDate, newRange.endDate);
-      setTimeout(() => {
-        setIsOpen(false);
-      }, 150);
-    }
-    // На мобильном только обновляем range, но не применяем - дожидаемся кнопки "Применить"
+    // Теперь на всех платформах только обновляем range, но не применяем - дожидаемся кнопки "Применить"
   };
 
   const handleApply = () => {
     if (range.startDate && range.endDate) {
-      onChange(range.startDate, range.endDate);
+      // Убеждаемся, что startDate - начало дня, а endDate - конец дня
+      const normalizedStartDate = startOfDay(range.startDate);
+      const normalizedEndDate = endOfDay(range.endDate);
+
+      onChange(normalizedStartDate, normalizedEndDate);
     }
     setIsOpen(false);
     setFocusedRange([0, 0]);
+    previousFocusedRange.current = [0, 0];
   };
 
   const handleClose = () => {
     // Восстанавливаем исходные значения при закрытии без применения
-    if (startDate && endDate) {
-      setRange({
-        startDate,
-        endDate,
-        key: 'selection',
-      });
-    }
+    setRange({
+      startDate: startDate ?? today,
+      endDate: endDate ?? today,
+      key: 'selection',
+    });
     setIsOpen(false);
     setFocusedRange([0, 0]);
+    previousFocusedRange.current = [0, 0];
   };
 
   const formatDate = (date: Date) => {
@@ -491,11 +468,11 @@ export const DateRangePicker = ({
   };
 
   const displayValue =
-    range.startDate && range.endDate
-      ? isSameDate(range.startDate, range.endDate)
-        ? formatDate(range.startDate)
-        : `${formatDate(range.startDate)} — ${formatDate(range.endDate)}`
-      : placeholder || 'Выберите диапазон дат';
+    startDate && endDate
+      ? isSameDate(startDate, endDate)
+        ? formatDate(startDate)
+        : `${formatDate(startDate)} — ${formatDate(endDate)}`
+      : placeholder || 'Весь период';
 
   return (
     <div className={classNames('relative', className)}>
@@ -510,7 +487,7 @@ export const DateRangePicker = ({
             'flex items-center justify-between',
             'text-left',
             disabled && 'opacity-50 cursor-not-allowed',
-            !range.startDate && 'text-gray-400 dark:text-gray-500'
+            (!startDate || !endDate) && 'text-gray-400 dark:text-gray-500'
           )}
         >
           <span className="block truncate">{displayValue}</span>
@@ -591,20 +568,29 @@ export const DateRangePicker = ({
 
                   {/* Текст-подсказка */}
                   <div className="date-range-picker-hint">
-                    {range.startDate &&
-                    range.endDate &&
-                    range.startDate.getTime() !== range.endDate.getTime() ? (
-                      <span className="text-green-600 dark:text-green-400 font-semibold">
-                        ✓ Выбран диапазон: {formatDate(range.startDate)} —{' '}
-                        {formatDate(range.endDate)}. Нажмите "Применить".
+                    {focusedRange[1] === 1 && range.startDate ? (
+                      // Выбирается конечная дата
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Выбрана дата начала: {formatDate(range.startDate)}.
+                        <br />
+                        Выберите дату завершения
                       </span>
-                    ) : range.startDate &&
-                      range.endDate &&
-                      range.startDate.getTime() === range.endDate.getTime() ? (
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">
-                        📅 Начало: {formatDate(range.startDate)}. Выберите
-                        конечную дату →
-                      </span>
+                    ) : range.startDate && range.endDate ? (
+                      // Обе даты выбраны
+                      range.startDate.getTime() !== range.endDate.getTime() ? (
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Выбран диапазон: {formatDate(range.startDate)} —{' '}
+                          {formatDate(range.endDate)}.
+                          <br />
+                          Нажмите "Применить"
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Выбран один день: {formatDate(range.startDate)}.
+                          <br />
+                          Нажмите "Применить"
+                        </span>
+                      )
                     ) : (
                       <span className="text-gray-600 dark:text-gray-400">
                         Выберите начальную дату или готовый фильтр
@@ -648,11 +634,17 @@ export const DateRangePicker = ({
                       type="button"
                       className={classNames(
                         'date-range-picker-apply-btn',
-                        (!range.startDate || !range.endDate) &&
+                        (!range.startDate ||
+                          !range.endDate ||
+                          focusedRange[1] === 1) &&
                           'opacity-50 cursor-not-allowed'
                       )}
                       onClick={handleApply}
-                      disabled={!range.startDate || !range.endDate}
+                      disabled={
+                        !range.startDate ||
+                        !range.endDate ||
+                        focusedRange[1] === 1
+                      }
                     >
                       Применить
                     </button>
@@ -685,7 +677,7 @@ export const DateRangePicker = ({
                   })}
                 </div>
 
-                {/* Календарь */}
+                {/* Календарь с подсказкой */}
                 <div className="date-range-picker-desktop-calendar">
                   <RDRDateRangePicker
                     key={`calendar-desktop-${calendarKey}`}
@@ -706,6 +698,71 @@ export const DateRangePicker = ({
                     inputRanges={[]}
                     editableDateInputs={false}
                   />
+
+                  {/* Текст-подсказка под календарем */}
+                  <div
+                    className="date-range-picker-hint"
+                    style={{
+                      marginTop: '8px',
+                      fontSize: '12px',
+                      padding: '6px 8px',
+                      textAlign: 'center',
+                      color: 'inherit',
+                    }}
+                  >
+                    {focusedRange[1] === 1 && range.startDate ? (
+                      // Выбирается конечная дата
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Выбрана дата начала: {formatDate(range.startDate)}.{' '}
+                        Выберите дату завершения
+                      </span>
+                    ) : range.startDate && range.endDate ? (
+                      // Обе даты выбраны
+                      range.startDate.getTime() !== range.endDate.getTime() ? (
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Выбран диапазон: {formatDate(range.startDate)} —{' '}
+                          {formatDate(range.endDate)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 dark:text-gray-400">
+                          Выбран один день: {formatDate(range.startDate)}
+                        </span>
+                      )
+                    ) : (
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Выберите начальную дату или готовый фильтр
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Кнопки действий для десктопа */}
+                  <div className="date-range-picker-desktop-actions">
+                    <button
+                      type="button"
+                      className="date-range-picker-desktop-reset-btn"
+                      onClick={handleClose}
+                    >
+                      Сбросить
+                    </button>
+                    <button
+                      type="button"
+                      className={classNames(
+                        'date-range-picker-desktop-apply-btn',
+                        (!range.startDate ||
+                          !range.endDate ||
+                          focusedRange[1] === 1) &&
+                          'opacity-50 cursor-not-allowed'
+                      )}
+                      onClick={handleApply}
+                      disabled={
+                        !range.startDate ||
+                        !range.endDate ||
+                        focusedRange[1] === 1
+                      }
+                    >
+                      Применить
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

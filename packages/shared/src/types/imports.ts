@@ -1,0 +1,160 @@
+/**
+ * Import and mapping types
+ */
+
+export interface ParsedDocument {
+  date: Date;
+  number?: string;
+  amount: number;
+  payer?: string;
+  payerInn?: string;
+  payerAccount?: string;
+  receiver?: string;
+  receiverInn?: string;
+  receiverAccount?: string;
+  purpose?: string;
+  hash?: string;
+}
+
+export interface ImportSession {
+  id: string;
+  companyId: string;
+  userId: string;
+  fileName: string;
+  status: 'draft' | 'confirmed' | 'processed' | 'canceled';
+  importedCount: number;
+  confirmedCount: number;
+  processedCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ImportedOperation {
+  id: string;
+  importSessionId: string;
+  companyId: string;
+  date: Date;
+  number?: string | null;
+  amount: number;
+  description: string;
+  direction?: 'income' | 'expense' | 'transfer' | null;
+  payer?: string | null;
+  payerInn?: string | null;
+  payerAccount?: string | null;
+  receiver?: string | null;
+  receiverInn?: string | null;
+  receiverAccount?: string | null;
+  matchedArticleId?: string | null;
+  matchedCounterpartyId?: string | null;
+  matchedAccountId?: string | null;
+  matchedDealId?: string | null;
+  matchedDepartmentId?: string | null;
+  currency?: string;
+  repeat?: string; // none|daily|weekly|monthly|quarterly|semiannual|annual
+  matchedBy?: string | null;
+  matchedRuleId?: string | null;
+  isDuplicate: boolean;
+  duplicateOfId?: string | null;
+  confirmed: boolean;
+  processed: boolean;
+  draft: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  matchedArticle?: { id: string; name: string } | null;
+  matchedCounterparty?: { id: string; name: string } | null;
+  matchedAccount?: { id: string; name: string } | null;
+  matchedDeal?: { id: string; name: string } | null;
+  matchedDepartment?: { id: string; name: string } | null;
+}
+
+export interface MappingRule {
+  id: string;
+  companyId: string;
+  userId: string;
+  ruleType: 'contains' | 'equals' | 'regex' | 'alias';
+  pattern: string;
+  targetType: 'article' | 'counterparty' | 'account' | 'operationType';
+  targetId?: string | null;
+  targetName?: string | null;
+  sourceField: 'description' | 'receiver' | 'payer' | 'inn';
+  usageCount: number;
+  lastUsedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ImportedOperationsResponse {
+  operations: ImportedOperation[];
+  total: number;
+  confirmed: number;
+  unmatched: number;
+  duplicates: number;
+}
+
+export interface ImportSessionsResponse {
+  sessions: ImportSession[];
+  total: number;
+}
+
+export interface ImportOperationsRequest {
+  operationIds?: string[];
+  saveRulesForIds?: string[];
+}
+
+/**
+ * Result of duplicate check
+ */
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  duplicateOfId?: string;
+  existingOperation?: {
+    id: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Filters for importing operations
+ */
+export interface ImportFilters {
+  confirmed?: boolean;
+  matched?: boolean;
+  duplicate?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Upload statement result
+ */
+export interface UploadStatementResult {
+  sessionId: string;
+  importedCount: number;
+  duplicatesCount: number;
+  fileName: string;
+  parseStats?: {
+    documentsStarted: number;
+    documentsFound: number;
+    documentsSkipped: number;
+    documentsInvalid: number;
+    documentTypesFound: string[];
+  };
+}
+
+/**
+ * Import operations result
+ */
+export interface ImportOperationsResult {
+  imported: number;
+  created: number;
+  errors: number;
+  sessionId: string;
+}
+
+/**
+ * Apply rules result
+ */
+export interface ApplyRulesResult {
+  applied: number;
+  updated: number;
+}

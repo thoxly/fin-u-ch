@@ -32,7 +32,8 @@
     "react-joyride": "^2.9.3",
     "react-redux": "^9.0.4",
     "react-router-dom": "^6.20.0",
-    "recharts": "^2.10.3"
+    "recharts": "^2.10.3",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
@@ -44,6 +45,7 @@
     "@types/react-datepicker": "^4.19.4",
     "@types/react-dom": "^18.2.17",
     "@types/react-joyride": "^2.0.5",
+    "@types/xlsx": "^0.0.36",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "eslint": "^8.55.0",

@@ -4,9 +4,10 @@
  */
 
 import prisma from '../src/config/db';
+import logger from '../src/config/logger';
 
 async function migrateRecurringToTemplates() {
-  console.log('Начинаем миграцию повторяющихся операций в шаблоны...');
+  logger.info('Начинаем миграцию повторяющихся операций в шаблоны...');
 
   try {
     // Находим все операции, которые должны быть шаблонами
@@ -25,10 +26,10 @@ async function migrateRecurringToTemplates() {
       },
     });
 
-    console.log(`Найдено ${operationsToMigrate.length} операций для миграции`);
+    logger.info(`Найдено ${operationsToMigrate.length} операций для миграции`);
 
     if (operationsToMigrate.length === 0) {
-      console.log('Нет операций для миграции');
+      logger.info('Нет операций для миграции');
       return;
     }
 
@@ -42,17 +43,17 @@ async function migrateRecurringToTemplates() {
       },
     });
 
-    console.log(`Успешно обновлено ${result.count} операций`);
-    console.log('Миграция завершена');
+    logger.info(`Успешно обновлено ${result.count} операций`);
+    logger.info('Миграция завершена');
 
     // Выводим информацию об обновленных операциях
     for (const op of operationsToMigrate) {
-      console.log(
+      logger.info(
         `  - ID: ${op.id}, Company: ${op.companyId}, Repeat: ${op.repeat}, Amount: ${op.amount}`
       );
     }
   } catch (error) {
-    console.error('Ошибка при миграции:', error);
+    logger.error('Ошибка при миграции:', error);
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -62,10 +63,10 @@ async function migrateRecurringToTemplates() {
 // Запускаем миграцию
 migrateRecurringToTemplates()
   .then(() => {
-    console.log('✅ Миграция успешно завершена');
+    logger.info('✅ Миграция успешно завершена');
     process.exit(0);
   })
   .catch((error) => {
-    console.error('❌ Ошибка миграции:', error);
+    logger.error('❌ Ошибка миграции:', error);
     process.exit(1);
   });

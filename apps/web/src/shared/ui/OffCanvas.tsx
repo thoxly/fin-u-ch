@@ -43,7 +43,7 @@ export const OffCanvas = ({
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {/* Оверлей — затемнение фона */}
-      <div className="absolute inset-0 bg-black bg-opacity-50 dark:bg-opacity-70" />
+      <div className="absolute inset-0 bg-black bg-opacity-60 backdrop-blur-sm dark:bg-opacity-70" />
 
       {/* OffCanvas (Drawer) */}
       <div
@@ -53,7 +53,7 @@ export const OffCanvas = ({
           // Десктоп: фиксированная ширина 400px
           'md:w-[400px] md:max-w-none',
           // Фон и тень — с поддержкой темы
-          'bg-white shadow-xl dark:bg-gray-800 dark:shadow-gray-900/50',
+          'bg-white shadow-2xl dark:bg-gray-800 dark:shadow-gray-900/50 border-l border-gray-200 dark:border-gray-700',
           // Общие стили
           'transform transition-transform duration-300 ease-in-out z-50 flex flex-col'
         )}
@@ -63,11 +63,11 @@ export const OffCanvas = ({
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
             <h2
               data-testid="offcanvas-title"
               id="offcanvas-title"
-              className="text-xl font-semibold text-gray-900 dark:text-gray-100"
+              className="text-lg font-semibold text-gray-900 dark:text-gray-100"
             >
               {title}
             </h2>

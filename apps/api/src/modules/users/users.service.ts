@@ -1,3 +1,4 @@
+import { Prisma, PrismaClient } from '@prisma/client';
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { hashPassword, verifyPassword } from '../../utils/hash';
@@ -13,6 +14,41 @@ import {
 } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
+
+// Тип для транзакции Prisma (безопасная альтернатива any)
+// Используем unknown для безопасного приведения типа при работе с Prisma транзакциями
+type PrismaTransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+// Типы для работы с пользователями и компаниями
+// Используются для правильной типизации результатов Prisma запросов с include
+type CompanySelect = {
+  id: string;
+  name: string;
+  currencyBase: string;
+  inn?: string | null;
+};
+
+type UserWithCompany<T = CompanySelect> = {
+  id: string;
+  email: string;
+  companyId: string;
+  isActive: boolean;
+  createdAt: Date;
+  firstName: string | null;
+  lastName: string | null;
+  company: T | null;
+};
+
+// Тип для select компании (используется для обхода проблем типизации Prisma)
+type CompanySelectInput = {
+  id: true;
+  name: true;
+  currencyBase: true;
+  inn?: true;
+};
 
 // Вспомогательная функция для обработки ошибок нарушения уникального ограничения Prisma
 function handleUniqueConstraintError(
@@ -156,8 +192,19 @@ async function processOldEmailConfirmation(
   newEmail: string
 ): Promise<void> {
   // Помечаем токен старого email как использованный в транзакции
+  // Используем unknown для безопасного приведения типа (Prisma не всегда правильно типизирует модели в транзакциях)
+  // Это безопаснее чем any, так как мы явно указываем структуру типа
   await prisma.$transaction(async (tx) => {
-    await tx.emailToken.update({
+    // Приводим к unknown, затем к типу с emailToken (безопасная альтернатива any)
+    const txClient = tx as unknown as {
+      emailToken: {
+        update: (args: {
+          where: { token: string };
+          data: { used: boolean };
+        }) => Promise<unknown>;
+      };
+    };
+    await txClient.emailToken.update({
       where: { token },
       data: { used: true },
     });
@@ -175,20 +222,14 @@ export class UsersService {
         id: userId,
         companyId: companyId,
       },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        companyId: true,
-        isActive: true,
-        createdAt: true,
+      include: {
         company: {
           select: {
             id: true,
             name: true,
             currencyBase: true,
-          },
+            inn: true,
+          } as Prisma.CompanySelect,
         },
       },
     });
@@ -197,9 +238,23 @@ export class UsersService {
       throw new AppError('User not found or access denied', 404);
     }
 
+    // Типизируем результат с учетом включенных связей
+    // Используем явную типизацию для обхода проблем с типами Prisma при использовании include + select
+    const userWithCompany = user as unknown as UserWithCompany<CompanySelect>;
+
+    if (!userWithCompany.company) {
+      throw new AppError('Company not found for user', 500);
+    }
+
     return {
-      ...user,
-      companyName: user.company.name,
+      id: user.id,
+      email: user.email,
+      firstName: userWithCompany.firstName,
+      lastName: userWithCompany.lastName,
+      companyId: user.companyId,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+      companyName: userWithCompany.company.name,
     };
   }
 
@@ -277,29 +332,55 @@ export class UsersService {
         // Получаем обновленного пользователя
         const updatedUser = await tx.user.findUniqueOrThrow({
           where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            companyId: true,
-            isActive: true,
+          include: {
             company: {
               select: {
                 id: true,
                 name: true,
                 currencyBase: true,
-              },
+              } as Prisma.CompanySelect,
             },
           },
         });
 
-        return updatedUser;
+        // Типизируем результат с учетом включенных связей
+        const userWithCompany = updatedUser as unknown as UserWithCompany<
+          Omit<CompanySelect, 'inn'>
+        >;
+
+        if (!userWithCompany.company) {
+          throw new AppError('Company not found for user', 500);
+        }
+
+        return {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: userWithCompany.firstName,
+          lastName: userWithCompany.lastName,
+          companyId: updatedUser.companyId,
+          isActive: updatedUser.isActive,
+          company: userWithCompany.company,
+        };
       });
 
+      // Типизируем результат с учетом включенных связей
+      const resultWithCompany = updatedUser as unknown as UserWithCompany<
+        Omit<CompanySelect, 'inn'>
+      >;
+
+      // Проверяем наличие company (должна быть, так как проверяли внутри транзакции)
+      if (!resultWithCompany.company) {
+        throw new AppError('Company not found for user', 500);
+      }
+
       return {
-        ...updatedUser,
-        companyName: updatedUser.company.name,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: resultWithCompany.firstName,
+        lastName: resultWithCompany.lastName,
+        companyId: updatedUser.companyId,
+        isActive: updatedUser.isActive,
+        companyName: resultWithCompany.company.name,
       };
     } catch (error: unknown) {
       if (error instanceof AppError) {
@@ -518,7 +599,7 @@ export class UsersService {
           data: {
             email: newEmail,
             isEmailVerified: true, // Новый email считается подтвержденным
-          },
+          } as Prisma.UserUpdateManyMutationInput,
         });
 
         if (updateResult.count === 0) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Pencil, Trash2, Archive, RotateCcw, X } from 'lucide-react';
+import { Pencil, Trash2, Archive, RotateCcw, X, Plus } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
@@ -37,7 +37,9 @@ export const ArticlesPage = () => {
   });
 
   // Фильтры
-  const [typeFilter, setTypeFilter] = useState<'income' | 'expense' | ''>('');
+  const [typeFilter, setTypeFilter] = useState<
+    'income' | 'expense' | 'transfer' | ''
+  >('');
   const [activityFilter, setActivityFilter] = useState<
     'operating' | 'investing' | 'financing' | ''
   >('');
@@ -46,7 +48,9 @@ export const ArticlesPage = () => {
   );
 
   const filters = {
-    ...(typeFilter && { type: typeFilter as 'income' | 'expense' }),
+    ...(typeFilter && {
+      type: typeFilter as 'income' | 'expense' | 'transfer',
+    }),
     ...(activityFilter && {
       activity: activityFilter as 'operating' | 'investing' | 'financing',
     }),
@@ -164,7 +168,11 @@ export const ArticlesPage = () => {
       key: 'type',
       header: 'Тип',
       render: (a: Article) =>
-        a.type === 'income' ? 'Поступления' : 'Списания',
+        a.type === 'income'
+          ? 'Поступления'
+          : a.type === 'expense'
+            ? 'Списания'
+            : 'Переводы',
     },
     {
       key: 'activity',
@@ -230,7 +238,13 @@ export const ArticlesPage = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
             Статьи
           </h1>
-          <Button onClick={handleCreate}>Создать статью</Button>
+          <button
+            onClick={handleCreate}
+            className="relative px-4 py-2 border border-primary-500 dark:border-primary-400 rounded-lg bg-primary-500 dark:bg-primary-600 text-white hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus size={18} />
+            Создать статью
+          </button>
         </div>
 
         <Card>
@@ -241,12 +255,15 @@ export const ArticlesPage = () => {
                   label="Тип"
                   value={typeFilter}
                   onChange={(value) =>
-                    setTypeFilter(value as 'income' | 'expense' | '')
+                    setTypeFilter(
+                      value as 'income' | 'expense' | 'transfer' | ''
+                    )
                   }
                   options={[
                     { value: '', label: 'Все типы' },
                     { value: 'income', label: 'Поступления' },
                     { value: 'expense', label: 'Списания' },
+                    { value: 'transfer', label: 'Переводы' },
                   ]}
                   placeholder="Выберите тип"
                   fullWidth={false}

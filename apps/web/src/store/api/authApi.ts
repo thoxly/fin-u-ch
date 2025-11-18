@@ -19,6 +19,12 @@ interface AuthResponse {
     firstName?: string;
     lastName?: string;
     companyName?: string;
+    company?: {
+      id: string;
+      name: string;
+      currencyBase: string;
+      inn?: string | null;
+    };
   };
   accessToken: string;
   refreshToken: string;

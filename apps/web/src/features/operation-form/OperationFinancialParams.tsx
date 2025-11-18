@@ -52,6 +52,10 @@ interface OperationFinancialParamsProps {
   onDealChange: (value: string) => void;
   onDepartmentChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
+  onOpenCreateModal?: (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => void;
 }
 
 export const OperationFinancialParams = ({
@@ -78,6 +82,7 @@ export const OperationFinancialParams = ({
   onDealChange,
   onDepartmentChange,
   onValidationErrorClear,
+  onOpenCreateModal,
 }: OperationFinancialParamsProps) => {
   return (
     <div className="space-y-4 mb-6">
@@ -93,6 +98,11 @@ export const OperationFinancialParams = ({
               onSourceAccountChange(value);
               onValidationErrorClear('sourceAccountId');
             }}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'source')
+                : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.sourceAccountId}
@@ -105,6 +115,11 @@ export const OperationFinancialParams = ({
               onTargetAccountChange(value);
               onValidationErrorClear('targetAccountId');
             }}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'target')
+                : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.targetAccountId}
@@ -134,6 +149,9 @@ export const OperationFinancialParams = ({
               onAccountChange(value);
               onValidationErrorClear('accountId');
             }}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('account') : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.accountId}
@@ -153,6 +171,9 @@ export const OperationFinancialParams = ({
             label="Сделка"
             value={dealId}
             onChange={(value) => onDealChange(value)}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('deal') : undefined
+            }
             options={filteredDeals.map((d) => ({
               value: d.id,
               label: d.name,
@@ -164,12 +185,17 @@ export const OperationFinancialParams = ({
                   ? 'Нет доступных сделок'
                   : 'Выберите сделку'
             }
-            disabled={filteredDeals.length === 0}
+            disabled={filteredDeals.length === 0 && !onOpenCreateModal}
           />
           <Select
             label="Подразделение"
             value={departmentId}
             onChange={(value) => onDepartmentChange(value)}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('department')
+                : undefined
+            }
             options={departments.map((d) => ({
               value: d.id,
               label: d.name,
