@@ -169,28 +169,28 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     volumes:
-      # PERSISTENT STORAGE ��� ������ Grafana (��������, ���������, ������������)
+      # PERSISTENT STORAGE ��для данных Grafana (дашборды, настройки)
       - grafana_data:/var/lib/grafana
 
-      # VOLUME ��� �������������� ��������� datasources
+      # VOLUME для автоматической настройки datasources
       - ./grafana/provisioning:/etc/grafana/provisioning
 
     ports:
-      - '3000' # ������ ���������� ���� � Docker ����
+      - '3000' # Только внутренний порт в Docker сети
 
     networks:
       - backend
 
     environment:
-      # ���������� ��������� - ���������� �������� ������� ������
+      # ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ - безопасное хранение учетных данных
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_SERVER_ROOT_URL=http://localhost:3000 # �����������: ������� URL
-      - GF_SECURITY_ALLOW_EMBEDDING=true # ��������� �����������
-      - GF_USERS_ALLOW_SIGN_UP=false # ��������� ����������� ����� �������������
+      - GF_SERVER_ROOT_URL=http://localhost:3000 # Опционально: базовый URL
+      - GF_SECURITY_ALLOW_EMBEDDING=true # Разрешить встраивание
+      - GF_USERS_ALLOW_SIGN_UP=false # Запретить регистрацию новых пользователей
 
     healthcheck:
-      # �������� �������� Grafana
+      # Проверка здоровья Grafana
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
       timeout: 10s
@@ -199,7 +199,7 @@ services:
 
     depends_on:
       prometheus:
-        condition: service_healthy # ���� ���� Prometheus ������ healthy
+        condition: service_healthy # Ждем пока Prometheus станет healthy
 
     restart: unless-stopped
 

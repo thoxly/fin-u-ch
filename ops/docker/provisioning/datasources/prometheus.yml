@@ -1,15 +1,15 @@
 apiVersion: 1
 
-# ������ datasources ��� �������������� ���������
+# Список datasources для автоматической настройки
 datasources:
   - name: Prometheus
-    type: prometheus # ��� datasource - Prometheus
-    access: proxy # Grafana ����� ������������ �������
-    url: http://prometheus:9090 # URL Prometheus � Docker ����
-    isDefault: true # ������������ �� ���������
-    editable: true # ��������� �������������� � UI
-    # �������������� ���������:
+    type: prometheus # Тип datasource - Prometheus
+    access: proxy # Grafana будет проксировать запросы
+    url: http://prometheus:9090 # URL Prometheus в Docker сети
+    isDefault: true # Использовать по умолчанию
+    editable: true # Разрешить редактирование в UI
+    # Дополнительные настройки:
     jsonData:
-      timeInterval: 15s # �������� ��������
-      queryTimeout: 60s # ������� ��������
-      httpMethod: POST # ����� �������
+      timeInterval: 15s # Интервал запросов
+      queryTimeout: 60s # Таймаут запросов
+      httpMethod: POST # Метод запроса

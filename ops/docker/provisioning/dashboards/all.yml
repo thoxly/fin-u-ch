@@ -1,6 +1,6 @@
 apiVersion: 1
 
-# ���������� ���������
+# Провайдеры дашбордов
 providers:
   - name: 'default'
     orgId: 1
