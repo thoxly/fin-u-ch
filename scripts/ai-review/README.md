@@ -83,8 +83,25 @@ If AI review fails:
 3. Run locally with `pnpm dev <pr-number>`
 4. Ensure DeepSeek response format is valid JSON
 
+## Full Reports
+
+All review results are saved to `.ai-review-reports/` directory in the project root:
+
+- **JSON format**: `pr-{number}-{timestamp}.json` - Machine-readable format with all issues
+- **Markdown format**: `pr-{number}-{timestamp}.md` - Human-readable report grouped by severity
+
+The reports include:
+
+- All issues (even those without inline diff positions)
+- Issues grouped by severity (Critical, High, Medium, Low)
+- Issues grouped by file
+- Full suggestions and recommendations
+
+**Note**: The GitHub PR summary comment shows only up to 30 issues without inline positions. For the complete list, check the saved reports.
+
 ## Limits
 
 - Max 10 files per batch (`maxFilesPerBatch`)
 - DeepSeek limits: 16000 tokens per response
 - Skips generated files (dist/, \*.d.ts, maps, lockfiles)
+- GitHub summary shows max 30 issues without inline positions (full list in saved reports)

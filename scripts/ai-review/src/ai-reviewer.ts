@@ -48,7 +48,10 @@ export class AiReviewer {
     console.log('Sending code to LLM (with tools) for review...');
 
     const systemPrompt =
-      'You are an expert AI code reviewer with access to tools for reading project files, listing files, and searching the codebase. Use tools when you need additional context beyond the diff.';
+      'You are an expert, ultra-conservative AI code reviewer with access to tools for reading project files, listing files, and searching the codebase.' +
+      ' Your TOP PRIORITY is to AVOID FALSE POSITIVES.' +
+      ' It is ALWAYS better to miss a potential issue than to wrongly accuse correct code.' +
+      ' Use tools aggressively whenever you need additional context beyond the diff, and NEVER claim that something is missing (a field, a filter, error handling, etc.) unless you have verified it in the actual code via tools.';
 
     const userPrompt = this.buildPrompt(files, diff, distilledContext);
 
@@ -62,20 +65,30 @@ export class AiReviewer {
     try {
       // Tool calling loop (limited by LLM behaviour; stops when no tool calls requested)
       let awaitingToolCalls = true;
+      let loopIterations = 0;
+      let totalToolCalls = 0;
 
       while (awaitingToolCalls) {
+        loopIterations++;
+        if (loopIterations > 10 || totalToolCalls > 50) {
+          console.warn(
+            `  ⚠ Aborting main LLM tool loop after ${loopIterations} iterations and ${totalToolCalls} tool calls to avoid timeouts.`
+          );
+          console.warn(
+            '  ⚠ Returning empty findings due to main LLM tool loop safety limit.'
+          );
+          // Fail-safe: if the model misbehaves with tools, we prefer to return
+          // an empty result (no issues) rather than fail the entire CI job.
+          return { comments: [], issues: [], issuesWithoutInline: [] };
+        }
         const completion = await this.openai.chat.completions.create({
           model: CONFIG.deepseek.model,
           max_tokens: CONFIG.deepseek.maxTokens,
           messages,
           tools,
           tool_choice: 'auto',
-          // DeepSeek supports JSON output mode and is OpenAI-compatible.
-          // This forces the final assistant message to be strict JSON,
-          // which removes flakiness with markdown wrappers and stray text.
-          response_format: {
-            type: 'json_object',
-          } as any,
+          // Note: We don't use response_format here because we need a JSON array,
+          // not a JSON object. The prompt explicitly requests an array format.
         });
 
         const message = completion.choices[0]?.message;
@@ -87,6 +100,7 @@ export class AiReviewer {
         const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
 
         if (toolCalls && toolCalls.length > 0) {
+          totalToolCalls += toolCalls.length;
           console.log(`  LLM requested ${toolCalls.length} tool call(s)`);
 
           for (const toolCall of toolCalls) {
@@ -162,17 +176,31 @@ export class AiReviewer {
         console.log(responseText);
         console.log('\n');
 
+        // First, parse raw findings from the model
         const issues = this.parseFindings(responseText);
-        const { comments, issuesWithoutInline } = this.convertToReviewComments(
+
+        // Second, run a dedicated verification pass whose ONLY job is to
+        // aggressively filter out false positives. The verifier:
+        // - must NEVER invent new issues;
+        // - may only keep issues that it can confirm with code evidence;
+        // - should drop or downgrade anything uncertain.
+        const verifiedIssues = await this.verifyFindings(
           issues,
+          files,
+          diff,
+          distilledContext
+        );
+
+        const { comments, issuesWithoutInline } = this.convertToReviewComments(
+          verifiedIssues,
           files
         );
 
         console.log(
-          `  Parsed findings: ${issues.length} total, ${comments.length} with valid inline positions, ${issuesWithoutInline.length} without inline positions`
+          `  Parsed findings (after verification): ${verifiedIssues.length} total, ${comments.length} with valid inline positions, ${issuesWithoutInline.length} without inline positions`
         );
 
-        return { comments, issues, issuesWithoutInline };
+        return { comments, issues: verifiedIssues, issuesWithoutInline };
       }
 
       throw new Error('LLM finished without producing a final response');
@@ -182,18 +210,244 @@ export class AiReviewer {
     }
   }
 
+  /**
+   * Second-pass verifier.
+   *
+   * Takes the raw issues produced by the first model pass and asks the model
+   * (with full tool access) to strictly verify each one against the real code.
+   *
+   * Rules for the verifier:
+   * - MUST NOT invent new issues.
+   * - MAY drop any issue that cannot be clearly confirmed from the code.
+   * - SHOULD prefer dropping/downgrading over keeping uncertain issues.
+   */
+  private async verifyFindings(
+    issues: Finding[],
+    files: PullRequestFile[],
+    diff: string,
+    distilledContext: string
+  ): Promise<Finding[]> {
+    if (!issues || issues.length === 0) {
+      return issues;
+    }
+
+    console.log(
+      `\nRunning verification pass for ${issues.length} initial issue(s)...`
+    );
+
+    const tools = this.buildTools();
+    let loopIterations = 0;
+    let totalToolCalls = 0;
+
+    const systemPrompt =
+      'You are a STRICT VERIFIER of AI code review findings for the Fin-U-CH project.' +
+      ' Your ONLY job is to review a list of proposed issues and remove anything that is not clearly confirmed in the code.' +
+      ' You MUST NOT invent new issues.' +
+      ' False positives are MUCH WORSE than missed issues.' +
+      ' If you are not sure, you MUST drop the issue.' +
+      ' You have tools to read files, read line ranges, list files and search the codebase — use them to confirm or reject each issue.' +
+      ' Never call the same tool with the exact same arguments more than once: if a search or file read returned empty or not found, treat it as definitive and move on.';
+
+    const userPrompt = `
+You are given:
+
+1) DISTILLED PROJECT CONTEXT:
+
+${distilledContext}
+
+2) CODE DIFF FOR THIS BATCH:
+
+\`\`\`diff
+${diff}
+\`\`\`
+
+3) LIST OF FILES IN THIS BATCH:
+
+${files
+  .map((f) => `- ${f.filename} (+${f.additions}/-${f.deletions})`)
+  .join('\n')}
+
+4) INITIAL AI ISSUES (POTENTIALLY NOISY, MAY CONTAIN FALSE POSITIVES):
+
+\`\`\`json
+${JSON.stringify(issues, null, 2)}
+\`\`\`
+
+YOUR TASK:
+
+- For EACH issue in the list, verify whether it is REAL based on the actual code.
+- You MUST use tools to inspect the relevant files/lines before keeping an issue.
+- You MUST NOT add any new issues that are not present in the input list.
+- If you cannot clearly confirm an issue from the code, you MUST DROP it.
+
+SPECIAL RULES TO AVOID TYPICAL FALSE POSITIVES FOR THIS PROJECT:
+
+1) Prisma / types:
+   - Do NOT report "missing field" or "type mismatch" between Prisma schema and generated types as a bug.
+   - If there is a mismatch, treat it as "types may be outdated" and DROP the issue (this is not a code bug).
+
+2) companyId filters:
+   - Before claiming that a query lacks companyId filtering, you MUST:
+     a) Inspect the exact query via tools.
+     b) Check service-level methods that may add companyId filters.
+   - If companyId is present at any level (controller OR service), DROP the issue.
+
+3) Error handling:
+   - Before claiming "missing error handling" for a call, you MUST:
+     a) Inspect the surrounding code for try/catch or centralised error handlers.
+   - If there is a try/catch or appropriate error handling, DROP the issue.
+
+4) "X is not defined / not found":
+   - NEVER claim that a variable/field/identifier does not exist without:
+     a) Using search tools to look for it;
+     b) Showing a concrete code location where it is absent and clearly required.
+   - If there is any ambiguity (e.g. could be generated, imported elsewhere, or from types), DROP the issue.
+
+OUTPUT FORMAT:
+
+- Return a JSON array of VERIFIED issues.
+- Each issue MUST correspond to one of the input issues (same "file" and "line" and "message" semantics).
+- You may optionally add:
+  - "verification_status": "confirmed" | "dropped" | "downgraded"
+  - "verification_notes": string (short explanation)
+- HOWEVER:
+  - Only include issues in the output array if "verification_status" is "confirmed" or "downgraded".
+  - Never output issues with "verification_status": "dropped".
+
+IMPORTANT:
+- Prefer dropping an issue over keeping a doubtful one.
+- Do NOT output any free-form text — only the JSON array.`;
+
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      loopIterations++;
+      if (loopIterations > 10 || totalToolCalls > 50) {
+        console.warn(
+          `  ⚠ Verifier: aborting tool loop after ${loopIterations} iterations and ${totalToolCalls} tool calls to avoid timeouts. Returning original issues without further verification.`
+        );
+        return issues;
+      }
+      const completion = await this.openai.chat.completions.create({
+        model: CONFIG.deepseek.model,
+        max_tokens: CONFIG.deepseek.maxTokens,
+        messages,
+        tools,
+        tool_choice: 'auto',
+      });
+
+      const message = completion.choices[0]?.message;
+
+      if (!message) {
+        throw new Error('Verifier LLM returned empty response');
+      }
+
+      const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
+
+      if (toolCalls && toolCalls.length > 0) {
+        totalToolCalls += toolCalls.length;
+        console.log(`  Verifier requested ${toolCalls.length} tool call(s)`);
+
+        for (const toolCall of toolCalls) {
+          const { name, arguments: argsJson } = toolCall.function;
+
+          let parsedArgs: any;
+          try {
+            parsedArgs = JSON.parse(argsJson || '{}');
+          } catch (err) {
+            console.warn(
+              `  ⚠ Verifier: failed to parse tool arguments for ${name}:`,
+              err
+            );
+            parsedArgs = {};
+          }
+
+          const formatArg = (key: string, value: any): string => {
+            if (typeof value === 'string') {
+              const maxLen = 60;
+              const str =
+                value.length > maxLen
+                  ? `${value.substring(0, maxLen)}...`
+                  : value;
+              return `${key}="${str}"`;
+            }
+            return `${key}=${JSON.stringify(value)}`;
+          };
+
+          const argsStr = Object.entries(parsedArgs)
+            .map(([key, value]) => formatArg(key, value))
+            .join(', ');
+
+          console.log(`  → verifier.${name}(${argsStr})`);
+
+          const result = await this.callTool(name, parsedArgs);
+
+          const resultSize =
+            typeof result === 'string'
+              ? result.length
+              : JSON.stringify(result).length;
+          const resultPreview =
+            resultSize > 200
+              ? `[${resultSize} chars]`
+              : JSON.stringify(result).substring(0, 200);
+          console.log(`    ← verifier result: ${resultPreview}`);
+
+          messages.push({
+            role: 'assistant',
+            content: null,
+            tool_calls: [toolCall] as any,
+          } as any);
+
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(result),
+          } as any);
+        }
+
+        continue;
+      }
+
+      const responseText = message.content || '';
+
+      console.log('Verifier LLM response:');
+      console.log(responseText);
+      console.log('\n');
+
+      const verifiedIssues = this.parseFindings(responseText);
+
+      console.log(
+        `Verifier kept ${verifiedIssues.length} / ${issues.length} initial issue(s).`
+      );
+
+      return verifiedIssues;
+    }
+  }
+
   private buildPrompt(
     files: PullRequestFile[],
     diff: string,
     distilledContext: string
   ): string {
-    const basePrompt = `You are an expert code reviewer for the Fin-U-CH financial management system.
+    const basePrompt = `You are an expert, ULTRA-CONSERVATIVE code reviewer for the Fin-U-CH financial management system.
 
 # DISTILLED PROJECT CONTEXT
 
 ${distilledContext}
 
-# YOUR TASK (MULTI-LEVEL REVIEW WITH TOOLS)
+# YOUR TASK (MULTI-LEVEL REVIEW WITH TOOLS, MINIMISING FALSE POSITIVES)
+
+**IMPORTANT: Focus ONLY on CRITICAL and HIGH severity issues. Do NOT report Medium or Low severity issues.**
+This project is in early stages, and we want to avoid noise from minor issues.
+
+**EVEN MORE IMPORTANT: Avoid FALSE POSITIVES at all costs.**
+- It is BETTER to MISS a real issue than to mislabel correct code as a bug.
+- You MUST use tools (read_file, read_file_range, list_files, search) whenever you are unsure.
+- You MUST provide evidence from code for every issue (file, line, and a short code quote in the message).
 
 Review the following pull request changes and identify issues at THREE LEVELS:
 
@@ -206,6 +460,27 @@ Identify issues based on:
 4. Performance issues (N+1 queries, missing indexes, no pagination)
 5. Missing error handling or validation
 6. Breaking changes or technical debt
+7. **Simplicity & readability** — prefer simple, boring, explicit code over clever abstractions.
+
+### Simplicity & "junior + AI" patterns
+
+Flag code as problematic (HIGH/CRITICAL if it clearly hurts maintainability) when:
+- Code looks "smart" but:
+  - uses complex TypeScript patterns (deep generics, advanced utility/conditional types) without real need;
+  - introduces unnecessary abstraction layers (wrappers around simple calls, generic helpers used only once);
+  - does premature optimization (heavy useMemo/useCallback, custom caches, complex algorithms for small datasets).
+- It re-implements existing project solutions:
+  - writes a custom hook instead of using an existing hook from \`shared/hooks\`;
+  - uses a custom HTTP client / RTK query hook instead of \`shared/api\` or existing API layer;
+  - implements a new UI component instead of reusing components from \`shared/ui\` or \`entities/\` / \`features/\`.
+- Logic is made more complex for "beauty":
+  - hard-to-read one-liners and long method chains;
+  - heavy map/filter/reduce chains where a simple for/if would be clearer;
+  - usage of patterns/libraries that are not used elsewhere in this project.
+
+Priority:
+- If the code is technically correct but clearly too complex and harms maintainability → category \`architecture\` or \`best-practice\`, severity usually "high".
+- If complexity significantly increases the risk of bugs or domain model mismatch → severity can be "critical".
 
 ## LEVEL 2: ARCHITECTURAL & SYSTEM REVIEW (Project structure)
 
@@ -278,8 +553,39 @@ Perform a high-level architectural review. Detect issues that affect scalability
 
 - **critical** — Architecture break (wrong layer, data leakage, missing companyId)
 - **high** — Major duplication or non-reusable component that blocks maintainability
-- **medium** — Non-scalable structure, inconsistent abstraction, complexity issues
-- **low** — Naming inconsistency, minor structural improvements
+
+**Note:** Do not report medium or low severity issues. Focus only on critical and high.
+
+## PROJECT-SPECIFIC FALSE POSITIVE PATTERNS TO AVOID
+
+Before reporting an issue, ALWAYS check if it falls into one of these categories. If yes, you MUST either:
+- downgrade it to a suggestion (but we skip medium/low entirely), or
+- NOT report it at all.
+
+1) **Prisma fields / types appear "missing"**
+   - Sometimes generated Prisma types may be out of sync with the schema.
+   - Treat this as "types may need regeneration (e.g. prisma generate)", NOT as a bug in business logic.
+   - Do NOT report issues purely about missing fields in generated types if the schema contains them.
+
+2) **companyId filters**
+   - Never assume there is "no companyId filter" after looking at only one layer.
+   - You MUST inspect:
+     - the controller/route handler,
+     - the service method it calls,
+     - and any shared helper used for the query.
+   - If companyId is present in ANY of these, do NOT report a missing companyId bug.
+
+3) **Error handling**
+   - Do NOT report "missing error handling" if:
+     - there is a try/catch around the call,
+     - errors are passed to a central error handler,
+     - or the error is intentionally propagated to a higher layer that handles it.
+
+4) **"X is not defined / not found"**
+   - NEVER claim that a field/variable/identifier does not exist without:
+     - using the search tool to look for it,
+     - and verifying that the code truly expects it to be present there.
+   - If it could reasonably come from types, imports, or generated code, treat it as uncertain and do NOT report it.
 
 ## LEVEL 3: CONFIGURATION & SECURITY REVIEW
 
@@ -305,8 +611,8 @@ Check for:
 **Severity rules (Level 3):**
 - critical — leaked secrets, disabled security validation, public tokens
 - high — build or deployment bypass, unsafe env config
-- medium — bad dependency management, missing validation
-- low — naming or formatting inconsistencies
+
+**Note:** Do not report medium or low severity issues. Focus only on critical and high.
 
 # CHANGED FILES
 
@@ -325,15 +631,18 @@ Provide your review as a JSON array of issues. Each issue must have:
 - line: line number in the NEW file (not diff line)
 - severity: "low" | "medium" | "high" | "critical"
 - category: one of "security", "performance", "bug", "style", "best-practice", **"architecture"**
-- message: clear description of the issue
+- message: clear description of the issue. The message MUST briefly quote or describe the exact code snippet that proves the problem (e.g. mention the Prisma query or the try/catch that is missing).
 - suggestion: (optional) how to fix it
+
+You may also include optional fields:
+- evidence: short code snippet or reference that clearly shows the problem
 
 **Use "architecture" category for Level 2 issues** (wrong placement, duplication, complexity, domain inconsistency)
 
 **CRITICAL SEVERITY**: Security vulnerabilities (missing companyId, SQL injection, XSS), architecture breaks (wrong layer, data leakage)
 **HIGH SEVERITY**: Bugs, major duplication, missing error handling
-**MEDIUM SEVERITY**: Performance issues, non-scalable patterns, complexity
-**LOW SEVERITY**: Style issues, naming inconsistencies, minor improvements
+
+**IMPORTANT REMINDER**: Only report CRITICAL and HIGH severity issues. Skip medium and low severity issues entirely.
 
 Example:
 \`\`\`json
@@ -353,22 +662,6 @@ Example:
     "category": "architecture",
     "message": "Reusable Modal component defined in /pages. This violates layer separation and prevents reuse.",
     "suggestion": "Move this component to /shared/ui/Modal or use existing shared Modal component"
-  },
-  {
-    "file": "apps/web/src/features/operation-form/OperationForm.tsx",
-    "line": 78,
-    "severity": "medium",
-    "category": "architecture",
-    "message": "Duplicate date formatting logic. Same code exists in 3+ components.",
-    "suggestion": "Extract to shared/lib/formatDate.ts and import from there"
-  },
-  {
-    "file": "apps/api/src/modules/reports/complex-report.service.ts",
-    "line": 145,
-    "severity": "medium",
-    "category": "architecture",
-    "message": "Function is 67 lines long with nesting depth of 4. Too complex to maintain.",
-    "suggestion": "Break down into smaller functions: extractData(), transformData(), aggregateResults()"
   }
 ]
 \`\`\`
@@ -476,28 +769,48 @@ Begin your review:`;
   }
 
   private async callTool(name: string, args: any): Promise<unknown> {
-    switch (name) {
-      case 'read_file':
-        return callMcpTool('read_file', {
-          path: args.path,
-        });
-      case 'read_file_range':
-        return callMcpTool('read_file_range', {
-          path: args.path,
-          start: args.start,
-          end: args.end,
-        });
-      case 'list_files':
-        return callMcpTool('list_files', {
-          pattern: args.pattern,
-        });
-      case 'search':
-        return callMcpTool('search', {
-          query: args.query,
-        });
-      default:
-        console.warn(`  ⚠ Unknown tool requested: ${name}`);
-        return { error: `Unknown tool: ${name}` };
+    try {
+      switch (name) {
+        case 'read_file':
+          return callMcpTool('read_file', {
+            path: args.path,
+          });
+        case 'read_file_range':
+          return callMcpTool('read_file_range', {
+            path: args.path,
+            start: args.start,
+            end: args.end,
+          });
+        case 'list_files':
+          return callMcpTool('list_files', {
+            pattern: args.pattern,
+          });
+        case 'search':
+          return callMcpTool('search', {
+            query: args.query,
+          });
+        default:
+          console.warn(`  ⚠ Unknown tool requested: ${name}`);
+          return { error: `Unknown tool: ${name}` };
+      }
+    } catch (error: any) {
+      // Return error message to LLM instead of crashing the entire review
+      const errorMessage = error?.message || 'Unknown error';
+      console.warn(`  ⚠ Tool call failed: ${name} - ${errorMessage}`);
+
+      // Return a user-friendly error message that the LLM can understand
+      if (
+        errorMessage.includes('ENOENT') ||
+        errorMessage.includes('no such file')
+      ) {
+        return {
+          error: `File not found: ${args.path || args.pattern || 'unknown'}. This file may have been deleted, moved, or doesn't exist in the repository.`,
+        };
+      }
+
+      return {
+        error: `Failed to execute ${name}: ${errorMessage}`,
+      };
     }
   }
 
@@ -505,9 +818,62 @@ Begin your review:`;
     try {
       // Extract JSON from markdown code blocks if present
       const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : response;
+      let jsonStr = jsonMatch ? jsonMatch[1] : response;
 
-      const issues = JSON.parse(jsonStr.trim());
+      // Try to fix truncated JSON arrays
+      jsonStr = jsonStr.trim();
+
+      // If it looks like a truncated array (starts with [ but doesn't end with ])
+      if (jsonStr.startsWith('[') && !jsonStr.endsWith(']')) {
+        // Try to extract valid JSON objects from the array using balanced brace matching
+        const objectMatches: string[] = [];
+        let depth = 0;
+        let start = -1;
+        let inArray = false;
+        let arrayDepth = 0;
+
+        for (let i = 1; i < jsonStr.length; i++) {
+          // Start from 1 to skip opening [
+          const char = jsonStr[i];
+
+          if (char === '[') {
+            if (depth === 0) inArray = true;
+            arrayDepth++;
+          } else if (char === ']') {
+            arrayDepth--;
+            if (arrayDepth === 0) inArray = false;
+          } else if (char === '{') {
+            if (depth === 0 && !inArray) start = i;
+            depth++;
+          } else if (char === '}') {
+            depth--;
+            if (depth === 0 && start !== -1 && !inArray) {
+              const objStr = jsonStr.substring(start, i + 1);
+              objectMatches.push(objStr);
+              start = -1;
+            }
+          }
+        }
+
+        if (objectMatches.length > 0) {
+          console.warn(
+            `⚠️  Response was truncated. Extracted ${objectMatches.length} complete objects from partial JSON.`
+          );
+          // Reconstruct valid JSON array
+          jsonStr = '[' + objectMatches.join(',') + ']';
+        } else {
+          // Try to close the array manually if we can find the last complete object
+          const lastBraceIndex = jsonStr.lastIndexOf('}');
+          if (lastBraceIndex > 0) {
+            console.warn(
+              '⚠️  Response was truncated. Attempting to close JSON array manually.'
+            );
+            jsonStr = jsonStr.substring(0, lastBraceIndex + 1) + ']';
+          }
+        }
+      }
+
+      const issues = JSON.parse(jsonStr);
 
       if (!Array.isArray(issues)) {
         console.warn('LLM response is not an array, returning empty');
@@ -517,6 +883,73 @@ Begin your review:`;
       return issues;
     } catch (error) {
       console.error('Failed to parse LLM response as JSON:', error);
+
+      // Try to extract partial results from truncated JSON
+      try {
+        // Look for complete JSON objects in the response
+        // We'll try to find objects by matching balanced braces
+        const objectMatches: string[] = [];
+        let depth = 0;
+        let start = -1;
+
+        for (let i = 0; i < response.length; i++) {
+          if (response[i] === '{') {
+            if (depth === 0) start = i;
+            depth++;
+          } else if (response[i] === '}') {
+            depth--;
+            if (depth === 0 && start !== -1) {
+              const objStr = response.substring(start, i + 1);
+              // Check if it looks like a Finding object (has required fields)
+              if (
+                objStr.includes('"file"') &&
+                objStr.includes('"line"') &&
+                objStr.includes('"severity"') &&
+                objStr.includes('"category"') &&
+                objStr.includes('"message"')
+              ) {
+                objectMatches.push(objStr);
+              }
+              start = -1;
+            }
+          }
+        }
+
+        if (objectMatches && objectMatches.length > 0) {
+          console.warn(
+            `⚠️  Extracted ${objectMatches.length} issues from truncated response. Some issues may be missing.`
+          );
+          const partialIssues = objectMatches
+            .map((obj) => {
+              try {
+                return JSON.parse(obj);
+              } catch {
+                return null;
+              }
+            })
+            .filter((issue): issue is Finding => {
+              if (!issue) return false;
+              // Validate that it has all required fields
+              return (
+                typeof issue.file === 'string' &&
+                typeof issue.line === 'number' &&
+                typeof issue.severity === 'string' &&
+                typeof issue.category === 'string' &&
+                typeof issue.message === 'string'
+              );
+            });
+
+          if (partialIssues.length > 0) {
+            console.warn(
+              `⚠️  Using ${partialIssues.length} extracted issues. Original error: ${error}`
+            );
+            return partialIssues;
+          }
+        }
+      } catch (extractError) {
+        console.warn('Failed to extract partial results:', extractError);
+      }
+
       // Логируем только начало ответа, чтобы не засорять логи огромными строками
       const preview =
         response.length > 2000

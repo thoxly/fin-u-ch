@@ -15,6 +15,21 @@ export default defineConfig({
   optimizeDeps: {
     include: ['@fin-u-ch/shared'],
     force: false, // Set to true if you need to force re-optimization
+    exclude: ['crypto'], // Exclude Node.js crypto module
+  },
+  build: {
+    rollupOptions: {
+      external: (id) => {
+        // Exclude Node.js crypto module from browser bundle
+        if (id === 'crypto' || id.startsWith('crypto/')) {
+          return true;
+        }
+        return false;
+      },
+    },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
   },
   server: {
     port: 5173,
