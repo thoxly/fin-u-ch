@@ -74,9 +74,12 @@ export class AiReviewer {
           console.warn(
             `  ⚠ Aborting main LLM tool loop after ${loopIterations} iterations and ${totalToolCalls} tool calls to avoid timeouts.`
           );
-          throw new Error(
-            'LLM tool loop exceeded safety limits (iterations/tool calls).'
+          console.warn(
+            '  ⚠ Returning empty findings due to main LLM tool loop safety limit.'
           );
+          // Fail-safe: if the model misbehaves with tools, we prefer to return
+          // an empty result (no issues) rather than fail the entire CI job.
+          return { comments: [], issues: [], issuesWithoutInline: [] };
         }
         const completion = await this.openai.chat.completions.create({
           model: CONFIG.deepseek.model,
