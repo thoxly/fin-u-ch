@@ -30,8 +30,9 @@ export class DuplicateDetectionService {
     // 1. Проверяем среди уже импортированных операций (таблица operation)
     // ВАЖНО: в таблице operation нет исходных данных из выписки (payer, receiver, payerInn и т.д.)
     // Поэтому сравниваем только по: дате, сумме и описанию
+    // SECURITY: companyId filter is required to prevent data leakage between tenants
     const whereOperation: Prisma.OperationWhereInput = {
-      companyId,
+      companyId, // REQUIRED: tenant isolation
       operationDate: {
         gte: dateFrom,
         lte: dateTo,
@@ -73,8 +74,9 @@ export class DuplicateDetectionService {
 
     // 2. Проверяем среди импортированных, но не обработанных операций (таблица imported_operations)
     // Здесь есть все исходные данные из выписки, поэтому сравниваем более точно
+    // SECURITY: companyId filter is required to prevent data leakage between tenants
     const whereImported: Prisma.ImportedOperationWhereInput = {
-      companyId,
+      companyId, // REQUIRED: tenant isolation
       date: {
         gte: dateFrom,
         lte: dateTo,
@@ -221,9 +223,10 @@ export class DuplicateDetectionService {
     const amounts = [...new Set(documents.map((doc) => doc.amount))];
 
     // Загружаем все потенциально подходящие операции одним запросом
+    // SECURITY: companyId filter is required to prevent data leakage between tenants
     const existingOperations = await prisma.operation.findMany({
       where: {
-        companyId,
+        companyId, // REQUIRED: tenant isolation
         operationDate: {
           gte: minDate,
           lte: maxDate,
@@ -238,9 +241,10 @@ export class DuplicateDetectionService {
       },
     });
 
+    // SECURITY: companyId filter is required to prevent data leakage between tenants
     const importedOperations = await prisma.importedOperation.findMany({
       where: {
-        companyId,
+        companyId, // REQUIRED: tenant isolation
         date: {
           gte: minDate,
           lte: maxDate,
