@@ -5,16 +5,24 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
-  requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
-});
+// Проверяем, настроен ли SMTP
+const isSmtpConfigured = Boolean(
+  env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS
+);
+
+// Создаем transporter только если SMTP настроен
+const transporter = isSmtpConfigured
+  ? nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
+      requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
+      auth: {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
+      },
+    })
+  : null;
 
 export type EmailTemplate =
   | 'email-verification'
@@ -55,6 +63,28 @@ function replaceVariables(
 }
 
 export async function sendEmail(options: EmailOptions): Promise<void> {
+  // Если SMTP не настроен
+  if (!isSmtpConfigured) {
+    if (env.NODE_ENV === 'production') {
+      throw new Error(
+        'SMTP is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables.'
+      );
+    }
+    // В development режиме просто логируем и не отправляем
+    logger.warn(
+      `Email not sent (SMTP not configured): ${options.subject} to ${options.to}`,
+      {
+        template: options.template,
+        variables: options.variables,
+      }
+    );
+    return;
+  }
+
+  if (!transporter) {
+    throw new Error('Email transporter is not initialized');
+  }
+
   try {
     const template = loadTemplate(options.template);
     const html = replaceVariables(template, options.variables);
