@@ -55,15 +55,9 @@ export class AuthService {
     // Create company and user in a transaction
     const passwordHash = await hashPassword(data.password);
 
-    // Используем правильный тип для транзакции
-    type TransactionClient = Omit<
-      typeof prisma,
-      '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
-    >;
-
     let result;
     try {
-      result = await prisma.$transaction(async (tx: TransactionClient) => {
+      result = await prisma.$transaction(async (tx) => {
         const company = await tx.company.create({
           data: {
             name: data.companyName,
@@ -109,23 +103,39 @@ export class AuthService {
         throw new AppError('User with this email already exists', 409);
       }
 
-      // Логируем детали ошибки
-      logger.error('Failed to create user and company', {
+      // Логируем детали ошибки для диагностики
+      const errorDetails = {
         email: data.email,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        code:
+        companyName: data.companyName,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorCode:
           error && typeof error === 'object' && 'code' in error
             ? error.code
             : undefined,
-      });
+        errorMeta:
+          error && typeof error === 'object' && 'meta' in error
+            ? error.meta
+            : undefined,
+        errorName: error instanceof Error ? error.name : undefined,
+      };
+
+      logger.error('Failed to create user and company', errorDetails);
 
       // Если это уже AppError, пробрасываем как есть
       if (error instanceof AppError) {
         throw error;
       }
 
-      // Иначе общая ошибка
+      // Для development режима показываем детали ошибки
+      if (process.env.NODE_ENV === 'development') {
+        throw new AppError(
+          `Registration failed: ${errorDetails.errorMessage}`,
+          500
+        );
+      }
+
+      // Иначе общая ошибка (не раскрываем детали пользователю из соображений безопасности)
       throw new AppError('Failed to register user. Please try again.', 500);
     }
 

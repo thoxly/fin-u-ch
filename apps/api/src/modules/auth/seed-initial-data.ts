@@ -1,7 +1,8 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../../config/db';
 import logger from '../../config/logger';
 
-// Правильный тип для транзакции Prisma
+// Правильный тип для транзакции Prisma - используем официальный тип из Prisma
 type TransactionClient = Omit<
   typeof prisma,
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
@@ -15,10 +16,11 @@ export async function seedInitialData(
   tx: TransactionClient,
   companyId: string
 ): Promise<void> {
+  const txClient = tx;
   try {
     // 1. СЧЕТА
     logger.info('Creating accounts for company', { companyId });
-    const accounts = await tx.account.createMany({
+    const accounts = await txClient.account.createMany({
       data: [
         {
           companyId,
@@ -49,7 +51,7 @@ export async function seedInitialData(
 
     // 2. СТАТЬИ - только ключевые (5-6 статей)
     logger.info('Creating articles for company', { companyId });
-    await tx.article.createMany({
+    await txClient.article.createMany({
       data: [
         {
           companyId,
@@ -98,7 +100,7 @@ export async function seedInitialData(
 
     // 3. ПОДРАЗДЕЛЕНИЯ - минимальный набор
     logger.info('Creating departments for company', { companyId });
-    await tx.department.createMany({
+    await txClient.department.createMany({
       data: [
         {
           companyId,
@@ -110,7 +112,7 @@ export async function seedInitialData(
 
     // 4. КОНТРАГЕНТЫ - минимальный набор
     logger.info('Creating counterparties for company', { companyId });
-    await tx.counterparty.createMany({
+    await txClient.counterparty.createMany({
       data: [
         {
           companyId,
@@ -124,17 +126,17 @@ export async function seedInitialData(
 
     // 5. СДЕЛКИ - минимальный набор
     logger.info('Creating deals for company', { companyId });
-    const createdDepartments = await tx.department.findMany({
+    const createdDepartments = await txClient.department.findMany({
       where: { companyId },
       take: 1,
     });
-    const createdCounterparties = await tx.counterparty.findMany({
+    const createdCounterparties = await txClient.counterparty.findMany({
       where: { companyId },
       take: 1,
     });
 
     if (createdDepartments.length > 0 && createdCounterparties.length > 0) {
-      await tx.deal.createMany({
+      await txClient.deal.createMany({
         data: [
           {
             companyId,
@@ -162,15 +164,27 @@ export async function seedInitialData(
       accounts: accounts.count,
     });
   } catch (error: unknown) {
-    logger.error('Error during seed initial data', {
+    const errorDetails = {
       companyId,
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      code:
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : undefined,
+      errorCode:
         error && typeof error === 'object' && 'code' in error
           ? error.code
           : undefined,
-    });
+      errorMeta:
+        error && typeof error === 'object' && 'meta' in error
+          ? error.meta
+          : undefined,
+      errorName: error instanceof Error ? error.name : undefined,
+    };
+
+    logger.error('Error during seed initial data', errorDetails);
+
+    // Пробрасываем ошибку с более понятным сообщением
+    if (error instanceof Error) {
+      throw new Error(`Failed to seed initial data: ${error.message}`);
+    }
     throw error;
   }
 }
