@@ -10,7 +10,11 @@ export interface ReadFileParams {
 export interface ReadFileRangeParams {
   path: string;
   start: number;
-  end: number;
+  /**
+   * Optional end line (1-based, inclusive). If omitted, the tool will return
+   * a reasonable window of lines after `start` instead of an empty string.
+   */
+  end?: number;
 }
 
 export interface ListFilesParams {
@@ -153,7 +157,14 @@ export async function readFileRangeTool(
   const lines = content.split('\n');
 
   const start = Math.max(0, params.start - 1);
-  const end = Math.min(lines.length, params.end);
+
+  // If `end` is not provided or invalid, default to a 80-line window or to the file end.
+  const rawEnd =
+    typeof params.end === 'number' && Number.isFinite(params.end)
+      ? params.end
+      : params.start + 79;
+
+  const end = Math.min(lines.length, rawEnd);
 
   return lines.slice(start, end).join('\n');
 }

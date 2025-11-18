@@ -65,8 +65,19 @@ export class AiReviewer {
     try {
       // Tool calling loop (limited by LLM behaviour; stops when no tool calls requested)
       let awaitingToolCalls = true;
+      let loopIterations = 0;
+      let totalToolCalls = 0;
 
       while (awaitingToolCalls) {
+        loopIterations++;
+        if (loopIterations > 10 || totalToolCalls > 50) {
+          console.warn(
+            `  ⚠ Aborting main LLM tool loop after ${loopIterations} iterations and ${totalToolCalls} tool calls to avoid timeouts.`
+          );
+          throw new Error(
+            'LLM tool loop exceeded safety limits (iterations/tool calls).'
+          );
+        }
         const completion = await this.openai.chat.completions.create({
           model: CONFIG.deepseek.model,
           max_tokens: CONFIG.deepseek.maxTokens,
@@ -86,6 +97,7 @@ export class AiReviewer {
         const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
 
         if (toolCalls && toolCalls.length > 0) {
+          totalToolCalls += toolCalls.length;
           console.log(`  LLM requested ${toolCalls.length} tool call(s)`);
 
           for (const toolCall of toolCalls) {
@@ -221,6 +233,8 @@ export class AiReviewer {
     );
 
     const tools = this.buildTools();
+    let loopIterations = 0;
+    let totalToolCalls = 0;
 
     const systemPrompt =
       'You are a STRICT VERIFIER of AI code review findings for the Fin-U-CH project.' +
@@ -308,6 +322,13 @@ IMPORTANT:
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      loopIterations++;
+      if (loopIterations > 10 || totalToolCalls > 50) {
+        console.warn(
+          `  ⚠ Verifier: aborting tool loop after ${loopIterations} iterations and ${totalToolCalls} tool calls to avoid timeouts. Returning original issues without further verification.`
+        );
+        return issues;
+      }
       const completion = await this.openai.chat.completions.create({
         model: CONFIG.deepseek.model,
         max_tokens: CONFIG.deepseek.maxTokens,
@@ -325,6 +346,7 @@ IMPORTANT:
       const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
 
       if (toolCalls && toolCalls.length > 0) {
+        totalToolCalls += toolCalls.length;
         console.log(`  Verifier requested ${toolCalls.length} tool call(s)`);
 
         for (const toolCall of toolCalls) {
