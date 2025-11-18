@@ -181,7 +181,10 @@ export async function listFilesTool(
 export async function searchTool(
   params: SearchParams
 ): Promise<{ path: string; line: number; preview: string }[]> {
-  const files = await fg('**/*.{ts,tsx,js,jsx,json,md}', {
+  // IMPORTANT: include not only TS/JS, but also schema and migration files,
+  // because a lot of critical project logic (Prisma schema, SQL migrations)
+  // lives there and the reviewer often searches for fields/enums there.
+  const files = await fg('**/*.{ts,tsx,js,jsx,json,md,prisma,sql}', {
     cwd: projectRoot,
     dot: false,
     onlyFiles: true,

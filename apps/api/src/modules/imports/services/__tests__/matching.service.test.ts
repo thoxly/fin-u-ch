@@ -26,6 +26,7 @@ jest.mock('../../../../config/db', () => ({
     },
     article: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
     },
     account: {
       findFirst: jest.fn(),
@@ -244,13 +245,15 @@ describe('matching.service', () => {
         matchedBy: 'rule',
         ruleId: 'rule-2',
       });
-      expect(mockPrisma.mappingRule.update).toHaveBeenCalledWith({
-        where: { id: 'rule-2' },
-        data: {
-          usageCount: { increment: 1 },
-          lastUsedAt: expect.any(Date),
-        },
-      });
+      expect(mockPrisma.mappingRule.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'rule-2', companyId },
+          data: expect.objectContaining({
+            usageCount: { increment: 1 },
+            lastUsedAt: expect.any(Date),
+          }),
+        })
+      );
     });
 
     it('должен сопоставить контрагента по fuzzy match', async () => {
@@ -331,8 +334,10 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить статью по правилу типа contains', async () => {
+      // Мокируем equalsRules (пустой массив, чтобы код дошел до containsRules)
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
       // Мокируем regexRules (пустой массив, чтобы код дошел до containsRules)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
       // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
@@ -376,13 +381,13 @@ describe('matching.service', () => {
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
-      mockPrisma.article.findFirst.mockResolvedValueOnce({
-        id: 'article-2',
-        companyId,
-        name: 'Налоги',
-        type: 'expense',
-        isActive: true,
-      } as Prisma.ArticleGetPayload<Record<string, never>>);
+      // Мокируем article.findMany для поиска по ключевым словам
+      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([
+        {
+          id: 'article-2',
+          name: 'Налоги',
+        },
+      ] as Prisma.ArticleGetPayload<{ select: { id: true; name: true } }>[]);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -397,7 +402,8 @@ describe('matching.service', () => {
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
-      mockPrisma.article.findFirst.mockResolvedValueOnce(null);
+      // Мокируем article.findMany для поиска по ключевым словам (пустой результат)
+      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([]);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -427,9 +433,16 @@ describe('matching.service', () => {
           updatedAt: new Date(),
         },
       ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
-      mockPrisma.article.findFirst.mockResolvedValueOnce(null); // Статья не найдена, т.к. тип не совпадает (article-3 имеет тип income, а мы ищем expense)
-      // Мокируем поиск по ключевым словам (пустой результат)
-      mockPrisma.article.findFirst.mockResolvedValueOnce(null);
+      // Статья найдена, но тип не совпадает (article-3 имеет тип income, а мы ищем expense)
+      mockPrisma.article.findFirst.mockResolvedValueOnce({
+        id: 'article-3',
+        companyId,
+        name: 'Выручка',
+        type: 'income', // Неправильный тип
+        isActive: true,
+      } as Prisma.ArticleGetPayload<Record<string, never>>);
+      // Мокируем поиск по ключевым словам (пустой результат, чтобы не было совпадений)
+      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([]);
 
       const operationWithRevenue: ParsedDocument = {
         ...operation,
@@ -571,13 +584,12 @@ describe('matching.service', () => {
 
       // Mock matchArticle - нужно замокать все вызовы Prisma
       mockPrisma.mappingRule.findMany.mockResolvedValue([]); // Все правила пустые
-      mockPrisma.article.findFirst.mockResolvedValueOnce({
-        id: 'article-1',
-        companyId,
-        name: 'Налоги',
-        type: 'expense',
-        isActive: true,
-      } as Prisma.ArticleGetPayload<Record<string, never>>);
+      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([
+        {
+          id: 'article-1',
+          name: 'Налоги',
+        },
+      ] as Prisma.ArticleGetPayload<{ select: { id: true; name: true } }>[]);
 
       jest
         .spyOn(matchingService, 'matchArticle')

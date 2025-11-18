@@ -228,7 +228,8 @@ export class AiReviewer {
       ' You MUST NOT invent new issues.' +
       ' False positives are MUCH WORSE than missed issues.' +
       ' If you are not sure, you MUST drop the issue.' +
-      ' You have tools to read files, read line ranges, list files and search the codebase — use them to confirm or reject each issue.';
+      ' You have tools to read files, read line ranges, list files and search the codebase — use them to confirm or reject each issue.' +
+      ' Never call the same tool with the exact same arguments more than once: if a search or file read returned empty or not found, treat it as definitive and move on.';
 
     const userPrompt = `
 You are given:
