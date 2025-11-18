@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 
@@ -41,6 +42,8 @@ import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
+import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
+import { OzonIcon } from '../features/integrations/OzonIcon';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -76,6 +79,16 @@ export const OperationsPage = () => {
   );
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [integrations, setIntegrations] = useState([
+    {
+      id: 'ozon',
+      name: 'Ozon',
+      icon: OzonIcon,
+      connected: false,
+      data: undefined,
+    },
+  ]);
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -187,6 +200,25 @@ export const OperationsPage = () => {
     useBulkSelection();
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
+
+  const handleIntegrationUpdate = (integrationId: string, data: any) => {
+    setIntegrations((prev) =>
+      prev.map((integration) =>
+        integration.id === integrationId
+          ? {
+              ...integration,
+              connected: true,
+              data: {
+                ...data,
+                articleId: data.articleId,
+                accountId: data.accountId,
+              },
+            }
+          : integration
+      )
+    );
+    showSuccess('Интеграция успешно подключена');
+  };
 
   // Extract data reloading logic to avoid duplication
   const reloadOperationsData = useCallback(async () => {
@@ -793,6 +825,10 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+            <IntegrationsDropdown
+              integrations={integrations}
+              onIntegrationUpdate={handleIntegrationUpdate}
+            />
             <RecurringOperations onEdit={handleEdit} />
             <MappingRules />
             <ExportMenu

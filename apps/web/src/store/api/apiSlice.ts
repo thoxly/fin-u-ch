@@ -109,6 +109,7 @@ export const apiSlice = createApi({
     'Report',
     'Import',
     'MappingRule',
+    'Integration',
   ],
   endpoints: () => ({}),
 });
