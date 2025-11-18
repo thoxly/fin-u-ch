@@ -157,7 +157,7 @@ async function processOldEmailConfirmation(
 ): Promise<void> {
   // Помечаем токен старого email как использованный в транзакции
   await prisma.$transaction(async (tx) => {
-    await tx.emailToken.update({
+    await (tx as any).emailToken.update({
       where: { token },
       data: { used: true },
     });
@@ -175,14 +175,7 @@ export class UsersService {
         id: userId,
         companyId: companyId,
       },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        companyId: true,
-        isActive: true,
-        createdAt: true,
+      include: {
         company: {
           select: {
             id: true,
@@ -198,8 +191,18 @@ export class UsersService {
       throw new AppError('User not found or access denied', 404);
     }
 
+    if (!user.company) {
+      throw new AppError('Company not found for user', 500);
+    }
+
     return {
-      ...user,
+      id: user.id,
+      email: user.email,
+      firstName: (user as any).firstName,
+      lastName: (user as any).lastName,
+      companyId: user.companyId,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
       companyName: user.company.name,
     };
   }
@@ -278,13 +281,7 @@ export class UsersService {
         // Получаем обновленного пользователя
         const updatedUser = await tx.user.findUniqueOrThrow({
           where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            companyId: true,
-            isActive: true,
+          include: {
             company: {
               select: {
                 id: true,
@@ -295,11 +292,28 @@ export class UsersService {
           },
         });
 
-        return updatedUser;
+        if (!updatedUser.company) {
+          throw new AppError('Company not found for user', 500);
+        }
+
+        return {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: (updatedUser as any).firstName,
+          lastName: (updatedUser as any).lastName,
+          companyId: updatedUser.companyId,
+          isActive: updatedUser.isActive,
+          company: updatedUser.company,
+        };
       });
 
       return {
-        ...updatedUser,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: (updatedUser as any).firstName,
+        lastName: (updatedUser as any).lastName,
+        companyId: updatedUser.companyId,
+        isActive: updatedUser.isActive,
         companyName: updatedUser.company.name,
       };
     } catch (error: unknown) {
@@ -519,7 +533,7 @@ export class UsersService {
           data: {
             email: newEmail,
             isEmailVerified: true, // Новый email считается подтвержденным
-          },
+          } as any,
         });
 
         if (updateResult.count === 0) {
