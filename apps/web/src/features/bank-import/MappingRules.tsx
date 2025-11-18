@@ -18,7 +18,7 @@ export const MappingRules = () => {
   const { showSuccess, showError } = useNotification();
   const isMobile = useIsMobile();
 
-  const { data: rules = [], refetch } = useGetMappingRulesQuery();
+  const { data: rules = [], refetch } = useGetMappingRulesQuery({});
   const [deleteRule] = useDeleteMappingRuleMutation();
 
   // Закрытие при клике вне (только для десктопной версии)

@@ -323,12 +323,13 @@ export const importsApi = apiSlice.injectEndpoints({
 
     getMappingRules: builder.query<
       MappingRule[],
-      {
-        targetType?: string;
-        sourceField?: string;
-      } | void
+      | {
+          targetType?: string;
+          sourceField?: string;
+        }
+      | undefined
     >({
-      query: (params) => ({
+      query: (params = {}) => ({
         url: '/imports/rules',
         params,
       }),
@@ -379,15 +380,16 @@ export const importsApi = apiSlice.injectEndpoints({
 
     getImportSessions: builder.query<
       ImportSessionsResponse,
-      {
-        status?: string;
-        limit?: number;
-        offset?: number;
-        dateFrom?: string;
-        dateTo?: string;
-      } | void
+      | {
+          status?: string;
+          limit?: number;
+          offset?: number;
+          dateFrom?: string;
+          dateTo?: string;
+        }
+      | undefined
     >({
-      query: (params) => ({
+      query: (params = {}) => ({
         url: '/imports/sessions',
         params,
       }),

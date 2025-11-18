@@ -1,35 +1,14 @@
 import { Select } from '../../shared/ui/Select';
-import { OperationType } from '@fin-u-ch/shared';
-
-interface Article {
-  id: string;
-  name: string;
-  type: OperationType;
-}
-
-interface Account {
-  id: string;
-  name: string;
-}
-
-interface Counterparty {
-  id: string;
-  name: string;
-}
-
-interface Deal {
-  id: string;
-  name: string;
-  counterpartyId: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-}
+import type {
+  Article,
+  Account,
+  Counterparty,
+  Deal,
+  Department,
+} from '@fin-u-ch/shared';
 
 interface OperationFinancialParamsProps {
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   articleId: string;
   accountId: string;
   sourceAccountId: string;
@@ -89,7 +68,7 @@ export const OperationFinancialParams = ({
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
         Финансовые параметры
       </h3>
-      {type === OperationType.TRANSFER ? (
+      {type === 'transfer' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
             label="Счет списания"

@@ -13,13 +13,14 @@ export const catalogsApi = apiSlice.injectEndpoints({
     // Articles
     getArticles: builder.query<
       Article[],
-      {
-        type?: 'income' | 'expense' | 'transfer';
-        activity?: 'operating' | 'investing' | 'financing';
-        isActive?: boolean;
-      } | void
+      | {
+          type?: 'income' | 'expense' | 'transfer';
+          activity?: 'operating' | 'investing' | 'financing';
+          isActive?: boolean;
+        }
+      | undefined
     >({
-      query: (filters) => {
+      query: (filters = {}) => {
         const params = new URLSearchParams();
         if (filters?.type) params.append('type', filters.type);
         if (filters?.activity) params.append('activity', filters.activity);

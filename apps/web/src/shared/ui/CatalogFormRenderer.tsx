@@ -4,6 +4,14 @@ import { DepartmentForm } from '../../features/catalog-forms/index';
 import { CounterpartyForm } from '../../features/catalog-forms/index';
 import { DealForm } from '../../features/catalog-forms/index';
 import { SalaryForm } from '../../features/catalog-forms/index';
+import type {
+  Article,
+  Account,
+  Department,
+  Counterparty,
+  Deal,
+  Salary,
+} from '@fin-u-ch/shared';
 
 interface CatalogFormRendererProps {
   catalogType: string;
@@ -19,24 +27,47 @@ export const CatalogFormRenderer = ({
   const getFormComponent = (): JSX.Element => {
     switch (catalogType) {
       case 'Статьи':
-        return <ArticleForm article={editingData || null} onClose={onClose} />;
+        return (
+          <ArticleForm
+            article={(editingData as Article | null) ?? null}
+            onClose={onClose}
+          />
+        );
       case 'Счета':
-        return <AccountForm account={editingData || null} onClose={onClose} />;
+        return (
+          <AccountForm
+            account={(editingData as Account | null) ?? null}
+            onClose={onClose}
+          />
+        );
       case 'Подразделения':
         return (
-          <DepartmentForm department={editingData || null} onClose={onClose} />
+          <DepartmentForm
+            department={(editingData as Department | null) ?? null}
+            onClose={onClose}
+          />
         );
       case 'Контрагенты':
         return (
           <CounterpartyForm
-            counterparty={editingData || null}
+            counterparty={(editingData as Counterparty | null) ?? null}
             onClose={onClose}
           />
         );
       case 'Сделки':
-        return <DealForm deal={editingData || null} onClose={onClose} />;
+        return (
+          <DealForm
+            deal={(editingData as Deal | null) ?? null}
+            onClose={onClose}
+          />
+        );
       case 'Зарплаты':
-        return <SalaryForm salary={editingData || null} onClose={onClose} />;
+        return (
+          <SalaryForm
+            salary={(editingData as Salary | null) ?? null}
+            onClose={onClose}
+          />
+        );
       default:
         return (
           <div className="p-4 text-gray-600 dark:text-gray-400">

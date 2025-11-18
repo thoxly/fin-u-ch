@@ -847,7 +847,7 @@ export const ImportMappingTable = ({
       render: (op: ImportedOperation) => (
         <SaveRulesCell
           operation={op}
-          _sessionId={sessionId}
+          sessionId={sessionId}
           onToggle={handleToggleRuleSave}
           disabled={op.processed}
         />

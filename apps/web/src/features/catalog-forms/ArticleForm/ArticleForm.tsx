@@ -23,8 +23,12 @@ export const ArticleForm = ({
   initialType = 'expense',
 }: ArticleFormProps) => {
   const [name, setName] = useState(article?.name || initialName);
-  const [type, setType] = useState(article?.type || initialType);
-  const [activity, setActivity] = useState(article?.activity || 'operating');
+  const [type, setType] = useState<'income' | 'expense' | 'transfer'>(
+    article?.type || initialType
+  );
+  const [activity, setActivity] = useState<
+    'operating' | 'investing' | 'financing'
+  >(article?.activity || 'operating');
   const [counterpartyId, setCounterpartyId] = useState(
     article?.counterpartyId || ''
   );
@@ -92,7 +96,9 @@ export const ArticleForm = ({
       <Select
         label="Тип"
         value={type}
-        onChange={(value) => setType(value)}
+        onChange={(value) =>
+          setType(value as 'income' | 'expense' | 'transfer')
+        }
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
@@ -103,7 +109,9 @@ export const ArticleForm = ({
       <Select
         label="Деятельность"
         value={activity}
-        onChange={(value) => setActivity(value)}
+        onChange={(value) =>
+          setActivity(value as 'operating' | 'investing' | 'financing')
+        }
         options={[
           { value: 'operating', label: 'Операционная' },
           { value: 'investing', label: 'Инвестиционная' },

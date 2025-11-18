@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { OperationType, CreateOperationSchema } from '@fin-u-ch/shared';
+import { CreateOperationSchema } from '@fin-u-ch/shared';
 import { parseAmountInputToNumber } from '../../shared/lib/numberInput';
 
 export interface ValidationErrors {
@@ -10,7 +10,7 @@ export interface OperationFormData {
   operationDate: string;
   amount: string;
   currency: string;
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   articleId: string;
   accountId: string;
   sourceAccountId: string;
@@ -67,7 +67,7 @@ export const useOperationValidation = () => {
     };
 
     // Add type-specific fields
-    if (formData.type === OperationType.TRANSFER) {
+    if (formData.type === 'transfer') {
       validationData.sourceAccountId = formData.sourceAccountId || '';
       validationData.targetAccountId = formData.targetAccountId || '';
     } else {

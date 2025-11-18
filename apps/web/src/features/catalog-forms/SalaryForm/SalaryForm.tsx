@@ -26,14 +26,24 @@ export const SalaryForm = ({
   const [incomeTaxPct, setIncomeTaxPct] = useState(
     salary?.incomeTaxPct.toString() || '13'
   );
-  const [periodicity, setPeriodicity] = useState(
+  const [periodicity, setPeriodicity] = useState<'monthly'>(
     salary?.periodicity || 'monthly'
   );
+
+  const formatDateForInput = (
+    date: Date | string | null | undefined
+  ): string => {
+    if (!date) return '';
+    if (typeof date === 'string') return date.split('T')[0];
+    if (date instanceof Date) return date.toISOString().split('T')[0];
+    return '';
+  };
+
   const [effectiveFrom, setEffectiveFrom] = useState(
-    salary?.effectiveFrom ? salary.effectiveFrom.split('T')[0] : ''
+    formatDateForInput(salary?.effectiveFrom)
   );
   const [effectiveTo, setEffectiveTo] = useState(
-    salary?.effectiveTo ? salary.effectiveTo.split('T')[0] : ''
+    formatDateForInput(salary?.effectiveTo)
   );
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
@@ -52,10 +62,8 @@ export const SalaryForm = ({
     setIncomeTaxPct(salary?.incomeTaxPct?.toString() || '13');
     setPeriodicity(salary?.periodicity || 'monthly');
     // Обработка дат с проверкой на null/undefined
-    setEffectiveFrom(
-      salary?.effectiveFrom ? salary.effectiveFrom.split('T')[0] : ''
-    );
-    setEffectiveTo(salary?.effectiveTo ? salary.effectiveTo.split('T')[0] : '');
+    setEffectiveFrom(formatDateForInput(salary?.effectiveFrom));
+    setEffectiveTo(formatDateForInput(salary?.effectiveTo));
   }, [salary]); // Зависимость от salary
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,10 +75,8 @@ export const SalaryForm = ({
       contributionsPct: parseFloat(contributionsPct),
       incomeTaxPct: parseFloat(incomeTaxPct),
       periodicity,
-      effectiveFrom: new Date(effectiveFrom).toISOString(),
-      effectiveTo: effectiveTo
-        ? new Date(effectiveTo).toISOString()
-        : undefined,
+      effectiveFrom: new Date(effectiveFrom),
+      effectiveTo: effectiveTo ? new Date(effectiveTo) : undefined,
     };
     try {
       if (salary) await update({ id: salary.id, data }).unwrap();
@@ -110,7 +116,7 @@ export const SalaryForm = ({
         <Select
           label="Периодичность"
           value={periodicity}
-          onChange={(value) => setPeriodicity(value)}
+          onChange={(value) => setPeriodicity(value as 'monthly')}
           options={[
             { value: 'monthly', label: 'Ежемесячно' },
             { value: 'weekly', label: 'Еженедельно' },

@@ -9,7 +9,6 @@ import {
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
 import type { Operation } from '@fin-u-ch/shared';
-import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { formatAmountInput } from '../../shared/lib/numberInput';
 import { useOperationValidation } from './useOperationValidation';
 import { useFilteredDeals } from './useFilteredDeals';
@@ -84,7 +83,7 @@ export const OperationForm = ({
       validateOperation,
     });
 
-  const { data: articles = [] } = useGetArticlesQuery();
+  const { data: articles = [] } = useGetArticlesQuery({});
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
@@ -159,7 +158,7 @@ export const OperationForm = ({
   };
 
   const handleTypeChange = (value: string) => {
-    setType(value as OperationType);
+    setType(value as 'income' | 'expense' | 'transfer');
     clearAllValidationErrors();
   };
 
@@ -239,7 +238,18 @@ export const OperationForm = ({
           onDealChange={setDealId}
           onDepartmentChange={setDepartmentId}
           onDescriptionChange={setDescription}
-          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onRepeatChange={(value) =>
+            setRepeat(
+              value as
+                | 'none'
+                | 'daily'
+                | 'weekly'
+                | 'monthly'
+                | 'quarterly'
+                | 'semiannual'
+                | 'annual'
+            )
+          }
           onEndDateChange={setRecurrenceEndDate}
           onValidationErrorClear={clearValidationError}
           onOpenCreateModal={handleOpenCreateModal}

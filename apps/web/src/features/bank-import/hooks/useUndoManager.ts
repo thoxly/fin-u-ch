@@ -18,7 +18,7 @@ export const useUndoManager = (options: UseUndoManagerOptions = {}) => {
 
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const [isUndoAvailable, setIsUndoAvailable] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [updateOperation] = useUpdateImportedOperationMutation();
 

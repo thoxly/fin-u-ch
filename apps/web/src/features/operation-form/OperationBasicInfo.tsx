@@ -1,9 +1,8 @@
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
-import { OperationType } from '@fin-u-ch/shared';
 
 interface OperationBasicInfoProps {
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   operationDate: string;
   amount: string;
   currency: string;
