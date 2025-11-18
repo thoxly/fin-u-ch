@@ -196,8 +196,8 @@ importers:
         specifier: ^2.10.3
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       xlsx:
-        specifier: ^0.18.5
-        version: 0.18.5
+        specifier: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
+        version: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz
     devDependencies:
       '@playwright/test':
         specifier: ^1.56.0
@@ -5407,6 +5407,12 @@ packages:
 
   xlsx@0.18.5:
     resolution: {integrity: sha512-dmg3LCjBPHZnQp5/F/+nnTa+miPJxUXB6vtk42YjBBKayDNagxGEeIdWApkYPOf3Z3pm3k62Knjzp7lMeTEtFQ==}
+    engines: {node: '>=0.8'}
+    hasBin: true
+
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz:
+    resolution: {tarball: https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz}
+    version: 0.20.2
     engines: {node: '>=0.8'}
     hasBin: true
 
@@ -11965,6 +11971,8 @@ snapshots:
       ssf: 0.11.2
       wmf: 1.0.2
       word: 0.3.0
+
+  xlsx@https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz: {}
 
   xml-name-validator@5.0.0: {}
 

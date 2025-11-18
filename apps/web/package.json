@@ -33,7 +33,7 @@
     "react-redux": "^9.0.4",
     "react-router-dom": "^6.20.0",
     "recharts": "^2.10.3",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.2/xlsx-0.20.2.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",
