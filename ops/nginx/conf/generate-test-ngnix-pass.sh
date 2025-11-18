@@ -24,6 +24,9 @@ if [ ${#PASSWORD} -ne 6 ]; then
     exit 1
 fi
 
+# Выводим сгенерированный пароль в консоль
+echo "✅ Generated password: $PASSWORD"
+
 # Сохраняем логин и пароль в файл .hpassword
 echo "admin:$PASSWORD" > .hpassword
 chmod 600 .htpasswd  # Только владелец может читать/писать

@@ -40,6 +40,7 @@ test-results/
 # IDE
 .vscode/
 .idea/
+.vs/
 *.swp
 *.swo
 *~
@@ -68,4 +69,5 @@ ops/nginx/ssl/*.pem
 apps/api/.env
 apps/worker/.env
 
+ops/nginx/.htpasswd
 ops/nginx/conf/.htpasswd

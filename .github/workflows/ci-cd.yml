@@ -675,10 +675,24 @@ jobs:
           scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
           scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
 
+          # Copying the prometheus and provisioning folders recursively
+          scp -i ~/.ssh/deploy_key -r ops/docker/prometheus/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/prometheus/ || true          
+          scp -i ~/.ssh/deploy_key -r ops/docker/provisioning/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/provisioning/ || true
+
           # Copy diagnostic scripts
           scp -i ~/.ssh/deploy_key ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
           scp -i ~/.ssh/deploy_key ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
           ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh' || true
+
+      - name: Create and upload .htpasswd from base64 secret
+        run: |
+            if [ -n "${{ secrets.GRAFANA_HTPASSWD_B64 }}" ]; then
+              echo "${{ secrets.GRAFANA_HTPASSWD_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+                  'base64 -d > /opt/fin-u-ch/nginx/.htpasswd && chmod 600 /opt/fin-u-ch/nginx/.htpasswd'
+              echo "✅ .htpasswd created from base64 secret"
+            else
+              echo "⚠️ GRAFANA_HTPASSWD_B64 secret not found, skipping .htpasswd creation"
+            fi
 
       - name: Upload SSL certificate
         run: |
