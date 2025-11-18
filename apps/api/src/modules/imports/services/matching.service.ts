@@ -1,4 +1,5 @@
 import prisma from '../../../config/db';
+import { Prisma } from '@prisma/client';
 import { compareTwoStrings } from 'string-similarity';
 import { ParsedDocument } from '../parsers/clientBankExchange.parser';
 import logger from '../../../config/logger';
@@ -303,7 +304,9 @@ export async function matchArticle(
 
   for (const rule of equalsRules) {
     if (purpose.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
-      const article = await prisma.article.findFirst({
+      const article:
+        | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
+        | null = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
           companyId,
@@ -313,19 +316,22 @@ export async function matchArticle(
       });
 
       if (article) {
-        await prisma.mappingRule.update({
-          where: { id: rule.id, companyId },
-          data: {
-            usageCount: { increment: 1 },
-            lastUsedAt: new Date(),
-          },
-        });
+        // Проверяем тип статьи перед возвратом
+        if (article.type === articleType) {
+          await prisma.mappingRule.update({
+            where: { id: rule.id, companyId },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          });
 
-        return {
-          id: article.id,
-          matchedBy: 'rule',
-          ruleId: rule.id,
-        };
+          return {
+            id: article.id,
+            matchedBy: 'rule',
+            ruleId: rule.id,
+          };
+        }
       }
     }
   }
@@ -344,7 +350,9 @@ export async function matchArticle(
     try {
       const regex = new RegExp(rule.pattern, 'i');
       if (regex.test(purpose) && rule.targetId) {
-        const article = await prisma.article.findFirst({
+        const article:
+          | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
+          | null = await prisma.article.findFirst({
           where: {
             id: rule.targetId,
             companyId,
@@ -354,19 +362,22 @@ export async function matchArticle(
         });
 
         if (article) {
-          await prisma.mappingRule.update({
-            where: { id: rule.id, companyId },
-            data: {
-              usageCount: { increment: 1 },
-              lastUsedAt: new Date(),
-            },
-          });
+          // Проверяем тип статьи перед возвратом
+          if (article.type === articleType) {
+            await prisma.mappingRule.update({
+              where: { id: rule.id, companyId },
+              data: {
+                usageCount: { increment: 1 },
+                lastUsedAt: new Date(),
+              },
+            });
 
-          return {
-            id: article.id,
-            matchedBy: 'rule',
-            ruleId: rule.id,
-          };
+            return {
+              id: article.id,
+              matchedBy: 'rule',
+              ruleId: rule.id,
+            };
+          }
         }
       }
     } catch (e) {
@@ -390,7 +401,9 @@ export async function matchArticle(
       purpose.toLowerCase().includes(rule.pattern.toLowerCase()) &&
       rule.targetId
     ) {
-      const article = await prisma.article.findFirst({
+      const article:
+        | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
+        | null = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
           companyId,
@@ -400,19 +413,22 @@ export async function matchArticle(
       });
 
       if (article) {
-        await prisma.mappingRule.update({
-          where: { id: rule.id, companyId },
-          data: {
-            usageCount: { increment: 1 },
-            lastUsedAt: new Date(),
-          },
-        });
+        // Проверяем тип статьи перед возвратом
+        if (article.type === articleType) {
+          await prisma.mappingRule.update({
+            where: { id: rule.id, companyId },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          });
 
-        return {
-          id: article.id,
-          matchedBy: 'rule',
-          ruleId: rule.id,
-        };
+          return {
+            id: article.id,
+            matchedBy: 'rule',
+            ruleId: rule.id,
+          };
+        }
       }
     }
   }

@@ -248,6 +248,19 @@ export class ImportsService {
     companyInn: string | null,
     companyAccountNumber?: string
   ): Promise<Prisma.ImportedOperationGetPayload<Record<string, never>>[]> {
+    // Verify the import session belongs to the company (security check)
+    const session = await prisma.importSession.findFirst({
+      where: { id: sessionId, companyId },
+      select: { id: true },
+    });
+
+    if (!session) {
+      throw new AppError(
+        'Import session not found or does not belong to company',
+        404
+      );
+    }
+
     const importedOperations: Prisma.ImportedOperationGetPayload<
       Record<string, never>
     >[] = [];
@@ -261,6 +274,15 @@ export class ImportsService {
 
         try {
           await prisma.$transaction(async (tx) => {
+            // Security: Verify session belongs to company within transaction (defense in depth)
+            const sessionCheck = await tx.importSession.findFirst({
+              where: { id: sessionId, companyId },
+              select: { id: true },
+            });
+            if (!sessionCheck) {
+              throw new AppError('Import session validation failed', 403);
+            }
+
             for (const doc of batch) {
               try {
                 // Проверка дубликата
