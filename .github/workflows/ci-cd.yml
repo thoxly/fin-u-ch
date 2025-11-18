@@ -659,13 +659,25 @@ jobs:
           
           SSH_PORT="${{ secrets.VPS_SSH_PORT }}"
           if [ -z "$SSH_PORT" ]; then
+            echo "Using default SSH port 22"
             SSH_PORT=22
+          elif ! [[ "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "❌ ERROR: SSH_PORT must be numeric, got: '$SSH_PORT'"
+            exit 1
+          elif [ "$SSH_PORT" -lt 1 ] || [ "$SSH_PORT" -gt 65535 ]; then
+            echo "❌ ERROR: SSH_PORT must be between 1 and 65535, got: $SSH_PORT"
+            exit 1
+          elif [ "$SSH_PORT" -lt 1024 ] && [ "$SSH_PORT" -ne 22 ]; then
+            echo "⚠️ WARNING: SSH_PORT $SSH_PORT is a privileged port"
           fi
           echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
 
           SUDO_CMD=""
           if [ "${{ secrets.VPS_SUDO_ENABLED }}" = "true" ]; then
             SUDO_CMD="sudo"
+            echo "✅ Sudo enabled"
+          else
+            SUDO_CMD=""
           fi
           echo "SUDO_CMD=$SUDO_CMD" >> $GITHUB_ENV
 
@@ -683,11 +695,11 @@ jobs:
 
       - name: Copy docker-compose and scripts to VPS
         run: |
-          # Создаем временную директорию для этого шага
+          # Creating a temp directory
           TEMP_DIR="/tmp/deploy-scripts"
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "mkdir -p $TEMP_DIR"
           
-          # Копируем файлы во временную директорию
+          # Copying files to a temp directory
           scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/docker/docker-compose.prod.yml \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/docker-compose.prod.yml
 
@@ -697,6 +709,12 @@ jobs:
           scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/nginx-ssl.conf \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/nginx-ssl.conf || true
 
+          # Copying the prometheus and provisioning folders recursively
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} -r ops/docker/prometheus/ \
+           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/prometheus/ || true          
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} -r ops/docker/provisioning/ \
+           ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/provisioning/ || true
+
           # Copy diagnostic scripts
           scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/diagnose-deploy.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/diagnose-deploy.sh || true
@@ -704,16 +722,33 @@ jobs:
           scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/fix-deployment.sh \
             ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${TEMP_DIR}/fix-deployment.sh || true
 
-          # Перемещаем файлы с sudo
+          # Moving files from a temp folder
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "${{ env.SUDO_CMD }} mkdir -p /opt/fin-u-ch/nginx && \
             ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/docker-compose.prod.yml /opt/fin-u-ch/docker-compose.prod.yml && \
-            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx.conf /opt/fin-u-ch/nginx/nginx.conf && \
-            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx-ssl.conf /opt/fin-u-ch/nginx/nginx-ssl.conf && \
-            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/diagnose-deploy.sh /opt/fin-u-ch/diagnose-deploy.sh && \
-            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/fix-deployment.sh /opt/fin-u-ch/fix-deployment.sh && \
-            ${{ env.SUDO_CMD }} chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx.conf /opt/fin-u-ch/nginx/nginx.conf || true && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/nginx-ssl.conf /opt/fin-u-ch/nginx/nginx-ssl.conf || true && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/diagnose-deploy.sh /opt/fin-u-ch/diagnose-deploy.sh || true && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/fix-deployment.sh /opt/fin-u-ch/fix-deployment.sh || true && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/prometheus/ /opt/fin-u-ch/prometheus/ || true && \
+            ${{ env.SUDO_CMD }} mv ${TEMP_DIR}/provisioning/ /opt/fin-u-ch/provisioning/ || true && \
+            ${{ env.SUDO_CMD }} chmod +x /opt/fin-u-ch/*.sh || true && \
             ${{ env.SUDO_CMD }} rm -rf ${TEMP_DIR}"
+
+      - name: Create and upload .htpasswd from base64 secret
+        run: |
+            if [ -n "${{ secrets.GRAFANA_HTPASSWD_B64 }}" ]; then
+              echo "${{ secrets.GRAFANA_HTPASSWD_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} \
+                ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "${{ env.SUDO_CMD }} sh -c 'base64 -d > /opt/fin-u-ch/nginx/.htpasswd'"
+
+              ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+                "${{ env.SUDO_CMD }} chmod 600 /opt/fin-u-ch/nginx/.htpasswd 2>/dev/null || true && \
+                ${{ env.SUDO_CMD }} chown root:root /opt/fin-u-ch/nginx/.htpasswd 2>/dev/null || true"
+
+              echo "✅ .htpasswd created from base64 secret"
+            else
+              echo "⚠️ GRAFANA_HTPASSWD_B64 secret not found, skipping .htpasswd creation"
+            fi
 
       - name: Upload SSL certificate
         run: |
