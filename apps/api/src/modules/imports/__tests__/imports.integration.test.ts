@@ -27,40 +27,47 @@ jest.mock('../../../config/logger', () => ({
 }));
 
 // Mock Prisma client
+const mockPrismaClient: any = {
+  company: {
+    findUnique: jest.fn(),
+  },
+  importSession: {
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  importedOperation: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    count: jest.fn(),
+  },
+  mappingRule: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  },
+  operation: {
+    create: jest.fn(),
+  },
+  article: {
+    findFirst: jest.fn(),
+  },
+  $transaction: jest.fn((callback: (tx: any) => any) =>
+    callback(mockPrismaClient)
+  ),
+};
+
 jest.mock('../../../config/db', () => ({
   __esModule: true,
-  default: {
-    company: {
-      findUnique: jest.fn(),
-    },
-    importSession: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    importedOperation: {
-      create: jest.fn(),
-      findMany: jest.fn(),
-      findFirst: jest.fn(),
-      update: jest.fn(),
-      updateMany: jest.fn(),
-      deleteMany: jest.fn(),
-      count: jest.fn(),
-    },
-    mappingRule: {
-      findMany: jest.fn(),
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    operation: {
-      create: jest.fn(),
-    },
-    $transaction: jest.fn((callback) => callback({})),
-  },
+  default: mockPrismaClient,
 }));
 
 // Mock matching service
@@ -75,14 +82,13 @@ jest.mock('../../operations/operations.service', () => ({
   },
 }));
 
-import prisma from '../../../config/db';
 import { ImportsService } from '../imports.service';
 import { AppError } from '../../../middlewares/error';
 import { autoMatch } from '../services/matching.service';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockPrisma = mockPrismaClient;
 const mockAutoMatch = autoMatch as jest.MockedFunction<typeof autoMatch>;
 
 describe('ImportsService Integration Tests', () => {
@@ -203,15 +209,15 @@ describe('ImportsService Integration Tests', () => {
 
       // Мокаем парсер, чтобы вернуть 1001 операцию
       const parserModule = await import('../parsers/clientBankExchange.parser');
-      jest.spyOn(parserModule, 'parseClientBankExchange').mockReturnValueOnce(
-        Array(1001)
+      jest.spyOn(parserModule, 'parseClientBankExchange').mockReturnValueOnce({
+        documents: Array(1001)
           .fill(null)
           .map((_, i) => ({
             date: new Date(),
             amount: 1000,
-            description: `Operation ${i}`,
-          }))
-      );
+            purpose: `Operation ${i}`,
+          })),
+      });
 
       await expect(
         importsService.uploadStatement(

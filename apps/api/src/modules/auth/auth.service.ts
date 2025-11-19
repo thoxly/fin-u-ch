@@ -132,13 +132,21 @@ export class AuthService {
       logger.debug('Active company roles after registration', {
         companyId: result.company.id,
         rolesCount: roles.length,
-        roles: roles.map((r) => ({
-          id: r.id,
-          name: r.name,
-          category: r.category,
-          isSystem: r.isSystem,
-          usersCount: r._count?.userRoles || 0,
-        })),
+        roles: roles.map(
+          (r: {
+            id: string;
+            name: string;
+            category: string;
+            isSystem: boolean;
+            _count?: { userRoles: number };
+          }) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })
+        ),
       });
     } catch (error) {
       logger.warn(
@@ -237,13 +245,21 @@ export class AuthService {
         companyId: user.companyId,
         userId: user.id,
         rolesCount: roles.length,
-        roles: roles.map((r) => ({
-          id: r.id,
-          name: r.name,
-          category: r.category,
-          isSystem: r.isSystem,
-          usersCount: r._count?.userRoles || 0,
-        })),
+        roles: roles.map(
+          (r: {
+            id: string;
+            name: string;
+            category: string;
+            isSystem: boolean;
+            _count?: { userRoles: number };
+          }) => ({
+            id: r.id,
+            name: r.name,
+            category: r.category,
+            isSystem: r.isSystem,
+            usersCount: r._count?.userRoles || 0,
+          })
+        ),
       });
     } catch (error) {
       logger.warn('Failed to get roles during login', {

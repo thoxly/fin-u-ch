@@ -2,11 +2,19 @@ import { PrismaClient } from '@prisma/client';
 import logger from '../../config/logger';
 
 /**
+ * Тип для транзакционного клиента Prisma
+ */
+type PrismaTransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/**
  * Создает начальные данные для новой компании
  * Вызывается при регистрации
  */
 export async function seedInitialData(
-  tx: PrismaClient,
+  tx: PrismaTransactionClient,
   companyId: string,
   firstUserId?: string
 ): Promise<void> {

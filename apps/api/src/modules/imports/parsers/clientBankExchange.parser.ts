@@ -1,10 +1,6 @@
-import { createRequire } from 'module';
 import { AppError } from '../../../middlewares/error';
 import logger from '../../../config/logger';
-
-// Используем createRequire для iconv-lite в ESM модуле
-const require = createRequire(import.meta.url);
-const iconv = require('iconv-lite');
+import iconv from 'iconv-lite';
 
 export interface ParsedDocument {
   date: Date;
