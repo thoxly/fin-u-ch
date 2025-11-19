@@ -15,13 +15,6 @@ import {
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
 
-// Тип для транзакции Prisma (безопасная альтернатива any)
-// Используем unknown для безопасного приведения типа при работе с Prisma транзакциями
-type PrismaTransactionClient = Omit<
-  PrismaClient,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
-
 // Типы для работы с пользователями и компаниями
 // Используются для правильной типизации результатов Prisma запросов с include
 type CompanySelect = {
@@ -40,14 +33,6 @@ type UserWithCompany<T = CompanySelect> = {
   firstName: string | null;
   lastName: string | null;
   company: T | null;
-};
-
-// Тип для select компании (используется для обхода проблем типизации Prisma)
-type CompanySelectInput = {
-  id: true;
-  name: true;
-  currencyBase: true;
-  inn?: true;
 };
 
 // Вспомогательная функция для обработки ошибок нарушения уникального ограничения Prisma
@@ -255,6 +240,12 @@ export class UsersService {
       isActive: user.isActive,
       createdAt: user.createdAt,
       companyName: userWithCompany.company.name,
+      company: {
+        id: userWithCompany.company.id,
+        name: userWithCompany.company.name,
+        currencyBase: userWithCompany.company.currencyBase,
+        inn: userWithCompany.company.inn,
+      },
     };
   }
 
@@ -338,15 +329,15 @@ export class UsersService {
                 id: true,
                 name: true,
                 currencyBase: true,
+                inn: true,
               } as Prisma.CompanySelect,
             },
           },
         });
 
         // Типизируем результат с учетом включенных связей
-        const userWithCompany = updatedUser as unknown as UserWithCompany<
-          Omit<CompanySelect, 'inn'>
-        >;
+        const userWithCompany =
+          updatedUser as unknown as UserWithCompany<CompanySelect>;
 
         if (!userWithCompany.company) {
           throw new AppError('Company not found for user', 500);
@@ -364,9 +355,8 @@ export class UsersService {
       });
 
       // Типизируем результат с учетом включенных связей
-      const resultWithCompany = updatedUser as unknown as UserWithCompany<
-        Omit<CompanySelect, 'inn'>
-      >;
+      const resultWithCompany =
+        updatedUser as unknown as UserWithCompany<CompanySelect>;
 
       // Проверяем наличие company (должна быть, так как проверяли внутри транзакции)
       if (!resultWithCompany.company) {
@@ -381,6 +371,12 @@ export class UsersService {
         companyId: updatedUser.companyId,
         isActive: updatedUser.isActive,
         companyName: resultWithCompany.company.name,
+        company: {
+          id: resultWithCompany.company.id,
+          name: resultWithCompany.company.name,
+          currencyBase: resultWithCompany.company.currencyBase,
+          inn: resultWithCompany.company.inn,
+        },
       };
     } catch (error: unknown) {
       if (error instanceof AppError) {

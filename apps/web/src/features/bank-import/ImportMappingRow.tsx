@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import {
   useGetCounterpartiesQuery,
   useGetArticlesQuery,
@@ -50,7 +50,8 @@ interface ImportMappingRowProps {
   onRegisterChange?: (
     operationId: string,
     previousState: Record<string, unknown>,
-    description: string
+    description: string,
+    anchorPosition?: { top: number; left: number }
   ) => void;
   disabled?: boolean;
 }
@@ -79,7 +80,7 @@ const isFieldFilled = (
   }
 };
 
-export const ImportMappingRow = ({
+const ImportMappingRowComponent = ({
   operation,
   field,
   _sessionId,
@@ -102,7 +103,7 @@ export const ImportMappingRow = ({
   const { data: departments = [] } = useGetDepartmentsQuery();
 
   const [updateOperation] = useUpdateImportedOperationMutation();
-  const { showSuccess, showError } = useNotification();
+  const { showError } = useNotification();
 
   const getCurrentValue = () => {
     switch (field) {
@@ -287,47 +288,6 @@ export const ImportMappingRow = ({
 
       setIsEditing(false);
 
-      // Проверяем похожие операции (только для значимых полей)
-      if (
-        field !== 'repeat' &&
-        onFieldUpdate &&
-        lastClickPosition &&
-        (field === 'counterparty' ||
-          field === 'article' ||
-          field === 'account' ||
-          field === 'deal' ||
-          field === 'department' ||
-          field === 'currency' ||
-          field === 'direction')
-      ) {
-        // Создаем синтетическое событие с сохраненной позицией
-        const syntheticEvent = {
-          currentTarget: {
-            getBoundingClientRect: () => ({
-              top: lastClickPosition.top - 40, // Примерная высота элемента
-              bottom: lastClickPosition.top,
-              left: lastClickPosition.left,
-              right: lastClickPosition.right,
-            }),
-          },
-        } as React.MouseEvent;
-
-        // Проверяем наличие похожих операций
-        const hasPopover = await onFieldUpdate(
-          operation,
-          field,
-          value,
-          updateData,
-          syntheticEvent
-        );
-
-        // Если показан popover - не обновляем операцию сейчас
-        // Обновление произойдет после выбора в popover
-        if (hasPopover) {
-          return;
-        }
-      }
-
       // Регистрируем изменение для возможности отмены (если есть callback)
       if (onRegisterChange) {
         // Сохраняем предыдущее состояние
@@ -364,16 +324,55 @@ export const ImportMappingRow = ({
         };
         const description = `Изменено: ${fieldNames[field] || field}`;
 
-        onRegisterChange(operation.id, previousState, description);
+        onRegisterChange(
+          operation.id,
+          previousState,
+          description,
+          lastClickPosition || undefined
+        );
       }
 
-      // Нет похожих операций или поле не требует проверки - обновляем сразу
+      // СНАЧАЛА обновляем текущую операцию
       await updateOperation({
         id: operation.id,
         data: updateData,
       }).unwrap();
 
-      showSuccess('Обновлено');
+      // ЗАТЕМ проверяем похожие операции и показываем popover (только для значимых полей)
+      if (
+        field !== 'repeat' &&
+        onFieldUpdate &&
+        lastClickPosition &&
+        (field === 'counterparty' ||
+          field === 'article' ||
+          field === 'account' ||
+          field === 'deal' ||
+          field === 'department' ||
+          field === 'currency' ||
+          field === 'direction')
+      ) {
+        // Создаем синтетическое событие с сохраненной позицией
+        const syntheticEvent = {
+          currentTarget: {
+            getBoundingClientRect: () => ({
+              top: lastClickPosition.top - 40, // Примерная высота элемента
+              bottom: lastClickPosition.top,
+              left: lastClickPosition.left,
+              right: lastClickPosition.right,
+            }),
+          },
+        } as React.MouseEvent;
+
+        // Проверяем наличие похожих операций
+        // Результат игнорируем, так как операция уже обновлена
+        await onFieldUpdate(
+          operation,
+          field,
+          value,
+          updateData,
+          syntheticEvent
+        );
+      }
     } catch (error) {
       showError('Ошибка при обновлении');
     }
@@ -451,12 +450,10 @@ export const ImportMappingRow = ({
     );
   }
 
-  // Для account показываем номер счета серым текстом
+  // Для account показываем номер счета серым текстом (только если счет выбран)
   if (field === 'account') {
-    const accountNumber =
-      operation.direction === 'expense'
-        ? operation.payerAccount
-        : operation.receiverAccount;
+    // Показываем номер только выбранного счета из справочника
+    const selectedAccountNumber = operation.matchedAccount?.number;
 
     return (
       <div
@@ -480,9 +477,9 @@ export const ImportMappingRow = ({
         }
       >
         <div className="truncate">{getDisplayValue()}</div>
-        {accountNumber && (
+        {selectedAccountNumber && (
           <div className="text-gray-500 dark:text-gray-400 mt-1 text-xs">
-            {accountNumber}
+            {selectedAccountNumber}
           </div>
         )}
       </div>
@@ -514,3 +511,77 @@ export const ImportMappingRow = ({
     </div>
   );
 };
+
+// Мемоизируем компонент для избежания лишних ререндеров
+// Компонент обновляется только если изменились его пропсы
+export const ImportMappingRow = memo(
+  ImportMappingRowComponent,
+  (prevProps, nextProps) => {
+    // Возвращаем true если props НЕ изменились (пропускаем ререндер)
+    return (
+      prevProps.operation.id === nextProps.operation.id &&
+      prevProps.field === nextProps.field &&
+      prevProps.disabled === nextProps.disabled &&
+      // Сравниваем только те поля операции которые используются в компоненте
+      JSON.stringify(
+        getRelevantOperationFields(prevProps.operation, prevProps.field)
+      ) ===
+        JSON.stringify(
+          getRelevantOperationFields(nextProps.operation, nextProps.field)
+        )
+    );
+  }
+);
+
+// Вспомогательная функция для получения релевантных полей операции для данного field
+function getRelevantOperationFields(
+  operation: ImportedOperation,
+  field: string
+) {
+  const base = {
+    id: operation.id,
+    processed: operation.processed,
+  };
+
+  switch (field) {
+    case 'counterparty':
+      return {
+        ...base,
+        matchedCounterpartyId: operation.matchedCounterpartyId,
+        matchedCounterparty: operation.matchedCounterparty,
+      };
+    case 'article':
+      return {
+        ...base,
+        matchedArticleId: operation.matchedArticleId,
+        matchedArticle: operation.matchedArticle,
+        direction: operation.direction,
+      };
+    case 'account':
+      return {
+        ...base,
+        matchedAccountId: operation.matchedAccountId,
+        matchedAccount: operation.matchedAccount,
+      };
+    case 'deal':
+      return {
+        ...base,
+        matchedDealId: operation.matchedDealId,
+        matchedDeal: operation.matchedDeal,
+      };
+    case 'department':
+      return {
+        ...base,
+        matchedDepartmentId: operation.matchedDepartmentId,
+        matchedDepartment: operation.matchedDepartment,
+      };
+    case 'currency':
+      return { ...base, currency: operation.currency };
+    case 'direction':
+      return { ...base, direction: operation.direction };
+    case 'repeat':
+      return { ...base, repeat: operation.repeat };
+    default:
+      return base;
+  }
+}

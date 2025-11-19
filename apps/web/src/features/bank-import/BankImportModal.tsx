@@ -50,6 +50,9 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
   const [navigationLevel, setNavigationLevel] =
     useState<NavigationLevel>('main');
   const [sessionFileName, setSessionFileName] = useState<string | null>(null);
+  const [companyAccountNumber, setCompanyAccountNumber] = useState<
+    string | null
+  >(null);
   const [isMinimizing, setIsMinimizing] = useState(false); // Флаг для предотвращения перезаписи при сворачивании
   const [uploadStatement, { isLoading }] = useUploadStatementMutation();
   const { showSuccess, showError } = useNotification();
@@ -150,6 +153,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         sessionStorage.removeItem('importModalTab');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Сохраняем состояние в localStorage только когда модальное окно открыто
@@ -211,6 +215,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         const result = await uploadStatement(formData).unwrap();
         setSessionId(result.sessionId);
         setSessionFileName(file.name);
+        setCompanyAccountNumber(result.companyAccountNumber || null);
         setNavigationLevel('session-details');
 
         // Формируем сообщение с учетом дубликатов и статистики парсинга
@@ -330,6 +335,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
     setViewingSessionId(null);
     setSessionId(null);
     setSessionFileName(null);
+    setCompanyAccountNumber(null);
   }, []);
 
   // Просмотр сессии из истории
@@ -349,6 +355,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
     setViewingSessionId(null);
     setNavigationLevel('main');
     setSessionFileName(null);
+    setCompanyAccountNumber(null);
     clearStoredState();
     onClose();
   };
@@ -527,6 +534,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
             // Экран деталей сессии
             <ImportMappingTable
               sessionId={currentSessionId}
+              companyAccountNumber={companyAccountNumber}
               onClose={handleBackToMain}
               onImportSuccess={handleClose}
             />

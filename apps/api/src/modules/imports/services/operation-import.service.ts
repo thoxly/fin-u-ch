@@ -2,11 +2,8 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../../config/db';
 import logger from '../../../config/logger';
 import { AppError } from '../../../middlewares/error';
-import {
-  CreateOperationSchema,
-  createOperationHash,
-  ParsedDocument,
-} from '@fin-u-ch/shared';
+import { CreateOperationSchema, ParsedDocument } from '@fin-u-ch/shared';
+import { createOperationHash } from '@fin-u-ch/shared/lib/operationHash';
 import { formatZodErrors } from '../../../utils/validation';
 import { autoMatch } from './matching.service';
 import { invalidateReportCache } from '../../reports/utils/cache';
@@ -72,7 +69,7 @@ export class OperationImportService {
     // Обрабатываем операции батчами
     await this.batchProcessor.processBatches(
       operations,
-      async (batch, batchNumber) => {
+      async (batch, _batchNumber) => {
         const results = await this.processBatch(
           batch,
           companyId,
@@ -305,7 +302,7 @@ export class OperationImportService {
         error: errorMessage,
       });
       // Добавляем ошибки для всех операций в батче
-      for (const op of batch) {
+      for (const _op of batch) {
         results.push({ success: false, error: errorMessage });
       }
     }

@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
 import { ImportFilters } from '@fin-u-ch/shared';
+import logger from '../../../config/logger';
 
 /**
  * Import session status constants
@@ -23,7 +24,8 @@ export class SessionService {
     companyId: string,
     userId: string,
     fileName: string,
-    importedCount: number
+    importedCount: number,
+    companyAccountNumber?: string
   ): Promise<Prisma.ImportSessionGetPayload<Record<string, never>>> {
     return prisma.importSession.create({
       data: {
@@ -32,6 +34,7 @@ export class SessionService {
         fileName,
         status: IMPORT_SESSION_STATUS.DRAFT,
         importedCount,
+        companyAccountNumber,
       },
     });
   }
@@ -98,7 +101,7 @@ export class SessionService {
     sessionId: string,
     companyId: string
   ): Promise<{ deleted: number }> {
-    const session = await this.getSession(sessionId, companyId);
+    await this.getSession(sessionId, companyId);
 
     // Удаляем все черновики (CASCADE через Prisma)
     const deletedCount = await prisma.importedOperation.count({
@@ -180,9 +183,10 @@ export class SessionService {
     confirmed: number;
     unmatched: number;
     duplicates: number;
+    companyAccountNumber?: string;
   }> {
     // Проверяем, что сессия принадлежит компании
-    await this.getSession(sessionId, companyId);
+    const session = await this.getSession(sessionId, companyId);
 
     // Базовый where без фильтров matched/duplicate - для счетчиков
     const baseWhere: Prisma.ImportedOperationWhereInput = {
@@ -250,11 +254,13 @@ export class SessionService {
       confirmed: confirmedCount,
       unmatched: unmatchedCount,
       duplicates: duplicatesCount,
+      companyAccountNumber: session.companyAccountNumber || undefined,
     };
   }
 
   /**
    * Получает все операции сессии без пагинации (для поиска похожих)
+   * Возвращает только необработанные операции, так как только они могут быть обновлены
    */
   async getAllImportedOperations(
     sessionId: string,
@@ -273,10 +279,12 @@ export class SessionService {
     // Проверяем, что сессия принадлежит компании
     await this.getSession(sessionId, companyId);
 
+    // Возвращаем только необработанные операции, так как только их можно обновить
     const operations = await prisma.importedOperation.findMany({
       where: {
         importSessionId: sessionId,
         companyId,
+        processed: false, // Только необработанные операции
       },
       include: {
         matchedArticle: { select: { id: true, name: true } },
@@ -459,66 +467,133 @@ export class SessionService {
         importSessionId: sessionId,
         companyId,
       },
+      select: {
+        id: true,
+        processed: true,
+        lockedFields: true,
+      },
     });
 
     if (!operations || operations.length !== operationIds.length) {
-      throw new AppError('Some operations not found', 404);
+      // Находим отсутствующие ID для более информативной ошибки
+      const foundIds = new Set(operations?.map((op) => op.id) || []);
+      const missingIds = operationIds.filter((id) => !foundIds.has(id));
+
+      logger.error('Bulk update failed: some operations not found', {
+        sessionId,
+        companyId,
+        requestedCount: operationIds.length,
+        foundCount: operations?.length || 0,
+        missingIds: missingIds.slice(0, 5), // Показываем первые 5 для диагностики
+      });
+
+      throw new AppError(
+        `Some operations not found or already processed (${missingIds.length} missing)`,
+        404
+      );
     }
 
-    const updateData: Prisma.ImportedOperationUpdateManyMutationInput & {
-      matchedArticleId?: string | null;
-      matchedCounterpartyId?: string | null;
-      matchedAccountId?: string | null;
-      matchedDealId?: string | null;
-      matchedDepartmentId?: string | null;
-    } = {};
-
-    if (data.matchedArticleId !== undefined) {
-      updateData.matchedArticleId = data.matchedArticleId;
-      updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
+    // Проверяем, что ни одна из операций не обработана
+    const processedOps = operations.filter((op) => op.processed);
+    if (processedOps.length > 0) {
+      logger.warn('Attempting to update processed operations', {
+        sessionId,
+        processedCount: processedOps.length,
+      });
+      throw new AppError(
+        `Cannot update processed operations (${processedOps.length} already processed)`,
+        400
+      );
     }
 
-    if (data.matchedCounterpartyId !== undefined) {
-      updateData.matchedCounterpartyId = data.matchedCounterpartyId;
-      if (!updateData.matchedBy) {
-        updateData.matchedBy = data.matchedCounterpartyId ? 'manual' : null;
+    // Обновляем каждую операцию отдельно, чтобы учитывать lockedFields
+    let updated = 0;
+    for (const operation of operations) {
+      // Парсим заблокированные поля
+      let lockedFields: string[] = [];
+      try {
+        lockedFields = operation.lockedFields
+          ? JSON.parse(operation.lockedFields)
+          : [];
+      } catch {
+        lockedFields = [];
+      }
+
+      // Формируем данные для обновления, исключая заблокированные поля
+      const updateData: Prisma.ImportedOperationUpdateInput = {};
+
+      if (
+        data.matchedArticleId !== undefined &&
+        !lockedFields.includes('matchedArticleId')
+      ) {
+        updateData.matchedArticle = data.matchedArticleId
+          ? { connect: { id: data.matchedArticleId } }
+          : { disconnect: true };
+        updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
+      }
+
+      if (
+        data.matchedCounterpartyId !== undefined &&
+        !lockedFields.includes('matchedCounterpartyId')
+      ) {
+        updateData.matchedCounterparty = data.matchedCounterpartyId
+          ? { connect: { id: data.matchedCounterpartyId } }
+          : { disconnect: true };
+        if (!updateData.matchedBy) {
+          updateData.matchedBy = data.matchedCounterpartyId ? 'manual' : null;
+        }
+      }
+
+      if (
+        data.matchedAccountId !== undefined &&
+        !lockedFields.includes('matchedAccountId')
+      ) {
+        updateData.matchedAccount = data.matchedAccountId
+          ? { connect: { id: data.matchedAccountId } }
+          : { disconnect: true };
+      }
+
+      if (
+        data.matchedDealId !== undefined &&
+        !lockedFields.includes('matchedDealId')
+      ) {
+        updateData.matchedDeal = data.matchedDealId
+          ? { connect: { id: data.matchedDealId } }
+          : { disconnect: true };
+      }
+
+      if (
+        data.matchedDepartmentId !== undefined &&
+        !lockedFields.includes('matchedDepartmentId')
+      ) {
+        updateData.matchedDepartment = data.matchedDepartmentId
+          ? { connect: { id: data.matchedDepartmentId } }
+          : { disconnect: true };
+      }
+
+      if (data.currency !== undefined && !lockedFields.includes('currency')) {
+        updateData.currency = data.currency;
+      }
+
+      if (data.direction !== undefined && !lockedFields.includes('direction')) {
+        updateData.direction = data.direction;
+      }
+
+      if (data.confirmed !== undefined && !lockedFields.includes('confirmed')) {
+        updateData.confirmed = data.confirmed;
+      }
+
+      // Обновляем только если есть что обновлять
+      if (Object.keys(updateData).length > 0) {
+        await prisma.importedOperation.update({
+          where: { id: operation.id },
+          data: updateData,
+        });
+        updated++;
       }
     }
 
-    if (data.matchedAccountId !== undefined) {
-      updateData.matchedAccountId = data.matchedAccountId;
-    }
-
-    if (data.matchedDealId !== undefined) {
-      updateData.matchedDealId = data.matchedDealId;
-    }
-
-    if (data.matchedDepartmentId !== undefined) {
-      updateData.matchedDepartmentId = data.matchedDepartmentId;
-    }
-
-    if (data.currency !== undefined) {
-      updateData.currency = data.currency;
-    }
-
-    if (data.direction !== undefined) {
-      updateData.direction = data.direction;
-    }
-
-    if (data.confirmed !== undefined) {
-      updateData.confirmed = data.confirmed;
-    }
-
-    const result = await prisma.importedOperation.updateMany({
-      where: {
-        id: { in: operationIds },
-        importSessionId: sessionId,
-        companyId,
-      },
-      data: updateData,
-    });
-
-    return { updated: result.count };
+    return { updated };
   }
 }
 

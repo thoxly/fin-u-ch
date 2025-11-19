@@ -16,9 +16,7 @@ import {
 } from '@fin-u-ch/shared';
 import { invalidateReportCache } from '../reports/utils/cache';
 import duplicateDetectionService from './services/duplicate-detection.service';
-import sessionService, {
-  IMPORT_SESSION_STATUS,
-} from './services/session.service';
+import sessionService from './services/session.service';
 import mappingRulesService from './services/mapping-rules.service';
 import operationImportService from './services/operation-import.service';
 import { BatchProcessor } from './utils/batch-processor';
@@ -73,15 +71,18 @@ export class ImportsService {
     });
 
     // Проверка дубликатов по хэшу (быстрая проверка)
-    const { uniqueDocuments, duplicatesCount } =
-      await this.checkDuplicatesByHash(companyId, documents);
+    const { duplicatesCount } = await this.checkDuplicatesByHash(
+      companyId,
+      documents
+    );
 
     // Создаем сессию импорта
     const importSession = await sessionService.createSession(
       companyId,
       userId,
       fileName,
-      documents.length
+      documents.length,
+      companyAccountNumber
     );
 
     logger.info('Import session created', {
@@ -113,6 +114,7 @@ export class ImportsService {
       importedCount: importedOperations.length,
       duplicatesCount,
       fileName: importSession.fileName,
+      companyAccountNumber,
       parseStats: parseStats
         ? {
             documentsStarted: parseStats.documentsStarted,

@@ -567,18 +567,20 @@ describe('SessionService', () => {
           id: 'op-1',
           importSessionId: sessionId,
           companyId,
+          processed: false,
+          lockedFields: null,
         },
         {
           id: 'op-2',
           importSessionId: sessionId,
           companyId,
+          processed: false,
+          lockedFields: null,
         },
       ];
 
       mockPrisma.importedOperation.findMany.mockResolvedValueOnce(operations);
-      mockPrisma.importedOperation.updateMany.mockResolvedValueOnce({
-        count: 2,
-      });
+      mockPrisma.importedOperation.update.mockResolvedValue({} as any);
 
       const result = await service.bulkUpdateImportedOperations(
         sessionId,
@@ -590,17 +592,15 @@ describe('SessionService', () => {
       );
 
       expect(result.updated).toBe(2);
-      expect(mockPrisma.importedOperation.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: ['op-1', 'op-2'] },
-          importSessionId: sessionId,
-          companyId,
-        },
-        data: expect.objectContaining({
-          matchedArticleId: 'article-1',
-          matchedBy: 'manual',
-        }),
-      });
+      expect(mockPrisma.importedOperation.update).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.importedOperation.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'op-1' },
+          data: expect.objectContaining({
+            matchedBy: 'manual',
+          }),
+        })
+      );
     });
 
     it('должен выбросить ошибку, если не все операции найдены', async () => {
@@ -609,6 +609,8 @@ describe('SessionService', () => {
           id: 'op-1',
           importSessionId: sessionId,
           companyId,
+          processed: false,
+          lockedFields: null,
         },
       ];
 
@@ -625,6 +627,9 @@ describe('SessionService', () => {
         )
       ).rejects.toThrow(AppError);
 
+      // Второй вызов для проверки сообщения
+      mockPrisma.importedOperation.findMany.mockResolvedValueOnce(operations);
+
       await expect(
         service.bulkUpdateImportedOperations(
           sessionId,
@@ -635,6 +640,52 @@ describe('SessionService', () => {
           }
         )
       ).rejects.toThrow('Some operations not found');
+    });
+
+    it('должен выбросить ошибку, если операции уже обработаны', async () => {
+      const operations = [
+        {
+          id: 'op-1',
+          importSessionId: sessionId,
+          companyId,
+          processed: true,
+          lockedFields: null,
+        },
+        {
+          id: 'op-2',
+          importSessionId: sessionId,
+          companyId,
+          processed: false,
+          lockedFields: null,
+        },
+      ];
+
+      mockPrisma.importedOperation.findMany.mockResolvedValueOnce(operations);
+
+      await expect(
+        service.bulkUpdateImportedOperations(
+          sessionId,
+          companyId,
+          ['op-1', 'op-2'],
+          {
+            matchedArticleId: 'article-1',
+          }
+        )
+      ).rejects.toThrow(AppError);
+
+      // Второй вызов для проверки сообщения
+      mockPrisma.importedOperation.findMany.mockResolvedValueOnce(operations);
+
+      await expect(
+        service.bulkUpdateImportedOperations(
+          sessionId,
+          companyId,
+          ['op-1', 'op-2'],
+          {
+            matchedArticleId: 'article-1',
+          }
+        )
+      ).rejects.toThrow('Cannot update processed operations');
     });
   });
 });

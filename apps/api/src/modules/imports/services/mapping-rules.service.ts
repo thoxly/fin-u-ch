@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client';
 import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
-import { MappingRule } from '@fin-u-ch/shared';
 
 /**
  * Service for managing mapping rules

@@ -29,18 +29,8 @@ export const CollapsedImportSections = () => {
           const now = Date.now();
           const hoursPassed = (now - parsedState.timestamp) / (1000 * 60 * 60);
 
-          console.log('📦 Загружено состояние из localStorage:', {
-            collapsedHistory: parsedState.collapsedHistory,
-            collapsedMapping: parsedState.collapsedMapping,
-            minimized: parsedState.minimized,
-            sessionId: parsedState.sessionId,
-            viewingSessionId: parsedState.viewingSessionId,
-            hoursPassed: hoursPassed.toFixed(2),
-          });
-
           // Если прошло больше 24 часов, удаляем состояние
           if (hoursPassed >= EXPIRY_HOURS) {
-            console.log('⏰ Состояние устарело, удаляем');
             localStorage.removeItem(STORAGE_KEY);
             setState(null);
             return;
@@ -48,12 +38,10 @@ export const CollapsedImportSections = () => {
 
           setState(parsedState);
         } catch (error) {
-          console.error('Failed to load collapsed state:', error);
           localStorage.removeItem(STORAGE_KEY);
           setState(null);
         }
       } else {
-        console.log('📭 Нет сохраненного состояния в localStorage');
         setState(null);
       }
     };
@@ -63,14 +51,12 @@ export const CollapsedImportSections = () => {
     // Слушаем изменения в localStorage (для других вкладок)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
-        console.log('🔄 Storage event received');
         loadState();
       }
     };
 
     // Слушаем кастомное событие для изменений в той же вкладке
     const handleLocalStorageChange = () => {
-      console.log('🔄 Local storage change event received');
       loadState();
     };
 
@@ -91,8 +77,6 @@ export const CollapsedImportSections = () => {
   }, []);
 
   const handleExpand = (type: 'history' | 'mapping') => {
-    console.log('🔄 Разворачиваем секцию:', type);
-
     // Обновляем состояние в localStorage, чтобы развернуть секцию
     if (state) {
       const updatedState: StoredState = {
@@ -103,11 +87,6 @@ export const CollapsedImportSections = () => {
         // Важно: сохраняем правильную вкладку
         activeTab: type === 'history' ? 'history' : state.activeTab,
       };
-
-      console.log(
-        '💾 Сохраняем обновленное состояние для разворачивания:',
-        updatedState
-      );
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
       setState(updatedState);
@@ -158,7 +137,6 @@ export const CollapsedImportSections = () => {
 
   // Отображаем компонент, если есть свернутые секции
   if (!state) {
-    console.log('👻 CollapsedImportSections: нет состояния, не рендерим');
     return null;
   }
 
@@ -167,21 +145,9 @@ export const CollapsedImportSections = () => {
     state.collapsedHistory ||
     (state.collapsedMapping && (state.sessionId || state.viewingSessionId));
 
-  console.log('✅ CollapsedImportSections: проверка отображения:', {
-    hasCollapsedSections,
-    collapsedHistory: state.collapsedHistory,
-    collapsedMapping: state.collapsedMapping,
-    hasSession: !!(state.sessionId || state.viewingSessionId),
-  });
-
   if (!hasCollapsedSections) {
-    console.log(
-      '👻 CollapsedImportSections: нет свернутых секций, не рендерим'
-    );
     return null;
   }
-
-  console.log('🎨 CollapsedImportSections: рендерим свернутые секции!');
 
   // Приоритет отображения: маппинг > история
   // Показываем только ОДНО окошко

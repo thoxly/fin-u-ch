@@ -1,4 +1,5 @@
 import type { ParsedDocument } from '../types/imports';
+import crypto from 'crypto';
 
 /**
  * Creates a stable SHA-256 hash from a ParsedDocument to uniquely identify an operation.
@@ -30,38 +31,65 @@ export async function createOperationHashAsync(
     doc.purpose?.trim() ?? '',
   ].join('|'); // Use a separator to prevent field collision
 
-  // Use Web Crypto API in browser, Node.js crypto in Node.js
+  // Always try Web Crypto API first (available in browsers and Node.js 15+)
+  // This ensures we never try to import Node.js crypto module in browser
   if (
     typeof globalThis !== 'undefined' &&
     'crypto' in globalThis &&
     globalThis.crypto &&
     typeof globalThis.crypto === 'object' &&
-    'subtle' in globalThis.crypto
+    'subtle' in globalThis.crypto &&
+    typeof globalThis.crypto.subtle !== 'undefined'
   ) {
-    // Browser environment - use Web Crypto API
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-    const crypto = globalThis.crypto as {
-      subtle: {
-        digest(
-          algorithm: string,
-          data: ArrayBuffer | ArrayBufferView
-        ): Promise<ArrayBuffer>;
+    // Browser or Node.js with Web Crypto API - use Web Crypto API
+    try {
+      const encoder = new TextEncoder();
+      const dataBuffer = encoder.encode(data);
+      const crypto = globalThis.crypto as {
+        subtle: {
+          digest(
+            algorithm: string,
+            data: ArrayBuffer | ArrayBufferView
+          ): Promise<ArrayBuffer>;
+        };
       };
-    };
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
-  } else {
-    // Node.js environment
-    const { createHash } = await import('crypto');
-    return createHash('sha256').update(data).digest('hex');
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      // If Web Crypto API fails, fall through to Node.js crypto (only in Node.js)
+    }
   }
+
+  // Node.js environment only - use Function constructor to hide require from Vite
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const global = globalThis as any;
+  if (typeof global.process !== 'undefined' && global.process.versions?.node) {
+    try {
+      // Use Function constructor to completely hide require from static analysis
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const getRequire = new Function(
+        'moduleName',
+        'return require(moduleName);'
+      );
+      const crypto = getRequire('crypto');
+      return crypto.createHash('sha256').update(data).digest('hex');
+    } catch (error) {
+      throw new Error(
+        `Unable to create hash: ${error instanceof Error ? error.message : 'unknown error'}`
+      );
+    }
+  }
+
+  throw new Error('Unable to create hash: crypto API not available');
 }
 
 /**
  * Synchronous version for Node.js only.
  * Use createOperationHashAsync for browser compatibility.
+ *
+ * WARNING: This function will throw an error in browser environments.
+ * Use createOperationHashAsync instead for cross-platform compatibility.
  */
 export function createOperationHash(doc: ParsedDocument): string {
   // Normalize and concatenate key fields into a stable string
@@ -81,16 +109,39 @@ export function createOperationHash(doc: ParsedDocument): string {
     doc.purpose?.trim() ?? '',
   ].join('|'); // Use a separator to prevent field collision
 
-  // Only works in Node.js
-  if (typeof globalThis === 'undefined' || !('window' in globalThis)) {
-    // Dynamic import to avoid bundling crypto in browser
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    return crypto.createHash('sha256').update(data).digest('hex');
+  // Check if we're in Node.js environment
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const global = globalThis as any;
+  if (typeof global.process === 'undefined' || !global.process.versions?.node) {
+    throw new Error(
+      'createOperationHash is only available in Node.js. Use createOperationHashAsync for browser compatibility.'
+    );
   }
 
-  // Fallback for browser (should not be used, but provides a sync interface)
-  throw new Error(
-    'createOperationHash is not available in browser. Use createOperationHashAsync instead.'
-  );
+  // Use dynamic import or direct require based on environment
+  try {
+    // In Node.js environment (including Jest), we can use crypto directly
+    if (
+      typeof process !== 'undefined' &&
+      process.versions &&
+      process.versions.node
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = require('crypto');
+      return crypto.createHash('sha256').update(data).digest('hex');
+    }
+
+    // Fallback for other environments
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const getRequire = new Function(
+      'moduleName',
+      'return require(moduleName);'
+    );
+    const crypto = getRequire('crypto');
+    return crypto.createHash('sha256').update(data).digest('hex');
+  } catch (error) {
+    throw new Error(
+      `Failed to load crypto module: ${error instanceof Error ? error.message : 'unknown error'}`
+    );
+  }
 }

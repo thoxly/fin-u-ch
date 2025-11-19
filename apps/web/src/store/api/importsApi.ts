@@ -13,6 +13,7 @@ interface UploadStatementResponse {
   importedCount: number;
   duplicatesCount: number;
   fileName: string;
+  companyAccountNumber?: string;
 }
 
 interface BulkUpdateRequest {
@@ -109,7 +110,7 @@ export const importsApi = apiSlice.injectEndpoints({
         { dispatch, queryFulfilled, getState }
       ): Promise<void> {
         // Функция для проверки, сопоставлена ли операция
-        const checkOperationMatched = (op: ImportedOperation): boolean => {
+        const _checkOperationMatched = (op: ImportedOperation): boolean => {
           if (!op.direction) return false;
 
           const currency = op.currency || 'RUB';
@@ -192,14 +193,10 @@ export const importsApi = apiSlice.injectEndpoints({
                       operation.direction = data.direction;
                     }
 
-                    // Пересчитываем unmatched и duplicates после обновления операции
-                    // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
-                    draft.unmatched = draft.operations.filter(
-                      (op) => !checkOperationMatched(op)
-                    ).length;
-                    draft.duplicates = draft.operations.filter(
-                      (op) => op.isDuplicate
-                    ).length;
+                    // НЕ пересчитываем счетчики здесь!
+                    // draft.operations содержит только текущую страницу (20 операций),
+                    // а счетчики должны быть по ВСЕМ операциям сессии.
+                    // Счетчики приходят с бэкенда в изначальном ответе и остаются валидными.
 
                     // matchedBy будет обновлен из ответа сервера после успешного запроса
                   }
@@ -249,14 +246,10 @@ export const importsApi = apiSlice.injectEndpoints({
                       operation.matchedRuleId =
                         updatedOperation.matchedRuleId ?? null;
 
-                      // Пересчитываем unmatched и duplicates после обновления из ответа сервера
-                      // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
-                      draft.unmatched = draft.operations.filter(
-                        (op) => !checkOperationMatched(op)
-                      ).length;
-                      draft.duplicates = draft.operations.filter(
-                        (op) => op.isDuplicate
-                      ).length;
+                      // НЕ пересчитываем счетчики!
+                      // Они актуальны из изначального ответа бэкенда.
+                      // При одиночном обновлении операции счетчики не сильно меняются,
+                      // а при массовом - будет вызван invalidatesTags.
                     }
                   }
                 }
@@ -268,8 +261,8 @@ export const importsApi = apiSlice.injectEndpoints({
           patchResults.forEach((patchResult) => patchResult.undo());
         }
       },
-      // Инвалидируем теги для обновления данных в истории импортов
-      invalidatesTags: ['Import'],
+      // НЕ инвалидируем теги - используем оптимистичные обновления выше
+      // invalidatesTags: ['Import'],
     }),
 
     bulkUpdateImportedOperations: builder.mutation<

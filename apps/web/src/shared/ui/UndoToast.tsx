@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 
 interface UndoToastProps {
@@ -7,6 +7,7 @@ interface UndoToastProps {
   onUndo: () => void;
   onClose: () => void;
   isVisible: boolean;
+  anchorPosition?: { top: number; left: number };
 }
 
 export const UndoToast = ({
@@ -15,6 +16,7 @@ export const UndoToast = ({
   onUndo,
   onClose,
   isVisible,
+  anchorPosition,
 }: UndoToastProps) => {
   const [progress, setProgress] = useState(100);
   const [isClosing, setIsClosing] = useState(false);
@@ -39,6 +41,7 @@ export const UndoToast = ({
     }, 50);
 
     return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVisible, duration]);
 
   const handleClose = () => {
@@ -58,9 +61,30 @@ export const UndoToast = ({
     return null;
   }
 
+  // Вычисляем стили позиционирования
+  const getPositionStyles = () => {
+    if (anchorPosition) {
+      // Позиционируем рядом с элементом, где пользователь кликнул
+      return {
+        position: 'fixed' as const,
+        top: `${anchorPosition.top + 10}px`,
+        left: `${anchorPosition.left}px`,
+        zIndex: 50,
+      };
+    }
+    // Дефолтная позиция - правый нижний угол
+    return {
+      position: 'fixed' as const,
+      bottom: '1rem',
+      right: '1rem',
+      zIndex: 50,
+    };
+  };
+
   return (
     <div
-      className={`fixed bottom-4 right-4 z-50 transition-all duration-300 ${
+      style={getPositionStyles()}
+      className={`transition-all duration-300 ${
         isVisible && !isClosing
           ? 'translate-y-0 opacity-100'
           : 'translate-y-2 opacity-0'
