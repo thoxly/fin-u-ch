@@ -269,6 +269,9 @@ jobs:
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
 
+      - name: Regenerate Prisma Client after migrations
+        run: pnpm --filter api prisma:generate
+
       - name: Create demo user for E2E tests
         working-directory: apps/api
         run: npx tsx ../../scripts/setup-demo-user.ts
@@ -417,6 +420,9 @@ jobs:
 
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
+
+      - name: Regenerate Prisma Client after migrations
+        run: pnpm --filter api prisma:generate
 
       - name: Create demo user for E2E tests
         working-directory: apps/api
