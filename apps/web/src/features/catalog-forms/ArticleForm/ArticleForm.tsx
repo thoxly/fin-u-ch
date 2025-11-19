@@ -7,16 +7,28 @@ import {
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 
+interface ArticleFormProps {
+  article: Article | null;
+  onClose: () => void;
+  onSuccess?: (createdId: string) => void;
+  initialName?: string;
+  initialType?: 'income' | 'expense' | 'transfer';
+}
+
 export const ArticleForm = ({
   article,
   onClose,
-}: {
-  article: Article | null;
-  onClose: () => void;
-}) => {
-  const [name, setName] = useState(article?.name || '');
-  const [type, setType] = useState(article?.type || 'expense');
-  const [activity, setActivity] = useState(article?.activity || 'operating');
+  onSuccess,
+  initialName = '',
+  initialType = 'expense',
+}: ArticleFormProps) => {
+  const [name, setName] = useState(article?.name || initialName);
+  const [type, setType] = useState<'income' | 'expense' | 'transfer'>(
+    article?.type || initialType
+  );
+  const [activity, setActivity] = useState<
+    'operating' | 'investing' | 'financing'
+  >(article?.activity || 'operating');
   const [counterpartyId, setCounterpartyId] = useState(
     article?.counterpartyId || ''
   );
@@ -25,26 +37,18 @@ export const ArticleForm = ({
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
   useEffect(() => {
-    console.log('ArticleForm - article prop changed:', article);
     if (article) {
-      console.log('ArticleForm - setting form values from article:', {
-        name: article.name,
-        type: article.type,
-        activity: article.activity,
-      });
       setName(article.name || '');
       setType(article.type || 'expense');
       setActivity(article.activity || 'operating');
       setCounterpartyId(article.counterpartyId || '');
     } else {
-      console.log('ArticleForm - resetting form for new article');
-      // Сброс при создании новой статьи
-      setName('');
-      setType('expense');
+      setName(initialName);
+      setType(initialType);
       setActivity('operating');
       setCounterpartyId('');
     }
-  }, [article]);
+  }, [article, initialName, initialType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,15 +64,22 @@ export const ArticleForm = ({
           },
         }).unwrap();
       } else {
-        await create({
+        const result = await create({
           name,
           type,
           activity,
           isActive: true,
           counterpartyId: counterpartyId || undefined,
         }).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
       }
-      onClose();
+      if (article) {
+        onClose();
+      }
     } catch (error) {
       console.error('Failed to save article:', error);
     }
@@ -85,17 +96,22 @@ export const ArticleForm = ({
       <Select
         label="Тип"
         value={type}
-        onChange={(value) => setType(value)}
+        onChange={(value) =>
+          setType(value as 'income' | 'expense' | 'transfer')
+        }
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
+          { value: 'transfer', label: 'Переводы' },
         ]}
         required
       />
       <Select
         label="Деятельность"
         value={activity}
-        onChange={(value) => setActivity(value)}
+        onChange={(value) =>
+          setActivity(value as 'operating' | 'investing' | 'financing')
+        }
         options={[
           { value: 'operating', label: 'Операционная' },
           { value: 'investing', label: 'Инвестиционная' },

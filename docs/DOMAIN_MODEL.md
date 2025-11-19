@@ -78,7 +78,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 - companyId
 - name
 - parentId?
-- type (enum: income|expense)
+- type (enum: income|expense|transfer)
 - activity (enum: operating|investing|financing)
 - indicator (enum: cash|accrual)
 - description?

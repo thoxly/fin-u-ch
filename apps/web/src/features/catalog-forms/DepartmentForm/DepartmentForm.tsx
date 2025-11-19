@@ -9,9 +9,11 @@ import { useState, useEffect } from 'react';
 export const DepartmentForm = ({
   department,
   onClose,
+  onSuccess,
 }: {
   department: Department | null;
   onClose: () => void;
+  onSuccess?: (createdId: string) => void;
 }) => {
   const [name, setName] = useState(department?.name || '');
   const [description, setDescription] = useState(department?.description || '');
@@ -27,13 +29,20 @@ export const DepartmentForm = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (department)
+      if (department) {
         await update({
           id: department.id,
           data: { name, description },
         }).unwrap();
-      else await create({ name, description }).unwrap();
-      onClose();
+        onClose();
+      } else {
+        const result = await create({ name, description }).unwrap();
+        if (onSuccess && result.id) {
+          onSuccess(result.id);
+        } else {
+          onClose();
+        }
+      }
     } catch (error) {
       console.error('Failed to save department:', error);
     }

@@ -21,6 +21,7 @@ import plansRoutes from './modules/plans/plans.routes';
 import budgetsRoutes from './modules/budgets/budgets.routes';
 import reportsRoutes from './modules/reports/reports.routes';
 import demoRoutes from './modules/demo/demo.routes';
+import importsRoutes from './modules/imports/imports.routes';
 
 const app: Application = express();
 
@@ -59,6 +60,7 @@ app.use('/api/plans', plansRoutes);
 app.use('/api/budgets', budgetsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/imports', importsRoutes);
 
 // Error handling
 app.use(errorHandler);

@@ -1,4 +1,5 @@
 import { Button } from './Button';
+import { classNames } from '../lib/utils';
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -9,6 +10,7 @@ interface BulkActionsBarProps {
     variant?: 'danger' | 'warning' | 'secondary';
     className?: string;
   }>;
+  className?: string;
 }
 
 /**
@@ -19,12 +21,18 @@ export const BulkActionsBar = ({
   selectedCount,
   onClear,
   actions,
+  className,
 }: BulkActionsBarProps) => {
   if (selectedCount === 0) return null;
 
   return (
-    <div className="mt-4 flex items-center justify-between">
-      <div className="text-sm text-gray-600 dark:text-gray-400">
+    <div
+      className={classNames(
+        'flex items-center justify-between gap-4 p-2.5 bg-gradient-to-br from-primary-50 to-primary-100/50 dark:from-primary-900/20 dark:to-primary-900/10 border border-primary-200 dark:border-primary-800 rounded-lg shadow-sm',
+        className
+      )}
+    >
+      <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
         Выбрано: {selectedCount}
       </div>
       <div className="flex gap-2">
@@ -43,6 +51,9 @@ export const BulkActionsBar = ({
             {action.label}
           </Button>
         ))}
+        <Button variant="secondary" size="sm" onClick={onClear}>
+          Очистить
+        </Button>
       </div>
     </div>
   );

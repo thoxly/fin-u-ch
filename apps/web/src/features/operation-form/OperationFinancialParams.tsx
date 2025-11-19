@@ -1,35 +1,14 @@
 import { Select } from '../../shared/ui/Select';
-import { OperationType } from '@fin-u-ch/shared';
-
-interface Article {
-  id: string;
-  name: string;
-  type: OperationType;
-}
-
-interface Account {
-  id: string;
-  name: string;
-}
-
-interface Counterparty {
-  id: string;
-  name: string;
-}
-
-interface Deal {
-  id: string;
-  name: string;
-  counterpartyId: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-}
+import type {
+  Article,
+  Account,
+  Counterparty,
+  Deal,
+  Department,
+} from '@fin-u-ch/shared';
 
 interface OperationFinancialParamsProps {
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   articleId: string;
   accountId: string;
   sourceAccountId: string;
@@ -52,6 +31,10 @@ interface OperationFinancialParamsProps {
   onDealChange: (value: string) => void;
   onDepartmentChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
+  onOpenCreateModal?: (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => void;
 }
 
 export const OperationFinancialParams = ({
@@ -78,13 +61,14 @@ export const OperationFinancialParams = ({
   onDealChange,
   onDepartmentChange,
   onValidationErrorClear,
+  onOpenCreateModal,
 }: OperationFinancialParamsProps) => {
   return (
     <div className="space-y-4 mb-6">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
         Финансовые параметры
       </h3>
-      {type === OperationType.TRANSFER ? (
+      {type === 'transfer' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
             label="Счет списания"
@@ -93,6 +77,11 @@ export const OperationFinancialParams = ({
               onSourceAccountChange(value);
               onValidationErrorClear('sourceAccountId');
             }}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'source')
+                : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.sourceAccountId}
@@ -105,6 +94,11 @@ export const OperationFinancialParams = ({
               onTargetAccountChange(value);
               onValidationErrorClear('targetAccountId');
             }}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'target')
+                : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.targetAccountId}
@@ -134,6 +128,9 @@ export const OperationFinancialParams = ({
               onAccountChange(value);
               onValidationErrorClear('accountId');
             }}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('account') : undefined
+            }
             options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.accountId}
@@ -153,6 +150,9 @@ export const OperationFinancialParams = ({
             label="Сделка"
             value={dealId}
             onChange={(value) => onDealChange(value)}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('deal') : undefined
+            }
             options={filteredDeals.map((d) => ({
               value: d.id,
               label: d.name,
@@ -164,12 +164,17 @@ export const OperationFinancialParams = ({
                   ? 'Нет доступных сделок'
                   : 'Выберите сделку'
             }
-            disabled={filteredDeals.length === 0}
+            disabled={filteredDeals.length === 0 && !onOpenCreateModal}
           />
           <Select
             label="Подразделение"
             value={departmentId}
             onChange={(value) => onDepartmentChange(value)}
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('department')
+                : undefined
+            }
             options={departments.map((d) => ({
               value: d.id,
               label: d.name,

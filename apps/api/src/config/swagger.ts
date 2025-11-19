@@ -45,6 +45,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'Operations', description: 'Financial operations' },
       { name: 'Plans', description: 'Budget planning' },
       { name: 'Reports', description: 'Financial reports' },
+      { name: 'Imports', description: 'Bank statement imports' },
     ],
   },
   apis: ['./src/modules/**/*.routes.ts', './src/app.ts'],

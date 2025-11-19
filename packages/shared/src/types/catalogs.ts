@@ -2,13 +2,6 @@
  * Catalog types: Accounts, Departments, Counterparties, Deals, Articles
  */
 
-import {
-  CounterpartyCategory,
-  OperationType,
-  Activity,
-  ArticleIndicator,
-} from '../constants/enums';
-
 export interface Account {
   id: string;
   companyId: string;
@@ -38,7 +31,7 @@ export interface Counterparty {
   companyId: string;
   name: string;
   inn?: string | null;
-  category: CounterpartyCategory;
+  category: 'supplier' | 'customer' | 'gov' | 'employee' | 'other';
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
@@ -64,9 +57,21 @@ export interface Article {
   companyId: string;
   name: string;
   parentId?: string | null;
-  type: OperationType;
-  activity: Activity;
-  indicator: ArticleIndicator;
+  type: 'income' | 'expense' | 'transfer';
+  activity?: 'operating' | 'investing' | 'financing' | null;
+  indicator?:
+    | 'amortization'
+    | 'dividends'
+    | 'taxes'
+    | 'opex'
+    | 'interest'
+    | 'other'
+    | 'cogs'
+    | 'loan_principal'
+    | 'payroll'
+    | 'revenue'
+    | 'other_income'
+    | null;
   isActive: boolean;
   counterpartyId?: string | null;
   createdAt: Date;

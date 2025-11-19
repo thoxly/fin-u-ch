@@ -10,6 +10,7 @@ export class CompaniesService {
         id: true,
         name: true,
         currencyBase: true,
+        inn: true,
         uiSettings: true,
         createdAt: true,
         updatedAt: true,
@@ -25,7 +26,7 @@ export class CompaniesService {
 
   async update(
     companyId: string,
-    data: { name?: string; currencyBase?: string }
+    data: { name?: string; currencyBase?: string; inn?: string }
   ) {
     return prisma.company.update({
       where: { id: companyId },
@@ -34,6 +35,7 @@ export class CompaniesService {
         id: true,
         name: true,
         currencyBase: true,
+        inn: true,
         updatedAt: true,
       },
     });

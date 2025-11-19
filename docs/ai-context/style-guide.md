@@ -193,6 +193,34 @@ function Button({ label, onClick }: ButtonProps) {
 
 ## Prisma Best Practices
 
+### Type Compatibility
+
+- **Use string literals, not enums** - Prisma returns strings
+- Types in shared package must match Prisma schema exactly
+
+```typescript
+// BAD - enum incompatible with Prisma
+interface Article {
+  type: OperationType; // enum
+}
+
+// GOOD - string literal matches Prisma
+interface Article {
+  type: 'income' | 'expense' | 'transfer';
+}
+```
+
+**After changing types:**
+
+1. Rebuild shared: `cd packages/shared && pnpm run build`
+2. Restart dev servers
+
+### Schema Sync
+
+- Always create migrations: `npx prisma migrate dev --name change_name`
+- Check sync: `npx prisma migrate status`
+- Never use `db push` in production
+
 ### CompanyId Filtering
 
 - ALWAYS filter queries by companyId

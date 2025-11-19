@@ -197,7 +197,57 @@ const total = await prisma.operation.count({
 });
 ```
 
-## 6. Build Dependencies
+## 6. Prisma Types vs TypeScript Enums
+
+### Problem
+
+Prisma returns string literals (`'income' | 'expense' | 'transfer'`), but code uses TypeScript enums (`OperationType.INCOME`), causing runtime type mismatches.
+
+### Solution
+
+**Always use string literals, not enums** in shared types:
+
+```typescript
+// BAD - enum incompatible with Prisma
+export interface Article {
+  type: OperationType; // enum
+}
+
+// GOOD - string literal matches Prisma
+export interface Article {
+  type: 'income' | 'expense' | 'transfer';
+}
+```
+
+**After changing types in shared:**
+
+1. Rebuild shared: `cd packages/shared && pnpm run build`
+2. Restart dev servers to pick up new types
+
+## 7. Prisma Schema vs Database Sync
+
+### Problem
+
+Schema has field, but database doesn't → `Column does not exist` errors.
+
+### Solution
+
+**Always create migrations** when changing schema:
+
+```bash
+# After schema change
+npx prisma migrate dev --name add_field_name
+
+# Check sync status
+npx prisma migrate status
+
+# If out of sync, apply migrations
+npx prisma migrate deploy
+```
+
+**Never use `db push` in production code** - it doesn't track history.
+
+## 8. Build Dependencies
 
 ### Problem
 
@@ -220,7 +270,7 @@ pnpm --filter worker build
 
 Maintain order in Docker multi-stage builds as well.
 
-## 7. Frontend Proxy in Vite
+## 9. Frontend Proxy in Vite
 
 ### Problem
 
@@ -246,7 +296,7 @@ export default defineConfig({
 
 In production Nginx handles proxy, in dev - Vite.
 
-## 8. Worker Depends on Prisma Migrations
+## 10. Worker Depends on Prisma Migrations
 
 ### Problem
 
@@ -273,7 +323,7 @@ services:
     command: npm start
 ```
 
-## 9. Breaking Changes in JWT Payload
+## 11. Breaking Changes in JWT Payload
 
 ### Problem
 
@@ -298,7 +348,7 @@ if (payload.version !== CURRENT_JWT_VERSION) {
 }
 ```
 
-## 10. Migrations with Column Removal
+## 12. Migrations with Column Removal
 
 ### Problem
 
@@ -332,7 +382,7 @@ model User {
 }
 ```
 
-## 11. Enum Changes Require Data Updates
+## 13. Enum Changes Require Data Updates
 
 ### Problem
 
@@ -354,7 +404,7 @@ WHERE type = 'old_expense_type';
 -- Then remove from enum
 ```
 
-## 12. Redis Connection Handling
+## 14. Redis Connection Handling
 
 ### Problem
 
@@ -390,7 +440,7 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-## 13. Date Handling with Timezone
+## 15. Date Handling with Timezone
 
 ### Problem
 
@@ -424,7 +474,7 @@ res.json({
 });
 ```
 
-## 14. Memory Leaks in React
+## 16. Memory Leaks in React
 
 ### Problem
 
@@ -472,7 +522,7 @@ useEffect(() => {
 }, []);
 ```
 
-## 15. Testing with Real Database
+## 17. Testing with Real Database
 
 ### Problem
 
@@ -516,7 +566,8 @@ Check these points before creating a PR:
 - [ ] Heavy reports are cached in Redis
 - [ ] Large lists have pagination
 - [ ] packages/shared rebuilt after type changes
-- [ ] Prisma migrations updated
+- [ ] Prisma migrations created and applied (`migrate status` shows "up to date")
+- [ ] Types use string literals, not enums (Prisma compatibility)
 - [ ] No breaking changes in JWT payload (or version incremented)
 - [ ] Enum changes accounted for in existing data
 - [ ] Correct build order in CI/CD

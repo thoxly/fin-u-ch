@@ -1,4 +1,4 @@
-import { FormEvent, useEffect } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { OperationFormFields } from './OperationFormFields';
 import { OperationFormActions } from './OperationFormActions';
 import {
@@ -9,12 +9,15 @@ import {
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
 import type { Operation } from '@fin-u-ch/shared';
-import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { formatAmountInput } from '../../shared/lib/numberInput';
 import { useOperationValidation } from './useOperationValidation';
 import { useFilteredDeals } from './useFilteredDeals';
 import { useOperationSubmit } from './useOperationSubmit';
 import { useOperationFormState } from './useOperationFormState';
+import { OffCanvas } from '../../shared/ui/OffCanvas';
+import { AccountForm } from '../catalog-forms/AccountForm/AccountForm';
+import { DealForm } from '../catalog-forms/DealForm/DealForm';
+import { DepartmentForm } from '../catalog-forms/DepartmentForm/DepartmentForm';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -80,13 +83,23 @@ export const OperationForm = ({
       validateOperation,
     });
 
-  const { data: articles = [] } = useGetArticlesQuery();
+  const { data: articles = [] } = useGetArticlesQuery({});
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
 
   const filteredDeals = useFilteredDeals(counterpartyId, deals);
+
+  // Состояние для модалок создания
+  const [createModal, setCreateModal] = useState<{
+    isOpen: boolean;
+    field: 'account' | 'deal' | 'department' | 'currency' | null;
+    accountType?: 'source' | 'target' | 'default';
+  }>({
+    isOpen: false,
+    field: null,
+  });
 
   // Сброс сделки при изменении контрагента
   useEffect(() => {
@@ -98,6 +111,46 @@ export const OperationForm = ({
     }
   }, [counterpartyId, dealId, deals, setDealId]);
 
+  // Обработчики для открытия модалок создания
+  const handleOpenCreateModal = (
+    field: 'account' | 'deal' | 'department' | 'currency',
+    accountType?: 'source' | 'target' | 'default'
+  ) => {
+    setCreateModal({
+      isOpen: true,
+      field,
+      accountType: accountType || 'default',
+    });
+  };
+
+  const handleCloseModal = () => {
+    setCreateModal({
+      isOpen: false,
+      field: null,
+    });
+  };
+
+  // Обработчик успешного создания элемента
+  const handleCreateSuccess = (createdId: string) => {
+    if (createModal.field === 'account') {
+      if (createModal.accountType === 'source') {
+        setSourceAccountId(createdId);
+        clearValidationError('sourceAccountId');
+      } else if (createModal.accountType === 'target') {
+        setTargetAccountId(createdId);
+        clearValidationError('targetAccountId');
+      } else {
+        setAccountId(createdId);
+        clearValidationError('accountId');
+      }
+    } else if (createModal.field === 'deal') {
+      setDealId(createdId);
+    } else if (createModal.field === 'department') {
+      setDepartmentId(createdId);
+    }
+    handleCloseModal();
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     clearAllValidationErrors();
@@ -105,7 +158,7 @@ export const OperationForm = ({
   };
 
   const handleTypeChange = (value: string) => {
-    setType(value as OperationType);
+    setType(value as 'income' | 'expense' | 'transfer');
     clearAllValidationErrors();
   };
 
@@ -185,9 +238,21 @@ export const OperationForm = ({
           onDealChange={setDealId}
           onDepartmentChange={setDepartmentId}
           onDescriptionChange={setDescription}
-          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onRepeatChange={(value) =>
+            setRepeat(
+              value as
+                | 'none'
+                | 'daily'
+                | 'weekly'
+                | 'monthly'
+                | 'quarterly'
+                | 'semiannual'
+                | 'annual'
+            )
+          }
           onEndDateChange={setRecurrenceEndDate}
           onValidationErrorClear={clearValidationError}
+          onOpenCreateModal={handleOpenCreateModal}
         />
       </div>
 
@@ -201,6 +266,53 @@ export const OperationForm = ({
         onUpdateScopeChange={setUpdateScope}
         onClose={onClose}
       />
+
+      {/* OffCanvas для создания счетов, сделок, подразделений и валют */}
+      <OffCanvas
+        isOpen={createModal.isOpen && !!createModal.field}
+        title={
+          createModal.field === 'account'
+            ? 'Создание счета'
+            : createModal.field === 'deal'
+              ? 'Создание сделки'
+              : createModal.field === 'department'
+                ? 'Создание подразделения'
+                : createModal.field === 'currency'
+                  ? 'Создание валюты'
+                  : ''
+        }
+        onClose={handleCloseModal}
+      >
+        {createModal.field === 'account' ? (
+          <AccountForm
+            account={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'deal' ? (
+          <DealForm
+            deal={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'department' ? (
+          <DepartmentForm
+            department={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'currency' ? (
+          <div className="p-4">
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Валюты выбираются из предопределенного списка. Для добавления
+              новой валюты обратитесь к администратору.
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">
+              Текущая валюта: {currency || 'RUB'}
+            </p>
+          </div>
+        ) : null}
+      </OffCanvas>
     </form>
   );
 };

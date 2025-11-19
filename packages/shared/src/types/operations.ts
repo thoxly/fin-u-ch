@@ -2,12 +2,10 @@
  * Operation and Plan types
  */
 
-import { OperationType, Periodicity, PlanStatus } from '../constants/enums';
-
 export interface Operation {
   id: string;
   companyId: string;
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   operationDate: Date;
   amount: number;
   currency: string;
@@ -19,7 +17,14 @@ export interface Operation {
   dealId?: string | null;
   departmentId?: string | null;
   description?: string | null;
-  repeat: Periodicity;
+  repeat:
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual';
   recurrenceParentId?: string | null;
   recurrenceEndDate?: Date | null;
   isConfirmed: boolean;
@@ -32,7 +37,7 @@ export interface Operation {
 export interface PlanItem {
   id: string;
   companyId: string;
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   startDate: Date;
   endDate?: Date | null;
   amount: number;
@@ -43,18 +48,25 @@ export interface PlanItem {
   departmentId?: string | null;
   budgetId?: string | null;
   description?: string | null;
-  repeat: Periodicity;
+  repeat:
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual';
   accountId?: string | null;
   sourceAccountId?: string | null;
   targetAccountId?: string | null;
-  status: PlanStatus;
+  status: 'active' | 'paused' | 'archived';
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;
 }
 
 export interface CreateOperationDTO {
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   operationDate: Date | string;
   amount: number;
   currency: string;
@@ -66,13 +78,20 @@ export interface CreateOperationDTO {
   dealId?: string;
   departmentId?: string;
   description?: string;
-  repeat?: Periodicity;
+  repeat?:
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual';
   recurrenceEndDate?: Date | string;
   isTemplate?: boolean;
 }
 
 export interface CreatePlanItemDTO {
-  type: OperationType;
+  type: 'income' | 'expense' | 'transfer';
   startDate: Date | string;
   endDate?: Date | string;
   amount: number;
@@ -83,11 +102,18 @@ export interface CreatePlanItemDTO {
   departmentId?: string;
   budgetId?: string;
   description?: string;
-  repeat: Periodicity;
+  repeat:
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual';
   accountId?: string;
   sourceAccountId?: string;
   targetAccountId?: string;
-  status?: PlanStatus;
+  status?: 'active' | 'paused' | 'archived';
 }
 
 export interface MonthlyAmount {

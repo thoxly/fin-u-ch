@@ -55,36 +55,89 @@ export class AuthService {
     // Create company and user in a transaction
     const passwordHash = await hashPassword(data.password);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await prisma.$transaction(async (tx: any) => {
-      const company = await tx.company.create({
-        data: {
-          name: data.companyName,
-        },
-      });
-
-      const user = await tx.user.create({
-        data: {
-          email: data.email,
-          passwordHash,
-          companyId: company.id,
-          isEmailVerified: false,
-        },
-      });
-
-      // Создаем начальные данные для компании
-      try {
-        await seedInitialData(tx, company.id);
-      } catch (error) {
-        logger.error('Failed to seed initial data', {
-          companyId: company.id,
-          error,
+    let result;
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        const company = await tx.company.create({
+          data: {
+            name: data.companyName,
+          },
         });
-        throw new AppError('Failed to initialize company data', 500);
+
+        const user = await tx.user.create({
+          data: {
+            email: data.email,
+            passwordHash,
+            companyId: company.id,
+            isEmailVerified: false,
+          },
+        });
+
+        // Создаем начальные данные для компании
+        try {
+          await seedInitialData(tx, company.id);
+        } catch (error) {
+          logger.error('Failed to seed initial data', {
+            companyId: company.id,
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+          });
+          throw error; // Пробрасываем ошибку для отката транзакции
+        }
+
+        return { user, company };
+      });
+    } catch (error: unknown) {
+      // Обработка ошибок Prisma
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        // Unique constraint violation - race condition
+        logger.error('Race condition detected during user registration', {
+          email: data.email,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new AppError('User with this email already exists', 409);
       }
 
-      return { user, company };
-    });
+      // Логируем детали ошибки для диагностики
+      const errorDetails = {
+        email: data.email,
+        companyName: data.companyName,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        errorCode:
+          error && typeof error === 'object' && 'code' in error
+            ? error.code
+            : undefined,
+        errorMeta:
+          error && typeof error === 'object' && 'meta' in error
+            ? error.meta
+            : undefined,
+        errorName: error instanceof Error ? error.name : undefined,
+      };
+
+      logger.error('Failed to create user and company', errorDetails);
+
+      // Если это уже AppError, пробрасываем как есть
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      // Для development режима показываем детали ошибки
+      if (process.env.NODE_ENV === 'development') {
+        throw new AppError(
+          `Registration failed: ${errorDetails.errorMessage}`,
+          500
+        );
+      }
+
+      // Иначе общая ошибка (не раскрываем детали пользователю из соображений безопасности)
+      throw new AppError('Failed to register user. Please try again.', 500);
+    }
 
     const accessToken = generateAccessToken({
       userId: result.user.id,
@@ -96,7 +149,7 @@ export class AuthService {
       email: result.user.email,
     });
 
-    // Отправляем письмо подтверждения email
+    // Send email verification email
     try {
       const verificationToken = await tokenService.createToken({
         userId: result.user.id,
@@ -108,7 +161,7 @@ export class AuthService {
         userId: result.user.id,
         error,
       });
-      // Не блокируем регистрацию, если письмо не отправилось
+      // Don't block registration if email sending fails
     }
 
     return {

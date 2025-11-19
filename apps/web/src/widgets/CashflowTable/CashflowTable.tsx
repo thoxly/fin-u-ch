@@ -47,14 +47,89 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>(
     {}
   );
+  const [draggedActivity, setDraggedActivity] = useState<string | null>(null);
+  const [dragOverActivity, setDragOverActivity] = useState<string | null>(null);
+  const [activityOrder, setActivityOrder] = useState<string[]>([]);
 
   const hasFactData = data.activities.length > 0;
+
+  const activitiesToRender = hasFactData
+    ? data.activities
+    : planData?.activities || [];
+
+  // Initialize activity order on first render or when activities change
+  React.useEffect(() => {
+    const currentActivities = activitiesToRender.map((a) => a.activity);
+    if (
+      activityOrder.length === 0 ||
+      !currentActivities.every((a) => activityOrder.includes(a))
+    ) {
+      setActivityOrder(currentActivities);
+    }
+  }, [data.activities, planData?.activities]);
 
   const toggleSection = (activity: string) => {
     setExpandedSections((prev) => ({
       ...prev,
       [activity]: !prev[activity],
     }));
+  };
+
+  const handleDragStart = (e: React.DragEvent, activity: string) => {
+    e.stopPropagation();
+    setDraggedActivity(activity);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add a semi-transparent drag image
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.stopPropagation();
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggedActivity(null);
+    setDragOverActivity(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, activity: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (draggedActivity && draggedActivity !== activity) {
+      setDragOverActivity(activity);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
+    setDragOverActivity(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetActivity: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedActivity || draggedActivity === targetActivity) {
+      setDraggedActivity(null);
+      setDragOverActivity(null);
+      return;
+    }
+
+    const newOrder = [...activityOrder];
+    const draggedIndex = newOrder.indexOf(draggedActivity);
+    const targetIndex = newOrder.indexOf(targetActivity);
+
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+      // Remove dragged item and insert at target position
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedActivity);
+      setActivityOrder(newOrder);
+    }
+
+    setDraggedActivity(null);
+    setDragOverActivity(null);
   };
 
   const allMonths = useMemo(() => {
@@ -216,9 +291,21 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     0
   );
 
-  const activitiesToRender = hasFactData
-    ? data.activities
-    : planData?.activities || [];
+  // Sort activities according to the user-defined order
+  const sortedActivities = useMemo(() => {
+    if (activityOrder.length === 0) return activitiesToRender;
+
+    return [...activitiesToRender].sort((a, b) => {
+      const indexA = activityOrder.indexOf(a.activity);
+      const indexB = activityOrder.indexOf(b.activity);
+
+      // If activity not in order, place it at the end
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+
+      return indexA - indexB;
+    });
+  }, [activitiesToRender, activityOrder]);
 
   const formatMonthLabel = (month: string) =>
     new Date(`${month}-01`)
@@ -370,19 +457,37 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             )}
           </thead>
           <tbody className="text-sm bg-zinc-50 dark:bg-zinc-900">
-            {activitiesToRender.map((activity) => {
+            {sortedActivities.map((activity) => {
               const planActivity = planActivityMap.get(activity.activity);
               const planSource: ActivityGroup | undefined =
                 planActivity || (!hasFactData ? activity : undefined);
 
               const activityColor = getActivityColor(activity.activity);
               const borderColor = getActivityBorderColor(activity.activity);
+              const isDragging = draggedActivity === activity.activity;
+              const isDragOver = dragOverActivity === activity.activity;
+
               return (
                 <React.Fragment key={activity.activity}>
                   <tr
-                    className={`${activityColor} cursor-pointer border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, activity.activity)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleDragOver(e, activity.activity)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, activity.activity)}
+                    className={`${activityColor} cursor-move border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5 ${
+                      isDragging ? 'opacity-50' : ''
+                    } ${
+                      isDragOver
+                        ? 'outline outline-2 outline-blue-500 dark:outline-blue-400'
+                        : ''
+                    }`}
                     onClick={() => toggleSection(activity.activity)}
-                    style={{ borderLeft: `3px solid ${borderColor}` }}
+                    style={{
+                      borderLeft: `3px solid ${borderColor}`,
+                      cursor: 'grab',
+                    }}
                   >
                     <td
                       className={`px-4 py-2 font-semibold text-sm text-gray-900 dark:text-zinc-50 sticky left-0 ${activityColor} z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]`}
@@ -390,7 +495,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         width: `${columnWidths.article}px`,
                       }}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
+                        <span
+                          className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing text-lg leading-none"
+                          title="Перетащите для изменения порядка"
+                        >
+                          ⋮⋮
+                        </span>
                         <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
                           {expandedSections[activity.activity] ? '▾' : '▸'}
                         </span>

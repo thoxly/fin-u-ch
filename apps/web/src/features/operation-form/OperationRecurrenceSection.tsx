@@ -3,12 +3,18 @@ import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
 import { InfoHint } from '../../shared/ui/InfoHint';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { Periodicity } from '@fin-u-ch/shared';
 import { OperationAdditionalFields } from './OperationAdditionalFields';
 
 interface OperationRecurrenceSectionProps {
   description: string;
-  repeat: Periodicity;
+  repeat:
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual';
   recurrenceEndDate: string;
   onDescriptionChange: (value: string) => void;
   onRepeatChange: (value: string) => void;
@@ -118,7 +124,7 @@ export const OperationRecurrenceSection = ({
                 options={repeatOptions}
               />
             </div>
-            {repeat !== Periodicity.NONE && (
+            {repeat !== 'none' && (
               <Input
                 label="Дата окончания повторов"
                 type="date"

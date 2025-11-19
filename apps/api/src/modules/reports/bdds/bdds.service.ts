@@ -85,6 +85,10 @@ export class BDDSService {
     for (const planItem of planItems) {
       if (!planItem.article || !planItem.article.activity) continue;
 
+      // Плановые переводы между счетами не должны искажать доходы/расходы БДДС
+      // Поэтому статьи с типом transfer пропускаем
+      if (planItem.article.type === 'transfer') continue;
+
       const activity = activitiesMap.get(planItem.article.activity);
       if (!activity) continue;
 

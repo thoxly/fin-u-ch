@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Archive, RotateCcw } from 'lucide-react';
+import { Trash2, Archive, RotateCcw, Plus } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -175,11 +175,14 @@ export const BudgetsPage = () => {
 
   return (
     <Layout>
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-          Бюджеты
-        </h1>
-        <Button onClick={handleCreate}>Создать бюджет</Button>
+      <div className="mb-6 flex justify-end items-center">
+        <button
+          onClick={handleCreate}
+          className="relative px-4 py-2 border border-primary-500 dark:border-primary-400 rounded-lg bg-primary-500 dark:bg-primary-600 text-white hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors flex items-center justify-center gap-2"
+        >
+          <Plus size={18} />
+          Создать бюджет
+        </button>
       </div>
 
       {/* Фильтр */}

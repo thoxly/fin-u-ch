@@ -39,7 +39,9 @@ interface PlanFormProps {
 }
 
 export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
-  const [type, setType] = useState(plan?.type || 'expense');
+  const [type, setType] = useState<'income' | 'expense' | 'transfer'>(
+    plan?.type || 'expense'
+  );
   const [startDate, setStartDate] = useState(
     plan?.startDate.split('T')[0] || toISODate(new Date())
   );
@@ -52,10 +54,20 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [currency, setCurrency] = useState(plan?.currency || 'RUB');
   const [articleId, setArticleId] = useState(plan?.articleId || '');
   const [accountId, setAccountId] = useState(plan?.accountId || '');
-  const [repeat, setRepeat] = useState(plan?.repeat || 'monthly');
-  const [status, setStatus] = useState(plan?.status || 'active');
+  const [repeat, setRepeat] = useState<
+    | 'none'
+    | 'daily'
+    | 'weekly'
+    | 'monthly'
+    | 'quarterly'
+    | 'semiannual'
+    | 'annual'
+  >(plan?.repeat || 'monthly');
+  const [status, setStatus] = useState<'active' | 'paused' | 'archived'>(
+    plan?.status || 'active'
+  );
 
-  const { data: articles = [] } = useGetArticlesQuery();
+  const { data: articles = [] } = useGetArticlesQuery({});
   const { data: accounts = [] } = useGetAccountsQuery();
 
   const [createPlan, { isLoading: isCreating }] = useCreatePlanMutation();
@@ -156,7 +168,9 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Тип"
           value={type}
-          onChange={(value) => setType(value)}
+          onChange={(value) =>
+            setType(value as 'income' | 'expense' | 'transfer')
+          }
           options={typeOptions}
           required
         />
@@ -164,7 +178,9 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Статус"
           value={status}
-          onChange={(value) => setStatus(value)}
+          onChange={(value) =>
+            setStatus(value as 'active' | 'paused' | 'archived')
+          }
           options={statusOptions}
           required
         />
@@ -205,7 +221,18 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
         <Select
           label="Повторение"
           value={repeat}
-          onChange={(value) => setRepeat(value)}
+          onChange={(value) =>
+            setRepeat(
+              value as
+                | 'none'
+                | 'daily'
+                | 'weekly'
+                | 'monthly'
+                | 'quarterly'
+                | 'semiannual'
+                | 'annual'
+            )
+          }
           options={repeatOptions}
           required
         />

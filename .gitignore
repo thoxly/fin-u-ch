@@ -18,6 +18,7 @@ node_modules/
 
 # Build outputs
 dist/
+!scripts/ai-review/dist/
 build/
 .next/
 out/
@@ -53,6 +54,8 @@ Thumbs.db
 .cache/
 .temp/
 .tmp/
+.distilled-context.cache
+.ai-review-reports/
 
 # SSL certificates (never commit private keys!)
 ops/nginx/ssl/*.pem
