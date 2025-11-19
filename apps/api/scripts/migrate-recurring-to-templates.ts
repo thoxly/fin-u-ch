@@ -7,7 +7,7 @@ import prisma from '../src/config/db';
 import logger from '../src/config/logger';
 
 async function migrateRecurringToTemplates() {
-  logger.info('Начинаем миграцию повторяющихся операций в шаблоны...');
+  logger.info('Starting migration of recurring operations to templates...');
 
   try {
     // Находим все операции, которые должны быть шаблонами
@@ -26,10 +26,10 @@ async function migrateRecurringToTemplates() {
       },
     });
 
-    logger.info(`Найдено ${operationsToMigrate.length} операций для миграции`);
+    logger.info(`Found ${operationsToMigrate.length} operations to migrate`);
 
     if (operationsToMigrate.length === 0) {
-      logger.info('Нет операций для миграции');
+      logger.info('No operations to migrate');
       return;
     }
 
@@ -43,17 +43,20 @@ async function migrateRecurringToTemplates() {
       },
     });
 
-    logger.info(`Успешно обновлено ${result.count} операций`);
-    logger.info('Миграция завершена');
+    logger.info(`Successfully updated ${result.count} operations`);
+    logger.info('Migration completed');
 
     // Выводим информацию об обновленных операциях
     for (const op of operationsToMigrate) {
-      logger.info(
-        `  - ID: ${op.id}, Company: ${op.companyId}, Repeat: ${op.repeat}, Amount: ${op.amount}`
-      );
+      logger.debug('Migrated operation', {
+        operationId: op.id,
+        companyId: op.companyId,
+        repeat: op.repeat,
+        amount: op.amount,
+      });
     }
   } catch (error) {
-    logger.error('Ошибка при миграции:', error);
+    logger.error('Migration error', { error });
     throw error;
   } finally {
     await prisma.$disconnect();
@@ -63,10 +66,10 @@ async function migrateRecurringToTemplates() {
 // Запускаем миграцию
 migrateRecurringToTemplates()
   .then(() => {
-    logger.info('✅ Миграция успешно завершена');
+    logger.info('✅ Migration completed successfully');
     process.exit(0);
   })
   .catch((error) => {
-    logger.error('❌ Ошибка миграции:', error);
+    logger.error('❌ Migration failed', { error });
     process.exit(1);
   });

@@ -25,6 +25,7 @@ const DEFAULT_ICONS: Record<string, string> = {
   Контрагенты: 'Users',
   Сделки: 'Handshake',
   Зарплаты: 'DollarSign',
+  Администрирование: 'Settings',
 };
 
 interface UseNavigationIconsReturn {

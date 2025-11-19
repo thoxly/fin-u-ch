@@ -6,7 +6,8 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full' | 'viewport';
+  customSize?: string;
   onMinimize?: () => void;
 }
 
@@ -16,6 +17,7 @@ export const Modal = ({
   title,
   children,
   size = 'md',
+  customSize,
   onMinimize,
 }: ModalProps) => {
   useEffect(() => {
@@ -41,9 +43,22 @@ export const Modal = ({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    viewport: '', // Для viewport используем inline стили
     '2xl': 'max-w-[900px]',
     full: 'max-w-[99vw]',
   };
+
+  const modalSizeClass =
+    customSize ||
+    (size && size !== 'viewport' ? sizeClasses[size] : sizeClasses.md);
+
+  // Для viewport размера используем проценты от экрана
+  const modalStyle =
+    size === 'viewport'
+      ? { width: '95vw', maxWidth: '95vw', maxHeight: '100vh', height: '100vh' }
+      : customSize
+        ? undefined
+        : undefined;
 
   return (
     <div
@@ -54,22 +69,23 @@ export const Modal = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div
         className={classNames(
-          'relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full flex flex-col border border-gray-200 dark:border-gray-700',
-          sizeClasses[size as keyof typeof sizeClasses] || sizeClasses[size],
+          'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 flex flex-col',
+          modalSizeClass,
           size === 'full' ? 'max-h-[95vh] h-[95vh]' : 'max-h-[90vh]'
         )}
+        style={modalStyle}
       >
         {/* Header */}
         {title && (
-          <div className="flex items-center justify-between px-6 py-3.5 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 bg-gradient-to-b from-gray-50 to-white dark:from-gray-800 dark:to-gray-800">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               {title}
             </h2>
             <div className="flex items-center gap-2">
@@ -117,7 +133,14 @@ export const Modal = ({
         )}
 
         {/* Content */}
-        <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+        <div
+          className={classNames(
+            'px-6 py-4 overflow-y-auto flex-1 min-h-0',
+            size === 'viewport'
+              ? 'max-h-[calc(100vh-80px)]'
+              : 'max-h-[calc(100vh-200px)]'
+          )}
+        >
           {children}
         </div>
       </div>

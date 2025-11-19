@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { loginAsTestUser, expectAuthenticated } from './helpers/auth';
-import { readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { writeFileSync, unlinkSync } from 'fs';
 
 test.describe('Bank Statement Import', () => {
   test.beforeEach(async ({ page }) => {
@@ -113,29 +113,27 @@ test.describe('Bank Statement Import', () => {
       const testFilePath = join(__dirname, '../test-statement.txt');
       writeFileSync(testFilePath, testFileContent);
 
-      try {
-        await fileInput.setInputFiles(testFilePath);
+      await fileInput.setInputFiles(testFilePath);
 
-        // Ждем обработки файла (может быть загрузка, парсинг)
-        await page.waitForTimeout(2000);
+      // Ждем обработки файла (может быть загрузка, парсинг)
+      await page.waitForTimeout(2000);
 
-        // Проверяем, что появилась таблица маппинга или сообщение об успехе
-        const mappingTable = page.locator(
-          'text=Импортированные операции, table, [class*="mapping"], [class*="import"]'
-        );
-        const successMessage = page.locator(
-          'text=успешно, text=загружен, [class*="success"]'
-        );
+      // Проверяем, что появилась таблица маппинга или сообщение об успехе
+      const mappingTable = page.locator(
+        'text=Импортированные операции, table, [class*="mapping"], [class*="import"]'
+      );
+      const successMessage = page.locator(
+        'text=успешно, text=загружен, [class*="success"]'
+      );
 
-        // Один из них должен быть виден
-        const hasTable = (await mappingTable.count()) > 0;
-        const hasSuccess = (await successMessage.count()) > 0;
+      // Один из них должен быть виден
+      const hasTable = (await mappingTable.count()) > 0;
+      const hasSuccess = (await successMessage.count()) > 0;
 
-        expect(hasTable || hasSuccess).toBe(true);
-      } finally {
-        // Очищаем временный файл
-        unlinkSync(testFilePath);
-      }
+      // Очищаем временный файл
+      unlinkSync(testFilePath);
+
+      expect(hasTable || hasSuccess).toBe(true);
     }
   });
 

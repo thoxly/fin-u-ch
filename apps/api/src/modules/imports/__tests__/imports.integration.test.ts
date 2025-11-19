@@ -18,7 +18,6 @@ jest.mock('../../../config/env', () => ({
 
 // Mock logger
 jest.mock('../../../config/logger', () => ({
-  __esModule: true,
   default: {
     debug: jest.fn(),
     info: jest.fn(),
@@ -57,32 +56,16 @@ jest.mock('../../../config/db', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
-    article: {
-      findFirst: jest.fn(),
-    },
     operation: {
       create: jest.fn(),
-      findMany: jest.fn(),
     },
-    $transaction: jest.fn(async (callback) => {
-      const tx = {
-        importedOperation: mockPrisma.importedOperation,
-        operation: mockPrisma.operation,
-        importSession: mockPrisma.importSession,
-      };
-      return await callback(tx);
-    }),
+    $transaction: jest.fn((callback) => callback({})),
   },
 }));
 
 // Mock matching service
 jest.mock('../services/matching.service', () => ({
   autoMatch: jest.fn(),
-}));
-
-// Mock parser
-jest.mock('../parsers/clientBankExchange.parser', () => ({
-  parseClientBankExchange: jest.fn(),
 }));
 
 // Mock operations service
@@ -96,19 +79,11 @@ import prisma from '../../../config/db';
 import { ImportsService } from '../imports.service';
 import { AppError } from '../../../middlewares/error';
 import { autoMatch } from '../services/matching.service';
-import { parseClientBankExchange } from '../parsers/clientBankExchange.parser';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// Используем правильную типизацию моков
-// Моки созданы через jest.mock, поэтому используем as any для обхода проблем типизации
-const mockPrisma = prisma as any;
-
+const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 const mockAutoMatch = autoMatch as jest.MockedFunction<typeof autoMatch>;
-const mockParseClientBankExchange =
-  parseClientBankExchange as jest.MockedFunction<
-    typeof parseClientBankExchange
-  >;
 
 describe('ImportsService Integration Tests', () => {
   let importsService: ImportsService;
@@ -122,6 +97,80 @@ describe('ImportsService Integration Tests', () => {
   });
 
   describe('uploadStatement', () => {
+    it('должен успешно загрузить файл и создать сессию импорта', async () => {
+      const filePath = join(fixturesDir, 'sample-statement.txt');
+      const fileBuffer = readFileSync(filePath);
+
+      mockPrisma.company.findUnique.mockResolvedValueOnce({
+        id: companyId,
+        inn: '1234567890',
+      } as any);
+
+      mockPrisma.importSession.create.mockResolvedValueOnce({
+        id: 'session-1',
+        companyId,
+        userId,
+        fileName: 'sample-statement.txt',
+        status: 'draft',
+        importedCount: 2,
+        confirmedCount: 0,
+        processedCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+
+      mockAutoMatch.mockResolvedValue({
+        direction: 'expense',
+        matchedCounterpartyId: 'counterparty-1',
+        matchedArticleId: 'article-1',
+        matchedAccountId: 'account-1',
+        matchedBy: 'inn',
+      });
+
+      mockPrisma.importedOperation.create
+        .mockResolvedValueOnce({
+          id: 'op-1',
+          importSessionId: 'session-1',
+          companyId,
+          date: new Date('2025-10-24'),
+          amount: 8263.0,
+          description: 'Единый налоговый платеж',
+          direction: 'expense',
+          confirmed: false,
+          processed: false,
+          draft: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any)
+        .mockResolvedValueOnce({
+          id: 'op-2',
+          importSessionId: 'session-1',
+          companyId,
+          date: new Date('2025-10-25'),
+          amount: 15000.5,
+          description: 'Оплата по счету №123 от 20.10.2025',
+          direction: 'expense',
+          confirmed: false,
+          processed: false,
+          draft: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any);
+
+      const result = await importsService.uploadStatement(
+        companyId,
+        userId,
+        'sample-statement.txt',
+        fileBuffer
+      );
+
+      expect(result.sessionId).toBe('session-1');
+      expect(result.importedCount).toBe(2);
+      expect(result.fileName).toBe('sample-statement.txt');
+      expect(mockPrisma.importSession.create).toHaveBeenCalled();
+      expect(mockPrisma.importedOperation.create).toHaveBeenCalledTimes(2);
+    });
+
     it('должен выбросить ошибку для файла больше 10MB', async () => {
       const largeBuffer = Buffer.alloc(11 * 1024 * 1024); // 11MB
 
@@ -143,29 +192,26 @@ describe('ImportsService Integration Tests', () => {
       ).rejects.toThrow('File size exceeds 10MB limit');
     });
 
-    it('должен выбросить ошибку для файла с более чем 5000 операций', async () => {
+    it('должен выбросить ошибку для файла с более чем 1000 операций', async () => {
       const filePath = join(fixturesDir, 'sample-statement.txt');
       const fileBuffer = readFileSync(filePath);
 
-      mockPrisma.company.findUnique.mockResolvedValue({
+      mockPrisma.company.findUnique.mockResolvedValueOnce({
         id: companyId,
         inn: '1234567890',
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
+      } as any);
 
-      // Мокаем парсер, чтобы вернуть 5001 операцию
-      mockParseClientBankExchange.mockReturnValue({
-        documents: Array(5001)
+      // Мокаем парсер, чтобы вернуть 1001 операцию
+      const parserModule = await import('../parsers/clientBankExchange.parser');
+      jest.spyOn(parserModule, 'parseClientBankExchange').mockReturnValueOnce(
+        Array(1001)
           .fill(null)
           .map((_, i) => ({
             date: new Date(),
             amount: 1000,
-            purpose: `Operation ${i}`,
-            hash: `hash-${i}`,
-          })),
-        companyAccountNumber: undefined,
-      });
+            description: `Operation ${i}`,
+          }))
+      );
 
       await expect(
         importsService.uploadStatement(
@@ -174,9 +220,15 @@ describe('ImportsService Integration Tests', () => {
           'large.txt',
           fileBuffer
         )
-      ).rejects.toThrow(
-        'File contains too many operations (5001). Maximum allowed is 5000.'
-      );
+      ).rejects.toThrow(AppError);
+      await expect(
+        importsService.uploadStatement(
+          companyId,
+          userId,
+          'large.txt',
+          fileBuffer
+        )
+      ).rejects.toThrow('File contains more than 1000 operations');
     });
   });
 
@@ -195,9 +247,7 @@ describe('ImportsService Integration Tests', () => {
         processedCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
+      } as any);
 
       mockPrisma.importedOperation.findMany.mockResolvedValueOnce([
         {
@@ -216,9 +266,7 @@ describe('ImportsService Integration Tests', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.findMany>
-      >);
+      ] as any);
 
       mockPrisma.importedOperation.count.mockResolvedValueOnce(2);
 
@@ -251,9 +299,7 @@ describe('ImportsService Integration Tests', () => {
       mockPrisma.importSession.findFirst.mockResolvedValueOnce({
         id: sessionId,
         companyId,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
+      } as any);
 
       mockPrisma.importedOperation.findMany.mockResolvedValueOnce([]);
       mockPrisma.importedOperation.count.mockResolvedValueOnce(0);
@@ -280,9 +326,7 @@ describe('ImportsService Integration Tests', () => {
         id: operationId,
         companyId,
         importSessionId: 'session-1',
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.findFirst>
-      >);
+      } as any);
 
       mockPrisma.importedOperation.update.mockResolvedValueOnce({
         id: operationId,
@@ -290,9 +334,7 @@ describe('ImportsService Integration Tests', () => {
         matchedArticleId: 'article-1',
         matchedCounterpartyId: 'counterparty-1',
         confirmed: true,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.update>
-      >);
+      } as any);
 
       const result = await importsService.updateImportedOperation(
         operationId,
@@ -317,30 +359,11 @@ describe('ImportsService Integration Tests', () => {
       mockPrisma.importSession.findFirst.mockResolvedValueOnce({
         id: sessionId,
         companyId,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
-
-      mockPrisma.importedOperation.findMany.mockResolvedValueOnce([
-        {
-          id: 'op-1',
-          importSessionId: sessionId,
-          companyId,
-        },
-        {
-          id: 'op-2',
-          importSessionId: sessionId,
-          companyId,
-        },
-      ] as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.findMany>
-      >);
+      } as any);
 
       mockPrisma.importedOperation.updateMany.mockResolvedValueOnce({
         count: 2,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.updateMany>
-      >);
+      } as any);
 
       const result = await importsService.bulkUpdateImportedOperations(
         sessionId,
@@ -362,18 +385,14 @@ describe('ImportsService Integration Tests', () => {
       mockPrisma.importSession.findFirst.mockResolvedValueOnce({
         id: sessionId,
         companyId,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
+      } as any);
 
       mockPrisma.importedOperation.findMany.mockResolvedValueOnce([
         {
           id: 'op-1',
           description: 'Оплата налогов',
         },
-      ] as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importedOperation.findMany>
-      >);
+      ] as any);
 
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
@@ -383,26 +402,16 @@ describe('ImportsService Integration Tests', () => {
           targetType: 'article',
           targetId: 'article-1',
         },
-      ] as unknown as Awaited<
-        ReturnType<typeof mockPrisma.mappingRule.findMany>
-      >);
+      ] as any);
 
       mockPrisma.article.findFirst.mockResolvedValueOnce({
         id: 'article-1',
         type: 'expense',
         isActive: true,
-      } as unknown as Awaited<ReturnType<typeof mockPrisma.article.findFirst>>);
+      } as any);
 
-      mockPrisma.mappingRule.update.mockResolvedValueOnce(
-        {} as unknown as Awaited<
-          ReturnType<typeof mockPrisma.mappingRule.update>
-        >
-      );
-      mockPrisma.importedOperation.update.mockResolvedValueOnce(
-        {} as unknown as Awaited<
-          ReturnType<typeof mockPrisma.importedOperation.update>
-        >
-      );
+      mockPrisma.mappingRule.update.mockResolvedValueOnce({} as any);
+      mockPrisma.importedOperation.update.mockResolvedValueOnce({} as any);
 
       const result = await importsService.applyRules(sessionId, companyId);
 
@@ -411,7 +420,52 @@ describe('ImportsService Integration Tests', () => {
     });
   });
 
-  describe('importOperations', () => {});
+  describe('importOperations', () => {
+    it('должен импортировать подтвержденные операции', async () => {
+      const sessionId = 'session-1';
+
+      mockPrisma.importSession.findFirst.mockResolvedValueOnce({
+        id: sessionId,
+        companyId,
+      } as any);
+
+      mockPrisma.importedOperation.findMany.mockResolvedValueOnce([
+        {
+          id: 'op-1',
+          companyId,
+          date: new Date(),
+          amount: 1000,
+          description: 'Test',
+          direction: 'expense',
+          matchedArticleId: 'article-1',
+          matchedCounterpartyId: 'counterparty-1',
+          matchedAccountId: 'account-1',
+          currency: 'RUB',
+          confirmed: true,
+          processed: false,
+        },
+      ] as any);
+
+      mockPrisma.operation.create.mockResolvedValueOnce({
+        id: 'operation-1',
+      } as any);
+
+      mockPrisma.importedOperation.update.mockResolvedValueOnce({} as any);
+      mockPrisma.importSession.update.mockResolvedValueOnce({
+        processedCount: 1,
+      } as any);
+
+      const result = await importsService.importOperations(
+        sessionId,
+        companyId,
+        userId,
+        undefined
+      );
+
+      expect(result.imported).toBe(1);
+      expect(result.created).toBe(1);
+    });
+  });
 
   describe('deleteSession', () => {
     it('должен удалить сессию и все связанные операции', async () => {
@@ -420,17 +474,13 @@ describe('ImportsService Integration Tests', () => {
       mockPrisma.importSession.findFirst.mockResolvedValueOnce({
         id: sessionId,
         companyId,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.importSession.findFirst>
-      >);
+      } as any);
 
-      mockPrisma.importedOperation.count.mockResolvedValueOnce(5);
+      mockPrisma.importedOperation.deleteMany.mockResolvedValueOnce({
+        count: 5,
+      } as any);
 
-      mockPrisma.importSession.delete.mockResolvedValueOnce(
-        {} as unknown as Awaited<
-          ReturnType<typeof mockPrisma.importSession.delete>
-        >
-      );
+      mockPrisma.importSession.delete.mockResolvedValueOnce({} as any);
 
       const result = await importsService.deleteSession(sessionId, companyId);
 
@@ -452,9 +502,7 @@ describe('ImportsService Integration Tests', () => {
         usageCount: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.mappingRule.create>
-      >);
+      } as any);
 
       const result = await importsService.createMappingRule(companyId, userId, {
         ruleType: 'contains',
@@ -477,9 +525,7 @@ describe('ImportsService Integration Tests', () => {
           pattern: 'налог',
           targetType: 'article',
         },
-      ] as unknown as Awaited<
-        ReturnType<typeof mockPrisma.mappingRule.findMany>
-      >);
+      ] as any);
 
       const result = await importsService.getMappingRules(companyId, {
         targetType: 'article',
@@ -489,24 +535,40 @@ describe('ImportsService Integration Tests', () => {
       expect(result[0].id).toBe('rule-1');
     });
 
+    it('должен обновить правило', async () => {
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce({
+        id: 'rule-1',
+        companyId,
+      } as any);
+
+      mockPrisma.mappingRule.update.mockResolvedValueOnce({
+        id: 'rule-1',
+        pattern: 'обновленный паттерн',
+      } as any);
+
+      const result = await importsService.updateMappingRule(
+        'rule-1',
+        companyId,
+        {
+          pattern: 'обновленный паттерн',
+        }
+      );
+
+      expect(result.pattern).toBe('обновленный паттерн');
+    });
+
     it('должен удалить правило', async () => {
       mockPrisma.mappingRule.findFirst.mockResolvedValueOnce({
         id: 'rule-1',
         companyId,
-      } as unknown as Awaited<
-        ReturnType<typeof mockPrisma.mappingRule.findFirst>
-      >);
+      } as any);
 
-      mockPrisma.mappingRule.delete.mockResolvedValueOnce(
-        {} as unknown as Awaited<
-          ReturnType<typeof mockPrisma.mappingRule.delete>
-        >
-      );
+      mockPrisma.mappingRule.delete.mockResolvedValueOnce({} as any);
 
       await importsService.deleteMappingRule('rule-1', companyId);
 
       expect(mockPrisma.mappingRule.delete).toHaveBeenCalledWith({
-        where: { id: 'rule-1', companyId },
+        where: { id: 'rule-1' },
       });
     });
   });

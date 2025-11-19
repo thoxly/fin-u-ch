@@ -1,4 +1,3 @@
-import { Prisma, PrismaClient } from '@prisma/client';
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { hashPassword, verifyPassword } from '../../utils/hash';
@@ -14,41 +13,6 @@ import {
 } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
-
-// Тип для транзакции Prisma (безопасная альтернатива any)
-// Используем unknown для безопасного приведения типа при работе с Prisma транзакциями
-type PrismaTransactionClient = Omit<
-  PrismaClient,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
-
-// Типы для работы с пользователями и компаниями
-// Используются для правильной типизации результатов Prisma запросов с include
-type CompanySelect = {
-  id: string;
-  name: string;
-  currencyBase: string;
-  inn?: string | null;
-};
-
-type UserWithCompany<T = CompanySelect> = {
-  id: string;
-  email: string;
-  companyId: string;
-  isActive: boolean;
-  createdAt: Date;
-  firstName: string | null;
-  lastName: string | null;
-  company: T | null;
-};
-
-// Тип для select компании (используется для обхода проблем типизации Prisma)
-type CompanySelectInput = {
-  id: true;
-  name: true;
-  currencyBase: true;
-  inn?: true;
-};
 
 // Вспомогательная функция для обработки ошибок нарушения уникального ограничения Prisma
 function handleUniqueConstraintError(
@@ -192,19 +156,8 @@ async function processOldEmailConfirmation(
   newEmail: string
 ): Promise<void> {
   // Помечаем токен старого email как использованный в транзакции
-  // Используем unknown для безопасного приведения типа (Prisma не всегда правильно типизирует модели в транзакциях)
-  // Это безопаснее чем any, так как мы явно указываем структуру типа
   await prisma.$transaction(async (tx) => {
-    // Приводим к unknown, затем к типу с emailToken (безопасная альтернатива any)
-    const txClient = tx as unknown as {
-      emailToken: {
-        update: (args: {
-          where: { token: string };
-          data: { used: boolean };
-        }) => Promise<unknown>;
-      };
-    };
-    await txClient.emailToken.update({
+    await tx.emailToken.update({
       where: { token },
       data: { used: true },
     });
@@ -222,14 +175,22 @@ export class UsersService {
         id: userId,
         companyId: companyId,
       },
-      include: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        companyId: true,
+        isActive: true,
+        isSuperAdmin: true,
+        createdAt: true,
         company: {
           select: {
             id: true,
             name: true,
             currencyBase: true,
             inn: true,
-          } as Prisma.CompanySelect,
+          },
         },
       },
     });
@@ -238,23 +199,9 @@ export class UsersService {
       throw new AppError('User not found or access denied', 404);
     }
 
-    // Типизируем результат с учетом включенных связей
-    // Используем явную типизацию для обхода проблем с типами Prisma при использовании include + select
-    const userWithCompany = user as unknown as UserWithCompany<CompanySelect>;
-
-    if (!userWithCompany.company) {
-      throw new AppError('Company not found for user', 500);
-    }
-
     return {
-      id: user.id,
-      email: user.email,
-      firstName: userWithCompany.firstName,
-      lastName: userWithCompany.lastName,
-      companyId: user.companyId,
-      isActive: user.isActive,
-      createdAt: user.createdAt,
-      companyName: userWithCompany.company.name,
+      ...user,
+      companyName: user.company.name,
     };
   }
 
@@ -264,11 +211,240 @@ export class UsersService {
       select: {
         id: true,
         email: true,
+        firstName: true,
+        lastName: true,
         isActive: true,
+        isSuperAdmin: true,
         createdAt: true,
         updatedAt: true,
       },
     });
+  }
+
+  /**
+   * Обновить пользователя (для администраторов)
+   */
+  async updateUser(
+    userId: string,
+    companyId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      isActive?: boolean;
+    }
+  ) {
+    logger.debug('[UsersService.updateUser] Обновление пользователя', {
+      userId,
+      companyId,
+      data,
+    });
+
+    // Проверка существования пользователя и принадлежности к компании
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, companyId: true, isSuperAdmin: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Нельзя деактивировать супер-администратора
+    if (data.isActive === false && user.isSuperAdmin) {
+      throw new AppError('Cannot deactivate super administrator', 403);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.firstName !== undefined && { firstName: data.firstName }),
+        ...(data.lastName !== undefined && { lastName: data.lastName }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        companyId: true,
+        isActive: true,
+        isSuperAdmin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    logger.debug('[UsersService.updateUser] Пользователь успешно обновлён', {
+      userId,
+      companyId,
+      changes: data,
+    });
+
+    return updatedUser;
+  }
+
+  /**
+   * Удалить пользователя
+   */
+  async deleteUser(userId: string, companyId: string, deletedBy: string) {
+    logger.debug('[UsersService.deleteUser] Удаление пользователя', {
+      userId,
+      companyId,
+      deletedBy,
+    });
+
+    // Проверка существования пользователя и принадлежности к компании
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        companyId: true,
+        isSuperAdmin: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Нельзя удалить супер-администратора
+    if (user.isSuperAdmin) {
+      throw new AppError('Cannot delete super administrator', 403);
+    }
+
+    // Удаляем пользователя (soft delete - деактивируем)
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+      },
+    });
+
+    logger.debug('[UsersService.deleteUser] Пользователь успешно удалён', {
+      userId,
+      companyId,
+      email: user.email,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Пригласить пользователя по email
+   */
+  async inviteUser(
+    companyId: string,
+    email: string,
+    roleIds: string[],
+    invitedBy: string
+  ) {
+    logger.debug('[UsersService.inviteUser] Приглашение пользователя', {
+      companyId,
+      email,
+      roleIds,
+      invitedBy,
+    });
+
+    // Проверка, не существует ли уже пользователь с таким email
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, companyId: true },
+    });
+
+    if (existingUser) {
+      if (existingUser.companyId === companyId) {
+        throw new AppError(
+          'User with this email already exists in your company',
+          409
+        );
+      } else {
+        throw new AppError(
+          'User with this email already exists in another company',
+          409
+        );
+      }
+    }
+
+    // Проверка ролей
+    if (roleIds.length > 0) {
+      const roles = await prisma.role.findMany({
+        where: {
+          id: { in: roleIds },
+          companyId,
+          isActive: true,
+          deletedAt: null,
+        },
+      });
+
+      if (roles.length !== roleIds.length) {
+        throw new AppError('One or more roles not found or inactive', 404);
+      }
+    }
+
+    // TODO: В будущем здесь будет отправка email с приглашением
+    // Пока просто создаём пользователя с временным паролем или флагом "ожидает активации"
+    // Для простоты создаём пользователя с дефолтным паролем (в продакшене нужно генерировать токен приглашения)
+
+    // Генерируем временный пароль (в продакшене это должно быть через токен приглашения)
+    const tempPassword = `temp_${Math.random().toString(36).slice(2)}`;
+    const passwordHash = await hashPassword(tempPassword);
+
+    // Создаём пользователя
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        companyId,
+        isActive: true, // Или false, если требуется активация через email
+        // Можно добавить поле isInvited: true для отслеживания
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        companyId: true,
+        isActive: true,
+        isSuperAdmin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    // Назначаем роли, если указаны
+    if (roleIds.length > 0) {
+      await prisma.userRole.createMany({
+        data: roleIds.map((roleId) => ({
+          userId: newUser.id,
+          roleId,
+          assignedBy: invitedBy,
+        })),
+      });
+    }
+
+    logger.debug('[UsersService.inviteUser] Пользователь успешно приглашён', {
+      userId: newUser.id,
+      email,
+      roleIds,
+      invitedBy,
+    });
+
+    // TODO: Отправить email с приглашением
+
+    // Возвращаем пользователя с временным паролем (только для отображения администратору)
+    return {
+      ...newUser,
+      tempPassword, // Временный пароль возвращаем только один раз
+    };
   }
 
   async updateMe(
@@ -332,55 +508,29 @@ export class UsersService {
         // Получаем обновленного пользователя
         const updatedUser = await tx.user.findUniqueOrThrow({
           where: { id: userId },
-          include: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            companyId: true,
+            isActive: true,
             company: {
               select: {
                 id: true,
                 name: true,
                 currencyBase: true,
-              } as Prisma.CompanySelect,
+              },
             },
           },
         });
 
-        // Типизируем результат с учетом включенных связей
-        const userWithCompany = updatedUser as unknown as UserWithCompany<
-          Omit<CompanySelect, 'inn'>
-        >;
-
-        if (!userWithCompany.company) {
-          throw new AppError('Company not found for user', 500);
-        }
-
-        return {
-          id: updatedUser.id,
-          email: updatedUser.email,
-          firstName: userWithCompany.firstName,
-          lastName: userWithCompany.lastName,
-          companyId: updatedUser.companyId,
-          isActive: updatedUser.isActive,
-          company: userWithCompany.company,
-        };
+        return updatedUser;
       });
 
-      // Типизируем результат с учетом включенных связей
-      const resultWithCompany = updatedUser as unknown as UserWithCompany<
-        Omit<CompanySelect, 'inn'>
-      >;
-
-      // Проверяем наличие company (должна быть, так как проверяли внутри транзакции)
-      if (!resultWithCompany.company) {
-        throw new AppError('Company not found for user', 500);
-      }
-
       return {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        firstName: resultWithCompany.firstName,
-        lastName: resultWithCompany.lastName,
-        companyId: updatedUser.companyId,
-        isActive: updatedUser.isActive,
-        companyName: resultWithCompany.company.name,
+        ...updatedUser,
+        companyName: updatedUser.company.name,
       };
     } catch (error: unknown) {
       if (error instanceof AppError) {
@@ -599,7 +749,7 @@ export class UsersService {
           data: {
             email: newEmail,
             isEmailVerified: true, // Новый email считается подтвержденным
-          } as Prisma.UserUpdateManyMutationInput,
+          },
         });
 
         if (updateResult.count === 0) {
@@ -618,6 +768,263 @@ export class UsersService {
     logger.info('Email changed successfully', {
       userId: validation.userId,
     });
+  }
+
+  /**
+   * Назначить роль пользователю
+   */
+  async assignRole(
+    userId: string,
+    roleId: string,
+    companyId: string,
+    assignedBy: string
+  ) {
+    logger.debug(
+      '[UsersService.assignRole] Начало назначения роли пользователю',
+      {
+        userId,
+        roleId,
+        companyId,
+        assignedBy,
+      }
+    );
+
+    // Проверка существования пользователя и принадлежности к компании
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, companyId: true, isActive: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    if (!user.isActive) {
+      throw new AppError('Cannot assign role to inactive user', 403);
+    }
+
+    // Проверка существования роли и принадлежности к компании
+    const role = await prisma.role.findUnique({
+      where: { id: roleId },
+      select: {
+        id: true,
+        companyId: true,
+        isActive: true,
+        deletedAt: true,
+        name: true,
+      },
+    });
+
+    if (!role) {
+      throw new AppError('Role not found', 404);
+    }
+
+    if (role.companyId !== companyId) {
+      throw new AppError('Role does not belong to this company', 403);
+    }
+
+    if (!role.isActive || role.deletedAt) {
+      throw new AppError('Cannot assign inactive or deleted role', 403);
+    }
+
+    // Проверка, не назначена ли уже эта роль
+    const existingUserRole = await prisma.userRole.findUnique({
+      where: {
+        userId_roleId: {
+          userId,
+          roleId,
+        },
+      },
+    });
+
+    if (existingUserRole) {
+      logger.debug(
+        '[UsersService.assignRole] Роль уже назначена пользователю',
+        {
+          userId,
+          roleId,
+          userRoleId: existingUserRole.id,
+        }
+      );
+      throw new AppError('Role is already assigned to this user', 409);
+    }
+
+    // Назначение роли
+    const userRole = await prisma.userRole.create({
+      data: {
+        userId,
+        roleId,
+        assignedBy,
+      },
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            category: true,
+            isSystem: true,
+          },
+        },
+      },
+    });
+
+    logger.debug(
+      '[UsersService.assignRole] Роль успешно назначена пользователю',
+      {
+        userRoleId: userRole.id,
+        userId,
+        roleId,
+        roleName: userRole.role.name,
+        assignedBy,
+      }
+    );
+
+    return userRole;
+  }
+
+  /**
+   * Снять роль с пользователя
+   */
+  async removeRole(userId: string, roleId: string, companyId: string) {
+    logger.debug(
+      '[UsersService.removeRole] Начало снятия роли с пользователя',
+      {
+        userId,
+        roleId,
+        companyId,
+      }
+    );
+
+    // Проверка существования пользователя и принадлежности к компании
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, companyId: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Проверка существования роли и принадлежности к компании
+    const role = await prisma.role.findUnique({
+      where: { id: roleId },
+      select: { id: true, companyId: true, isSystem: true, name: true },
+    });
+
+    if (!role) {
+      throw new AppError('Role not found', 404);
+    }
+
+    if (role.companyId !== companyId) {
+      throw new AppError('Role does not belong to this company', 403);
+    }
+
+    // Проверка, что роль не системная (нельзя снимать системные роли)
+    if (role.isSystem) {
+      logger.debug('[UsersService.removeRole] Попытка снять системную роль', {
+        userId,
+        roleId,
+        roleName: role.name,
+      });
+      throw new AppError('Cannot remove system role', 403);
+    }
+
+    // Поиск связи пользователя и роли
+    const userRole = await prisma.userRole.findUnique({
+      where: {
+        userId_roleId: {
+          userId,
+          roleId,
+        },
+      },
+    });
+
+    if (!userRole) {
+      throw new AppError('Role is not assigned to this user', 404);
+    }
+
+    // Удаление связи
+    await prisma.userRole.delete({
+      where: { id: userRole.id },
+    });
+
+    logger.debug(
+      '[UsersService.removeRole] Роль успешно снята с пользователя',
+      {
+        userRoleId: userRole.id,
+        userId,
+        roleId,
+        roleName: role.name,
+      }
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Получить роли пользователя
+   */
+  async getUserRoles(userId: string, companyId: string) {
+    logger.debug('[UsersService.getUserRoles] Получение ролей пользователя', {
+      userId,
+      companyId,
+    });
+
+    // Проверка существования пользователя и принадлежности к компании
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, companyId: true, isActive: true },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        userId,
+        role: {
+          isActive: true,
+          deletedAt: null,
+          companyId,
+        },
+      },
+      include: {
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            category: true,
+            isSystem: true,
+          },
+        },
+      },
+      orderBy: {
+        assignedAt: 'desc',
+      },
+    });
+
+    logger.debug('[UsersService.getUserRoles] Роли пользователя получены', {
+      userId,
+      companyId,
+      rolesCount: userRoles.length,
+    });
+
+    return userRoles;
   }
 }
 

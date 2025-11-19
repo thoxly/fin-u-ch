@@ -26,7 +26,6 @@ jest.mock('../../../../config/db', () => ({
     },
     article: {
       findFirst: jest.fn(),
-      findMany: jest.fn(),
     },
     account: {
       findFirst: jest.fn(),
@@ -40,8 +39,6 @@ jest.mock('../../../../config/db', () => ({
 }));
 
 import prisma from '../../../../config/db';
-import { Prisma } from '@prisma/client';
-import * as matchingService from '../matching.service';
 import {
   determineDirection,
   matchCounterparty,
@@ -51,9 +48,7 @@ import {
 } from '../matching.service';
 import { ParsedDocument } from '../../parsers/clientBankExchange.parser';
 
-// Используем правильную типизацию моков
-// Моки созданы через jest.mock, поэтому используем as any для обхода проблем типизации
-const mockPrisma = prisma as any;
+const mockPrisma = prisma as jest.Mocked<typeof prisma>;
 
 describe('matching.service', () => {
   beforeEach(() => {
@@ -117,7 +112,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      purpose: 'Test',
+      description: 'Test',
       payer: 'ООО Поставщик',
       payerInn: '1234567890',
       receiver: 'ООО Клиент',
@@ -134,7 +129,7 @@ describe('matching.service', () => {
         description: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as Prisma.CounterpartyGetPayload<Record<string, never>>);
+      } as any);
 
       const result = await matchCounterparty(companyId, operation, 'expense');
 
@@ -160,7 +155,7 @@ describe('matching.service', () => {
         description: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as Prisma.CounterpartyGetPayload<Record<string, never>>);
+      } as any);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -177,30 +172,22 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить контрагента по правилу типа alias', async () => {
-      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null); // INN match fails
-      // Мокируем equalsRules (пустой массив, чтобы код дошел до aliasRules)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      // Мокируем aliasRules
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
-        {
-          id: 'rule-1',
-          companyId,
-          userId: 'user-1',
-          ruleType: 'alias',
-          pattern: 'Поставщик',
-          targetType: 'counterparty',
-          targetId: 'counterparty-3',
-          targetName: null,
-          sourceField: 'payer',
-          usageCount: 0,
-          lastUsedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
-      mockPrisma.mappingRule.update.mockResolvedValueOnce(
-        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
-      );
+      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce({
+        id: 'rule-1',
+        companyId,
+        userId: 'user-1',
+        ruleType: 'alias',
+        pattern: 'Поставщик',
+        targetType: 'counterparty',
+        targetId: 'counterparty-3',
+        targetName: null,
+        sourceField: 'payer',
+        usageCount: 0,
+        lastUsedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -212,11 +199,8 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить контрагента по правилу типа contains', async () => {
-      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null); // INN match fails
-      // Мокируем equalsRules и aliasRules (пустые массивы)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // alias
-      // Мокируем containsRules
+      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-2',
@@ -233,10 +217,8 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
-      mockPrisma.mappingRule.update.mockResolvedValueOnce(
-        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
-      );
+      ] as any);
+      mockPrisma.mappingRule.update.mockResolvedValueOnce({} as any);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -245,30 +227,24 @@ describe('matching.service', () => {
         matchedBy: 'rule',
         ruleId: 'rule-2',
       });
-      expect(mockPrisma.mappingRule.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'rule-2', companyId },
-          data: expect.objectContaining({
-            usageCount: { increment: 1 },
-            lastUsedAt: expect.any(Date),
-          }),
-        })
-      );
+      expect(mockPrisma.mappingRule.update).toHaveBeenCalledWith({
+        where: { id: 'rule-2' },
+        data: {
+          usageCount: { increment: 1 },
+          lastUsedAt: expect.any(Date),
+        },
+      });
     });
 
     it('должен сопоставить контрагента по fuzzy match', async () => {
-      // Для income ищем по payer ('ООО Поставщик')
-      // Используем более похожее название для лучшего совпадения
-      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null); // INN match fails
-      // Мокируем equalsRules, aliasRules и containsRules (пустые массивы)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // alias
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
+      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
         {
           id: 'counterparty-5',
           companyId,
-          name: 'ООО Поставщик', // Точное совпадение для гарантии прохождения теста
+          name: 'ООО Поставщик Товаров',
           inn: null,
           category: 'supplier',
           description: null,
@@ -285,7 +261,7 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Prisma.CounterpartyGetPayload<Record<string, never>>[]);
+      ] as any);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -296,11 +272,9 @@ describe('matching.service', () => {
     });
 
     it('должен вернуть null, если контрагент не найден', async () => {
-      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null); // INN match fails
-      // Мокируем equalsRules, aliasRules и containsRules (пустые массивы)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // alias
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
+      mockPrisma.counterparty.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
       mockPrisma.counterparty.findMany.mockResolvedValueOnce([
         {
           id: 'counterparty-7',
@@ -312,7 +286,7 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Prisma.CounterpartyGetPayload<Record<string, never>>[]);
+      ] as any);
 
       const result = await matchCounterparty(companyId, operation, 'income');
 
@@ -325,7 +299,8 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      purpose: 'Оплата налогов',
+      description: 'Оплата налогов',
+      purpose: 'Единый налоговый платеж',
     };
 
     it('должен вернуть null, если направление не определено', async () => {
@@ -334,11 +309,6 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить статью по правилу типа contains', async () => {
-      // Мокируем equalsRules (пустой массив, чтобы код дошел до containsRules)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      // Мокируем regexRules (пустой массив, чтобы код дошел до containsRules)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
-      // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-3',
@@ -355,17 +325,15 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
+      ] as any);
       mockPrisma.article.findFirst.mockResolvedValueOnce({
         id: 'article-1',
         companyId,
         name: 'Налоги',
         type: 'expense',
         isActive: true,
-      } as Prisma.ArticleGetPayload<Record<string, never>>);
-      mockPrisma.mappingRule.update.mockResolvedValueOnce(
-        {} as Prisma.MappingRuleGetPayload<Record<string, never>>
-      );
+      } as any);
+      mockPrisma.mappingRule.update.mockResolvedValueOnce({} as any);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -377,17 +345,14 @@ describe('matching.service', () => {
     });
 
     it('должен сопоставить статью по ключевым словам', async () => {
-      // Мокируем equalsRules, regexRules и containsRules (пустые массивы)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
-      // Мокируем article.findMany для поиска по ключевым словам
-      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([
-        {
-          id: 'article-2',
-          name: 'Налоги',
-        },
-      ] as Prisma.ArticleGetPayload<{ select: { id: true; name: true } }>[]);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      mockPrisma.article.findFirst.mockResolvedValueOnce({
+        id: 'article-2',
+        companyId,
+        name: 'Налоги',
+        type: 'expense',
+        isActive: true,
+      } as any);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -398,12 +363,8 @@ describe('matching.service', () => {
     });
 
     it('должен вернуть null, если статья не найдена', async () => {
-      // Мокируем equalsRules, regexRules и containsRules (пустые массивы)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // contains
-      // Мокируем article.findMany для поиска по ключевым словам (пустой результат)
-      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([]);
+      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]);
+      mockPrisma.article.findFirst.mockResolvedValueOnce(null);
 
       const result = await matchArticle(companyId, operation, 'expense');
 
@@ -411,11 +372,6 @@ describe('matching.service', () => {
     });
 
     it('должен проверить тип статьи при сопоставлении по правилу', async () => {
-      // Мокируем equalsRules (пустой массив)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // equals
-      // Мокируем regexRules (пустой массив)
-      mockPrisma.mappingRule.findMany.mockResolvedValueOnce([]); // regex
-      // Мокируем containsRules
       mockPrisma.mappingRule.findMany.mockResolvedValueOnce([
         {
           id: 'rule-4',
@@ -432,17 +388,8 @@ describe('matching.service', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
         },
-      ] as Prisma.MappingRuleGetPayload<Record<string, never>>[]);
-      // Статья найдена, но тип не совпадает (article-3 имеет тип income, а мы ищем expense)
-      mockPrisma.article.findFirst.mockResolvedValueOnce({
-        id: 'article-3',
-        companyId,
-        name: 'Выручка',
-        type: 'income', // Неправильный тип
-        isActive: true,
-      } as Prisma.ArticleGetPayload<Record<string, never>>);
-      // Мокируем поиск по ключевым словам (пустой результат, чтобы не было совпадений)
-      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([]);
+      ] as any);
+      mockPrisma.article.findFirst.mockResolvedValueOnce(null); // Статья не найдена, т.к. тип не совпадает
 
       const operationWithRevenue: ParsedDocument = {
         ...operation,
@@ -464,7 +411,7 @@ describe('matching.service', () => {
     const operation: ParsedDocument = {
       date: new Date(),
       amount: 1000,
-      purpose: 'Test',
+      description: 'Test',
       payerAccount: '40702810068000001468',
       receiverAccount: '40817810099910004312',
     };
@@ -486,7 +433,7 @@ describe('matching.service', () => {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as Prisma.AccountGetPayload<Record<string, never>>);
+      } as any);
 
       const result = await matchAccount(companyId, operation, 'expense');
 
@@ -515,7 +462,7 @@ describe('matching.service', () => {
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as Prisma.AccountGetPayload<Record<string, never>>);
+      } as any);
 
       const result = await matchAccount(companyId, operation, 'income');
 
@@ -549,7 +496,8 @@ describe('matching.service', () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        purpose: 'Оплата налогов',
+        description: 'Оплата налогов',
+        purpose: 'Единый налоговый платеж',
         payer: 'ООО АКСОН',
         payerInn: '1234567890',
         payerAccount: '40702810068000001468',
@@ -559,65 +507,28 @@ describe('matching.service', () => {
       };
 
       // Mock determineDirection
+      const matchingService = await import('../matching.service');
       jest
         .spyOn(matchingService, 'determineDirection')
-        .mockImplementation(async () => 'expense');
+        .mockResolvedValueOnce('expense');
 
-      // Mock matchCounterparty - нужно замокать все вызовы Prisma
-      mockPrisma.counterparty.findFirst.mockResolvedValueOnce({
+      // Mock matchCounterparty
+      jest.spyOn(matchingService, 'matchCounterparty').mockResolvedValueOnce({
         id: 'counterparty-1',
-        companyId,
-        name: 'ФНС России',
-        inn: '9876543210',
-        category: 'other',
-        description: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Prisma.CounterpartyGetPayload<Record<string, never>>);
+        matchedBy: 'inn',
+      });
 
-      jest
-        .spyOn(matchingService, 'matchCounterparty')
-        .mockImplementation(async () => ({
-          id: 'counterparty-1',
-          matchedBy: 'inn',
-        }));
-
-      // Mock matchArticle - нужно замокать все вызовы Prisma
-      mockPrisma.mappingRule.findMany.mockResolvedValue([]); // Все правила пустые
-      mockPrisma.article.findMany = jest.fn().mockResolvedValueOnce([
-        {
-          id: 'article-1',
-          name: 'Налоги',
-        },
-      ] as Prisma.ArticleGetPayload<{ select: { id: true; name: true } }>[]);
-
-      jest
-        .spyOn(matchingService, 'matchArticle')
-        .mockImplementation(async () => ({
-          id: 'article-1',
-          matchedBy: 'keyword',
-        }));
+      // Mock matchArticle
+      jest.spyOn(matchingService, 'matchArticle').mockResolvedValueOnce({
+        id: 'article-1',
+        matchedBy: 'keyword',
+      });
 
       // Mock matchAccount
-      mockPrisma.account.findFirst.mockResolvedValueOnce({
+      jest.spyOn(matchingService, 'matchAccount').mockResolvedValueOnce({
         id: 'account-1',
-        companyId,
-        name: 'Расчетный счет',
-        number: '40702810068000001468',
-        currency: 'RUB',
-        openingBalance: 0,
-        excludeFromTotals: false,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as Prisma.AccountGetPayload<Record<string, never>>);
-
-      jest
-        .spyOn(matchingService, 'matchAccount')
-        .mockImplementation(async () => ({
-          id: 'account-1',
-          matchedBy: 'account_number',
-        }));
+        matchedBy: 'account_number',
+      });
 
       const result = await autoMatch(companyId, operation, companyInn);
 
@@ -625,14 +536,14 @@ describe('matching.service', () => {
       expect(result.matchedCounterpartyId).toBe('counterparty-1');
       expect(result.matchedArticleId).toBe('article-1');
       expect(result.matchedAccountId).toBe('account-1');
-      expect(result.matchedBy).toBe('keyword'); // Приоритет: rule > keyword > inn > fuzzy > account_number
+      expect(result.matchedBy).toBe('inn'); // Приоритет: inn > keyword > account_number
     });
 
     it('должен вернуть null для direction, если ИНН компании не указан', async () => {
       const operation: ParsedDocument = {
         date: new Date(),
         amount: 1000,
-        purpose: 'Test',
+        description: 'Test',
       };
 
       const result = await autoMatch(companyId, operation, null);

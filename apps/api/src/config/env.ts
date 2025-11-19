@@ -1,8 +1,16 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Load .env from monorepo root (current working directory)
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Determine project root: go up from apps/api/src/config to project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+// From apps/api/src/config/env.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
+const projectRoot = path.resolve(__dirname, '../../..');
+
+// Load .env from monorepo root
+dotenv.config({ path: path.resolve(projectRoot, '.env') });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',

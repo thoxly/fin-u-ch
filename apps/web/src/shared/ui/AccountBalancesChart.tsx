@@ -203,6 +203,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           filenameBase="account_balances"
           buildRows={buildExportRows}
           columns={['date', 'category', 'amount', 'type']}
+          entity="reports"
         />
       </div>
       <div

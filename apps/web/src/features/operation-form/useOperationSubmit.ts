@@ -6,6 +6,7 @@ import { useNotification } from '../../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
 import { parseAmountInputToNumber } from '../../shared/lib/numberInput';
 import type { Operation, CreateOperationDTO } from '@fin-u-ch/shared';
+import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { handleApiError } from './useOperationErrorHandler';
 import type { OperationFormData } from './useOperationValidation';
 
@@ -20,7 +21,7 @@ interface UseOperationSubmitProps {
 }
 
 interface FormValues {
-  type: 'income' | 'expense' | 'transfer';
+  type: OperationType;
   operationDate: string;
   amount: string;
   currency: string;
@@ -32,14 +33,7 @@ interface FormValues {
   dealId: string;
   departmentId: string;
   description: string;
-  repeat:
-    | 'none'
-    | 'daily'
-    | 'weekly'
-    | 'monthly'
-    | 'quarterly'
-    | 'semiannual'
-    | 'annual';
+  repeat: Periodicity;
   recurrenceEndDate: string;
   updateScope?: 'current' | 'all';
 }
@@ -66,21 +60,26 @@ function buildOperationDTO(formValues: FormValues): CreateOperationDTO {
   const amountNumber = parseAmountInputToNumber(amount);
 
   return {
-    type,
+    type: type as OperationType,
     operationDate: new Date(operationDate).toISOString(),
     amount: amountNumber,
     currency,
     articleId: articleId || undefined,
-    accountId: type !== 'transfer' ? accountId || undefined : undefined,
+    accountId:
+      type !== OperationType.TRANSFER ? accountId || undefined : undefined,
     sourceAccountId:
-      type === 'transfer' ? sourceAccountId || undefined : undefined,
+      type === OperationType.TRANSFER
+        ? sourceAccountId || undefined
+        : undefined,
     targetAccountId:
-      type === 'transfer' ? targetAccountId || undefined : undefined,
+      type === OperationType.TRANSFER
+        ? targetAccountId || undefined
+        : undefined,
     counterpartyId: counterpartyId || undefined,
     dealId: dealId || undefined,
     departmentId: departmentId || undefined,
     description: description || undefined,
-    repeat,
+    repeat: repeat as Periodicity,
     recurrenceEndDate: recurrenceEndDate
       ? new Date(recurrenceEndDate).toISOString()
       : undefined,
@@ -106,11 +105,16 @@ function buildTemplateUpdateDTO(
 
   return {
     articleId: articleId || undefined,
-    accountId: type !== 'transfer' ? accountId || undefined : undefined,
+    accountId:
+      type !== OperationType.TRANSFER ? accountId || undefined : undefined,
     sourceAccountId:
-      type === 'transfer' ? sourceAccountId || undefined : undefined,
+      type === OperationType.TRANSFER
+        ? sourceAccountId || undefined
+        : undefined,
     targetAccountId:
-      type === 'transfer' ? targetAccountId || undefined : undefined,
+      type === OperationType.TRANSFER
+        ? targetAccountId || undefined
+        : undefined,
     counterpartyId: counterpartyId || undefined,
     dealId: dealId || undefined,
     departmentId: departmentId || undefined,

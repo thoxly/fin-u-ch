@@ -103,9 +103,7 @@ export const MappingRuleDialog = ({
             fieldValue = op.payer || '';
             break;
           case 'inn':
-            // Используем оба ИНН (плательщика и получателя)
-            fieldValue =
-              [op.payerInn, op.receiverInn].filter(Boolean).join(' ') || '';
+            fieldValue = op.inn || '';
             break;
         }
 
@@ -182,15 +180,15 @@ export const MappingRuleDialog = ({
 
       onClose();
     } catch (error: unknown) {
-      const errorMessage: string =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
-        error.data &&
         typeof error.data === 'object' &&
+        error.data !== null &&
         'error' in error.data &&
         typeof error.data.error === 'string'
-          ? (error.data as { error: string }).error
+          ? error.data.error
           : 'Ошибка при сохранении правила';
       showError(errorMessage);
     }
@@ -200,16 +198,19 @@ export const MappingRuleDialog = ({
     switch (targetType) {
       case 'article':
         return [
+          { value: '__create__', label: '+ Создать новую статью' },
           { value: '', label: 'Не выбрано' },
           ...articles.map((a) => ({ value: a.id, label: a.name })),
         ];
       case 'counterparty':
         return [
+          { value: '__create__', label: '+ Создать нового контрагента' },
           { value: '', label: 'Не выбрано' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name })),
         ];
       case 'account':
         return [
+          { value: '__create__', label: '+ Создать новый счет' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
@@ -221,6 +222,16 @@ export const MappingRuleDialog = ({
   };
 
   const handleTargetIdChange = (value: string) => {
+    // Если выбрана опция создания, открываем модальное окно
+    if (value === '__create__') {
+      setCreateModal({
+        isOpen: true,
+        field: targetType as 'article' | 'counterparty' | 'account',
+      });
+      return;
+    }
+
+    // Иначе просто устанавливаем значение
     setTargetId(value);
     if (value) {
       const option = getTargetOptions().find((opt) => opt.value === value);
@@ -228,13 +239,6 @@ export const MappingRuleDialog = ({
     } else {
       setTargetName('');
     }
-  };
-
-  const handleCreateNew = () => {
-    setCreateModal({
-      isOpen: true,
-      field: targetType as 'article' | 'counterparty' | 'account',
-    });
   };
 
   const handleCloseCreateModal = () => {
@@ -290,9 +294,9 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={sourceField}
-              onChange={(value) =>
+              onChange={(e) =>
                 setSourceField(
-                  value as 'description' | 'receiver' | 'payer' | 'inn'
+                  e.target.value as 'description' | 'receiver' | 'payer' | 'inn'
                 )
               }
               options={[
@@ -311,8 +315,10 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={ruleType}
-              onChange={(value) =>
-                setRuleType(value as 'contains' | 'equals' | 'regex' | 'alias')
+              onChange={(e) =>
+                setRuleType(
+                  e.target.value as 'contains' | 'equals' | 'regex' | 'alias'
+                )
               }
               options={[
                 { value: 'contains', label: 'Содержит' },
@@ -370,9 +376,9 @@ export const MappingRuleDialog = ({
             </label>
             <Select
               value={targetType}
-              onChange={(value) =>
+              onChange={(e) =>
                 setTargetType(
-                  value as
+                  e.target.value as
                     | 'article'
                     | 'counterparty'
                     | 'account'
@@ -400,7 +406,6 @@ export const MappingRuleDialog = ({
               <Select
                 value={targetId}
                 onChange={handleTargetIdChange}
-                onCreateNew={handleCreateNew}
                 options={getTargetOptions()}
                 fullWidth
               />

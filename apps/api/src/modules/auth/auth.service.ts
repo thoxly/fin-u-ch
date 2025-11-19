@@ -9,8 +9,10 @@ import {
 import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
+import rolesService from '../roles/roles.service';
 import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
+import { Prisma } from '@prisma/client';
 
 export interface RegisterDTO {
   email: string;
@@ -55,88 +57,97 @@ export class AuthService {
     // Create company and user in a transaction
     const passwordHash = await hashPassword(data.password);
 
-    let result;
-    try {
-      result = await prisma.$transaction(async (tx) => {
-        const company = await tx.company.create({
-          data: {
-            name: data.companyName,
-          },
-        });
-
-        const user = await tx.user.create({
-          data: {
-            email: data.email,
-            passwordHash,
-            companyId: company.id,
-            isEmailVerified: false,
-          },
-        });
-
-        // Создаем начальные данные для компании
-        try {
-          await seedInitialData(tx, company.id);
-        } catch (error) {
-          logger.error('Failed to seed initial data', {
-            companyId: company.id,
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-          });
-          throw error; // Пробрасываем ошибку для отката транзакции
-        }
-
-        return { user, company };
+    const result = await prisma.$transaction(async (tx) => {
+      const company = await tx.company.create({
+        data: {
+          name: data.companyName,
+        },
       });
-    } catch (error: unknown) {
-      // Обработка ошибок Prisma
-      if (
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'P2002'
-      ) {
-        // Unique constraint violation - race condition
-        logger.error('Race condition detected during user registration', {
+
+      logger.info('Company created during registration', {
+        companyId: company.id,
+        name: company.name,
+        currencyBase: company.currencyBase,
+        createdAt: company.createdAt,
+      });
+
+      // Проверяем, является ли это первым пользователем компании
+      const usersCount = await tx.user.count({
+        where: { companyId: company.id },
+      });
+
+      const isFirstUser = usersCount === 0;
+
+      logger.debug('Checking if first user of company', {
+        companyId: company.id,
+        usersCount,
+        isFirstUser,
+      });
+
+      const user = await tx.user.create({
+        data: {
           email: data.email,
-          error: error instanceof Error ? error.message : String(error),
+          passwordHash,
+          companyId: company.id,
+          isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
+          isEmailVerified: false,
+        },
+      });
+
+      logger.info('User created during registration', {
+        userId: user.id,
+        email: user.email,
+        companyId: user.companyId,
+        isActive: user.isActive,
+        isSuperAdmin: user.isSuperAdmin,
+        createdAt: user.createdAt,
+        isFirstUser,
+      });
+
+      if (isFirstUser) {
+        logger.info('First user assigned as super admin', {
+          userId: user.id,
+          email: user.email,
+          companyId: company.id,
         });
-        throw new AppError('User with this email already exists', 409);
       }
 
-      // Логируем детали ошибки для диагностики
-      const errorDetails = {
-        email: data.email,
-        companyName: data.companyName,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        errorCode:
-          error && typeof error === 'object' && 'code' in error
-            ? error.code
-            : undefined,
-        errorMeta:
-          error && typeof error === 'object' && 'meta' in error
-            ? error.meta
-            : undefined,
-        errorName: error instanceof Error ? error.name : undefined,
-      };
-
-      logger.error('Failed to create user and company', errorDetails);
-
-      // Если это уже AppError, пробрасываем как есть
-      if (error instanceof AppError) {
-        throw error;
+      // Создаем начальные данные для компании (передаём userId первого пользователя)
+      try {
+        await seedInitialData(tx, company.id, user.id);
+      } catch (error) {
+        logger.error('Failed to seed initial data', {
+          companyId: company.id,
+          error,
+        });
+        throw new AppError('Failed to initialize company data', 500);
       }
 
-      // Для development режима показываем детали ошибки
-      if (process.env.NODE_ENV === 'development') {
-        throw new AppError(
-          `Registration failed: ${errorDetails.errorMessage}`,
-          500
-        );
-      }
+      return { user, company };
+    });
 
-      // Иначе общая ошибка (не раскрываем детали пользователю из соображений безопасности)
-      throw new AppError('Failed to register user. Please try again.', 500);
+    // Получаем активные роли компании после регистрации
+    try {
+      const roles = await rolesService.getAllRoles(result.company.id);
+      logger.debug('Active company roles after registration', {
+        companyId: result.company.id,
+        rolesCount: roles.length,
+        roles: roles.map((r) => ({
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          isSystem: r.isSystem,
+          usersCount: r._count?.userRoles || 0,
+        })),
+      });
+    } catch (error) {
+      logger.warn(
+        'Failed to get roles after registration (roles may not be created yet)',
+        {
+          companyId: result.company.id,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
 
     const accessToken = generateAccessToken({
@@ -149,19 +160,38 @@ export class AuthService {
       email: result.user.email,
     });
 
-    // Send email verification email
+    // Отправляем письмо подтверждения email
     try {
+      logger.info('Creating verification token for user', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
+
       const verificationToken = await tokenService.createToken({
         userId: result.user.id,
         type: 'email_verification',
       });
+
+      logger.info('Verification token created, sending email', {
+        userId: result.user.id,
+        email: result.user.email,
+        tokenLength: verificationToken.length,
+      });
+
       await sendVerificationEmail(result.user.email, verificationToken);
+
+      logger.info('Verification email sent successfully', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
     } catch (error) {
       logger.error('Failed to send verification email', {
         userId: result.user.id,
-        error,
+        email: result.user.email,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      // Don't block registration if email sending fails
+      // Не блокируем регистрацию, если письмо не отправилось
     }
 
     return {
@@ -198,6 +228,29 @@ export class AuthService {
 
     if (!isPasswordValid) {
       throw new AppError('Invalid email or password', 401);
+    }
+
+    // Получаем активные роли компании при авторизации
+    try {
+      const roles = await rolesService.getAllRoles(user.companyId);
+      logger.debug('Active company roles during login', {
+        companyId: user.companyId,
+        userId: user.id,
+        rolesCount: roles.length,
+        roles: roles.map((r) => ({
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          isSystem: r.isSystem,
+          usersCount: r._count?.userRoles || 0,
+        })),
+      });
+    } catch (error) {
+      logger.warn('Failed to get roles during login', {
+        companyId: user.companyId,
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     const accessToken = generateAccessToken({

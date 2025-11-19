@@ -1,42 +1,29 @@
-import { Prisma } from '@prisma/client';
 import prisma from '../../config/db';
 import logger from '../../config/logger';
 import { AppError } from '../../middlewares/error';
 import {
   parseClientBankExchange,
-  ParsedFile,
   ParsedDocument,
+  ParsedFile,
 } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
-import {
-  ImportFilters,
-  UploadStatementResult,
-  ImportOperationsResult,
-  ApplyRulesResult,
-} from '@fin-u-ch/shared';
-import { invalidateReportCache } from '../reports/utils/cache';
-import duplicateDetectionService from './services/duplicate-detection.service';
-import sessionService, {
-  IMPORT_SESSION_STATUS,
-} from './services/session.service';
-import mappingRulesService from './services/mapping-rules.service';
-import operationImportService from './services/operation-import.service';
-import { BatchProcessor } from './utils/batch-processor';
+import operationsService from '../operations/operations.service';
+import articlesService from '../catalogs/articles/articles.service';
+import counterpartiesService from '../catalogs/counterparties/counterparties.service';
+
+export interface ImportFilters {
+  confirmed?: boolean;
+  matched?: boolean;
+  limit?: number;
+  offset?: number;
+}
 
 /**
- * Main imports service - orchestrates the import process
- *
- * Responsibilities:
- * - File upload and parsing
- * - Orchestration of sub-services
- * - High-level business logic
+ * TODO: Написать integration тесты для всех endpoints
+ * Файл тестов: apps/api/src/modules/imports/__tests__/imports.integration.test.ts
+ * См. ТЗ: раздел "Тестирование" → "Integration тесты"
  */
 export class ImportsService {
-  private batchProcessor = new BatchProcessor<
-    ParsedDocument,
-    Prisma.ImportedOperationGetPayload<Record<string, never>>
-  >(100);
-
   /**
    * Загружает файл выписки, парсит и создает сессию импорта
    */
@@ -45,366 +32,188 @@ export class ImportsService {
     userId: string,
     fileName: string,
     fileBuffer: Buffer
-  ): Promise<UploadStatementResult> {
+  ) {
     // Валидация размера файла (10MB)
-    const maxSize = 10 * 1024 * 1024;
+    const maxSize = 10 * 1024 * 1024; // 10MB
     if (fileBuffer.length > maxSize) {
       throw new AppError('File size exceeds 10MB limit', 400);
     }
 
     // Парсинг файла
-    const parsedFile = await this.parseFile(fileName, fileBuffer);
-    const documents = parsedFile.documents;
-    const companyAccountNumber = parsedFile.companyAccountNumber;
-    const parseStats = parsedFile.stats;
-
-    // Валидация количества операций
-    if (documents.length > 5000) {
-      throw new AppError(
-        `File contains too many operations (${documents.length}). Maximum allowed is 5000.`,
-        400
-      );
-    }
-
-    // Получаем информацию о компании
-    const company = await prisma.company.findUnique({
-      where: { id: companyId },
-      select: { inn: true },
-    });
-
-    // Проверка дубликатов по хэшу (быстрая проверка)
-    const { uniqueDocuments, duplicatesCount } =
-      await this.checkDuplicatesByHash(companyId, documents);
-
-    // Создаем сессию импорта
-    const importSession = await sessionService.createSession(
-      companyId,
-      userId,
-      fileName,
-      documents.length
-    );
-
-    logger.info('Import session created', {
-      sessionId: importSession.id,
-      fileName,
-      companyId,
-      documentsCount: documents.length,
-    });
-
-    // Создаем черновики операций батчами
-    const importedOperations = await this.createImportedOperations(
-      importSession.id,
-      companyId,
-      documents,
-      company?.inn || null,
-      companyAccountNumber
-    );
-
-    logger.info('Upload statement processing completed', {
-      sessionId: importSession.id,
-      fileName,
-      companyId,
-      importedCount: importedOperations.length,
-      duplicatesCount,
-    });
-
-    return {
-      sessionId: importSession.id,
-      importedCount: importedOperations.length,
-      duplicatesCount,
-      fileName: importSession.fileName,
-      parseStats: parseStats
-        ? {
-            documentsStarted: parseStats.documentsStarted,
-            documentsFound: parseStats.documentsFound,
-            documentsSkipped: parseStats.documentsSkipped,
-            documentsInvalid: parseStats.documentsInvalid,
-            documentTypesFound: parseStats.documentTypesFound,
-          }
-        : undefined,
-    };
-  }
-
-  /**
-   * Парсит файл выписки
-   */
-  private async parseFile(
-    fileName: string,
-    fileBuffer: Buffer
-  ): Promise<ParsedFile> {
+    let parsedFile: ParsedFile;
     try {
+      // Логируем начало парсинга
       const filePreview = fileBuffer
         .slice(0, 500)
         .toString('utf8')
         .replace(/\0/g, '');
-
       logger.info('Starting file parse', {
         fileName,
         fileSize: fileBuffer.length,
         preview: filePreview.substring(0, 200),
       });
 
-      const parsedFile = parseClientBankExchange(fileBuffer);
+      parsedFile = parseClientBankExchange(fileBuffer);
 
       logger.info('File parsed successfully', {
         fileName,
         documentsCount: parsedFile.documents.length,
         companyAccountNumber: parsedFile.companyAccountNumber,
       });
-
-      return parsedFile;
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-
+    } catch (error: any) {
+      // Логируем ошибку парсинга с деталями
       logger.error('File parsing failed', {
         fileName,
-        error: errorMessage,
-        stack: errorStack,
+        error: error.message,
+        stack: error.stack,
       });
 
+      // Если это уже AppError, передаем как есть (с детальной информацией)
       if (error instanceof AppError) {
         throw error;
       }
+      // Иначе оборачиваем в AppError с детальным сообщением
       throw new AppError(
-        errorMessage || `Failed to parse file: ${String(error)}`,
+        error?.message || `Failed to parse file: ${String(error)}`,
         400
       );
     }
-  }
 
-  /**
-   * Проверяет дубликаты по хэшу (быстрая проверка)
-   */
-  private async checkDuplicatesByHash(
-    companyId: string,
-    documents: ParsedDocument[]
-  ): Promise<{ uniqueDocuments: ParsedDocument[]; duplicatesCount: number }> {
+    const documents = parsedFile.documents;
+    const companyAccountNumber = parsedFile.companyAccountNumber;
+
+    // Валидация количества операций (максимум 1000)
+    if (documents.length > 1000) {
+      throw new AppError('File contains more than 1000 operations', 400);
+    }
+
+    // Если документов нет, но ошибка не была выброшена парсером,
+    // значит файл корректный, но пустой
     if (documents.length === 0) {
-      return { uniqueDocuments: [], duplicatesCount: 0 };
-    }
-
-    // Собираем хэши
-    const hashes = documents
-      .map((doc) => doc.hash)
-      .filter((hash): hash is string => hash !== null && hash !== undefined);
-
-    logger.debug('Checking duplicates by hash', {
-      hashesCount: hashes.length,
-    });
-
-    // Ищем существующие операции с такими хэшами
-    const existingOperations = await prisma.operation.findMany({
-      where: {
-        companyId,
-        sourceHash: {
-          in: hashes.length > 0 ? hashes : [],
-        },
-      },
-      select: {
-        id: true,
-        sourceHash: true,
-      },
-    });
-
-    const existingHashes = new Set(
-      existingOperations
-        .map((op) => op.sourceHash)
-        .filter((hash): hash is string => hash !== null && hash !== undefined)
-    );
-
-    // Разделяем на уникальные и дубликаты
-    const duplicates: ParsedDocument[] = [];
-    const uniqueDocuments: ParsedDocument[] = [];
-
-    for (const doc of documents) {
-      if (doc.hash && existingHashes.has(doc.hash)) {
-        duplicates.push(doc);
-      } else {
-        uniqueDocuments.push(doc);
-      }
-    }
-
-    logger.info('Duplicate check by hash completed', {
-      totalDocuments: documents.length,
-      duplicatesCount: duplicates.length,
-      uniqueDocumentsCount: uniqueDocuments.length,
-    });
-
-    return {
-      uniqueDocuments,
-      duplicatesCount: duplicates.length,
-    };
-  }
-
-  /**
-   * Создает черновики операций батчами
-   */
-  private async createImportedOperations(
-    sessionId: string,
-    companyId: string,
-    documents: ParsedDocument[],
-    companyInn: string | null,
-    companyAccountNumber?: string
-  ): Promise<Prisma.ImportedOperationGetPayload<Record<string, never>>[]> {
-    // Verify the import session belongs to the company (security check)
-    const session = await prisma.importSession.findFirst({
-      where: { id: sessionId, companyId },
-      select: { id: true },
-    });
-
-    if (!session) {
       throw new AppError(
-        'Import session not found or does not belong to company',
-        404
+        'File contains no valid operations. Please check that the file contains payment orders (Платежное поручение) with required fields (Дата, Сумма).',
+        400
       );
     }
 
-    const importedOperations: Prisma.ImportedOperationGetPayload<
-      Record<string, never>
-    >[] = [];
+    // Получаем ИНН компании
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { inn: true },
+    });
 
-    await this.batchProcessor.processBatches(
-      documents,
-      async (batch, batchNumber) => {
-        const batchResults: Prisma.ImportedOperationGetPayload<
-          Record<string, never>
-        >[] = [];
-
-        try {
-          await prisma.$transaction(async (tx) => {
-            // Security: Verify session belongs to company within transaction (defense in depth)
-            const sessionCheck = await tx.importSession.findFirst({
-              where: { id: sessionId, companyId },
-              select: { id: true },
-            });
-            if (!sessionCheck) {
-              throw new AppError('Import session validation failed', 403);
-            }
-
-            for (const doc of batch) {
-              try {
-                // Проверка дубликата
-                const duplicateCheck =
-                  await duplicateDetectionService.detectDuplicate(
-                    companyId,
-                    doc
-                  );
-
-                // Автосопоставление
-                const matchingResult = await autoMatch(
-                  companyId,
-                  doc,
-                  companyInn,
-                  companyAccountNumber
-                );
-
-                // Проверка полного сопоставления
-                const isFullyMatched = !!(
-                  matchingResult.matchedArticleId &&
-                  matchingResult.matchedAccountId &&
-                  matchingResult.direction
-                );
-
-                // Создаем черновик
-                const operationData: Prisma.ImportedOperationCreateInput = {
-                  importSession: { connect: { id: sessionId } },
-                  company: { connect: { id: companyId } },
-                  date: doc.date,
-                  number: doc.number,
-                  amount: doc.amount,
-                  description: doc.purpose || '',
-                  direction: matchingResult.direction || null,
-                  payer: doc.payer,
-                  payerInn: doc.payerInn,
-                  payerAccount: doc.payerAccount,
-                  receiver: doc.receiver,
-                  receiverInn: doc.receiverInn,
-                  receiverAccount: doc.receiverAccount,
-                  currency: 'RUB',
-                  matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
-                  isDuplicate: duplicateCheck.isDuplicate,
-                  duplicateOfId: duplicateCheck.duplicateOfId || null,
-                  confirmed: false,
-                  processed: false,
-                  draft: true,
-                };
-
-                // Добавляем связи
-                if (matchingResult.matchedArticleId) {
-                  operationData.matchedArticle = {
-                    connect: { id: matchingResult.matchedArticleId },
-                  };
-                }
-                if (matchingResult.matchedCounterpartyId) {
-                  operationData.matchedCounterparty = {
-                    connect: { id: matchingResult.matchedCounterpartyId },
-                  };
-                }
-                if (matchingResult.matchedAccountId) {
-                  operationData.matchedAccount = {
-                    connect: { id: matchingResult.matchedAccountId },
-                  };
-                }
-                if (isFullyMatched && matchingResult.matchedRuleId) {
-                  operationData.matchedRule = {
-                    connect: { id: matchingResult.matchedRuleId },
-                  };
-                }
-
-                const importedOp = await tx.importedOperation.create({
-                  data: operationData,
-                });
-
-                batchResults.push(importedOp);
-              } catch (error: unknown) {
-                const errorMessage =
-                  error instanceof Error ? error.message : String(error);
-                const errorStack =
-                  error instanceof Error ? error.stack : undefined;
-
-                logger.error('Failed to process document during import', {
-                  sessionId,
-                  batchNumber,
-                  document: {
-                    date: doc.date,
-                    amount: doc.amount,
-                    number: doc.number,
-                  },
-                  error: errorMessage,
-                  stack: errorStack,
-                });
-              }
-            }
-          });
-
-          importedOperations.push(...batchResults);
-          logger.debug('Batch processed successfully', {
-            sessionId,
-            batchNumber,
-            batchSize: batch.length,
-            totalProcessed: importedOperations.length,
-          });
-        } catch (error: unknown) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-          logger.error('Failed to process batch during import', {
-            sessionId,
-            batchNumber,
-            error: errorMessage,
-          });
-        }
-
-        return batchResults;
+    // Создаем сессию импорта
+    const session = await prisma.importSession.create({
+      data: {
+        companyId,
+        userId,
+        fileName,
+        status: 'draft',
+        importedCount: documents.length,
       },
-      {
-        context: `Upload statement session ${sessionId}`,
-        continueOnError: true,
-      }
-    );
+    });
 
-    return importedOperations;
+    // Применяем автосопоставление и создаем черновики операций
+    // Используем батчинг для больших файлов (по 100 операций за раз)
+    const importedOperations = [];
+    const BATCH_SIZE = 100;
+    const batches = [];
+
+    // Разбиваем документы на батчи
+    for (let i = 0; i < documents.length; i += BATCH_SIZE) {
+      batches.push(documents.slice(i, i + BATCH_SIZE));
+    }
+
+    // Обрабатываем каждый батч в транзакции
+    for (const batch of batches) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const doc of batch) {
+            try {
+              // Автосопоставление
+              const matchingResult = await autoMatch(
+                companyId,
+                doc,
+                company?.inn || null,
+                companyAccountNumber
+              );
+
+              // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+              // Валюта по умолчанию RUB, но для полного сопоставления нужны все поля
+              const isFullyMatched = !!(
+                matchingResult.matchedArticleId &&
+                matchingResult.matchedAccountId &&
+                matchingResult.direction // направление обязательно
+              );
+
+              // Создаем черновик операции
+              const operationData = {
+                importSessionId: session.id,
+                companyId,
+                date: doc.date,
+                number: doc.number,
+                amount: doc.amount,
+                description: doc.purpose || '',
+                direction: matchingResult.direction || null,
+                payer: doc.payer,
+                payerInn: doc.payerInn,
+                payerAccount: doc.payerAccount,
+                receiver: doc.receiver,
+                receiverInn: doc.receiverInn,
+                receiverAccount: doc.receiverAccount,
+                matchedArticleId: matchingResult.matchedArticleId,
+                matchedCounterpartyId: matchingResult.matchedCounterpartyId,
+                matchedAccountId: matchingResult.matchedAccountId,
+                currency: 'RUB', // По умолчанию RUB
+                // Устанавливаем matchedBy только если операция полностью сопоставлена
+                matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
+                matchedRuleId: isFullyMatched
+                  ? matchingResult.matchedRuleId
+                  : null,
+                confirmed: false,
+                processed: false,
+                draft: true,
+              };
+
+              const importedOp = await tx.importedOperation.create({
+                data: operationData,
+              });
+
+              importedOperations.push(importedOp);
+            } catch (error: any) {
+              // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
+              logger.error('Failed to process document during import', {
+                fileName,
+                sessionId: session.id,
+                document: {
+                  date: doc.date,
+                  amount: doc.amount,
+                  number: doc.number,
+                  purpose: doc.purpose,
+                },
+                error: error?.message || String(error),
+                stack: error?.stack,
+              });
+            }
+          }
+        });
+      } catch (error: any) {
+        // Логируем ошибку батча, но продолжаем обработку следующих батчей
+        logger.error('Failed to process batch during import', {
+          fileName,
+          sessionId: session.id,
+          batchSize: batch.length,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
+      }
+    }
+
+    return {
+      sessionId: session.id,
+      importedCount: importedOperations.length,
+      fileName: session.fileName,
+    };
   }
 
   /**
@@ -415,14 +224,63 @@ export class ImportsService {
     companyId: string,
     filters?: ImportFilters
   ) {
-    return sessionService.getImportedOperations(sessionId, companyId, filters);
-  }
+    // Проверяем, что сессия принадлежит компании
+    const session = await prisma.importSession.findFirst({
+      where: { id: sessionId, companyId },
+    });
 
-  /**
-   * Получает все операции сессии без пагинации
-   */
-  async getAllImportedOperations(sessionId: string, companyId: string) {
-    return sessionService.getAllImportedOperations(sessionId, companyId);
+    if (!session) {
+      throw new AppError('Import session not found', 404);
+    }
+
+    const where: any = {
+      importSessionId: sessionId,
+      companyId,
+    };
+
+    if (filters?.confirmed !== undefined) {
+      where.confirmed = filters.confirmed;
+    }
+
+    if (filters?.matched !== undefined) {
+      if (filters.matched) {
+        where.matchedBy = { not: null };
+      } else {
+        where.matchedBy = null;
+      }
+    }
+
+    const [operations, total] = await Promise.all([
+      prisma.importedOperation.findMany({
+        where,
+        include: {
+          matchedArticle: { select: { id: true, name: true } },
+          matchedCounterparty: { select: { id: true, name: true } },
+          matchedAccount: { select: { id: true, name: true } },
+          matchedDeal: { select: { id: true, name: true } },
+          matchedDepartment: { select: { id: true, name: true } },
+        },
+        take: filters?.limit || 20,
+        skip: filters?.offset || 0,
+        orderBy: { date: 'desc' },
+      }),
+      prisma.importedOperation.count({ where }),
+    ]);
+
+    const confirmedCount = await prisma.importedOperation.count({
+      where: { ...where, confirmed: true },
+    });
+
+    const unmatchedCount = await prisma.importedOperation.count({
+      where: { ...where, matchedBy: null },
+    });
+
+    return {
+      operations,
+      total,
+      confirmed: confirmedCount,
+      unmatched: unmatchedCount,
+    };
   }
 
   /**
@@ -443,7 +301,110 @@ export class ImportsService {
       direction?: 'income' | 'expense' | 'transfer';
     }
   ) {
-    return sessionService.updateImportedOperation(id, companyId, data);
+    const operation = await prisma.importedOperation.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!operation) {
+      throw new AppError('Imported operation not found', 404);
+    }
+
+    const updateData: any = {};
+
+    if (data.matchedArticleId !== undefined) {
+      updateData.matchedArticleId = data.matchedArticleId;
+    }
+
+    if (data.matchedCounterpartyId !== undefined) {
+      updateData.matchedCounterpartyId = data.matchedCounterpartyId;
+    }
+
+    if (data.matchedAccountId !== undefined) {
+      updateData.matchedAccountId = data.matchedAccountId;
+    }
+
+    if (data.matchedDealId !== undefined) {
+      updateData.matchedDealId = data.matchedDealId;
+    }
+
+    if (data.matchedDepartmentId !== undefined) {
+      updateData.matchedDepartmentId = data.matchedDepartmentId;
+    }
+
+    if (data.currency !== undefined) {
+      updateData.currency = data.currency;
+    }
+
+    if (data.repeat !== undefined) {
+      updateData.repeat = data.repeat;
+    }
+
+    if (data.confirmed !== undefined) {
+      updateData.confirmed = data.confirmed;
+    }
+
+    if (data.direction !== undefined) {
+      updateData.direction = data.direction;
+    }
+
+    // Обновляем операцию
+    const updatedOperation = await prisma.importedOperation.update({
+      where: { id },
+      data: updateData,
+      include: {
+        matchedArticle: { select: { id: true, name: true } },
+        matchedCounterparty: { select: { id: true, name: true } },
+        matchedAccount: { select: { id: true, name: true } },
+        matchedDeal: { select: { id: true, name: true } },
+        matchedDepartment: { select: { id: true, name: true } },
+      },
+    });
+
+    // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
+    const isFullyMatched = !!(
+      updatedOperation.matchedCounterpartyId &&
+      updatedOperation.matchedArticleId &&
+      updatedOperation.matchedAccountId &&
+      updatedOperation.currency
+    );
+
+    // Обновляем matchedBy в зависимости от полного сопоставления
+    if (isFullyMatched) {
+      // Если операция полностью сопоставлена, но matchedBy нет, помечаем как manual
+      // (если matchedBy уже есть от автосопоставления, оставляем его)
+      if (!updatedOperation.matchedBy) {
+        const finalOperation = await prisma.importedOperation.update({
+          where: { id },
+          data: { matchedBy: 'manual' },
+          include: {
+            matchedArticle: { select: { id: true, name: true } },
+            matchedCounterparty: { select: { id: true, name: true } },
+            matchedAccount: { select: { id: true, name: true } },
+            matchedDeal: { select: { id: true, name: true } },
+            matchedDepartment: { select: { id: true, name: true } },
+          },
+        });
+        return finalOperation;
+      }
+    } else {
+      // Если операция не полностью сопоставлена, сбрасываем matchedBy
+      if (updatedOperation.matchedBy) {
+        const finalOperation = await prisma.importedOperation.update({
+          where: { id },
+          data: { matchedBy: null, matchedRuleId: null },
+          include: {
+            matchedArticle: { select: { id: true, name: true } },
+            matchedCounterparty: { select: { id: true, name: true } },
+            matchedAccount: { select: { id: true, name: true } },
+            matchedDeal: { select: { id: true, name: true } },
+            matchedDepartment: { select: { id: true, name: true } },
+          },
+        });
+        return finalOperation;
+      }
+    }
+
+    return updatedOperation;
   }
 
   /**
@@ -457,29 +418,148 @@ export class ImportsService {
       matchedArticleId?: string | null;
       matchedCounterpartyId?: string | null;
       matchedAccountId?: string | null;
-      matchedDealId?: string | null;
-      matchedDepartmentId?: string | null;
-      currency?: string;
-      direction?: 'income' | 'expense' | 'transfer' | null;
       confirmed?: boolean;
     }
   ) {
-    return sessionService.bulkUpdateImportedOperations(
-      sessionId,
-      companyId,
-      operationIds,
-      data
-    );
+    // Проверяем, что все операции принадлежат сессии и компании
+    const operations = await prisma.importedOperation.findMany({
+      where: {
+        id: { in: operationIds },
+        importSessionId: sessionId,
+        companyId,
+      },
+    });
+
+    if (operations.length !== operationIds.length) {
+      throw new AppError('Some operations not found', 404);
+    }
+
+    const updateData: any = {};
+
+    if (data.matchedArticleId !== undefined) {
+      updateData.matchedArticleId = data.matchedArticleId;
+      updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
+    }
+
+    if (data.matchedCounterpartyId !== undefined) {
+      updateData.matchedCounterpartyId = data.matchedCounterpartyId;
+      if (!updateData.matchedBy) {
+        updateData.matchedBy = data.matchedCounterpartyId ? 'manual' : null;
+      }
+    }
+
+    if (data.matchedAccountId !== undefined) {
+      updateData.matchedAccountId = data.matchedAccountId;
+    }
+
+    if (data.confirmed !== undefined) {
+      updateData.confirmed = data.confirmed;
+    }
+
+    const result = await prisma.importedOperation.updateMany({
+      where: {
+        id: { in: operationIds },
+        importSessionId: sessionId,
+        companyId,
+      },
+      data: updateData,
+    });
+
+    return { updated: result.count };
   }
 
   /**
    * Применяет правила маппинга к сессии
    */
-  async applyRules(
-    sessionId: string,
-    companyId: string
-  ): Promise<ApplyRulesResult> {
-    return operationImportService.applyRules(sessionId, companyId);
+  async applyRules(sessionId: string, companyId: string) {
+    // Проверяем, что сессия принадлежит компании
+    const session = await prisma.importSession.findFirst({
+      where: { id: sessionId, companyId },
+    });
+
+    if (!session) {
+      throw new AppError('Import session not found', 404);
+    }
+
+    // Получаем все черновики сессии
+    const operations = await prisma.importedOperation.findMany({
+      where: { importSessionId: sessionId, companyId },
+    });
+
+    // Получаем ИНН компании
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { inn: true },
+    });
+
+    let updated = 0;
+
+    // Применяем автосопоставление заново
+    for (const op of operations) {
+      if (op.confirmed || op.processed) {
+        continue; // Пропускаем уже подтвержденные или обработанные
+      }
+
+      const doc: ParsedDocument = {
+        date: op.date,
+        number: op.number || undefined,
+        amount: op.amount,
+        payer: op.payer || undefined,
+        payerInn: op.payerInn || undefined,
+        payerAccount: op.payerAccount || undefined,
+        receiver: op.receiver || undefined,
+        receiverInn: op.receiverInn || undefined,
+        receiverAccount: op.receiverAccount || undefined,
+        purpose: op.description || undefined,
+      };
+
+      try {
+        const matchingResult = await autoMatch(
+          companyId,
+          doc,
+          company?.inn || null
+        );
+
+        // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
+        const isFullyMatched = !!(
+          matchingResult.matchedCounterpartyId &&
+          matchingResult.matchedArticleId &&
+          matchingResult.matchedAccountId &&
+          op.currency
+        );
+
+        await prisma.importedOperation.update({
+          where: { id: op.id },
+          data: {
+            matchedArticleId: matchingResult.matchedArticleId,
+            matchedCounterpartyId: matchingResult.matchedCounterpartyId,
+            matchedAccountId: matchingResult.matchedAccountId,
+            // Устанавливаем matchedBy только если операция полностью сопоставлена
+            matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
+            matchedRuleId: isFullyMatched ? matchingResult.matchedRuleId : null,
+            // Используем новое значение direction, если оно определено, иначе сохраняем старое
+            direction:
+              matchingResult.direction !== null &&
+              matchingResult.direction !== undefined
+                ? matchingResult.direction
+                : op.direction,
+          },
+        });
+
+        updated++;
+      } catch (error: any) {
+        // Логируем ошибку с деталями, но продолжаем обработку остальных
+        logger.error('Failed to apply rules to operation', {
+          sessionId,
+          companyId,
+          operationId: op.id,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
+      }
+    }
+
+    return { applied: operations.length, updated };
   }
 
   /**
@@ -491,24 +571,311 @@ export class ImportsService {
     userId: string,
     operationIds?: string[],
     saveRulesForIds?: string[]
-  ): Promise<ImportOperationsResult> {
-    return operationImportService.importOperations(
-      sessionId,
+  ) {
+    // Проверяем, что сессия принадлежит компании
+    const session = await prisma.importSession.findFirst({
+      where: { id: sessionId, companyId },
+    });
+
+    if (!session) {
+      throw new AppError('Import session not found', 404);
+    }
+
+    // Получаем черновики для импорта
+    const where: any = {
+      importSessionId: sessionId,
       companyId,
-      userId,
-      operationIds,
-      saveRulesForIds
-    );
+      processed: false, // Импортируем только необработанные операции
+    };
+
+    if (operationIds && operationIds.length > 0) {
+      where.id = { in: operationIds };
+    }
+
+    const operations = await prisma.importedOperation.findMany({
+      where,
+    });
+
+    if (operations.length === 0) {
+      throw new AppError('No operations to import', 400);
+    }
+
+    // Проверяем, что все операции полностью сопоставлены
+    // Операция считается сопоставленной, если указаны: статья, счет и валюта
+    const unmatchedOperations: string[] = [];
+    for (const op of operations) {
+      if (!op.direction) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не указан тип операции`
+        );
+        continue;
+      }
+
+      // Проверяем обязательные поля
+      if (!op.matchedArticleId) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не указана статья`
+        );
+      }
+      if (!op.matchedAccountId) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не указан счет`
+        );
+      }
+      if (!op.currency) {
+        unmatchedOperations.push(
+          `Операция ${op.number || op.id}: не указана валюта`
+        );
+      }
+
+      if (op.direction === 'transfer') {
+        // Для переводов дополнительно нужны счета плательщика и получателя
+        if (!op.payerAccount || !op.receiverAccount) {
+          unmatchedOperations.push(
+            `Операция ${op.number || op.id}: для перевода нужны счета плательщика и получателя`
+          );
+        }
+      }
+    }
+
+    if (unmatchedOperations.length > 0) {
+      throw new AppError(
+        `Не все операции сопоставлены:\n${unmatchedOperations.join('\n')}`,
+        400
+      );
+    }
+
+    let created = 0;
+    let errors = 0;
+
+    // Используем батчинг для больших объемов (по 50 операций за раз)
+    const BATCH_SIZE = 50;
+    const batches = [];
+
+    // Разбиваем операции на батчи
+    for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+      batches.push(operations.slice(i, i + BATCH_SIZE));
+    }
+
+    // Обрабатываем каждый батч в транзакции
+    for (const batch of batches) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          for (const op of batch) {
+            try {
+              // Проверяем обязательные поля
+              if (!op.direction) {
+                throw new AppError(`Operation ${op.id} has no direction`, 400);
+              }
+
+              if (
+                op.direction !== 'transfer' &&
+                (!op.matchedArticleId || !op.matchedAccountId)
+              ) {
+                throw new AppError(
+                  `Operation ${op.id} is missing required fields`,
+                  400
+                );
+              }
+
+              if (
+                op.direction === 'transfer' &&
+                (!op.payerAccount || !op.receiverAccount)
+              ) {
+                throw new AppError(
+                  `Operation ${op.id} is missing account information for transfer`,
+                  400
+                );
+              }
+
+              // Создаем операцию
+              const operationData: any = {
+                type: op.direction,
+                operationDate: op.date,
+                amount: op.amount,
+                currency: op.currency || 'RUB',
+                description: op.description,
+                repeat: op.repeat || 'none',
+              };
+
+              if (op.direction === 'transfer') {
+                // Для переводов нужно найти счета по номерам
+                const sourceAccount = op.payerAccount
+                  ? await prisma.account.findFirst({
+                      where: {
+                        companyId,
+                        number: op.payerAccount,
+                        isActive: true,
+                      },
+                    })
+                  : null;
+
+                const targetAccount = op.receiverAccount
+                  ? await prisma.account.findFirst({
+                      where: {
+                        companyId,
+                        number: op.receiverAccount,
+                        isActive: true,
+                      },
+                    })
+                  : null;
+
+                if (!sourceAccount || !targetAccount) {
+                  throw new AppError(
+                    `Cannot find accounts for transfer operation ${op.id}`,
+                    400
+                  );
+                }
+
+                operationData.sourceAccountId = sourceAccount.id;
+                operationData.targetAccountId = targetAccount.id;
+              } else {
+                operationData.accountId = op.matchedAccountId;
+                operationData.articleId = op.matchedArticleId;
+              }
+
+              if (op.matchedCounterpartyId) {
+                operationData.counterpartyId = op.matchedCounterpartyId;
+              }
+
+              if (op.matchedDealId) {
+                operationData.dealId = op.matchedDealId;
+              }
+
+              if (op.matchedDepartmentId) {
+                operationData.departmentId = op.matchedDepartmentId;
+              }
+
+              // Создаем операцию через сервис
+              await operationsService.create(companyId, operationData);
+
+              // Помечаем как обработанную
+              await tx.importedOperation.update({
+                where: { id: op.id },
+                data: { processed: true },
+              });
+
+              // Сохраняем правила для этой операции, если она в списке saveRulesForIds
+              if (saveRulesForIds && saveRulesForIds.includes(op.id)) {
+                try {
+                  // Сохраняем правила для всех сопоставленных полей
+                  if (op.matchedCounterpartyId) {
+                    const pattern =
+                      op.direction === 'expense' ? op.receiver : op.payer;
+                    if (pattern) {
+                      await this.createMappingRule(companyId, userId, {
+                        ruleType: 'contains',
+                        pattern,
+                        targetType: 'counterparty',
+                        targetId: op.matchedCounterpartyId,
+                        sourceField:
+                          op.direction === 'expense' ? 'receiver' : 'payer',
+                      });
+                    }
+                  }
+
+                  if (op.matchedArticleId && op.description) {
+                    await this.createMappingRule(companyId, userId, {
+                      ruleType: 'contains',
+                      pattern: op.description,
+                      targetType: 'article',
+                      targetId: op.matchedArticleId,
+                      sourceField: 'description',
+                    });
+                  }
+
+                  if (op.matchedAccountId && op.description) {
+                    await this.createMappingRule(companyId, userId, {
+                      ruleType: 'contains',
+                      pattern: op.description,
+                      targetType: 'account',
+                      targetId: op.matchedAccountId,
+                      sourceField: 'description',
+                    });
+                  }
+                } catch (error: any) {
+                  // Логируем ошибку, но не прерываем импорт
+                  console.error(
+                    `Failed to save rules for operation ${op.id}:`,
+                    error.message
+                  );
+                }
+              }
+
+              created++;
+            } catch (error: any) {
+              errors++;
+              logger.error('Failed to import operation', {
+                sessionId,
+                companyId,
+                operationId: op.id,
+                operationNumber: op.number,
+                operationDate: op.date,
+                error: error?.message || String(error),
+                stack: error?.stack,
+              });
+              // Продолжаем обработку остальных операций в батче
+            }
+          }
+        });
+      } catch (error: any) {
+        // Логируем ошибку батча, но продолжаем обработку следующих батчей
+        logger.error('Failed to import batch', {
+          sessionId,
+          companyId,
+          batchSize: batch.length,
+          error: error?.message || String(error),
+          stack: error?.stack,
+        });
+        // Помечаем все операции в батче как ошибки
+        errors += batch.length;
+      }
+    }
+
+    // Обновляем счетчики сессии
+    const processedCount = await prisma.importedOperation.count({
+      where: { importSessionId: sessionId, companyId, processed: true },
+    });
+
+    await prisma.importSession.update({
+      where: { id: sessionId },
+      data: {
+        processedCount,
+        status:
+          processedCount === session.importedCount ? 'processed' : 'confirmed',
+      },
+    });
+
+    return {
+      imported: operations.length,
+      created,
+      errors,
+      sessionId,
+    };
   }
 
   /**
    * Удаляет сессию импорта
    */
   async deleteSession(sessionId: string, companyId: string) {
-    const result = await sessionService.deleteSession(sessionId, companyId);
-    // Инвалидируем кэш отчетов после удаления сессии импорта
-    await invalidateReportCache(companyId);
-    return result;
+    const session = await prisma.importSession.findFirst({
+      where: { id: sessionId, companyId },
+    });
+
+    if (!session) {
+      throw new AppError('Import session not found', 404);
+    }
+
+    // Удаляем все черновики (CASCADE через Prisma)
+    const deletedCount = await prisma.importedOperation.count({
+      where: { importSessionId: sessionId, companyId },
+    });
+
+    await prisma.importSession.delete({
+      where: { id: sessionId },
+    });
+
+    return { deleted: deletedCount + 1 };
   }
 
   /**
@@ -518,7 +885,20 @@ export class ImportsService {
     companyId: string,
     filters?: { targetType?: string; sourceField?: string }
   ) {
-    return mappingRulesService.getMappingRules(companyId, filters);
+    const where: any = { companyId };
+
+    if (filters?.targetType) {
+      where.targetType = filters.targetType;
+    }
+
+    if (filters?.sourceField) {
+      where.sourceField = filters.sourceField;
+    }
+
+    return prisma.mappingRule.findMany({
+      where,
+      orderBy: { usageCount: 'desc' },
+    });
   }
 
   /**
@@ -536,7 +916,18 @@ export class ImportsService {
       sourceField?: 'description' | 'receiver' | 'payer' | 'inn';
     }
   ) {
-    return mappingRulesService.createMappingRule(companyId, userId, data);
+    return prisma.mappingRule.create({
+      data: {
+        companyId,
+        userId,
+        ruleType: data.ruleType,
+        pattern: data.pattern,
+        targetType: data.targetType,
+        targetId: data.targetId || null,
+        targetName: data.targetName || null,
+        sourceField: data.sourceField || 'description',
+      },
+    });
   }
 
   /**
@@ -554,14 +945,35 @@ export class ImportsService {
       sourceField: string;
     }>
   ) {
-    return mappingRulesService.updateMappingRule(id, companyId, data);
+    const rule = await prisma.mappingRule.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!rule) {
+      throw new AppError('Mapping rule not found', 404);
+    }
+
+    return prisma.mappingRule.update({
+      where: { id },
+      data,
+    });
   }
 
   /**
    * Удаляет правило маппинга
    */
   async deleteMappingRule(id: string, companyId: string) {
-    return mappingRulesService.deleteMappingRule(id, companyId);
+    const rule = await prisma.mappingRule.findFirst({
+      where: { id, companyId },
+    });
+
+    if (!rule) {
+      throw new AppError('Mapping rule not found', 404);
+    }
+
+    return prisma.mappingRule.delete({
+      where: { id },
+    });
   }
 
   /**
@@ -569,15 +981,25 @@ export class ImportsService {
    */
   async getImportSessions(
     companyId: string,
-    filters?: {
-      status?: string;
-      limit?: number;
-      offset?: number;
-      dateFrom?: string;
-      dateTo?: string;
-    }
+    filters?: { status?: string; limit?: number; offset?: number }
   ) {
-    return sessionService.getImportSessions(companyId, filters);
+    const where: any = { companyId };
+
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+
+    const [sessions, total] = await Promise.all([
+      prisma.importSession.findMany({
+        where,
+        take: filters?.limit || 20,
+        skip: filters?.offset || 0,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.importSession.count({ where }),
+    ]);
+
+    return { sessions, total };
   }
 }
 
