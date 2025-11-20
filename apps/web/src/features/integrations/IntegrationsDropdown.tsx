@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // features/integrations/IntegrationsDropdown.tsx
 import { useState, useRef, useEffect } from 'react';
-import { X, Settings, Puzzle } from 'lucide-react';
+import { X, Settings, Puzzle, Loader2, PowerOff, Power } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Card } from '../../shared/ui/Card';
 import { OzonIntegration } from './ozon-integration-operation/OzonIntegration';
@@ -12,28 +12,37 @@ import { useIsMobile } from '../../shared/hooks/useIsMobile';
 interface Integration {
   id: string;
   name: string;
-  icon: string | ((OzonIcon) => JSX.Element);
+  icon: string | ((props: any) => JSX.Element);
   connected: boolean;
   data?: {
     clientKey?: string;
     apiKey?: string;
     paymentSchedule?: 'next_week' | 'week_after';
+    articleId?: string;
+    accountId?: string;
   };
 }
 
 interface IntegrationsDropdownProps {
   integrations: Integration[];
   onIntegrationUpdate: (integrationId: string, data: any) => void;
+  onIntegrationDisconnect: (integrationId: string) => void;
+  isLoading?: boolean;
 }
 
 export const IntegrationsDropdown = ({
   integrations,
   onIntegrationUpdate,
+  onIntegrationDisconnect,
+  isLoading = false,
 }: IntegrationsDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(
     null
   );
+  const [disconnectingIntegration, setDisconnectingIntegration] = useState<
+    string | null
+  >(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
 
@@ -69,6 +78,15 @@ export const IntegrationsDropdown = ({
     setSelectedIntegration(null);
   };
 
+  const handleDisconnect = async (integrationId: string) => {
+    setDisconnectingIntegration(integrationId);
+    try {
+      await onIntegrationDisconnect(integrationId);
+    } finally {
+      setDisconnectingIntegration(null);
+    }
+  };
+
   const getIntegrationComponent = (integrationId: string) => {
     const integration = integrations.find((i) => i.id === integrationId);
 
@@ -79,12 +97,31 @@ export const IntegrationsDropdown = ({
             onSave={(data) => handleSaveIntegration(integrationId, data)}
             onCancel={handleCancel}
             initialData={integration?.data}
+            isConnected={integration?.connected || false}
+            onDisconnect={() => handleDisconnect(integrationId)}
+            isDisconnecting={disconnectingIntegration === integrationId}
           />
         );
       default:
         return null;
     }
   };
+
+  // Если идет загрузка, показываем индикатор загрузки
+  if (isLoading) {
+    return (
+      <button
+        className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center justify-center opacity-50 cursor-not-allowed"
+        title="Загрузка интеграций..."
+        disabled
+      >
+        <Loader2
+          size={18}
+          className="text-primary-600 dark:text-primary-400 animate-spin"
+        />
+      </button>
+    );
+  }
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -158,52 +195,68 @@ export const IntegrationsDropdown = ({
                         </div>
                       ) : (
                         integrations.map((integration: any) => (
-                          <button
+                          <div
                             key={integration.id}
-                            onClick={() =>
-                              handleIntegrationClick(integration.id)
-                            }
-                            className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                            className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {typeof integration.icon === 'function' ? (
-                                  <integration.icon size={30} />
-                                ) : (
-                                  <span className="text-sm font-bold">
-                                    {integration.icon}
-                                  </span>
-                                )}
-                                <div>
-                                  <div className="font-medium text-gray-900 dark:text-white text-left">
-                                    {integration.name}
-                                  </div>
-                                  <div
-                                    className={`text-xs ${
-                                      integration.connected
-                                        ? 'text-green-600 dark:text-green-400'
-                                        : 'text-gray-500 dark:text-gray-400'
-                                    }`}
-                                  >
-                                    {integration.connected
-                                      ? 'Подключено'
-                                      : 'Не подключено'}
+                              <button
+                                onClick={() =>
+                                  handleIntegrationClick(integration.id)
+                                }
+                                className="flex-1 flex items-center gap-3 text-left"
+                              >
+                                <div className="flex items-center gap-3">
+                                  {typeof integration.icon === 'function' ? (
+                                    <integration.icon size={30} />
+                                  ) : (
+                                    <span className="text-sm font-bold">
+                                      {integration.icon}
+                                    </span>
+                                  )}
+                                  <div>
+                                    <div className="font-medium text-gray-900 dark:text-white text-left">
+                                      {integration.name}
+                                    </div>
+                                    <div
+                                      className={`text-xs ${
+                                        integration.connected
+                                          ? 'text-green-600 dark:text-green-400'
+                                          : 'text-gray-500 dark:text-gray-400'
+                                      }`}
+                                    >
+                                      {integration.connected
+                                        ? 'Подключено'
+                                        : 'Не подключено'}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  integration.connected
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                                }`}
-                              >
-                                {integration.connected
-                                  ? 'Активно'
-                                  : 'Не активно'}
-                              </div>
+                              </button>
+
+                              {integration.connected && (
+                                <button
+                                  onClick={() =>
+                                    handleDisconnect(integration.id)
+                                  }
+                                  disabled={
+                                    disconnectingIntegration === integration.id
+                                  }
+                                  className="ml-2 p-2 text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Отключить интеграцию"
+                                >
+                                  {disconnectingIntegration ===
+                                  integration.id ? (
+                                    <Loader2
+                                      size={16}
+                                      className="animate-spin"
+                                    />
+                                  ) : (
+                                    <PowerOff size={16} />
+                                  )}
+                                </button>
+                              )}
                             </div>
-                          </button>
+                          </div>
                         ))
                       )}
                     </div>
@@ -247,48 +300,62 @@ export const IntegrationsDropdown = ({
                       </div>
                     ) : (
                       integrations.map((integration: any) => (
-                        <button
+                        <div
                           key={integration.id}
-                          onClick={() => handleIntegrationClick(integration.id)}
-                          className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-left"
+                          className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {typeof integration.icon === 'function' ? (
-                                <integration.icon size={40} />
-                              ) : (
-                                <span className="text-sm font-bold">
-                                  {integration.icon}
-                                </span>
-                              )}
-                              <div>
-                                <div className="font-medium text-gray-900 dark:text-white text-left">
-                                  {integration.name}
-                                </div>
-                                <div
-                                  className={`text-xs ${
-                                    integration.connected
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-gray-500 dark:text-gray-400'
-                                  }`}
-                                >
-                                  {integration.connected
-                                    ? 'Подключено'
-                                    : 'Не подключено'}
+                            <button
+                              onClick={() =>
+                                handleIntegrationClick(integration.id)
+                              }
+                              className="flex-1 flex items-center gap-3 text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                {typeof integration.icon === 'function' ? (
+                                  <integration.icon size={40} />
+                                ) : (
+                                  <span className="text-sm font-bold">
+                                    {integration.icon}
+                                  </span>
+                                )}
+                                <div>
+                                  <div className="font-medium text-gray-900 dark:text-white text-left">
+                                    {integration.name}
+                                  </div>
+                                  <div
+                                    className={`text-xs ${
+                                      integration.connected
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : 'text-gray-500 dark:text-gray-400'
+                                    }`}
+                                  >
+                                    {integration.connected
+                                      ? 'Подключено'
+                                      : 'Не подключено'}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                            <div
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                integration.connected
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                              }`}
-                            >
-                              {integration.connected ? 'Активно' : 'Не активно'}
-                            </div>
+                            </button>
+
+                            {integration.connected && (
+                              <button
+                                onClick={() => handleDisconnect(integration.id)}
+                                disabled={
+                                  disconnectingIntegration === integration.id
+                                }
+                                className="ml-2 p-2 text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Отключить интеграцию"
+                              >
+                                {disconnectingIntegration === integration.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <PowerOff size={16} />
+                                )}
+                              </button>
+                            )}
                           </div>
-                        </button>
+                        </div>
                       ))
                     )}
                   </div>

@@ -44,6 +44,10 @@ import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
 import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
 import { OzonIcon } from '../features/integrations/OzonIcon';
+import {
+  useDisconnectOzonIntegrationMutation,
+  useGetOzonIntegrationQuery,
+} from '../store/api/integrationsApi';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -79,16 +83,49 @@ export const OperationsPage = () => {
   );
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+  // Загружаем данные интеграции Ozon
+  const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
+    useGetOzonIntegrationQuery();
+  const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
+
+  // Инициализируем интеграции с данными из API
   const [integrations, setIntegrations] = useState([
     {
       id: 'ozon',
       name: 'Ozon',
       icon: OzonIcon,
       connected: false,
-      data: undefined,
+      data: undefined as any,
     },
   ]);
+
+  const handleIntegrationDisconnect = async (integrationId: string) => {
+    if (integrationId === 'ozon') {
+      try {
+        const result = await disconnectOzonIntegration().unwrap();
+        if (result.success) {
+          setIntegrations((prev) =>
+            prev.map((integration) =>
+              integration.id === 'ozon'
+                ? {
+                    ...integration,
+                    connected: false,
+                    data: undefined,
+                  }
+                : integration
+            )
+          );
+          showSuccess('Интеграция Ozon успешно отключена');
+        } else {
+          showError(result.error || 'Ошибка при отключении интеграции');
+        }
+      } catch (error) {
+        console.error('Failed to disconnect Ozon integration:', error);
+        showError('Ошибка при отключении интеграции');
+      }
+    }
+  };
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -130,6 +167,23 @@ export const OperationsPage = () => {
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: company } = useGetCompanyQuery();
+
+  // Обновляем состояние интеграций при загрузке данных
+  useEffect(() => {
+    if (ozonIntegrationData?.success && ozonIntegrationData.data) {
+      setIntegrations((prev) =>
+        prev.map((integration) =>
+          integration.id === 'ozon'
+            ? {
+                ...integration,
+                connected: ozonIntegrationData.data!.connected,
+                data: ozonIntegrationData.data!.data,
+              }
+            : integration
+        )
+      );
+    }
+  }, [ozonIntegrationData]);
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -828,6 +882,8 @@ export const OperationsPage = () => {
             <IntegrationsDropdown
               integrations={integrations}
               onIntegrationUpdate={handleIntegrationUpdate}
+              onIntegrationDisconnect={handleIntegrationDisconnect}
+              isLoading={isLoadingOzonIntegration}
             />
             <RecurringOperations onEdit={handleEdit} />
             <MappingRules />

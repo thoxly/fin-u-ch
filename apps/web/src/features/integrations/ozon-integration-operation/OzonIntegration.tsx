@@ -9,6 +9,7 @@ import {
   Loader2,
   Plus,
   Search,
+  PowerOff,
 } from 'lucide-react';
 import { OzonIcon } from '../OzonIcon';
 import { useSaveOzonIntegrationMutation } from '../../../store/api/integrationsApi';
@@ -30,6 +31,7 @@ interface OzonIntegrationProps {
     accountId: string;
   }) => void;
   onCancel: () => void;
+  onDisconnect: () => void;
   initialData?: {
     clientKey?: string;
     apiKey?: string;
@@ -37,6 +39,8 @@ interface OzonIntegrationProps {
     articleId?: string;
     accountId?: string;
   };
+  isConnected: boolean;
+  isDisconnecting?: boolean;
 }
 
 interface Article {
@@ -65,7 +69,10 @@ interface Counterparty {
 export const OzonIntegration = ({
   onSave,
   onCancel,
+  onDisconnect,
   initialData,
+  isConnected,
+  isDisconnecting = false,
 }: OzonIntegrationProps) => {
   const [clientKey, setClientKey] = useState(initialData?.clientKey || '');
   const [apiKey, setApiKey] = useState(initialData?.apiKey || '');
@@ -132,7 +139,6 @@ export const OzonIntegration = ({
       (account.number && account.number.includes(accountSearchQuery))
   );
 
-  // Автоматически выбираем существующие статьи и счета с "Ozon"
   // Автоматически выбираем существующие статьи и счета
   useEffect(() => {
     if (articles.length > 0 && !selectedArticleId) {
@@ -212,7 +218,7 @@ export const OzonIntegration = ({
       setSelectedAccountId(result.id);
       setIsCreatingAccount(false);
       setShowAccountSearch(false);
-      showSuccess('Счет успешно создан');
+      showSuccess('Счет успешно создана');
     } catch (error) {
       console.error('Failed to create account:', error);
       showError('Ошибка при создании счета');
@@ -273,18 +279,43 @@ export const OzonIntegration = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-          <OzonIcon size={24} />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+            <OzonIcon size={24} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+              Интеграция с Ozon
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {isConnected
+                ? 'Интеграция подключена'
+                : 'Подключите ваш аккаунт Ozon для автоматизации операций'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-            Интеграция с Ozon
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Подключите ваш аккаунт Ozon для автоматизации операций
-          </p>
-        </div>
+
+        {isConnected && (
+          <Button
+            onClick={onDisconnect}
+            variant="danger"
+            size="sm"
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? (
+              <>
+                <Loader2 size={16} className="animate-spin mr-2" />
+                Отключение...
+              </>
+            ) : (
+              <>
+                <PowerOff size={16} className="mr-2" />
+                Отключить
+              </>
+            )}
+          </Button>
+        )}
       </div>
 
       <Card className="p-4">
@@ -880,7 +911,7 @@ export const OzonIntegration = ({
                 <p className="text-gray-600 dark:text-gray-400 text-xs">
                   Пример: за неделю с 14 по 20 октября вы заработали 300 000 ₽.
                   <br />
-                  Рассчитаем сумму выплаты: в понедельник, 28 октября.
+                  Рассчитаем сумму выплата: в понедельник, 28 октября.
                   <br />
                   Переведём деньги: в среду, 30 октября.
                 </p>
@@ -889,32 +920,34 @@ export const OzonIntegration = ({
           )}
 
           {/* Кнопки действий */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <Button
-              onClick={handleSave}
-              className="flex-1"
-              disabled={!isFormValid || isSavingIntegration}
-              size="sm"
-            >
-              {isSavingIntegration ? (
-                <>
-                  <Loader2 size={16} className="animate-spin mr-2" />
-                  Сохранение...
-                </>
-              ) : (
-                'Сохранить'
-              )}
-            </Button>
-            <Button
-              onClick={onCancel}
-              variant="secondary"
-              className="flex-1"
-              size="sm"
-              disabled={isSavingIntegration}
-            >
-              Отмена
-            </Button>
-          </div>
+          {!isConnected && (
+            <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={handleSave}
+                className="flex-1"
+                disabled={!isFormValid || isSavingIntegration}
+                size="sm"
+              >
+                {isSavingIntegration ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    Сохранение...
+                  </>
+                ) : (
+                  'Сохранить'
+                )}
+              </Button>
+              <Button
+                onClick={onCancel}
+                variant="secondary"
+                className="flex-1"
+                size="sm"
+                disabled={isSavingIntegration}
+              >
+                Отмена
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
     </div>

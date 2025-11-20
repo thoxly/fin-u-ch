@@ -27,7 +27,7 @@ export class IntegrationsService {
     apiKey: string
   ): Promise<boolean> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch('https://api-seller.ozon.ru/v1/roles', {
@@ -246,6 +246,62 @@ export class IntegrationsService {
         error: 'Внутренняя ошибка сервера',
       };
     }
+  }
+
+  async getLastOzonOperation(
+    companyId: string,
+    articleId: string,
+    accountId: string
+  ) {
+    return prisma.operation.findFirst({
+      where: {
+        companyId,
+        articleId,
+        accountId,
+        description: {
+          contains: 'Ozon выплата',
+        },
+      },
+      orderBy: {
+        operationDate: 'desc',
+      },
+      select: {
+        id: true,
+        operationDate: true,
+        amount: true,
+        currency: true,
+        description: true,
+      },
+    });
+  }
+
+  async getOzonOperationsHistory(
+    companyId: string,
+    articleId: string,
+    accountId: string,
+    limit: number = 10
+  ) {
+    return prisma.operation.findMany({
+      where: {
+        companyId,
+        articleId,
+        accountId,
+        description: {
+          contains: 'Ozon выплата',
+        },
+      },
+      orderBy: {
+        operationDate: 'desc',
+      },
+      take: limit,
+      select: {
+        id: true,
+        operationDate: true,
+        amount: true,
+        currency: true,
+        description: true,
+      },
+    });
   }
 
   private async validateCompanyOwnership(
