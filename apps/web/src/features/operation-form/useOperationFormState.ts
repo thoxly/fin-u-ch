@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toISODate } from '../../shared/lib/date';
 import { formatAmountInput } from '../../shared/lib/numberInput';
 import type { Operation } from '@fin-u-ch/shared';
+import { OperationType, Periodicity } from '@fin-u-ch/shared';
 
 // Вспомогательная функция для преобразования даты
 function convertToDateString(date: Date | string | undefined): string {
@@ -16,8 +17,8 @@ function convertToDateString(date: Date | string | undefined): string {
 }
 
 export const useOperationFormState = (operation: Operation | null) => {
-  const [type, setType] = useState<'income' | 'expense' | 'transfer'>(
-    operation?.type || 'expense'
+  const [type, setType] = useState<OperationType>(
+    operation?.type || OperationType.EXPENSE
   );
 
   const [operationDate, setOperationDate] = useState(
@@ -56,15 +57,9 @@ export const useOperationFormState = (operation: Operation | null) => {
 
   const [description, setDescription] = useState(operation?.description || '');
 
-  const [repeat, setRepeat] = useState<
-    | 'none'
-    | 'daily'
-    | 'weekly'
-    | 'monthly'
-    | 'quarterly'
-    | 'semiannual'
-    | 'annual'
-  >(operation?.repeat || 'none');
+  const [repeat, setRepeat] = useState<Periodicity>(
+    operation?.repeat || Periodicity.NONE
+  );
 
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(
     convertToDateString(operation?.recurrenceEndDate)

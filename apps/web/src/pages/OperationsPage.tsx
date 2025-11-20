@@ -16,7 +16,7 @@ import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import { MappingRules } from '../features/bank-import/MappingRules';
 import {
-  useLazyGetOperationsQuery,
+  useGetOperationsQuery,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
   useBulkDeleteOperationsMutation,
@@ -35,7 +35,6 @@ import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 import { useBulkSelection } from '../shared/hooks/useBulkSelection';
-import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
@@ -173,11 +172,18 @@ export const OperationsPage = () => {
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
-  const PAGE_SIZE = 50;
-  const [items, setItems] = useState<OperationWithRelations[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [trigger, { isFetching }] = useLazyGetOperationsQuery();
+  // Загружаем данные один раз при монтировании с текущими фильтрами
+  const {
+    data: operationsData = [],
+    isLoading: isFetching,
+    refetch,
+  } = useGetOperationsQuery(hasActiveFilters ? filters : undefined, {
+    // Отключаем автоматическую перезагрузку при изменении фильтров
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
@@ -188,74 +194,11 @@ export const OperationsPage = () => {
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
 
-  // Extract data reloading logic to avoid duplication
+  // Функция для ручной перезагрузки данных (после мутаций)
   const reloadOperationsData = useCallback(async () => {
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
     clearSelection();
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset: 0,
-    };
-    const result = await trigger(params).unwrap();
-    setItems(result as OperationWithRelations[]);
-    setHasMore(result.length === PAGE_SIZE);
-    setOffset(result.length);
-  }, [hasActiveFilters, filters, trigger, clearSelection]);
-
-  // Memoize loadMore callback to prevent unnecessary re-renders
-  const loadMore = useCallback(async () => {
-    if (isFetching || !hasMore) return;
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset,
-    };
-    const result = await trigger(params).unwrap();
-    const page = result || [];
-    // Фильтруем дубликаты по id при добавлении новых элементов
-    setItems((prev) => {
-      const existingIds = new Set(prev.map((item) => item.id));
-      const newItems = page.filter((item) => !existingIds.has(item.id));
-      return [...prev, ...newItems];
-    });
-    setOffset((prevOffset) => prevOffset + page.length);
-    setHasMore(page.length === PAGE_SIZE);
-  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
-
-  // Initial and filters-changed load with proper dependencies
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      await reloadOperationsData();
-      if (cancelled) {
-        // Reset state if cancelled
-        setItems([]);
-        setOffset(0);
-        setHasMore(true);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadOperationsData]);
-
-  // Use IntersectionObserver hook for infinite scroll
-  const sentinelRef = useIntersectionObserver(
-    useCallback(
-      (entry) => {
-        if (entry.isIntersecting && !isFetching && hasMore) {
-          loadMore();
-        }
-      },
-      [isFetching, hasMore, loadMore]
-    ),
-    { rootMargin: '200px', enabled: hasMore && !isFetching }
-  );
+    await refetch();
+  }, [refetch, clearSelection]);
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -428,9 +371,9 @@ export const OperationsPage = () => {
 
   // Сортированные данные
   const sortedItems = useMemo(() => {
-    if (!sortKey) return items;
+    if (!sortKey) return operationsData as OperationWithRelations[];
 
-    return [...items].sort((a, b) => {
+    return [...(operationsData as OperationWithRelations[])].sort((a, b) => {
       let aValue: unknown;
       let bValue: unknown;
 
@@ -485,7 +428,7 @@ export const OperationsPage = () => {
       if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [items, sortKey, sortDirection]);
+  }, [operationsData, sortKey, sortDirection]);
 
   const selectableIds = useMemo(
     () =>
@@ -981,9 +924,9 @@ export const OperationsPage = () => {
             </div>
           </div>
 
-          {items.length === 0 && isFetching ? (
+          {operationsData.length === 0 && isFetching ? (
             <TableSkeleton rows={5} columns={6} />
-          ) : items.length === 0 ? (
+          ) : operationsData.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="Нет операций"
@@ -1159,7 +1102,6 @@ export const OperationsPage = () => {
               },
             ]}
           />
-          <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
         <Modal

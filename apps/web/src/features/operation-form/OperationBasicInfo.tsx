@@ -1,8 +1,9 @@
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
+import { OperationType } from '@fin-u-ch/shared';
 
 interface OperationBasicInfoProps {
-  type: 'income' | 'expense' | 'transfer';
+  type: OperationType;
   operationDate: string;
   amount: string;
   currency: string;
@@ -87,13 +88,19 @@ export const OperationBasicInfo = ({
           label="Валюта"
           value={currency}
           onChange={(value) => {
-            onCurrencyChange(value);
-            onValidationErrorClear('currency');
+            if (value === '__create__' && onOpenCreateModal) {
+              onOpenCreateModal('currency');
+            } else {
+              onCurrencyChange(value);
+              onValidationErrorClear('currency');
+            }
           }}
-          onCreateNew={
-            onOpenCreateModal ? () => onOpenCreateModal('currency') : undefined
-          }
-          options={currencyOptions}
+          options={[
+            ...(onOpenCreateModal
+              ? [{ value: '__create__', label: '+ Добавить новый' }]
+              : []),
+            ...currencyOptions,
+          ]}
           error={validationErrors.currency}
           required
         />

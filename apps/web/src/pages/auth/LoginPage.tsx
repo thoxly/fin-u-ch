@@ -26,7 +26,9 @@ export const LoginPage = () => {
       const response = await login({ email, password }).unwrap();
       dispatch(setCredentials(response));
       showSuccess(NOTIFICATION_MESSAGES.AUTH.LOGIN_SUCCESS);
-      navigate('/dashboard');
+      // Редирект будет выполнен компонентом RedirectToFirstAvailable
+      // после загрузки прав пользователя
+      navigate('/redirect', { replace: true });
     } catch (err) {
       const errorMessage = 'Неверный email или пароль';
       setError(errorMessage);

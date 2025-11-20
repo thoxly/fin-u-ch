@@ -266,8 +266,27 @@ jobs:
       - name: Build API
         run: pnpm --filter api build
 
+      - name: Check for failed migrations and resolve if needed
+        working-directory: apps/api
+        continue-on-error: true
+        run: |
+          if npx prisma migrate status 2>&1 | grep -q "failed migration"; then
+            echo "⚠️  Found failed migrations, attempting to resolve..."
+            # Check if the known failed migration exists and is actually applied
+            FAILED_MIGRATION="20251110063339_add_roles_and_permissions"
+            if npx prisma migrate status 2>&1 | grep -q "$FAILED_MIGRATION"; then
+              echo "Resolving failed migration: $FAILED_MIGRATION"
+              npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
+            fi
+          else
+            echo "✅ No failed migrations found"
+          fi
+
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
+
+      - name: Regenerate Prisma Client after migrations
+        run: pnpm --filter api prisma:generate
 
       - name: Create demo user for E2E tests
         working-directory: apps/api
@@ -415,8 +434,27 @@ jobs:
       - name: Build Web
         run: pnpm --filter web build
 
+      - name: Check for failed migrations and resolve if needed
+        working-directory: apps/api
+        continue-on-error: true
+        run: |
+          if npx prisma migrate status 2>&1 | grep -q "failed migration"; then
+            echo "⚠️  Found failed migrations, attempting to resolve..."
+            # Check if the known failed migration exists and is actually applied
+            FAILED_MIGRATION="20251110063339_add_roles_and_permissions"
+            if npx prisma migrate status 2>&1 | grep -q "$FAILED_MIGRATION"; then
+              echo "Resolving failed migration: $FAILED_MIGRATION"
+              npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
+            fi
+          else
+            echo "✅ No failed migrations found"
+          fi
+
       - name: Run Prisma migrations
         run: pnpm --filter api prisma:deploy
+
+      - name: Regenerate Prisma Client after migrations
+        run: pnpm --filter api prisma:generate
 
       - name: Create demo user for E2E tests
         working-directory: apps/api

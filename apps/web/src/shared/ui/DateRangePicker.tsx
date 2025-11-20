@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { DateRangePicker as RDRDateRangePicker, Range } from 'react-date-range';
 import { CalendarIcon } from '@heroicons/react/20/solid';
 import { classNames } from '../lib/utils';
@@ -40,10 +40,10 @@ export const DateRangePicker = ({
   disabled = false,
 }: DateRangePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const today = useMemo(() => new Date(), []);
+  const today = new Date();
   const [range, setRange] = useState<Range>({
-    startDate: startDate ?? today,
-    endDate: endDate ?? today,
+    startDate: startDate || today,
+    endDate: endDate || today,
     key: 'selection',
   });
   const [monthsCount, setMonthsCount] = useState(2);
@@ -234,13 +234,15 @@ export const DateRangePicker = ({
   ];
 
   useEffect(() => {
-    setRange({
-      startDate: startDate ?? today,
-      endDate: endDate ?? today,
-      key: 'selection',
-    });
-    setFocusedRange([0, 0]);
-  }, [startDate, endDate, today]);
+    if (startDate && endDate) {
+      setRange({
+        startDate,
+        endDate,
+        key: 'selection',
+      });
+      setFocusedRange([0, 0]);
+    }
+  }, [startDate, endDate]);
 
   // При открытии календаря обновляем ключ, чтобы календарь показал правильный месяц
   useEffect(() => {
@@ -441,11 +443,13 @@ export const DateRangePicker = ({
 
   const handleClose = () => {
     // Восстанавливаем исходные значения при закрытии без применения
-    setRange({
-      startDate: startDate ?? today,
-      endDate: endDate ?? today,
-      key: 'selection',
-    });
+    if (startDate && endDate) {
+      setRange({
+        startDate,
+        endDate,
+        key: 'selection',
+      });
+    }
     setIsOpen(false);
     setFocusedRange([0, 0]);
     previousFocusedRange.current = [0, 0];
@@ -468,11 +472,11 @@ export const DateRangePicker = ({
   };
 
   const displayValue =
-    startDate && endDate
-      ? isSameDate(startDate, endDate)
-        ? formatDate(startDate)
-        : `${formatDate(startDate)} — ${formatDate(endDate)}`
-      : placeholder || 'Весь период';
+    range.startDate && range.endDate
+      ? isSameDate(range.startDate, range.endDate)
+        ? formatDate(range.startDate)
+        : `${formatDate(range.startDate)} — ${formatDate(range.endDate)}`
+      : placeholder || 'Выберите диапазон дат';
 
   return (
     <div className={classNames('relative', className)}>
@@ -487,7 +491,7 @@ export const DateRangePicker = ({
             'flex items-center justify-between',
             'text-left',
             disabled && 'opacity-50 cursor-not-allowed',
-            (!startDate || !endDate) && 'text-gray-400 dark:text-gray-500'
+            !range.startDate && 'text-gray-400 dark:text-gray-500'
           )}
         >
           <span className="block truncate">{displayValue}</span>

@@ -1,5 +1,4 @@
 import prisma from '../../../config/db';
-import { Prisma } from '@prisma/client';
 import { compareTwoStrings } from 'string-similarity';
 import { ParsedDocument } from '../parsers/clientBankExchange.parser';
 import logger from '../../../config/logger';
@@ -132,7 +131,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id, companyId },
+          where: { id: rule.id },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -163,7 +162,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id, companyId },
+          where: { id: rule.id },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -194,7 +193,7 @@ export async function matchCounterparty(
         rule.targetId
       ) {
         await prisma.mappingRule.update({
-          where: { id: rule.id, companyId },
+          where: { id: rule.id },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
@@ -215,26 +214,9 @@ export async function matchCounterparty(
   // Возможно, стоит рассмотреть использование fuse.js для более гибкого поиска
   // См. ТЗ: раздел "Логика автосопоставления" → "3. По fuzzy match названия контрагента"
   if (nameToSearch) {
-    // Оптимизация: ограничиваем количество загружаемых контрагентов для fuzzy match
-    // Для больших компаний рекомендуется использовать полнотекстовый поиск в БД
-    const MAX_FUZZY_MATCH_COUNTERPARTIES = 1000;
     const counterparties = await prisma.counterparty.findMany({
       where: { companyId },
-      take: MAX_FUZZY_MATCH_COUNTERPARTIES,
-      select: {
-        id: true,
-        name: true,
-      },
     });
-
-    // Если контрагентов слишком много, пропускаем fuzzy match для производительности
-    if (counterparties.length >= MAX_FUZZY_MATCH_COUNTERPARTIES) {
-      logger.warn('Too many counterparties for fuzzy match, skipping', {
-        companyId,
-        count: counterparties.length,
-      });
-      return null;
-    }
 
     let bestMatch: { id: string; similarity: number } | null = null;
     const threshold = 0.8;
@@ -304,9 +286,7 @@ export async function matchArticle(
 
   for (const rule of equalsRules) {
     if (purpose.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
-      const article:
-        | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
-        | null = await prisma.article.findFirst({
+      const article = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
           companyId,
@@ -316,22 +296,19 @@ export async function matchArticle(
       });
 
       if (article) {
-        // Проверяем тип статьи перед возвратом
-        if (article.type === articleType) {
-          await prisma.mappingRule.update({
-            where: { id: rule.id, companyId },
-            data: {
-              usageCount: { increment: 1 },
-              lastUsedAt: new Date(),
-            },
-          });
+        await prisma.mappingRule.update({
+          where: { id: rule.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
 
-          return {
-            id: article.id,
-            matchedBy: 'rule',
-            ruleId: rule.id,
-          };
-        }
+        return {
+          id: article.id,
+          matchedBy: 'rule',
+          ruleId: rule.id,
+        };
       }
     }
   }
@@ -350,9 +327,7 @@ export async function matchArticle(
     try {
       const regex = new RegExp(rule.pattern, 'i');
       if (regex.test(purpose) && rule.targetId) {
-        const article:
-          | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
-          | null = await prisma.article.findFirst({
+        const article = await prisma.article.findFirst({
           where: {
             id: rule.targetId,
             companyId,
@@ -362,22 +337,19 @@ export async function matchArticle(
         });
 
         if (article) {
-          // Проверяем тип статьи перед возвратом
-          if (article.type === articleType) {
-            await prisma.mappingRule.update({
-              where: { id: rule.id, companyId },
-              data: {
-                usageCount: { increment: 1 },
-                lastUsedAt: new Date(),
-              },
-            });
+          await prisma.mappingRule.update({
+            where: { id: rule.id },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          });
 
-            return {
-              id: article.id,
-              matchedBy: 'rule',
-              ruleId: rule.id,
-            };
-          }
+          return {
+            id: article.id,
+            matchedBy: 'rule',
+            ruleId: rule.id,
+          };
         }
       }
     } catch (e) {
@@ -401,9 +373,7 @@ export async function matchArticle(
       purpose.toLowerCase().includes(rule.pattern.toLowerCase()) &&
       rule.targetId
     ) {
-      const article:
-        | (Prisma.ArticleGetPayload<Record<string, never>> & { type: string })
-        | null = await prisma.article.findFirst({
+      const article = await prisma.article.findFirst({
         where: {
           id: rule.targetId,
           companyId,
@@ -413,119 +383,25 @@ export async function matchArticle(
       });
 
       if (article) {
-        // Проверяем тип статьи перед возвратом
-        if (article.type === articleType) {
-          await prisma.mappingRule.update({
-            where: { id: rule.id, companyId },
-            data: {
-              usageCount: { increment: 1 },
-              lastUsedAt: new Date(),
-            },
-          });
+        await prisma.mappingRule.update({
+          where: { id: rule.id },
+          data: {
+            usageCount: { increment: 1 },
+            lastUsedAt: new Date(),
+          },
+        });
 
-          return {
-            id: article.id,
-            matchedBy: 'rule',
-            ruleId: rule.id,
-          };
-        }
+        return {
+          id: article.id,
+          matchedBy: 'rule',
+          ruleId: rule.id,
+        };
       }
     }
   }
 
   // 2. Сопоставление по ключевым словам (предустановленные правила)
-  // ВАЖНО: Порядок имеет значение! Более специфичные правила должны идти раньше общих
-
-  // Оптимизация: загружаем все статьи компании один раз, чтобы избежать N+1 запросов
-  const allArticles = await prisma.article.findMany({
-    where: {
-      companyId,
-      type: articleType,
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  // Создаем индекс для быстрого поиска статей по названию (case-insensitive)
-  const articlesByName = new Map<string, string>();
-  for (const article of allArticles) {
-    const normalizedName = article.name.toLowerCase().trim();
-    if (!articlesByName.has(normalizedName)) {
-      articlesByName.set(normalizedName, article.id);
-    }
-    // Также добавляем частичные совпадения для contains поиска
-    const words = normalizedName.split(/\s+/);
-    for (const word of words) {
-      if (word.length > 3 && !articlesByName.has(word)) {
-        articlesByName.set(word, article.id);
-      }
-    }
-  }
-
   const keywordRules: Array<{ keywords: string[]; articleNames: string[] }> = [
-    // Специфичные правила для зарплаты (проверяем раньше налогов, чтобы "Без налога" не перехватывало)
-    {
-      keywords: [
-        'зарплата',
-        'отпускные',
-        'аванс',
-        'премия',
-        'заработная плата',
-        'зарплата (аванс)',
-        'зарплата за',
-      ],
-      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ'],
-    },
-    // Аренда (проверяем раньше выручки, чтобы "оплата счета за аренду" не попадала в выручку)
-    {
-      keywords: [
-        'аренда',
-        'за аренду',
-        'аренда нежилых помещений',
-        'нежилых помещений',
-        'аренда помещений',
-        'помещений',
-        'аренда офиса',
-        'аренда недвижимости',
-        'оренда',
-      ],
-      articleNames: [
-        'Аренда офиса',
-        'Аренда помещений',
-        'Оренда недвижимости',
-        'Аренда',
-      ],
-    },
-    // Выручка (проверяем раньше общих правил, но после более специфичных)
-    {
-      keywords: [
-        'оплата по счету',
-        'оплата счета',
-        'счет №',
-        'выручка',
-        'поступление от клиента',
-        'оплата покупателя',
-        'доход',
-        'продажа',
-        'разработка по',
-        'разработка программного обеспечения',
-        'за разработку',
-        'за разработку по',
-        'услуги по разработке',
-        'оказание услуг',
-        'оказание услуг по',
-      ],
-      articleNames: [
-        'Выручка от продаж',
-        'Доход от реализации',
-        'Поступления от клиентов',
-        'Выручка',
-      ],
-    },
-    // Налоги (общее правило, проверяем после специфичных)
     {
       keywords: [
         'налог',
@@ -536,11 +412,31 @@ export async function matchArticle(
         'налоги',
         'пенсионный фонд',
       ],
+      articleNames: ['Налоги', 'Обязательные платежи', 'Отчисления в фонды'],
+    },
+    {
+      keywords: [
+        'зарплата',
+        'отпускные',
+        'аванс',
+        'премия',
+        'заработная плата',
+      ],
+      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ'],
+    },
+    {
+      keywords: [
+        'оплата по счету',
+        'выручка',
+        'поступление от клиента',
+        'оплата покупателя',
+        'доход',
+        'продажа',
+      ],
       articleNames: [
-        'Налоги',
-        'Обязательные платежи',
-        'Отчисления в фонды',
-        'Прочие налоги',
+        'Выручка от продаж',
+        'Доход от реализации',
+        'Поступления от клиентов',
       ],
     },
     {
@@ -578,6 +474,10 @@ export async function matchArticle(
         'Доставка и логистика',
         'Топливо и ГСМ',
       ],
+    },
+    {
+      keywords: ['аренда', 'офис', 'помещение'],
+      articleNames: ['Аренда офиса', 'Аренда помещений', 'Оренда недвижимости'],
     },
     {
       keywords: ['интернет', 'телефон', 'связь', 'сотовая связь'],
@@ -654,55 +554,27 @@ export async function matchArticle(
   ];
 
   for (const keywordRule of keywordRules) {
-    // Сортируем ключевые слова по длине (от длинных к коротким) для более точного сопоставления
-    const sortedKeywords = [...keywordRule.keywords].sort(
-      (a, b) => b.length - a.length
-    );
-
-    const purposeLower = purpose.toLowerCase();
-    const hasKeyword = sortedKeywords.some((keyword) =>
-      purposeLower.includes(keyword.toLowerCase())
+    const hasKeyword = keywordRule.keywords.some((keyword) =>
+      purpose.toLowerCase().includes(keyword.toLowerCase())
     );
 
     if (hasKeyword) {
-      // Ищем статью по любому из возможных названий (используем предзагруженные статьи)
+      // Ищем статью по любому из возможных названий
       for (const articleName of keywordRule.articleNames) {
-        const normalizedSearchName = articleName.toLowerCase().trim();
+        const article = await prisma.article.findFirst({
+          where: {
+            companyId,
+            name: { contains: articleName, mode: 'insensitive' },
+            type: articleType,
+            isActive: true,
+          },
+        });
 
-        // Прямое совпадение
-        const directMatch = articlesByName.get(normalizedSearchName);
-        if (directMatch) {
+        if (article) {
           return {
-            id: directMatch,
+            id: article.id,
             matchedBy: 'keyword',
           };
-        }
-
-        // Поиск по частичному совпадению (contains)
-        for (const [normalizedName, articleId] of articlesByName.entries()) {
-          if (
-            normalizedName.includes(normalizedSearchName) ||
-            normalizedSearchName.includes(normalizedName)
-          ) {
-            return {
-              id: articleId,
-              matchedBy: 'keyword',
-            };
-          }
-        }
-
-        // Fallback: поиск в полных названиях статей
-        for (const article of allArticles) {
-          const articleNameLower = article.name.toLowerCase();
-          if (
-            articleNameLower.includes(normalizedSearchName) ||
-            normalizedSearchName.includes(articleNameLower)
-          ) {
-            return {
-              id: article.id,
-              matchedBy: 'keyword',
-            };
-          }
         }
       }
     }

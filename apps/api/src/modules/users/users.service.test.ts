@@ -24,9 +24,20 @@ jest.mock('../../config/db', () => ({
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       findUniqueOrThrow: jest.fn(),
+      create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
       findMany: jest.fn(),
+    },
+    role: {
+      findMany: jest.fn(),
+    },
+    userRole: {
+      createMany: jest.fn(),
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      delete: jest.fn(),
     },
     emailToken: {
       update: jest.fn(),
@@ -93,6 +104,9 @@ const mockedTokenService = tokenService as jest.Mocked<typeof tokenService>;
 
 describe('UsersService', () => {
   let usersService: UsersService;
+  const mockCompanyId = 'company-1';
+  const mockUserId = 'user-1';
+  const mockInvitedBy = 'admin-1';
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
@@ -102,6 +116,7 @@ describe('UsersService', () => {
     companyId: 'company-1',
     isActive: true,
     isEmailVerified: true,
+    isSuperAdmin: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     company: {

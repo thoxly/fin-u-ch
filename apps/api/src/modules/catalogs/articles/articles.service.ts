@@ -13,19 +13,14 @@ export interface CreateArticleDTO {
 }
 
 export interface ArticleFilters {
-  type?: 'income' | 'expense' | 'transfer';
+  type?: 'income' | 'expense';
   activity?: 'operating' | 'investing' | 'financing';
   isActive?: boolean;
 }
 
 export class ArticlesService {
   async getAll(companyId: string, filters?: ArticleFilters) {
-    const where: {
-      companyId: string;
-      type?: string;
-      activity?: string;
-      isActive?: boolean;
-    } = { companyId };
+    const where: any = { companyId };
 
     if (filters?.type) {
       where.type = filters.type;
@@ -45,7 +40,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      },
+      } as any,
       orderBy: { name: 'asc' },
     });
   }
@@ -57,7 +52,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      },
+      } as any,
     });
 
     if (!article) {
@@ -70,8 +65,8 @@ export class ArticlesService {
   async create(companyId: string, data: CreateArticleDTO) {
     validateRequired({ name: data.name, type: data.type });
 
-    if (!['income', 'expense', 'transfer'].includes(data.type)) {
-      throw new AppError('Type must be income, expense or transfer', 400);
+    if (!['income', 'expense'].includes(data.type)) {
+      throw new AppError('Type must be income or expense', 400);
     }
 
     return prisma.article.create({

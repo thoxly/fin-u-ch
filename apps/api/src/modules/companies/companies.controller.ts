@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
 import companiesService from './companies.service';
+import auditLogService from '../audit/audit.service';
 
 export class CompaniesController {
   async get(req: TenantRequest, res: Response, next: NextFunction) {
@@ -14,7 +15,25 @@ export class CompaniesController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      // Получаем старую версию для логирования
+      const oldCompany = await companiesService.get(req.companyId!);
+
       const result = await companiesService.update(req.companyId!, req.body);
+
+      // Логируем действие
+      await auditLogService.logAction({
+        userId: req.userId!,
+        companyId: req.companyId!,
+        action: 'update',
+        entity: 'company',
+        entityId: result.id,
+        changes: { old: oldCompany, new: result },
+        metadata: {
+          ip: req.ip,
+          userAgent: req.get('user-agent'),
+        },
+      });
+
       res.json(result);
     } catch (error) {
       next(error);

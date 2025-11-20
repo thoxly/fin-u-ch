@@ -2,16 +2,31 @@ import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { OperationBasicInfo } from './OperationBasicInfo';
 import { OperationFinancialParams } from './OperationFinancialParams';
 import { OperationRecurrenceSection } from './OperationRecurrenceSection';
-import type {
-  Article,
-  Account,
-  Counterparty,
-  Deal,
-  Department,
-} from '@fin-u-ch/shared';
+import { OperationType, Periodicity, type Deal } from '@fin-u-ch/shared';
+
+interface Article {
+  id: string;
+  name: string;
+  type: OperationType;
+}
+
+interface Account {
+  id: string;
+  name: string;
+}
+
+interface Counterparty {
+  id: string;
+  name: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface OperationFormFieldsProps {
-  type: 'income' | 'expense' | 'transfer';
+  type: OperationType;
   operationDate: string;
   amount: string;
   currency: string;
@@ -23,14 +38,7 @@ interface OperationFormFieldsProps {
   dealId: string;
   departmentId: string;
   description: string;
-  repeat:
-    | 'none'
-    | 'daily'
-    | 'weekly'
-    | 'monthly'
-    | 'quarterly'
-    | 'semiannual'
-    | 'annual';
+  repeat: Periodicity;
   recurrenceEndDate: string;
   validationErrors: Record<string, string>;
   articles: Article[];

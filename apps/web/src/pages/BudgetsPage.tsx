@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Archive, RotateCcw, Plus } from 'lucide-react';
+import { Trash2, Archive, RotateCcw } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -9,6 +9,8 @@ import { Table } from '../shared/ui/Table';
 import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Input } from '../shared/ui/Input';
+import { usePermissions } from '../shared/hooks/usePermissions';
+import { ProtectedAction } from '../shared/components/ProtectedAction';
 import {
   useGetBudgetsQuery,
   useCreateBudgetMutation,
@@ -29,10 +31,12 @@ export const BudgetsPage = () => {
   const [filter, setFilter] = useState<'active' | 'archived' | undefined>(
     'active'
   );
+  const { canRead } = usePermissions();
 
-  const { data: budgets = [], isLoading } = useGetBudgetsQuery({
-    status: filter,
-  });
+  const { data: budgets = [], isLoading } = useGetBudgetsQuery(
+    { status: filter },
+    { skip: !canRead('budgets') }
+  );
   const [createBudget, { isLoading: isCreating }] = useCreateBudgetMutation();
   const [updateBudget] = useUpdateBudgetMutation();
   const [deleteBudget] = useDeleteBudgetMutation();
@@ -141,32 +145,61 @@ export const BudgetsPage = () => {
       header: 'Действия',
       render: (budget: Budget) => (
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleArchive(budget);
-            }}
-            title={budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
+          {budget.status === 'active' ? (
+            <ProtectedAction entity="budgets" action="archive">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleArchive(budget);
+                }}
+                title="Архивировать"
+              >
+                <Archive className="w-4 h-4" />
+              </Button>
+            </ProtectedAction>
+          ) : (
+            <ProtectedAction entity="budgets" action="restore">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleArchive(budget);
+                }}
+                title="Восстановить"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </ProtectedAction>
+          )}
+          <ProtectedAction
+            entity="budgets"
+            action="delete"
+            fallback={
+              <Button
+                variant="danger"
+                size="sm"
+                disabled
+                title="Нет прав на удаление"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            }
           >
-            {budget.status === 'active' ? (
-              <Archive className="w-4 h-4" />
-            ) : (
-              <RotateCcw className="w-4 h-4" />
-            )}
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDelete(budget.id);
-            }}
-            title="Удалить"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(budget.id);
+              }}
+              title="Удалить"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </ProtectedAction>
         </div>
       ),
       width: '120px',
@@ -175,14 +208,13 @@ export const BudgetsPage = () => {
 
   return (
     <Layout>
-      <div className="mb-6 flex justify-end items-center">
-        <button
-          onClick={handleCreate}
-          className="relative px-4 py-2 border border-primary-500 dark:border-primary-400 rounded-lg bg-primary-500 dark:bg-primary-600 text-white hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors flex items-center justify-center gap-2"
-        >
-          <Plus size={18} />
-          Создать бюджет
-        </button>
+      <div className="mb-6 flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          Бюджеты
+        </h1>
+        <ProtectedAction entity="budgets" action="create">
+          <Button onClick={handleCreate}>Создать бюджет</Button>
+        </ProtectedAction>
       </div>
 
       {/* Фильтр */}

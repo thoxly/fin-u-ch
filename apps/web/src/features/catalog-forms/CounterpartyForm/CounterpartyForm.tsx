@@ -25,9 +25,7 @@ export const CounterpartyForm = ({
 }: CounterpartyFormProps) => {
   const [name, setName] = useState(counterparty?.name || initialName);
   const [inn, setInn] = useState(counterparty?.inn || initialInn);
-  const [category, setCategory] = useState<
-    'supplier' | 'customer' | 'gov' | 'employee' | 'other'
-  >(counterparty?.category || 'other');
+  const [category, setCategory] = useState(counterparty?.category || 'other');
   const [create, { isLoading: isCreating }] = useCreateCounterpartyMutation();
   const [update, { isLoading: isUpdating }] = useUpdateCounterpartyMutation();
 
@@ -73,11 +71,7 @@ export const CounterpartyForm = ({
       <Select
         label="Категория"
         value={category}
-        onChange={(value) =>
-          setCategory(
-            value as 'supplier' | 'customer' | 'gov' | 'employee' | 'other'
-          )
-        }
+        onChange={(value) => setCategory(value)}
         options={[
           { value: 'supplier', label: 'Поставщик' },
           { value: 'customer', label: 'Клиент' },

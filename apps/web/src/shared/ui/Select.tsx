@@ -13,7 +13,6 @@ import {
   ChevronUpDownIcon,
   CheckIcon,
   PlusIcon,
-  MagnifyingGlassIcon,
 } from '@heroicons/react/20/solid';
 import { classNames } from '../lib/utils';
 
@@ -26,11 +25,10 @@ interface SelectProps
   extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
   label?: string;
   error?: string;
-  options: SelectOption[];
+  options?: SelectOption[];
   placeholder?: string;
   fullWidth?: boolean;
   onChange?: (value: string) => void;
-  onCreateNew?: () => void; // Callback для создания нового элемента
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
@@ -46,13 +44,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       onChange,
       disabled,
       required,
-      onCreateNew,
-      ...props
+      ..._props
     },
-    ref
+    _ref
   ) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
     const [position, setPosition] = useState({
       top: 0,
       left: 0,
@@ -61,34 +57,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       maxHeight: 300,
     });
     const buttonRef = useRef<HTMLButtonElement>(null);
-    const searchInputRef = useRef<HTMLInputElement>(null);
-    const selectedOption = options.find((opt) => opt.value === value) || null;
+    const selectedOption = options?.find((opt) => opt.value === value) || null;
     const displayValue = selectedOption
       ? selectedOption.label
       : placeholder || '';
 
-    // Фильтруем опции без __create__
-    const regularOptions = options.filter(
-      (opt) => String(opt.value) !== '__create__'
-    );
-    const filteredOptions = searchQuery
-      ? regularOptions.filter((opt) =>
-          opt.label.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      : regularOptions;
-
     const handleChange = (option: SelectOption | null) => {
       if (onChange && option) {
         onChange(String(option.value));
-      }
-      setSearchQuery(''); // Сбрасываем поиск после выбора
-    };
-
-    const handleCreateNew = () => {
-      if (onCreateNew) {
-        onCreateNew();
-        setIsOpen(false);
-        setSearchQuery('');
       }
     };
 
@@ -337,16 +313,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       return () => observer.disconnect();
     }, [isOpen, updatePosition]);
 
-    // Фокусируемся на поле поиска при открытии
-    useEffect(() => {
-      if (isOpen && searchInputRef.current) {
-        // Небольшая задержка для корректного отображения
-        setTimeout(() => {
-          searchInputRef.current?.focus();
-        }, 100);
-      }
-    }, [isOpen]);
-
     const optionsContent = (
       <Transition
         as={Fragment}
@@ -358,7 +324,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <Listbox.Options
           static
           className={classNames(
-            'fixed z-[10000] rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-xl focus:outline-none',
+            'fixed z-[10000] overflow-auto rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-lg focus:outline-none',
             position.openUpward ? 'mb-1' : 'mt-1'
           )}
           style={{
@@ -368,61 +334,33 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             minWidth: '280px',
             maxWidth: '320px',
             maxHeight: `${position.maxHeight}px`,
-            display: 'flex',
-            flexDirection: 'column',
           }}
         >
-          {/* Строка поиска с кнопкой + */}
-          <div className="p-2 border-b border-gray-200 dark:border-zinc-700 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <MagnifyingGlassIcon className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск..."
-                  className="w-full pl-8 pr-2 py-1.5 text-sm bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 text-gray-900 dark:text-gray-100"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setSearchQuery('');
-                      setIsOpen(false);
-                    }
-                  }}
-                />
-              </div>
-              {onCreateNew && (
-                <button
-                  type="button"
-                  onClick={handleCreateNew}
-                  className="flex-shrink-0 p-1.5 bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 text-white rounded transition-colors"
-                  title="Добавить новый"
-                >
-                  <PlusIcon className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
+          {(options || []).map((option, index) => {
+            const isCreateOption = String(option.value) === '__create__';
+            const prevOption = index > 0 ? (options || [])[index - 1] : null;
+            const showDivider =
+              isCreateOption &&
+              prevOption &&
+              String(prevOption.value) !== '__create__';
 
-          {/* Список опций с прокруткой */}
-          <div className="overflow-auto flex-1">
-            {filteredOptions.length === 0 ? (
-              <div className="py-2 px-3 text-sm text-gray-500 dark:text-gray-400 text-center">
-                Ничего не найдено
-              </div>
-            ) : (
-              filteredOptions.map((option) => (
+            return (
+              <Fragment key={option.value}>
+                {showDivider && (
+                  <div className="border-t border-gray-200 dark:border-zinc-700 my-1" />
+                )}
                 <Listbox.Option
-                  key={option.value}
                   value={option}
                   className={({ active }) =>
                     classNames(
-                      'relative cursor-pointer select-none py-1.5 pl-3 pr-9 transition-colors duration-150',
-                      active
-                        ? 'bg-primary-100 dark:bg-zinc-800 text-primary-900 dark:text-white'
-                        : 'text-gray-900 dark:text-gray-100'
+                      'relative cursor-pointer select-none py-2 pl-3 pr-9',
+                      isCreateOption
+                        ? active
+                          ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
+                          : 'text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10'
+                        : active
+                          ? 'bg-primary-100 dark:bg-zinc-800 text-primary-900 dark:text-white'
+                          : 'text-gray-900 dark:text-gray-100'
                     )
                   }
                 >
@@ -430,13 +368,20 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     <>
                       <span
                         className={classNames(
-                          'block truncate text-sm',
-                          selected ? 'font-medium' : 'font-normal'
+                          'block truncate flex items-center gap-2',
+                          selected ? 'font-medium' : 'font-normal',
+                          isCreateOption && 'font-semibold'
                         )}
                       >
+                        {isCreateOption && (
+                          <PlusIcon
+                            className="w-4 h-4 flex-shrink-0"
+                            aria-hidden="true"
+                          />
+                        )}
                         {option.label}
                       </span>
-                      {selected ? (
+                      {selected && !isCreateOption ? (
                         <span
                           className={classNames(
                             'absolute inset-y-0 right-0 flex items-center pr-3',
@@ -451,9 +396,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     </>
                   )}
                 </Listbox.Option>
-              ))
-            )}
-          </div>
+              </Fragment>
+            );
+          })}
         </Listbox.Options>
       </Transition>
     );
@@ -499,7 +444,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             {/* Скрытый стандартный список для управления состоянием Headless UI */}
             <div className="sr-only" aria-hidden="true">
               <Listbox.Options>
-                {filteredOptions.map((option) => (
+                {(options || []).map((option) => (
                   <Listbox.Option key={option.value} value={option}>
                     {option.label}
                   </Listbox.Option>

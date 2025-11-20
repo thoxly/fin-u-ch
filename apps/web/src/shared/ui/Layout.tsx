@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGetMeQuery } from '../../store/api/authApi';
 import * as Icons from 'lucide-react';
@@ -9,6 +9,7 @@ import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
+import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
 
 interface LayoutProps {
@@ -21,36 +22,193 @@ interface NavigationItem {
   children?: NavigationItem[];
   disabled?: boolean;
   tooltip?: string;
+  // Права доступа для фильтрации
+  entity?: string;
+  action?: string;
 }
 
-const navigation: NavigationItem[] = [
-  { name: 'Дашборд', href: '/dashboard' },
-  { name: 'Операции', href: '/operations' },
-  { name: 'Бюджеты', href: '/budgets' },
-  {
-    name: 'Отчеты',
-    children: [
-      { name: 'ДДС', href: '/reports?type=cashflow' },
-      { name: '🔒ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
-    ],
-  },
-  {
-    name: 'Справочники',
-    children: [
-      { name: 'Статьи', href: '/catalogs/articles' },
-      { name: 'Счета', href: '/catalogs/accounts' },
-      { name: 'Подразделения', href: '/catalogs/departments' },
-      { name: 'Контрагенты', href: '/catalogs/counterparties' },
-      { name: 'Сделки', href: '/catalogs/deals' },
-      { name: 'Зарплаты', href: '/catalogs/salaries' },
-    ],
-  },
-];
+// Маппинг названий пунктов меню к сущностям для проверки прав
+const getEntityForMenuItem = (
+  name: string
+): { entity: string; action: string } | null => {
+  const mapping: Record<string, { entity: string; action: string }> = {
+    Дашборд: { entity: 'reports', action: 'read' },
+    Операции: { entity: 'operations', action: 'read' },
+    Бюджеты: { entity: 'budgets', action: 'read' },
+    Отчеты: { entity: 'reports', action: 'read' },
+    ДДС: { entity: 'reports', action: 'read' },
+    Справочники: { entity: 'articles', action: 'read' }, // Проверяем хотя бы один справочник
+    Статьи: { entity: 'articles', action: 'read' },
+    Счета: { entity: 'accounts', action: 'read' },
+    Подразделения: { entity: 'departments', action: 'read' },
+    Контрагенты: { entity: 'counterparties', action: 'read' },
+    Сделки: { entity: 'deals', action: 'read' },
+    Зарплаты: { entity: 'salaries', action: 'read' },
+    Администрирование: { entity: 'users', action: 'read' },
+  };
+
+  return mapping[name] || null;
+};
+
+const getBaseNavigation = (): NavigationItem[] => {
+  return [
+    { name: 'Дашборд', href: '/dashboard', entity: 'reports', action: 'read' },
+    {
+      name: 'Операции',
+      href: '/operations',
+      entity: 'operations',
+      action: 'read',
+    },
+    { name: 'Бюджеты', href: '/budgets', entity: 'budgets', action: 'read' },
+    {
+      name: 'Отчеты',
+      entity: 'reports',
+      action: 'read',
+      children: [
+        {
+          name: 'ДДС',
+          href: '/reports?type=cashflow',
+          entity: 'reports',
+          action: 'read',
+        },
+        { name: '🔒ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
+      ],
+    },
+    {
+      name: 'Справочники',
+      entity: 'articles', // Проверяем хотя бы один справочник
+      action: 'read',
+      children: [
+        {
+          name: 'Статьи',
+          href: '/catalogs/articles',
+          entity: 'articles',
+          action: 'read',
+        },
+        {
+          name: 'Счета',
+          href: '/catalogs/accounts',
+          entity: 'accounts',
+          action: 'read',
+        },
+        {
+          name: 'Подразделения',
+          href: '/catalogs/departments',
+          entity: 'departments',
+          action: 'read',
+        },
+        {
+          name: 'Контрагенты',
+          href: '/catalogs/counterparties',
+          entity: 'counterparties',
+          action: 'read',
+        },
+        {
+          name: 'Сделки',
+          href: '/catalogs/deals',
+          entity: 'deals',
+          action: 'read',
+        },
+        {
+          name: 'Зарплаты',
+          href: '/catalogs/salaries',
+          entity: 'salaries',
+          action: 'read',
+        },
+      ],
+    },
+  ];
+};
 
 export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
   const { getIcon, updateIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
+  const {
+    hasPermission,
+    isLoading: permissionsLoading,
+    permissions: permissionsMap,
+  } = usePermissions();
+
+  // Получаем базовую навигацию
+  const baseNavigation = useMemo(() => {
+    const nav = getBaseNavigation();
+
+    // Добавляем раздел "Администрирование" только для супер-пользователя
+    if (user?.isSuperAdmin) {
+      nav.push({
+        name: 'Администрирование',
+        href: '/admin',
+        entity: 'users',
+        action: 'read',
+      });
+    }
+
+    return nav;
+  }, [user?.isSuperAdmin]);
+
+  // Фильтруем навигацию по правам
+  const navigation = useMemo(() => {
+    if (permissionsLoading) {
+      return [];
+    }
+
+    // Создаём локальную функцию проверки прав на основе permissionsMap
+    const checkPermission = (entity: string, action: string): boolean => {
+      if (user?.isSuperAdmin) {
+        return true;
+      }
+      const entityPermissions = permissionsMap[entity];
+      if (!entityPermissions) {
+        return false;
+      }
+      return entityPermissions.includes(action);
+    };
+
+    return baseNavigation
+      .map((item) => {
+        // Если у элемента есть дочерние элементы, фильтруем их
+        if (item.children) {
+          const filteredChildren = item.children.filter((child) => {
+            if (child.disabled) return true;
+            const entityInfo = getEntityForMenuItem(child.name);
+            if (!entityInfo) return true;
+            return checkPermission(entityInfo.entity, entityInfo.action);
+          });
+
+          if (filteredChildren.length > 0 || item.name === 'Справочники') {
+            if (item.name === 'Справочники') {
+              const hasAnyCatalogAccess =
+                checkPermission('articles', 'read') ||
+                checkPermission('accounts', 'read') ||
+                checkPermission('departments', 'read') ||
+                checkPermission('counterparties', 'read') ||
+                checkPermission('deals', 'read') ||
+                checkPermission('salaries', 'read');
+
+              if (!hasAnyCatalogAccess) {
+                return null;
+              }
+            }
+
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+          return null;
+        }
+
+        if (item.disabled) return item;
+        const entityInfo = getEntityForMenuItem(item.name);
+        if (!entityInfo) return item;
+        if (checkPermission(entityInfo.entity, entityInfo.action)) {
+          return item;
+        }
+        return null;
+      })
+      .filter((item): item is NavigationItem => item !== null);
+  }, [baseNavigation, permissionsLoading, permissionsMap, user?.isSuperAdmin]);
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
@@ -126,6 +284,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   };
 
   const handleCreateCatalog = (catalogName: string): void => {
+    // Проверяем права на создание перед открытием формы
+    const entityInfo = getEntityForMenuItem(catalogName);
+    if (entityInfo && !hasPermission(entityInfo.entity, 'create')) {
+      // Если нет прав, не открываем форму
+      return;
+    }
+
     setOffCanvasState({
       isOpen: true,
       title: getCatalogCreateTitle(catalogName),
@@ -147,19 +312,35 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     // Determine if this is a catalog menu (Справочники)
     const isCatalogMenu = parentName === 'Справочники';
 
-    const menuItems: MenuPopoverItem[] = children.map((child) => ({
-      name: child.name,
-      href: child.href || '/',
-      icon: getIcon(child.name),
-      createAction: isCatalogMenu
-        ? {
-            label: getCatalogCreateTitle(child.name),
-            onClick: () => handleCreateCatalog(child.name),
-          }
-        : undefined,
-      disabled: child.disabled,
-      tooltip: child.tooltip,
-    }));
+    const menuItems: MenuPopoverItem[] = children
+      .filter((child) => {
+        // Фильтруем элементы по правам
+        if (child.disabled) return true; // Оставляем disabled элементы
+        const entityInfo = getEntityForMenuItem(child.name);
+        if (!entityInfo) return true; // Если нет маппинга, показываем
+        return hasPermission(entityInfo.entity, entityInfo.action);
+      })
+      .map((child) => {
+        const entityInfo = getEntityForMenuItem(child.name);
+        const hasCreatePermission = entityInfo
+          ? hasPermission(entityInfo.entity, 'create')
+          : false;
+
+        return {
+          name: child.name,
+          href: child.href || '/',
+          icon: getIcon(child.name),
+          createAction:
+            isCatalogMenu && hasCreatePermission
+              ? {
+                  label: getCatalogCreateTitle(child.name),
+                  onClick: () => handleCreateCatalog(child.name),
+                }
+              : undefined,
+          disabled: child.disabled,
+          tooltip: child.tooltip,
+        };
+      });
 
     setMenuPopoverState({
       isOpen: true,
