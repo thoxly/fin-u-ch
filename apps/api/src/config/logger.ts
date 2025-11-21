@@ -1,13 +1,10 @@
 import winston from 'winston';
 import { env } from './env';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
-// Determine project root
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../..');
+// Determine project root - use process.cwd() which works in both ESM and CommonJS
+// This will point to the workspace root when running from apps/api
+const projectRoot = path.resolve(process.cwd(), '../..');
 
 const logger = winston.createLogger({
   level: env.NODE_ENV === 'production' ? 'info' : 'debug',

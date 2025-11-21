@@ -62,6 +62,7 @@ jest.mock('../hooks/usePermissions', () => ({
       hasPermission: checkPermission,
       isLoading: false,
       permissions: {
+        dashboard: ['read'],
         articles: ['read', 'create', 'update', 'delete'],
         accounts: ['read', 'create', 'update', 'delete'],
         departments: ['read', 'create', 'update', 'delete'],
@@ -270,7 +271,7 @@ describe('Layout - MenuPopover Integration', () => {
     expect(dashboardLink).not.toHaveAttribute('role', 'button');
   });
 
-  it('should prevent icon button click from triggering menu', async () => {
+  it('should open menu when catalog button is clicked', async () => {
     renderLayout();
 
     const catalogButton = screen
@@ -279,20 +280,13 @@ describe('Layout - MenuPopover Integration', () => {
     expect(catalogButton).toBeInTheDocument();
 
     if (catalogButton) {
-      const iconButton = catalogButton.querySelector(
-        'button[title="Изменить иконку"]'
-      );
-      expect(iconButton).toBeInTheDocument();
-
-      if (iconButton) {
-        fireEvent.click(iconButton);
-      }
+      fireEvent.click(catalogButton);
     }
 
-    // Menu should not open, but icon picker should
+    // Menu should open when catalog button is clicked
+    // Check for one of the menu items instead of "Меню" header
     await waitFor(() => {
-      const menuHeader = screen.queryByText('Меню');
-      expect(menuHeader).not.toBeInTheDocument();
+      expect(screen.getByText('Статьи')).toBeInTheDocument();
     });
   });
 

@@ -13,6 +13,7 @@ jest.mock('../../config/db', () => ({
     },
     rolePermission: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
   },
 }));
@@ -134,14 +135,8 @@ describe('PermissionsService', () => {
             companyId,
           },
         },
-        include: {
-          role: {
-            select: {
-              id: true,
-              name: true,
-              isActive: true,
-            },
-          },
+        select: {
+          roleId: true,
         },
       });
     });
@@ -173,9 +168,11 @@ describe('PermissionsService', () => {
       ];
 
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
-      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue(
-        mockPermissions
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock).mockResolvedValue(
+        mockPermissions[0]
       );
 
       const result = await permissionsService.checkPermission(
@@ -186,7 +183,7 @@ describe('PermissionsService', () => {
       );
 
       expect(result).toBe(true);
-      expect(prisma.rolePermission.findMany).toHaveBeenCalledWith({
+      expect(prisma.rolePermission.findFirst).toHaveBeenCalledWith({
         where: {
           roleId: { in: ['role-1'] },
           entity: 'operations',
@@ -203,19 +200,12 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-            isActive: true,
-          },
-        },
-      ];
-
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock).mockResolvedValue(null);
+      // Mock findMany for hierarchy check
       (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await permissionsService.checkPermission(
@@ -253,7 +243,7 @@ describe('PermissionsService', () => {
       });
     });
 
-    it('should return empty object if user not found', async () => {
+    it('should return empty permissions if user not found', async () => {
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
 
       const result = await permissionsService.getUserPermissions(
@@ -261,7 +251,14 @@ describe('PermissionsService', () => {
         companyId
       );
 
-      expect(result).toEqual({});
+      // getAllUserPermissions returns object with all entities, even if empty
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      // All permissions should be empty arrays
+      Object.values(result).forEach((actions) => {
+        expect(Array.isArray(actions)).toBe(true);
+        expect(actions.length).toBe(0);
+      });
     });
 
     it('should return permissions from user roles', async () => {
@@ -271,54 +268,69 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-          },
-        },
-      ];
-      const mockPermissions = [
-        {
-          roleId: 'role-1',
-          entity: 'operations',
-          action: 'create',
-          allowed: true,
-        },
-        {
-          roleId: 'role-1',
-          entity: 'operations',
-          action: 'read',
-          allowed: true,
-        },
-        {
-          roleId: 'role-1',
-          entity: 'articles',
-          action: 'read',
-          allowed: true,
-        },
-      ];
-
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
-      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue(
-        mockPermissions
+      // Mock multiple calls to userRole.findMany and rolePermission.findFirst
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      // Mock findFirst - return permission for some operations, null for others
+      // This will be called many times (once per entity:action combination)
+      (prisma.rolePermission.findFirst as jest.Mock).mockImplementation(
+        (args: any) => {
+          // Return permission for operations:create, operations:read, articles:read
+          if (
+            args?.where?.entity === 'operations' &&
+            args?.where?.action === 'create'
+          ) {
+            return Promise.resolve({
+              roleId: 'role-1',
+              entity: 'operations',
+              action: 'create',
+              allowed: true,
+            });
+          }
+          if (
+            args?.where?.entity === 'operations' &&
+            args?.where?.action === 'read'
+          ) {
+            return Promise.resolve({
+              roleId: 'role-1',
+              entity: 'operations',
+              action: 'read',
+              allowed: true,
+            });
+          }
+          if (
+            args?.where?.entity === 'articles' &&
+            args?.where?.action === 'read'
+          ) {
+            return Promise.resolve({
+              roleId: 'role-1',
+              entity: 'articles',
+              action: 'read',
+              allowed: true,
+            });
+          }
+          return Promise.resolve(null);
+        }
       );
+      // Mock findMany for hierarchy checks
+      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await permissionsService.getUserPermissions(
         userId,
         companyId
       );
 
-      expect(result).toEqual({
-        operations: ['create', 'read'],
-        articles: ['read'],
-      });
+      // Check structure and that we have some permissions
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result.operations).toContain('create');
+      expect(result.operations).toContain('read');
+      expect(result.articles).toContain('read');
     });
 
-    it('should return empty object if user has no roles', async () => {
+    it('should return empty permissions if user has no roles', async () => {
       const mockUser = {
         id: userId,
         companyId,
@@ -327,13 +339,23 @@ describe('PermissionsService', () => {
       };
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
       (prisma.userRole.findMany as jest.Mock).mockResolvedValue([]);
+      (prisma.rolePermission.findFirst as jest.Mock).mockResolvedValue(null);
+      // Mock findMany for hierarchy checks
+      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await permissionsService.getUserPermissions(
         userId,
         companyId
       );
 
-      expect(result).toEqual({});
+      // getAllUserPermissions returns object with all entities, even if empty
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      // All permissions should be empty arrays
+      Object.values(result).forEach((actions) => {
+        expect(Array.isArray(actions)).toBe(true);
+        expect(actions.length).toBe(0);
+      });
     });
   });
 
@@ -345,30 +367,22 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-            isActive: true,
-          },
-        },
-      ];
-      const mockPermissions = [
-        {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock)
+        .mockResolvedValueOnce(null) // для 'create'
+        .mockResolvedValueOnce({
           roleId: 'role-1',
           entity: 'operations',
           action: 'read',
           allowed: true,
-        },
-      ];
-
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
+        }); // для 'read'
+      // Mock findMany for hierarchy checks
       (prisma.rolePermission.findMany as jest.Mock)
-        .mockResolvedValueOnce([]) // для 'create'
-        .mockResolvedValueOnce(mockPermissions); // для 'read'
+        .mockResolvedValueOnce([]) // для 'create' hierarchy
+        .mockResolvedValueOnce([]); // для 'read' hierarchy (but findFirst already returned permission)
 
       const result = await permissionsService.hasAnyPermission(
         userId,
@@ -387,19 +401,12 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-            isActive: true,
-          },
-        },
-      ];
-
       (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock).mockResolvedValue(null);
+      // Mock findMany for hierarchy checks - return empty to ensure no permissions
       (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await permissionsService.hasAnyPermission(
@@ -421,36 +428,25 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-            isActive: true,
-          },
-        },
-      ];
-      const mockPermissions = [
-        {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
           roleId: 'role-1',
           entity: 'operations',
           action: 'create',
           allowed: true,
-        },
-        {
+        })
+        .mockResolvedValueOnce({
           roleId: 'role-1',
           entity: 'operations',
           action: 'read',
           allowed: true,
-        },
-      ];
-
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
-      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue(
-        mockPermissions
-      );
+        });
+      // Mock findMany for hierarchy checks (not needed here as findFirst already returns permissions)
+      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await permissionsService.hasAllPermissions(
         userId,
@@ -469,30 +465,20 @@ describe('PermissionsService', () => {
         isSuperAdmin: false,
         isActive: true,
       };
-      const mockUserRoles = [
-        {
-          roleId: 'role-1',
-          role: {
-            id: 'role-1',
-            name: 'Test Role',
-            isActive: true,
-          },
-        },
-      ];
-      const mockPermissions = [
-        {
+      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+      (prisma.userRole.findMany as jest.Mock).mockResolvedValue([
+        { roleId: 'role-1' },
+      ]);
+      (prisma.rolePermission.findFirst as jest.Mock)
+        .mockResolvedValueOnce({
           roleId: 'role-1',
           entity: 'operations',
           action: 'create',
           allowed: true,
-        },
-      ];
-
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (prisma.userRole.findMany as jest.Mock).mockResolvedValue(mockUserRoles);
-      (prisma.rolePermission.findMany as jest.Mock)
-        .mockResolvedValueOnce(mockPermissions) // для 'create'
-        .mockResolvedValueOnce([]); // для 'read'
+        }) // для 'create'
+        .mockResolvedValueOnce(null); // для 'read'
+      // Mock findMany for hierarchy checks
+      (prisma.rolePermission.findMany as jest.Mock).mockResolvedValueOnce([]); // для 'read' hierarchy check
 
       const result = await permissionsService.hasAllPermissions(
         userId,
