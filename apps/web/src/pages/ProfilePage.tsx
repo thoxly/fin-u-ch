@@ -11,6 +11,7 @@ import {
 } from '../store/api/authApi';
 import { EmailChangeSection } from '../features/user-profile/EmailChangeSection';
 import { PasswordChangeSection } from '../features/user-profile/PasswordChangeSection';
+import { PersonalSettingsSection } from '../features/user-profile/PersonalSettingsSection';
 import { useNotification } from '../shared/hooks/useNotification';
 import { Input } from '../shared/ui/Input';
 import { Save } from 'lucide-react';
@@ -207,13 +208,7 @@ export const ProfilePage = () => {
                 <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
                   Личные настройки
                 </h2>
-                <div className="text-gray-600 dark:text-gray-400">
-                  <p>
-                    Здесь будут настройки уведомлений, темы оформления и другие
-                    личные предпочтения.
-                  </p>
-                  <p className="mt-2 text-sm italic">Раздел в разработке</p>
-                </div>
+                <PersonalSettingsSection />
               </div>
             </div>
           )}

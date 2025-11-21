@@ -22,15 +22,13 @@ import { AdminPage } from './pages/AdminPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
-import { useDarkMode } from './shared/hooks/useDarkMode';
 import { NotificationContainer } from './components/Notification';
+import { ThemeProvider } from './components/ThemeProvider';
 
 function App() {
-  // Автоматическое определение системной темы
-  useDarkMode();
-
   return (
     <>
+      <ThemeProvider />
       <NotificationContainer />
       <Routes>
         {/* Public routes */}

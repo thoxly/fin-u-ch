@@ -52,7 +52,7 @@ export class AuthService {
       });
 
       if (existingUser) {
-        throw new AppError('User with this email already exists', 409);
+        throw new AppError('Пользователь с таким email уже существует', 409);
       }
 
       // Create company and user in a transaction

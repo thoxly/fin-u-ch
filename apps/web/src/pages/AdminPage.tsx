@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import { Users, Shield, FileText, Building2 } from 'lucide-react';
+import { Users, Shield, FileText } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
 import { AuditLogsTab } from './admin/AuditLogsTab';
-import { CompanySettingsTab } from './admin/CompanySettingsTab';
 
-type TabType = 'users' | 'roles' | 'audit' | 'company';
+type TabType = 'users' | 'roles' | 'audit';
 
 interface AdminTab {
   id: TabType;
@@ -35,12 +34,6 @@ const adminTabs: AdminTab[] = [
     label: 'Журнал действий',
     icon: FileText,
     requiredPermission: { entity: 'audit', action: 'read' },
-  },
-  {
-    id: 'company',
-    label: 'Настройки компании',
-    icon: Building2,
-    requiredPermission: { entity: 'users', action: 'read' },
   },
 ];
 
@@ -129,7 +122,6 @@ export const AdminPage = () => {
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'roles' && <RolesTab />}
           {activeTab === 'audit' && <AuditLogsTab />}
-          {activeTab === 'company' && <CompanySettingsTab />}
         </div>
       </div>
     </Layout>

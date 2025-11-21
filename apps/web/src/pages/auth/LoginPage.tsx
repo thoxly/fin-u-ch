@@ -29,10 +29,28 @@ export const LoginPage = () => {
       // Редирект будет выполнен компонентом RedirectToFirstAvailable
       // после загрузки прав пользователя
       navigate('/redirect', { replace: true });
-    } catch (err) {
-      const errorMessage = 'Неверный email или пароль';
+    } catch (err: unknown) {
+      // Извлекаем конкретное сообщение ошибки от API
+      let errorMessage = 'Неверный email или пароль';
+
+      if (err && typeof err === 'object' && 'data' in err) {
+        const errorData = err as { data?: { message?: string } };
+        if (errorData.data?.message) {
+          // Используем сообщение от сервера
+          const serverMessage = errorData.data.message;
+          if (serverMessage === 'User account is inactive') {
+            errorMessage =
+              'Ваш аккаунт деактивирован. Обратитесь к администратору.';
+          } else if (serverMessage === 'Invalid email or password') {
+            errorMessage = 'Неверный email или пароль';
+          } else {
+            errorMessage = serverMessage;
+          }
+        }
+      }
+
+      // Показываем ошибку только один раз - в UI форме
       setError(errorMessage);
-      showError(NOTIFICATION_MESSAGES.AUTH.LOGIN_ERROR);
     }
   };
 

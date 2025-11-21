@@ -28,12 +28,14 @@ interface MappingRuleDialogProps {
   rule?: MappingRule | null;
   onClose: () => void;
   sessionId?: string; // Для предпросмотра совпадений
+  readOnly?: boolean; // Режим просмотра без возможности редактирования
 }
 
 export const MappingRuleDialog = ({
   rule,
   onClose,
   sessionId,
+  readOnly = false,
 }: MappingRuleDialogProps) => {
   const [ruleType, setRuleType] = useState<
     'contains' | 'equals' | 'regex' | 'alias'
@@ -306,6 +308,7 @@ export const MappingRuleDialog = ({
                 { value: 'inn', label: 'ИНН' },
               ]}
               fullWidth
+              disabled={readOnly}
             />
           </div>
 
@@ -327,6 +330,7 @@ export const MappingRuleDialog = ({
                 { value: 'alias', label: 'Псевдоним' },
               ]}
               fullWidth
+              disabled={readOnly}
             />
           </div>
 
@@ -345,6 +349,7 @@ export const MappingRuleDialog = ({
               className={
                 !patternError ? '!bg-gray-50 dark:!bg-gray-700/50' : ''
               }
+              disabled={readOnly}
             />
             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
               Можно вводить часть слова или использовать регулярные выражения
@@ -392,6 +397,7 @@ export const MappingRuleDialog = ({
                 { value: 'operationType', label: 'Тип операции' },
               ]}
               fullWidth
+              disabled={readOnly}
             />
             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
               Какое поле будет заполнено автоматически при совпадении
@@ -408,6 +414,7 @@ export const MappingRuleDialog = ({
                 onChange={handleTargetIdChange}
                 options={getTargetOptions()}
                 fullWidth
+                disabled={readOnly}
               />
             </div>
           )}
@@ -416,26 +423,34 @@ export const MappingRuleDialog = ({
 
       {/* Кнопки действий */}
       <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-        <Button type="button" onClick={onClose} className="btn-secondary">
-          Отмена
-        </Button>
-        <Button
-          type="submit"
-          disabled={isCreating || isUpdating || !!patternError}
-          className="btn-primary flex items-center gap-2"
-        >
-          {rule ? (
-            <>
-              <CheckIcon className="w-4 h-4" />
-              Сохранить
-            </>
-          ) : (
-            <>
-              <Cog6ToothIcon className="w-4 h-4" />
-              Создать правило
-            </>
-          )}
-        </Button>
+        {readOnly ? (
+          <Button type="button" onClick={onClose} className="btn-primary">
+            Закрыть
+          </Button>
+        ) : (
+          <>
+            <Button type="button" onClick={onClose} className="btn-secondary">
+              Отмена
+            </Button>
+            <Button
+              type="submit"
+              disabled={isCreating || isUpdating || !!patternError}
+              className="btn-primary flex items-center gap-2"
+            >
+              {rule ? (
+                <>
+                  <CheckIcon className="w-4 h-4" />
+                  Сохранить
+                </>
+              ) : (
+                <>
+                  <Cog6ToothIcon className="w-4 h-4" />
+                  Создать правило
+                </>
+              )}
+            </Button>
+          </>
+        )}
       </div>
 
       {/* OffCanvas для создания элементов */}

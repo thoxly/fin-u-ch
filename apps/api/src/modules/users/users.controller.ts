@@ -394,6 +394,35 @@ export class UsersController {
       next(error);
     }
   }
+
+  async getPreferences(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const result = await usersService.getPreferences(
+        req.userId!,
+        req.companyId!
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updatePreferences(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const result = await usersService.updatePreferences(
+        req.userId!,
+        req.companyId!,
+        req.body
+      );
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new UsersController();

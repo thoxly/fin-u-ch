@@ -96,19 +96,30 @@ export const usersApi = apiSlice.injectEndpoints({
       invalidatesTags: ['User'],
     }),
 
-    // Обновить пользователя
-    updateUser: builder.mutation<
+    // Обновить пользователя (для админки)
+    updateUserById: builder.mutation<
       User,
       {
         userId: string;
         data: { firstName?: string; lastName?: string; isActive?: boolean };
       }
     >({
-      query: ({ userId, data }) => ({
-        url: `/users/${userId}`,
-        method: 'PATCH',
-        body: data,
-      }),
+      query: ({ userId, data }) => {
+        console.log('[usersApi.updateUserById] Called with:', { userId, data });
+        if (!userId || userId === 'me') {
+          console.error('[usersApi.updateUserById] Invalid userId:', userId);
+          throw new Error(
+            'Invalid userId: cannot use "me" for admin user update'
+          );
+        }
+        const url = `/users/${userId}`;
+        console.log('[usersApi.updateUserById] Making request to:', url);
+        return {
+          url,
+          method: 'PATCH',
+          body: data,
+        };
+      },
       invalidatesTags: (result, error, { userId }) => [
         { type: 'User', id: userId },
         'User',
@@ -158,6 +169,9 @@ export const {
   useGetUserPermissionsQuery,
   useLazyGetUserPermissionsQuery,
   useInviteUserMutation,
-  useUpdateUserMutation,
+  useUpdateUserByIdMutation,
   useDeleteUserMutation,
 } = usersApi;
+
+// Для обратной совместимости - используем прямое имя, чтобы избежать конфликта с authApi
+export { useUpdateUserByIdMutation as useUpdateUserMutation };

@@ -3,7 +3,6 @@ import {
   Building2,
   DollarSign,
   CreditCard,
-  FileText,
   Link as LinkIcon,
   Save,
 } from 'lucide-react';
@@ -19,7 +18,7 @@ import {
 import { useNotification } from '../shared/hooks/useNotification';
 import { CurrencySelect } from '../shared/ui/CurrencySelect';
 
-type TabType = 'general' | 'currency' | 'billing' | 'details' | 'integrations';
+type TabType = 'general' | 'currency' | 'billing' | 'integrations';
 
 export const CompanyPage = () => {
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -62,7 +61,6 @@ export const CompanyPage = () => {
     { id: 'general' as TabType, label: 'Основные настройки', icon: Building2 },
     { id: 'currency' as TabType, label: 'Валюта', icon: DollarSign },
     { id: 'billing' as TabType, label: 'Тариф и биллинг', icon: CreditCard },
-    { id: 'details' as TabType, label: 'Реквизиты', icon: FileText },
     { id: 'integrations' as TabType, label: 'Интеграции', icon: LinkIcon },
   ];
 
@@ -223,23 +221,6 @@ export const CompanyPage = () => {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'details' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-                  Реквизиты компании
-                </h2>
-                <div className="text-gray-600 dark:text-gray-400">
-                  <p>
-                    Полные банковские реквизиты, юридический адрес и другая
-                    официальная информация.
-                  </p>
-                  <p className="mt-2 text-sm italic">Раздел в разработке</p>
                 </div>
               </div>
             </div>

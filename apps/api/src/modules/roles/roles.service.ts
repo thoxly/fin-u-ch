@@ -35,42 +35,51 @@ export class RolesService {
       }
     );
 
-    const db: any = tx || prisma;
-    const roles = await db.role.findMany({
-      where: {
+    try {
+      const db: any = tx || prisma;
+      const roles = await db.role.findMany({
+        where: {
+          companyId,
+          isActive: true,
+          deletedAt: null,
+        },
+        include: {
+          _count: {
+            select: {
+              userRoles: true,
+            },
+          },
+          permissions: {
+            select: {
+              entity: true,
+              action: true,
+              allowed: true,
+            },
+          },
+        },
+        orderBy: [{ category: 'asc' }, { name: 'asc' }],
+      });
+
+      console.log('[RolesService.getAllRoles] Получено ролей', {
         companyId,
-        isActive: true,
-        deletedAt: null,
-      },
-      include: {
-        _count: {
-          select: {
-            userRoles: true,
-          },
-        },
-        permissions: {
-          select: {
-            entity: true,
-            action: true,
-            allowed: true,
-          },
-        },
-      },
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-    });
+        count: roles.length,
+        roles: roles.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          category: r.category,
+          usersCount: r._count?.userRoles || 0,
+        })),
+      });
 
-    console.log('[RolesService.getAllRoles] Получено ролей', {
-      companyId,
-      count: roles.length,
-      roles: roles.map((r: any) => ({
-        id: r.id,
-        name: r.name,
-        category: r.category,
-        usersCount: r._count.userRoles,
-      })),
-    });
-
-    return roles;
+      return roles;
+    } catch (error) {
+      console.error('[RolesService.getAllRoles] Ошибка при получении ролей', {
+        companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   /**

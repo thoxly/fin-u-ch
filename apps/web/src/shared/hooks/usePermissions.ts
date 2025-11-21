@@ -27,8 +27,9 @@ export const usePermissions = () => {
   const permissionsMap = useMemo<PermissionsByEntity>(() => {
     if (isSuperAdmin) {
       // Для супер-админа возвращаем все возможные права
+      // Синхронизировано с ENTITIES_CONFIG на бэкенде
       const allEntities = [
-        'dashboard',
+        'dashboard', // Добавлено: сущность дашборда
         'articles',
         'accounts',
         'departments',
@@ -46,8 +47,6 @@ export const usePermissions = () => {
         'read',
         'update',
         'delete',
-        'archive',
-        'restore',
         'confirm',
         'cancel',
         'export',
@@ -105,8 +104,6 @@ export const usePermissions = () => {
   const canRead = (entity: string) => hasPermission(entity, 'read');
   const canUpdate = (entity: string) => hasPermission(entity, 'update');
   const canDelete = (entity: string) => hasPermission(entity, 'delete');
-  const canArchive = (entity: string) => hasPermission(entity, 'archive');
-  const canRestore = (entity: string) => hasPermission(entity, 'restore');
   const canConfirm = (entity: string) => hasPermission(entity, 'confirm');
   const canCancel = (entity: string) => hasPermission(entity, 'cancel');
   const canExport = (entity: string) => hasPermission(entity, 'export');
@@ -120,8 +117,6 @@ export const usePermissions = () => {
     canRead,
     canUpdate,
     canDelete,
-    canArchive,
-    canRestore,
     canConfirm,
     canCancel,
     canExport,

@@ -7,7 +7,15 @@ import { Button } from '../../shared/ui/Button';
 import { useGetAuditLogsQuery } from '../../store/api/auditLogApi';
 import { formatDateTime } from '../../shared/lib/date';
 import { usePermissions } from '../../shared/hooks/usePermissions';
-import { FileText, User, Calendar, Filter, X } from 'lucide-react';
+import {
+  FileText,
+  User,
+  Calendar,
+  Filter,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import type { AuditLog } from '../../store/api/auditLogApi';
 
 const ENTITY_OPTIONS = [
@@ -48,6 +56,65 @@ const getEntityLabel = (entity: string): string => {
   return option?.label || entity;
 };
 
+const getActionBadgeClasses = (action: string): string => {
+  const baseClasses =
+    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+
+  const colorMap: Record<string, string> = {
+    create:
+      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    update: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    delete: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    archive:
+      'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    restore:
+      'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    confirm:
+      'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+    assign_role:
+      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    remove_role:
+      'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+    update_permissions:
+      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+  };
+
+  const colors =
+    colorMap[action] ||
+    'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+  return `${baseClasses} ${colors}`;
+};
+
+const getEntityBadgeClasses = (entity: string): string => {
+  const baseClasses =
+    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium';
+
+  const colorMap: Record<string, string> = {
+    operation:
+      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    budget:
+      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    plan: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    article:
+      'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    account:
+      'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    department:
+      'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300',
+    counterparty:
+      'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    deal: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    salary: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    role: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
+    user: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
+  };
+
+  const colors =
+    colorMap[entity] ||
+    'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+  return `${baseClasses} ${colors}`;
+};
+
 export const AuditLogsTab = () => {
   const { canRead } = usePermissions();
 
@@ -59,7 +126,7 @@ export const AuditLogsTab = () => {
   });
 
   const [page, setPage] = useState(0);
-  const limit = 50;
+  const [limit, setLimit] = useState(50);
 
   const { data, isLoading, error } = useGetAuditLogsQuery({
     entity: filters.entity || undefined,
@@ -73,6 +140,49 @@ export const AuditLogsTab = () => {
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(0); // Сбрасываем страницу при изменении фильтров
+  };
+
+  const handleLimitChange = (newLimit: string) => {
+    setLimit(Number(newLimit));
+    setPage(0); // Сбрасываем страницу при изменении лимита
+  };
+
+  const totalPages = data ? Math.ceil(data.total / limit) : 0;
+
+  const getPageNumbers = () => {
+    const currentPage = page + 1;
+    const pages: (number | string)[] = [];
+
+    if (totalPages <= 7) {
+      // Если страниц мало, показываем все
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Всегда показываем первую страницу
+      pages.push(1);
+
+      if (currentPage > 3) {
+        pages.push('...');
+      }
+
+      // Показываем страницы вокруг текущей
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (currentPage < totalPages - 2) {
+        pages.push('...');
+      }
+
+      // Всегда показываем последнюю страницу
+      pages.push(totalPages);
+    }
+
+    return pages;
   };
 
   const clearFilters = () => {
@@ -133,7 +243,7 @@ export const AuditLogsTab = () => {
       key: 'action',
       header: 'Действие',
       render: (log: AuditLog) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+        <span className={getActionBadgeClasses(log.action)}>
           {getActionLabel(log.action)}
         </span>
       ),
@@ -143,7 +253,7 @@ export const AuditLogsTab = () => {
       key: 'entity',
       header: 'Сущность',
       render: (log: AuditLog) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+        <span className={getEntityBadgeClasses(log.entity)}>
           {getEntityLabel(log.entity)}
         </span>
       ),
@@ -178,8 +288,6 @@ export const AuditLogsTab = () => {
     },
   ];
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
-
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Фильтры */}
@@ -196,14 +304,14 @@ export const AuditLogsTab = () => {
             <Select
               label="Сущность"
               value={filters.entity}
-              onChange={(e) => handleFilterChange('entity', e.target.value)}
+              onChange={(value) => handleFilterChange('entity', value)}
               options={ENTITY_OPTIONS}
             />
 
             <Select
               label="Действие"
               value={filters.action}
-              onChange={(e) => handleFilterChange('action', e.target.value)}
+              onChange={(value) => handleFilterChange('action', value)}
               options={ACTION_OPTIONS}
             />
 
@@ -250,13 +358,10 @@ export const AuditLogsTab = () => {
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <FileText className="w-4 h-4" />
                 <span>
-                  Всего записей: {data?.total || 0}
-                  {data && data.total > limit && (
-                    <span className="ml-2">
-                      (показано {page * limit + 1} -{' '}
-                      {Math.min((page + 1) * limit, data.total)})
-                    </span>
-                  )}
+                  Всего записей:{' '}
+                  <strong className="text-gray-900 dark:text-gray-100">
+                    {data?.total || 0}
+                  </strong>
                 </span>
               </div>
             </div>
@@ -270,31 +375,106 @@ export const AuditLogsTab = () => {
             />
 
             {/* Пагинация */}
-            {totalPages > 1 && (
-              <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  disabled={page === 0}
-                  className="w-full sm:w-auto"
-                >
-                  Назад
-                </Button>
-                <span className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                  Страница {page + 1} из {totalPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() =>
-                    setPage((p) => Math.min(totalPages - 1, p + 1))
-                  }
-                  disabled={page >= totalPages - 1}
-                  className="w-full sm:w-auto"
-                >
-                  Вперёд
-                </Button>
+            {totalPages > 0 && (
+              <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  {/* Выбор количества записей */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      Записей на странице:
+                    </span>
+                    <Select
+                      value={String(limit)}
+                      onChange={handleLimitChange}
+                      options={[
+                        { value: '25', label: '25' },
+                        { value: '50', label: '50' },
+                        { value: '100', label: '100' },
+                      ]}
+                      className="w-20"
+                    />
+                  </div>
+
+                  {/* Навигация по страницам */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(0, p - 1))}
+                        disabled={page === 0}
+                        className="flex items-center gap-1"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                        <span className="hidden sm:inline">Назад</span>
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {getPageNumbers().map((pageNum, index) => {
+                          if (pageNum === '...') {
+                            return (
+                              <span
+                                key={`ellipsis-${index}`}
+                                className="px-2 text-gray-500 dark:text-gray-400"
+                              >
+                                ...
+                              </span>
+                            );
+                          }
+
+                          const pageIndex = (pageNum as number) - 1;
+                          const isActive = pageIndex === page;
+
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setPage(pageIndex)}
+                              disabled={isActive}
+                              className={`
+                                min-w-[2.5rem] px-3 py-1.5 text-sm font-medium rounded-md
+                                transition-colors
+                                ${
+                                  isActive
+                                    ? 'bg-primary-600 text-white dark:bg-primary-500'
+                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                }
+                                disabled:cursor-default
+                              `}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          setPage((p) => Math.min(totalPages - 1, p + 1))
+                        }
+                        disabled={page >= totalPages - 1}
+                        className="flex items-center gap-1"
+                      >
+                        <span className="hidden sm:inline">Вперёд</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Информация о записях */}
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {data && data.total > 0 ? (
+                      <span>
+                        Показано {page * limit + 1} -{' '}
+                        {Math.min((page + 1) * limit, data.total)} из{' '}
+                        {data.total}
+                      </span>
+                    ) : (
+                      <span>Нет записей</span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </>

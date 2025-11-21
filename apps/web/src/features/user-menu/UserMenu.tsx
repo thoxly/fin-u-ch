@@ -14,13 +14,16 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isSuperAdmin } = usePermissions();
 
   // Проверяем, есть ли у пользователя доступ к администрированию
   const hasAdminAccess =
     hasPermission('users', 'read') ||
     hasPermission('users', 'manage_roles') ||
     hasPermission('audit', 'read');
+
+  // Пункт "Моя компания" доступен только супер-пользователю или администратору
+  const canAccessCompany = isSuperAdmin || hasAdminAccess;
 
   const handleLogout = (): void => {
     dispatch(logout());
@@ -78,13 +81,15 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
             <UserCircle size={16} />
             Мой профиль
           </button>
-          <button
-            onClick={() => handleMenuItemClick('/company')}
-            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
-          >
-            <Building2 size={16} />
-            Моя компания
-          </button>
+          {canAccessCompany && (
+            <button
+              onClick={() => handleMenuItemClick('/company')}
+              className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <Building2 size={16} />
+              Моя компания
+            </button>
+          )}
           {hasAdminAccess && (
             <>
               <hr className="my-1 border-gray-200 dark:border-gray-700" />

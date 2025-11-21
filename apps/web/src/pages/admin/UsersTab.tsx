@@ -54,7 +54,7 @@ export const UsersTab = () => {
 
   // Форма приглашения
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRoleIds, setInviteRoleIds] = useState<string[]>([]);
+  const [inviteRoleId, setInviteRoleId] = useState<string>('');
   const [tempPassword, setTempPassword] = useState<string>('');
   const [invitedUserEmail, setInvitedUserEmail] = useState<string>('');
   const [isPasswordCopied, setIsPasswordCopied] = useState(false);
@@ -153,7 +153,9 @@ export const UsersTab = () => {
 
   const handleInviteUser = () => {
     setInviteEmail('');
-    setInviteRoleIds([]);
+    // Находим роль "Полный доступ" и устанавливаем её по умолчанию
+    const fullAccessRole = roles.find((role) => role.name === 'Полный доступ');
+    setInviteRoleId(fullAccessRole?.id || '');
     setIsInviteModalOpen(true);
   };
 
@@ -166,7 +168,7 @@ export const UsersTab = () => {
     try {
       const result = await inviteUser({
         email: inviteEmail.trim(),
-        roleIds: inviteRoleIds.length > 0 ? inviteRoleIds : undefined,
+        roleIds: inviteRoleId ? [inviteRoleId] : [],
       }).unwrap();
 
       // Сохраняем временный пароль и email для отображения
@@ -176,12 +178,12 @@ export const UsersTab = () => {
         setIsInviteModalOpen(false);
         setIsPasswordModalOpen(true);
         setInviteEmail('');
-        setInviteRoleIds([]);
+        setInviteRoleId('');
       } else {
         showSuccess('Пользователь успешно приглашён');
         setIsInviteModalOpen(false);
         setInviteEmail('');
-        setInviteRoleIds([]);
+        setInviteRoleId('');
       }
     } catch (error) {
       const errorMessage =
@@ -218,7 +220,25 @@ export const UsersTab = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser) {
+      console.error('[UsersTab] selectedUser is null');
+      return;
+    }
+
+    if (!selectedUser.id || selectedUser.id === 'me') {
+      console.error('[UsersTab] Invalid userId:', selectedUser.id);
+      showError('Некорректный ID пользователя');
+      return;
+    }
+
+    console.log('[UsersTab] Updating user:', {
+      userId: selectedUser.id,
+      data: {
+        firstName: editFirstName.trim() || undefined,
+        lastName: editLastName.trim() || undefined,
+        isActive: editIsActive,
+      },
+    });
 
     try {
       await updateUser({
@@ -471,7 +491,7 @@ export const UsersTab = () => {
             <Select
               label="Статус"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={setStatusFilter}
               options={[
                 { value: '', label: 'Все статусы' },
                 { value: 'active', label: 'Активные' },
@@ -499,62 +519,44 @@ export const UsersTab = () => {
         onClose={() => {
           setIsInviteModalOpen(false);
           setInviteEmail('');
-          setInviteRoleIds([]);
+          setInviteRoleId('');
         }}
         title="Пригласить пользователя"
         size="md"
       >
-        <div className="space-y-4">
-          <Input
-            label="Email"
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            required
-            icon={<Mail size={18} />}
-          />
-          <div>
-            <label className="label">Роли (опционально)</label>
-            <select
-              multiple
-              value={inviteRoleIds}
-              onChange={(e) => {
-                const selected = Array.from(
-                  e.target.selectedOptions,
-                  (option) => option.value
-                );
-                setInviteRoleIds(selected);
-              }}
-              className="input w-full min-h-[120px]"
-              size={Math.min(roles.length, 6)}
-            >
-              {roles.length === 0 ? (
-                <option disabled>Нет доступных ролей</option>
-              ) : (
-                roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))
-              )}
-            </select>
-            {inviteRoleIds.length > 0 && (
-              <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                Выбрано ролей: {inviteRoleIds.length}
+        <div className="flex flex-col min-h-0">
+          <div className="space-y-4 flex-1 min-h-0">
+            <Input
+              label="Email"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              required
+              icon={<Mail size={18} />}
+            />
+            <div>
+              <Select
+                label="Роль"
+                value={inviteRoleId}
+                onChange={setInviteRoleId}
+                options={roles.map((role) => ({
+                  value: role.id,
+                  label: role.name,
+                }))}
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Выберите роль, которая будет назначена пользователю при
+                регистрации
               </p>
-            )}
-            <p className="mt-1 text-sm text-gray-500">
-              Выберите роли, которые будут назначены пользователю при
-              регистрации (удерживайте Ctrl/Cmd для выбора нескольких)
-            </p>
+            </div>
           </div>
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => {
                 setIsInviteModalOpen(false);
                 setInviteEmail('');
-                setInviteRoleIds([]);
+                setInviteRoleId('');
               }}
               className="w-full sm:w-auto"
             >
