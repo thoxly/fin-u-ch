@@ -37,180 +37,193 @@ export interface TokensResponse {
 
 export class AuthService {
   async register(data: RegisterDTO): Promise<TokensResponse> {
-    validateRequired({
-      email: data.email,
-      password: data.password,
-      companyName: data.companyName,
-    });
-    validateEmail(data.email);
-    validatePassword(data.password);
+    try {
+      validateRequired({
+        email: data.email,
+        password: data.password,
+        companyName: data.companyName,
+      });
+      validateEmail(data.email);
+      validatePassword(data.password);
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
-    });
-
-    if (existingUser) {
-      throw new AppError('User with this email already exists', 409);
-    }
-
-    // Create company and user in a transaction
-    const passwordHash = await hashPassword(data.password);
-
-    const result = await prisma.$transaction(async (tx) => {
-      const company = await tx.company.create({
-        data: {
-          name: data.companyName,
-        },
+      // Check if user already exists
+      const existingUser = await prisma.user.findUnique({
+        where: { email: data.email },
       });
 
-      logger.info('Company created during registration', {
-        companyId: company.id,
-        name: company.name,
-        currencyBase: company.currencyBase,
-        createdAt: company.createdAt,
-      });
+      if (existingUser) {
+        throw new AppError('User with this email already exists', 409);
+      }
 
-      // Проверяем, является ли это первым пользователем компании
-      const usersCount = await tx.user.count({
-        where: { companyId: company.id },
-      });
+      // Create company and user in a transaction
+      const passwordHash = await hashPassword(data.password);
 
-      const isFirstUser = usersCount === 0;
+      const result = await prisma.$transaction(async (tx) => {
+        const company = await tx.company.create({
+          data: {
+            name: data.companyName,
+          },
+        });
 
-      logger.debug('Checking if first user of company', {
-        companyId: company.id,
-        usersCount,
-        isFirstUser,
-      });
-
-      const user = await tx.user.create({
-        data: {
-          email: data.email,
-          passwordHash,
+        logger.info('Company created during registration', {
           companyId: company.id,
-          isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
-          isEmailVerified: false,
-        },
-      });
+          name: company.name,
+          currencyBase: company.currencyBase,
+          createdAt: company.createdAt,
+        });
 
-      logger.info('User created during registration', {
-        userId: user.id,
-        email: user.email,
-        companyId: user.companyId,
-        isActive: user.isActive,
-        isSuperAdmin: user.isSuperAdmin,
-        createdAt: user.createdAt,
-        isFirstUser,
-      });
+        // Проверяем, является ли это первым пользователем компании
+        const usersCount = await tx.user.count({
+          where: { companyId: company.id },
+        });
 
-      if (isFirstUser) {
-        logger.info('First user assigned as super admin', {
+        const isFirstUser = usersCount === 0;
+
+        logger.debug('Checking if first user of company', {
+          companyId: company.id,
+          usersCount,
+          isFirstUser,
+        });
+
+        const user = await tx.user.create({
+          data: {
+            email: data.email,
+            passwordHash,
+            companyId: company.id,
+            isSuperAdmin: isFirstUser, // Первый пользователь компании автоматически становится супер-администратором
+            isEmailVerified: false,
+          },
+        });
+
+        logger.info('User created during registration', {
           userId: user.id,
           email: user.email,
-          companyId: company.id,
+          companyId: user.companyId,
+          isActive: user.isActive,
+          isSuperAdmin: user.isSuperAdmin,
+          createdAt: user.createdAt,
+          isFirstUser,
         });
-      }
 
-      // Создаем начальные данные для компании (передаём userId первого пользователя)
-      try {
-        await seedInitialData(tx, company.id, user.id);
-      } catch (error) {
-        logger.error('Failed to seed initial data', {
-          companyId: company.id,
-          error,
-        });
-        throw new AppError('Failed to initialize company data', 500);
-      }
-
-      return { user, company };
-    });
-
-    // Получаем активные роли компании после регистрации
-    try {
-      const roles = await rolesService.getAllRoles(result.company.id);
-      logger.debug('Active company roles after registration', {
-        companyId: result.company.id,
-        rolesCount: roles.length,
-        roles: roles.map(
-          (r: {
-            id: string;
-            name: string;
-            category: string;
-            isSystem: boolean;
-            _count?: { userRoles: number };
-          }) => ({
-            id: r.id,
-            name: r.name,
-            category: r.category,
-            isSystem: r.isSystem,
-            usersCount: r._count?.userRoles || 0,
-          })
-        ),
-      });
-    } catch (error) {
-      logger.warn(
-        'Failed to get roles after registration (roles may not be created yet)',
-        {
-          companyId: result.company.id,
-          error: error instanceof Error ? error.message : String(error),
+        if (isFirstUser) {
+          logger.info('First user assigned as super admin', {
+            userId: user.id,
+            email: user.email,
+            companyId: company.id,
+          });
         }
-      );
-    }
 
-    const accessToken = generateAccessToken({
-      userId: result.user.id,
-      email: result.user.email,
-    });
+        // Создаем начальные данные для компании (передаём userId первого пользователя)
+        try {
+          await seedInitialData(tx, company.id, user.id);
+        } catch (error) {
+          logger.error('Failed to seed initial data', {
+            companyId: company.id,
+            error,
+          });
+          throw new AppError('Failed to initialize company data', 500);
+        }
 
-    const refreshToken = generateRefreshToken({
-      userId: result.user.id,
-      email: result.user.email,
-    });
+        return { user, company };
+      });
 
-    // Отправляем письмо подтверждения email
-    try {
-      logger.info('Creating verification token for user', {
+      // Получаем активные роли компании после регистрации
+      try {
+        const roles = await rolesService.getAllRoles(result.company.id);
+        logger.debug('Active company roles after registration', {
+          companyId: result.company.id,
+          rolesCount: roles.length,
+          roles: roles.map(
+            (r: {
+              id: string;
+              name: string;
+              category: string;
+              isSystem: boolean;
+              _count?: { userRoles: number };
+            }) => ({
+              id: r.id,
+              name: r.name,
+              category: r.category,
+              isSystem: r.isSystem,
+              usersCount: r._count?.userRoles || 0,
+            })
+          ),
+        });
+      } catch (error) {
+        logger.warn(
+          'Failed to get roles after registration (roles may not be created yet)',
+          {
+            companyId: result.company.id,
+            error: error instanceof Error ? error.message : String(error),
+          }
+        );
+      }
+
+      const accessToken = generateAccessToken({
         userId: result.user.id,
         email: result.user.email,
       });
 
-      const verificationToken = await tokenService.createToken({
-        userId: result.user.id,
-        type: 'email_verification',
-      });
-
-      logger.info('Verification token created, sending email', {
-        userId: result.user.id,
-        email: result.user.email,
-        tokenLength: verificationToken.length,
-      });
-
-      await sendVerificationEmail(result.user.email, verificationToken);
-
-      logger.info('Verification email sent successfully', {
+      const refreshToken = generateRefreshToken({
         userId: result.user.id,
         email: result.user.email,
       });
+
+      // Отправляем письмо подтверждения email
+      try {
+        logger.info('Creating verification token for user', {
+          userId: result.user.id,
+          email: result.user.email,
+        });
+
+        const verificationToken = await tokenService.createToken({
+          userId: result.user.id,
+          type: 'email_verification',
+        });
+
+        logger.info('Verification token created, sending email', {
+          userId: result.user.id,
+          email: result.user.email,
+          tokenLength: verificationToken.length,
+        });
+
+        await sendVerificationEmail(result.user.email, verificationToken);
+
+        logger.info('Verification email sent successfully', {
+          userId: result.user.id,
+          email: result.user.email,
+        });
+      } catch (error) {
+        logger.error('Failed to send verification email', {
+          userId: result.user.id,
+          email: result.user.email,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        // Не блокируем регистрацию, если письмо не отправилось
+      }
+
+      console.log('[AuthService.register] Регистрация успешна', {
+        userId: result.user.id,
+        email: result.user.email,
+      });
+      return {
+        accessToken,
+        refreshToken,
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          companyId: result.user.companyId,
+        },
+      };
     } catch (error) {
-      logger.error('Failed to send verification email', {
-        userId: result.user.id,
-        email: result.user.email,
+      console.error('[AuthService.register] ОШИБКА при регистрации:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
+        email: data.email,
       });
-      // Не блокируем регистрацию, если письмо не отправилось
+      throw error;
     }
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        companyId: result.user.companyId,
-      },
-    };
   }
 
   async login(data: LoginDTO): Promise<TokensResponse> {
