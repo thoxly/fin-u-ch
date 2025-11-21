@@ -2,13 +2,11 @@ import { ReactNode, useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGetMeQuery } from '../../store/api/authApi';
 import * as Icons from 'lucide-react';
-import { IconPickerPopover } from './IconPickerPopover';
 import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
-import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
 import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
 
@@ -32,7 +30,7 @@ const getEntityForMenuItem = (
   name: string
 ): { entity: string; action: string } | null => {
   const mapping: Record<string, { entity: string; action: string }> = {
-    Дашборд: { entity: 'reports', action: 'read' },
+    Дашборд: { entity: 'dashboard', action: 'read' }, // Исправлено: было 'reports'
     Операции: { entity: 'operations', action: 'read' },
     Бюджеты: { entity: 'budgets', action: 'read' },
     Отчеты: { entity: 'reports', action: 'read' },
@@ -52,7 +50,12 @@ const getEntityForMenuItem = (
 
 const getBaseNavigation = (): NavigationItem[] => {
   return [
-    { name: 'Дашборд', href: '/dashboard', entity: 'reports', action: 'read' },
+    {
+      name: 'Дашборд',
+      href: '/dashboard',
+      entity: 'dashboard',
+      action: 'read',
+    },
     {
       name: 'Операции',
       href: '/operations',
@@ -122,7 +125,7 @@ const getBaseNavigation = (): NavigationItem[] => {
 
 export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
-  const { getIcon, updateIcon } = useNavigationIcons();
+  const { getIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
   const {
     hasPermission,
@@ -130,22 +133,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     permissions: permissionsMap,
   } = usePermissions();
 
-  // Получаем базовую навигацию
+  // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
   const baseNavigation = useMemo(() => {
-    const nav = getBaseNavigation();
-
-    // Добавляем раздел "Администрирование" только для супер-пользователя
-    if (user?.isSuperAdmin) {
-      nav.push({
-        name: 'Администрирование',
-        href: '/admin',
-        entity: 'users',
-        action: 'read',
-      });
-    }
-
-    return nav;
-  }, [user?.isSuperAdmin]);
+    return getBaseNavigation();
+  }, []);
 
   // Фильтруем навигацию по правам
   const navigation = useMemo(() => {
@@ -212,12 +203,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
-  const [iconPickerState, setIconPickerState] = useState<{
-    isOpen: boolean;
-    itemName: string;
-    position: { top: number; left: number };
-  }>({ isOpen: false, itemName: '', position: { top: 0, left: 0 } });
-
   const [menuPopoverState, setMenuPopoverState] = useState<{
     isOpen: boolean;
     items: MenuPopoverItem[];
@@ -233,43 +218,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     editingData?: unknown; // Данные для редактирования
   }>({ isOpen: false, title: '', catalogType: '' });
 
-  const [userProfileOffCanvasOpen, setUserProfileOffCanvasOpen] =
-    useState(false);
-
   const isActive = (href: string): boolean => location.pathname === href;
 
   const isPopoverActive = (itemName: string): boolean =>
     menuPopoverState.isOpen && menuPopoverState.activeParentName === itemName;
-
-  const handleIconClick = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    itemName: string
-  ): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    setIconPickerState({
-      isOpen: true,
-      itemName,
-      position: {
-        top: rect.bottom + 5,
-        left: rect.left,
-      },
-    });
-  };
-
-  const handleIconSelect = (iconName: string): void => {
-    updateIcon(iconPickerState.itemName, iconName);
-  };
-
-  const handleCloseIconPicker = (): void => {
-    setIconPickerState({
-      isOpen: false,
-      itemName: '',
-      position: { top: 0, left: 0 },
-    });
-  };
 
   const getCatalogCreateTitle = (catalogName: string): string => {
     const titles: Record<string, string> = {
@@ -405,10 +357,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-            <UserMenu
-              userEmail={user?.email}
-              onProfileClick={() => setUserProfileOffCanvasOpen(true)}
-            />
+            <UserMenu userEmail={user?.email} />
           </div>
         </div>
       </header>
@@ -442,13 +391,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       }
                     }}
                   >
-                    <button
-                      onClick={(e) => handleIconClick(e, item.name)}
-                      className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-700"
-                      title="Изменить иконку"
-                    >
+                    <div className="flex-shrink-0 opacity-70 group-hover:opacity-100">
                       {renderIcon(item.name)}
-                    </button>
+                    </div>
                     <span>{item.name}</span>
                     <Icons.ChevronRight
                       size={16}
@@ -466,13 +411,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <button
-                    onClick={(e) => handleIconClick(e, item.name)}
-                    className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-600"
-                    title="Изменить иконку"
-                  >
+                  <div className="flex-shrink-0 opacity-70 group-hover:opacity-100">
                     {renderIcon(item.name)}
-                  </button>
+                  </div>
                   <span>{item.name}</span>
                 </Link>
               )
@@ -483,16 +424,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         {/* Main content */}
         <main className="flex-1 min-w-0 lg:pl-4">{children}</main>
       </div>
-
-      {/* Icon Picker Popover */}
-      {iconPickerState.isOpen && (
-        <IconPickerPopover
-          currentIcon={getIcon(iconPickerState.itemName)}
-          onSelectIcon={handleIconSelect}
-          onClose={handleCloseIconPicker}
-          anchorPosition={iconPickerState.position}
-        />
-      )}
 
       {/* Menu Popover */}
       {menuPopoverState.isOpen && (
@@ -518,17 +449,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             onClose={handleCloseOffCanvas}
             editingData={offCanvasState.editingData}
           />
-        </OffCanvas>
-      )}
-
-      {/* User Profile OffCanvas */}
-      {userProfileOffCanvasOpen && (
-        <OffCanvas
-          isOpen={userProfileOffCanvasOpen}
-          onClose={() => setUserProfileOffCanvasOpen(false)}
-          title="Мой профиль"
-        >
-          <UserProfileForm onClose={() => setUserProfileOffCanvasOpen(false)} />
         </OffCanvas>
       )}
 

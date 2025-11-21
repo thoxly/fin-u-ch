@@ -11,7 +11,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { Layout } from '../../shared/ui/Layout';
+import { AdminLayout } from '../../shared/ui/AdminLayout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -47,10 +47,17 @@ export const UsersPage = () => {
   const [isRolesModalOpen, setIsRolesModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    user: UserType | null;
+  }>({
+    isOpen: false,
+    user: null,
+  });
 
   // Форма приглашения
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRoleIds, setInviteRoleIds] = useState<string[]>([]);
+  const [inviteRoleId, setInviteRoleId] = useState<string>('');
   const [tempPassword, setTempPassword] = useState<string>('');
   const [invitedUserEmail, setInvitedUserEmail] = useState<string>('');
   const [isPasswordCopied, setIsPasswordCopied] = useState(false);
@@ -149,7 +156,7 @@ export const UsersPage = () => {
 
   const handleInviteUser = () => {
     setInviteEmail('');
-    setInviteRoleIds([]);
+    setInviteRoleId('');
     setIsInviteModalOpen(true);
   };
 
@@ -162,7 +169,7 @@ export const UsersPage = () => {
     try {
       const result = await inviteUser({
         email: inviteEmail.trim(),
-        roleIds: inviteRoleIds.length > 0 ? inviteRoleIds : undefined,
+        roleIds: inviteRoleId ? [inviteRoleId] : undefined,
       }).unwrap();
 
       // Сохраняем временный пароль и email для отображения
@@ -172,12 +179,12 @@ export const UsersPage = () => {
         setIsInviteModalOpen(false);
         setIsPasswordModalOpen(true);
         setInviteEmail('');
-        setInviteRoleIds([]);
+        setInviteRoleId('');
       } else {
         showSuccess('Пользователь успешно приглашён');
         setIsInviteModalOpen(false);
         setInviteEmail('');
-        setInviteRoleIds([]);
+        setInviteRoleId('');
       }
     } catch (error) {
       const errorMessage =
@@ -215,6 +222,11 @@ export const UsersPage = () => {
 
   const handleSaveEdit = async () => {
     if (!selectedUser) return;
+
+    if (!selectedUser.id || selectedUser.id === 'me') {
+      showError('Некорректный ID пользователя');
+      return;
+    }
 
     try {
       await updateUser({
@@ -300,15 +312,25 @@ export const UsersPage = () => {
     }
   };
 
-  const handleDeleteUser = async (user: UserType) => {
+  const handleDeleteUser = (user: UserType) => {
+    setDeleteModal({ isOpen: true, user });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deleteModal.user) return;
+
+    const user = deleteModal.user;
+
     if (user.isSuperAdmin) {
       showError('Нельзя удалить супер-администратора');
+      setDeleteModal({ isOpen: false, user: null });
       return;
     }
 
     try {
       await deleteUser(user.id).unwrap();
       showSuccess('Пользователь успешно удалён');
+      setDeleteModal({ isOpen: false, user: null });
     } catch (error) {
       const errorMessage =
         error &&
@@ -321,6 +343,7 @@ export const UsersPage = () => {
           ? error.data.message
           : 'Ошибка при удалении пользователя';
       showError(errorMessage);
+      setDeleteModal({ isOpen: false, user: null });
     }
   };
 
@@ -414,7 +437,7 @@ export const UsersPage = () => {
 
   if (!canRead('users')) {
     return (
-      <Layout>
+      <AdminLayout>
         <Card className="p-8 text-center max-w-md mx-auto">
           <User size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -424,12 +447,12 @@ export const UsersPage = () => {
             У вас нет прав для просмотра пользователей
           </p>
         </Card>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -504,62 +527,47 @@ export const UsersPage = () => {
           onClose={() => {
             setIsInviteModalOpen(false);
             setInviteEmail('');
-            setInviteRoleIds([]);
+            setInviteRoleId('');
           }}
           title="Пригласить пользователя"
           size="md"
         >
-          <div className="space-y-4">
-            <Input
-              label="Email"
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              required
-              icon={<Mail size={18} />}
-            />
-            <div>
-              <label className="label">Роли (опционально)</label>
-              <select
-                multiple
-                value={inviteRoleIds}
-                onChange={(e) => {
-                  const selected = Array.from(
-                    e.target.selectedOptions,
-                    (option) => option.value
-                  );
-                  setInviteRoleIds(selected);
-                }}
-                className="input w-full min-h-[120px]"
-                size={Math.min(roles.length, 6)}
-              >
-                {roles.length === 0 ? (
-                  <option disabled>Нет доступных ролей</option>
-                ) : (
-                  roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))
-                )}
-              </select>
-              {inviteRoleIds.length > 0 && (
-                <p className="mt-2 text-sm text-green-600 dark:text-green-400">
-                  Выбрано ролей: {inviteRoleIds.length}
+          <div className="flex flex-col min-h-0">
+            <div className="space-y-4 flex-1 min-h-0">
+              <Input
+                label="Email"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                required
+                icon={<Mail size={18} />}
+              />
+              <div>
+                <Select
+                  label="Роль (опционально)"
+                  value={inviteRoleId}
+                  onChange={setInviteRoleId}
+                  options={[
+                    { value: '', label: 'Без роли' },
+                    ...roles.map((role) => ({
+                      value: role.id,
+                      label: role.name,
+                    })),
+                  ]}
+                />
+                <p className="mt-1 text-sm text-gray-500">
+                  Выберите роль, которая будет назначена пользователю при
+                  регистрации
                 </p>
-              )}
-              <p className="mt-1 text-sm text-gray-500">
-                Выберите роли, которые будут назначены пользователю при
-                регистрации (удерживайте Ctrl/Cmd для выбора нескольких)
-              </p>
+              </div>
             </div>
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
                   setIsInviteModalOpen(false);
                   setInviteEmail('');
-                  setInviteRoleIds([]);
+                  setInviteRoleId('');
                 }}
                 className="w-full sm:w-auto"
               >
@@ -796,7 +804,36 @@ export const UsersPage = () => {
             </div>
           </div>
         </Modal>
+
+        {/* Модалка подтверждения удаления */}
+        <Modal
+          isOpen={deleteModal.isOpen}
+          onClose={() => setDeleteModal({ isOpen: false, user: null })}
+          title="Подтверждение удаления"
+        >
+          <div className="space-y-4">
+            <p className="text-gray-700 dark:text-gray-300">
+              Вы уверены, что хотите удалить пользователя{' '}
+              <span className="font-semibold">{deleteModal.user?.email}</span>?
+            </p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Это действие нельзя отменить. Пользователь будет деактивирован и
+              не сможет войти в систему.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="secondary"
+                onClick={() => setDeleteModal({ isOpen: false, user: null })}
+              >
+                Отмена
+              </Button>
+              <Button variant="danger" onClick={confirmDeleteUser}>
+                Удалить
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };

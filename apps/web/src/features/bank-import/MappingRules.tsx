@@ -6,6 +6,7 @@ import {
 } from '../../store/api/importsApi';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { useIsMobile } from '../../shared/hooks/useIsMobile';
+import { usePermissions } from '../../shared/hooks/usePermissions';
 import { MappingRuleDialog } from './MappingRuleDialog';
 import { Modal } from '../../shared/ui/Modal';
 import type { MappingRule } from '@shared/types/imports';
@@ -14,12 +15,16 @@ export const MappingRules = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<MappingRule | null>(null);
+  const [isViewMode, setIsViewMode] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { showSuccess, showError } = useNotification();
   const isMobile = useIsMobile();
+  const { canUpdate } = usePermissions();
 
   const { data: rules = [], refetch } = useGetMappingRulesQuery();
   const [deleteRule] = useDeleteMappingRuleMutation();
+
+  const canEditRules = canUpdate('operations');
 
   // Закрытие при клике вне (только для десктопной версии)
   useEffect(() => {
@@ -40,6 +45,14 @@ export const MappingRules = () => {
   const handleEdit = (rule: MappingRule, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingRule(rule);
+    setIsViewMode(false);
+    setIsDialogOpen(true);
+    setIsOpen(false);
+  };
+
+  const handleView = (rule: MappingRule) => {
+    setEditingRule(rule);
+    setIsViewMode(!canEditRules);
     setIsDialogOpen(true);
     setIsOpen(false);
   };
@@ -59,6 +72,7 @@ export const MappingRules = () => {
 
   const handleCreateNew = () => {
     setEditingRule(null);
+    setIsViewMode(false);
     setIsDialogOpen(true);
     setIsOpen(false);
   };
@@ -140,13 +154,15 @@ export const MappingRules = () => {
                       Правила маппинга
                     </h3>
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleCreateNew}
-                        className="p-2 text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                        title="Создать правило"
-                      >
-                        <Settings size={20} />
-                      </button>
+                      {canEditRules && (
+                        <button
+                          onClick={handleCreateNew}
+                          className="p-2 text-primary-600 dark:text-primary-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          title="Создать правило"
+                        >
+                          <Settings size={20} />
+                        </button>
+                      )}
                       <button
                         onClick={() => setIsOpen(false)}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -181,18 +197,21 @@ export const MappingRules = () => {
                           платежа содержит "Аренда", то автоматически выбирать
                           статью "Аренда" и контрагента "Арендодатель".
                         </p>
-                        <button
-                          onClick={handleCreateNew}
-                          className="mt-2 px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
-                        >
-                          Создать первое правило
-                        </button>
+                        {canEditRules && (
+                          <button
+                            onClick={handleCreateNew}
+                            className="mt-2 px-4 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors"
+                          >
+                            Создать первое правило
+                          </button>
+                        )}
                       </div>
                     ) : (
                       rules.map((rule) => (
                         <div
                           key={rule.id}
-                          className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                          onClick={() => handleView(rule)}
+                          className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
@@ -219,22 +238,24 @@ export const MappingRules = () => {
                                 Использовано: {rule.usageCount} раз
                               </div>
                             </div>
-                            <div className="flex gap-1 flex-shrink-0">
-                              <button
-                                onClick={(e) => handleEdit(rule, e)}
-                                className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                                title="Редактировать"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={(e) => handleDelete(rule, e)}
-                                className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                                title="Удалить"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
+                            {canEditRules && (
+                              <div className="flex gap-1 flex-shrink-0">
+                                <button
+                                  onClick={(e) => handleEdit(rule, e)}
+                                  className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                  title="Редактировать"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => handleDelete(rule, e)}
+                                  className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                  title="Удалить"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
@@ -245,15 +266,17 @@ export const MappingRules = () => {
             ) : (
               // Десктопная версия - выпадающее меню
               <div className="absolute z-50 right-0 mt-2 w-96 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-[400px] overflow-y-auto">
-                <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={handleCreateNew}
-                    className="w-full px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors flex items-center gap-2"
-                  >
-                    <Settings size={14} />
-                    Создать правило
-                  </button>
-                </div>
+                {canEditRules && (
+                  <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={handleCreateNew}
+                      className="w-full px-3 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors flex items-center gap-2"
+                    >
+                      <Settings size={14} />
+                      Создать правило
+                    </button>
+                  </div>
+                )}
                 <div className="p-2 space-y-1">
                   {rules.length === 0 ? (
                     <div className="p-6 text-center">
@@ -279,7 +302,8 @@ export const MappingRules = () => {
                     rules.map((rule) => (
                       <div
                         key={rule.id}
-                        className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors"
+                        onClick={() => handleView(rule)}
+                        className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors cursor-pointer"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -306,22 +330,24 @@ export const MappingRules = () => {
                               Использовано: {rule.usageCount} раз
                             </div>
                           </div>
-                          <div className="flex gap-1 flex-shrink-0">
-                            <button
-                              onClick={(e) => handleEdit(rule, e)}
-                              className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                              title="Редактировать"
-                            >
-                              <Edit size={14} />
-                            </button>
-                            <button
-                              onClick={(e) => handleDelete(rule, e)}
-                              className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                              title="Удалить"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                          {canEditRules && (
+                            <div className="flex gap-1 flex-shrink-0">
+                              <button
+                                onClick={(e) => handleEdit(rule, e)}
+                                className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                title="Редактировать"
+                              >
+                                <Edit size={14} />
+                              </button>
+                              <button
+                                onClick={(e) => handleDelete(rule, e)}
+                                className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                title="Удалить"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -333,14 +359,24 @@ export const MappingRules = () => {
         )}
       </div>
 
-      {/* Модальное окно для создания/редактирования правила */}
+      {/* Модальное окно для создания/редактирования/просмотра правила */}
       <Modal
         isOpen={isDialogOpen}
         onClose={handleDialogClose}
-        title={editingRule ? 'Редактировать правило' : 'Создать правило'}
+        title={
+          isViewMode
+            ? 'Просмотр правила'
+            : editingRule
+              ? 'Редактировать правило'
+              : 'Создать правило'
+        }
         size="md"
       >
-        <MappingRuleDialog rule={editingRule} onClose={handleDialogClose} />
+        <MappingRuleDialog
+          rule={editingRule}
+          onClose={handleDialogClose}
+          readOnly={isViewMode}
+        />
       </Modal>
     </>
   );

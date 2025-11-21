@@ -1,11 +1,12 @@
 import prisma from '../../config/db';
 import logger from '../../config/logger';
+import { ENTITIES_CONFIG } from '../roles/config/entities.config';
 
 /**
  * Миграционный скрипт для существующих пользователей
  * Назначает роли всем пользователям, у которых их нет
  * - Первому пользователю компании назначается роль "Супер-пользователь"
- * - Остальным пользователям назначается роль "По умолчанию"
+ * - Остальным пользователям назначается роль "Добавление операций" (если существует)
  */
 export async function migrateExistingUsers(): Promise<void> {
   logger.info(
@@ -30,38 +31,11 @@ export async function migrateExistingUsers(): Promise<void> {
         companyId: company.id,
       });
 
-      // Определяем все сущности и действия согласно ТЗ
-      const entities = [
-        {
-          name: 'articles',
-          actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
-        },
-        { name: 'accounts', actions: ['create', 'read', 'update', 'delete'] },
-        {
-          name: 'departments',
-          actions: ['create', 'read', 'update', 'delete'],
-        },
-        {
-          name: 'counterparties',
-          actions: ['create', 'read', 'update', 'delete'],
-        },
-        { name: 'deals', actions: ['create', 'read', 'update', 'delete'] },
-        { name: 'salaries', actions: ['create', 'read', 'update', 'delete'] },
-        {
-          name: 'operations',
-          actions: ['create', 'read', 'update', 'delete', 'confirm', 'cancel'],
-        },
-        {
-          name: 'budgets',
-          actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
-        },
-        { name: 'reports', actions: ['read', 'export'] },
-        {
-          name: 'users',
-          actions: ['create', 'read', 'update', 'delete', 'manage_roles'],
-        },
-        { name: 'audit', actions: ['read'] },
-      ];
+      // Используем централизованную конфигурацию сущностей
+      const entities = Object.values(ENTITIES_CONFIG).map((entity) => ({
+        name: entity.name,
+        actions: entity.actions,
+      }));
 
       // Проверяем, существуют ли системные роли для этой компании
       let superAdminRole = await prisma.role.findFirst({
@@ -72,11 +46,12 @@ export async function migrateExistingUsers(): Promise<void> {
         },
       });
 
-      let defaultRole = await prisma.role.findFirst({
+      // Ищем предустановленную роль "Добавление операций" (не системную)
+      let operationsEditorRole = await prisma.role.findFirst({
         where: {
           companyId: company.id,
-          name: 'По умолчанию',
-          isSystem: true,
+          name: 'Добавление операций',
+          isSystem: false,
         },
       });
 
@@ -196,58 +171,87 @@ export async function migrateExistingUsers(): Promise<void> {
         }
       );
 
-      if (!defaultRole) {
+      if (!operationsEditorRole) {
         logger.info(
-          '[migrateExistingUsers] Создание роли "По умолчанию" для компании:',
+          '[migrateExistingUsers] Создание роли "Добавление операций" для компании:',
           {
             companyId: company.id,
           }
         );
 
-        defaultRole = await prisma.role.create({
+        operationsEditorRole = await prisma.role.create({
           data: {
             companyId: company.id,
-            name: 'По умолчанию',
+            name: 'Добавление операций',
             description:
-              'Системная роль с минимальными правами (только просмотр)',
-            category: 'Системные',
-            isSystem: true,
+              'Возможность создавать и просматривать операции, а также просматривать справочники',
+            category: 'Предустановленные',
+            isSystem: false,
             isActive: true,
           },
         });
 
-        // Создаем права только на чтение для роли "По умолчанию"
-        const defaultPermissions = [];
-        for (const entity of entities) {
-          // Для reports добавляем только read (export не даём)
-          if (entity.name === 'reports') {
-            defaultPermissions.push({
-              roleId: defaultRole.id,
-              entity: entity.name,
-              action: 'read',
-              allowed: true,
-            });
-          } else {
-            // Для остальных сущностей добавляем только read
-            defaultPermissions.push({
-              roleId: defaultRole.id,
-              entity: entity.name,
-              action: 'read',
-              allowed: true,
-            });
-          }
+        // Создаем права для роли "Добавление операций"
+        const operationsEditorPermissions = [];
+
+        // Для операций: create и read
+        operationsEditorPermissions.push({
+          roleId: operationsEditorRole.id,
+          entity: 'operations',
+          action: 'create',
+          allowed: true,
+        });
+        operationsEditorPermissions.push({
+          roleId: operationsEditorRole.id,
+          entity: 'operations',
+          action: 'read',
+          allowed: true,
+        });
+
+        // Для dashboard: read
+        operationsEditorPermissions.push({
+          roleId: operationsEditorRole.id,
+          entity: 'dashboard',
+          action: 'read',
+          allowed: true,
+        });
+
+        // Для всех справочников (кроме администрирования): только read
+        const catalogEntities = [
+          'articles',
+          'accounts',
+          'counterparties',
+          'departments',
+          'deals',
+          'salaries',
+        ];
+        for (const entityName of catalogEntities) {
+          operationsEditorPermissions.push({
+            roleId: operationsEditorRole.id,
+            entity: entityName,
+            action: 'read',
+            allowed: true,
+          });
         }
 
+        // Для отчетов: только read (без export)
+        operationsEditorPermissions.push({
+          roleId: operationsEditorRole.id,
+          entity: 'reports',
+          action: 'read',
+          allowed: true,
+        });
+
         await prisma.rolePermission.createMany({
-          data: defaultPermissions,
+          data: operationsEditorPermissions,
         });
 
         totalRolesCreated += 1;
         logger.info(
-          '[migrateExistingUsers] Создана роль "По умолчанию" с правами:',
+          '[migrateExistingUsers] Создана роль "Добавление операций" с правами:',
           {
-            roleId: defaultRole.id,
-            permissionsCount: defaultPermissions.length,
+            roleId: operationsEditorRole.id,
+            permissionsCount: operationsEditorPermissions.length,
           }
         );
       }
@@ -302,12 +306,12 @@ export async function migrateExistingUsers(): Promise<void> {
         );
       }
 
-      // Назначаем роль "По умолчанию" остальным пользователям
+      // Назначаем роль "Добавление операций" остальным пользователям
       const remainingUsers = usersWithoutRoles.slice(1);
-      if (remainingUsers.length > 0 && defaultRole) {
+      if (remainingUsers.length > 0 && operationsEditorRole) {
         const userRoles = remainingUsers.map((user) => ({
           userId: user.id,
-          roleId: defaultRole!.id,
+          roleId: operationsEditorRole!.id,
           assignedBy: null, // Системное назначение
         }));
 
@@ -317,11 +321,11 @@ export async function migrateExistingUsers(): Promise<void> {
 
         totalUsersMigrated += remainingUsers.length;
         logger.info(
-          '[migrateExistingUsers] Назначена роль "По умолчанию" остальным пользователям:',
+          '[migrateExistingUsers] Назначена роль "Добавление операций" остальным пользователям:',
           {
             companyId: company.id,
             usersCount: remainingUsers.length,
-            roleId: defaultRole.id,
+            roleId: operationsEditorRole.id,
           }
         );
       }

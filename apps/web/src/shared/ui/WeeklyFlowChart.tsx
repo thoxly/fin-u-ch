@@ -100,9 +100,6 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             entity="reports"
           />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Динамика поступлений и списаний
-        </h3>
 
         <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">

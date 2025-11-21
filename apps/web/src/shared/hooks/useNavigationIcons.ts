@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import {
-  useGetUiSettingsQuery,
-  useUpdateUiSettingsMutation,
-} from '../../store/api/companiesApi';
+  useGetPreferencesQuery,
+  useUpdatePreferencesMutation,
+} from '../../store/api/authApi';
 
 export interface NavigationItem {
   name: string;
@@ -15,7 +15,8 @@ export interface NavigationItem {
 
 const DEFAULT_ICONS: Record<string, string> = {
   Дашборд: 'LayoutDashboard',
-  Операции: 'Receipt',
+  Операции: 'ArrowLeftRight',
+  Бюджеты: 'Target',
   Планы: 'ClipboardList',
   Отчеты: 'BarChart3',
   Справочники: 'FolderOpen',
@@ -35,15 +36,15 @@ interface UseNavigationIconsReturn {
 }
 
 export const useNavigationIcons = (): UseNavigationIconsReturn => {
-  const { data: uiSettings, isLoading } = useGetUiSettingsQuery();
-  const [updateUiSettings] = useUpdateUiSettingsMutation();
+  const { data: preferences, isLoading } = useGetPreferencesQuery();
+  const [updatePreferences] = useUpdatePreferencesMutation();
 
   const icons = useMemo(() => {
     return {
       ...DEFAULT_ICONS,
-      ...(uiSettings?.navigationIcons || {}),
+      ...(preferences?.navigationIcons || {}),
     };
-  }, [uiSettings]);
+  }, [preferences]);
 
   const getIcon = (name: string): string => {
     return icons[name] || 'Circle';
@@ -52,17 +53,17 @@ export const useNavigationIcons = (): UseNavigationIconsReturn => {
   const updateIcon = async (name: string, iconName: string): Promise<void> => {
     try {
       const newNavigationIcons = {
-        ...(uiSettings?.navigationIcons || {}),
+        ...(preferences?.navigationIcons || {}),
         [name]: iconName,
       };
 
-      await updateUiSettings({
-        ...uiSettings,
+      await updatePreferences({
+        ...preferences,
         navigationIcons: newNavigationIcons,
       }).unwrap();
     } catch (error) {
       console.error('Failed to update icon:', error);
-      // Note: Consider adding toast notification for user feedback
+      throw error;
     }
   };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, Trash2, Shield, Plus } from 'lucide-react';
-import { Layout } from '../../shared/ui/Layout';
+import { AdminLayout } from '../../shared/ui/AdminLayout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -43,8 +43,6 @@ const ACTIONS = [
   { name: 'read', label: 'Просмотр' },
   { name: 'update', label: 'Редактирование' },
   { name: 'delete', label: 'Удаление' },
-  { name: 'archive', label: 'Архивирование' },
-  { name: 'restore', label: 'Восстановление' },
   { name: 'confirm', label: 'Подтверждение' },
   { name: 'cancel', label: 'Отмена' },
   { name: 'export', label: 'Экспорт' },
@@ -100,10 +98,6 @@ const EntityRow = ({
         // Проверяем, применимо ли действие к сущности
         const isApplicable =
           (entity.name === 'dashboard' && action.name === 'read') ||
-          (entity.name === 'articles' &&
-            ['archive', 'restore'].includes(action.name)) ||
-          (entity.name === 'budgets' &&
-            ['archive', 'restore'].includes(action.name)) ||
           (entity.name === 'operations' &&
             ['confirm', 'cancel'].includes(action.name)) ||
           (entity.name === 'reports' && action.name === 'export') ||
@@ -322,13 +316,46 @@ export const RolesPage = () => {
   }, [isPermissionsModalOpen, rolePermissions, selectedRole]);
 
   const togglePermission = (entity: string, action: string) => {
-    setPermissions((prev) => ({
-      ...prev,
-      [entity]: {
-        ...prev[entity],
-        [action]: !prev[entity]?.[action],
-      },
-    }));
+    setPermissions((prev) => {
+      const currentValue = prev[entity]?.[action] || false;
+      const newValue = !currentValue;
+
+      const newEntityPermissions = { ...prev[entity] };
+
+      // Устанавливаем основное действие
+      newEntityPermissions[action] = newValue;
+
+      // Автоматическая иерархия прав:
+      // delete → update → read
+      // update → read
+
+      if (newValue) {
+        // Включаем действие - автоматически включаем зависимые
+        if (action === 'delete') {
+          // Если включаем delete, автоматически включаем update и read
+          newEntityPermissions['update'] = true;
+          newEntityPermissions['read'] = true;
+        } else if (action === 'update') {
+          // Если включаем update, автоматически включаем read
+          newEntityPermissions['read'] = true;
+        }
+      } else {
+        // Выключаем действие - автоматически выключаем зависящие от него
+        if (action === 'read') {
+          // Если выключаем read, автоматически выключаем update и delete
+          newEntityPermissions['update'] = false;
+          newEntityPermissions['delete'] = false;
+        } else if (action === 'update') {
+          // Если выключаем update, автоматически выключаем delete
+          newEntityPermissions['delete'] = false;
+        }
+      }
+
+      return {
+        ...prev,
+        [entity]: newEntityPermissions,
+      };
+    });
   };
 
   // Массовое включение/выключение всех прав для сущности
@@ -338,10 +365,6 @@ export const RolesPage = () => {
       const applicableActions = ACTIONS.filter((action) => {
         const isApplicable =
           (entity === 'dashboard' && action.name === 'read') ||
-          (entity === 'articles' &&
-            ['archive', 'restore'].includes(action.name)) ||
-          (entity === 'budgets' &&
-            ['archive', 'restore'].includes(action.name)) ||
           (entity === 'operations' &&
             ['confirm', 'cancel'].includes(action.name)) ||
           (entity === 'reports' && action.name === 'export') ||
@@ -439,7 +462,7 @@ export const RolesPage = () => {
 
   if (!canManageRoles()) {
     return (
-      <Layout>
+      <AdminLayout>
         <Card className="p-8 text-center max-w-md mx-auto">
           <Shield size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -449,12 +472,12 @@ export const RolesPage = () => {
             У вас нет прав для управления ролями
           </p>
         </Card>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -682,6 +705,6 @@ export const RolesPage = () => {
           )}
         </Modal>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };

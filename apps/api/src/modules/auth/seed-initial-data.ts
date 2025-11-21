@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import logger from '../../config/logger';
+import { ENTITIES_CONFIG } from '../roles/config/entities.config';
 
 /**
  * Тип для транзакционного клиента Prisma
@@ -145,39 +146,18 @@ export async function seedInitialData(
     });
   }
 
-  // 6. СИСТЕМНЫЕ РОЛИ И ПРАВА
-  logger.debug('Starting creation of system roles', {
+  // 6. РОЛИ И ПРАВА
+  logger.debug('Starting creation of roles', {
     companyId,
     firstUserId,
   });
 
-  // Определяем все сущности и действия согласно ТЗ
-  // ВАЖНО: При добавлении новых сущностей/действий, обязательно добавляйте их сюда
-  const entities = [
-    {
-      name: 'articles',
-      actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
-    },
-    { name: 'accounts', actions: ['create', 'read', 'update', 'delete'] },
-    { name: 'departments', actions: ['create', 'read', 'update', 'delete'] },
-    { name: 'counterparties', actions: ['create', 'read', 'update', 'delete'] },
-    { name: 'deals', actions: ['create', 'read', 'update', 'delete'] },
-    { name: 'salaries', actions: ['create', 'read', 'update', 'delete'] },
-    {
-      name: 'operations',
-      actions: ['create', 'read', 'update', 'delete', 'confirm', 'cancel'],
-    },
-    {
-      name: 'budgets',
-      actions: ['create', 'read', 'update', 'delete', 'archive', 'restore'],
-    },
-    { name: 'reports', actions: ['read', 'export'] },
-    {
-      name: 'users',
-      actions: ['create', 'read', 'update', 'delete', 'manage_roles'],
-    },
-    { name: 'audit', actions: ['read'] },
-  ];
+  // Используем централизованную конфигурацию сущностей
+  // При добавлении новой сущности обновите только config/entities.config.ts
+  const entities = Object.values(ENTITIES_CONFIG).map((entity) => ({
+    name: entity.name,
+    actions: entity.actions,
+  }));
 
   // Проверяем, существует ли уже роль "Супер-пользователь"
   let superAdminRole = await tx.role.findFirst({
@@ -283,55 +263,139 @@ export async function seedInitialData(
     permissions: finalPermissions.map((p) => `${p.entity}:${p.action}`),
   });
 
-  // Создаем роль "По умолчанию"
-  const defaultRole = await tx.role.create({
+  // =========================================================
+  // 7. ПРЕДУСТАНОВЛЕННЫЕ РОЛИ (не системные, можно редактировать)
+  // =========================================================
+
+  // 7.1. Роль "Полный доступ" - все права кроме администрирования
+  const fullAccessRole = await tx.role.create({
     data: {
       companyId,
-      name: 'По умолчанию',
-      description: 'Системная роль с минимальными правами (только просмотр)',
-      category: 'Системные',
-      isSystem: true,
+      name: 'Полный доступ',
+      description:
+        'Полный доступ ко всем функциям системы кроме управления пользователями и ролями',
+      category: 'Предустановленные',
+      isSystem: false,
       isActive: true,
     },
   });
 
-  logger.debug('Created "Default" role', {
-    roleId: defaultRole.id,
+  logger.debug('Created "Full Access" role', {
+    roleId: fullAccessRole.id,
     companyId,
-    name: defaultRole.name,
-    isSystem: defaultRole.isSystem,
+    name: fullAccessRole.name,
+    isSystem: fullAccessRole.isSystem,
   });
 
-  // Создаем права только на чтение для роли "По умолчанию"
-  const defaultPermissions = [];
+  // Создаем права: все действия кроме сущностей категории "Администрирование"
+  const fullAccessPermissions = [];
   for (const entity of entities) {
-    // Для reports добавляем только read (export не даём)
-    if (entity.name === 'reports') {
-      defaultPermissions.push({
-        roleId: defaultRole.id,
-        entity: entity.name,
-        action: 'read',
-        allowed: true,
-      });
-    } else {
-      // Для остальных сущностей добавляем только read
-      defaultPermissions.push({
-        roleId: defaultRole.id,
-        entity: entity.name,
-        action: 'read',
-        allowed: true,
-      });
+    const entityConfig = ENTITIES_CONFIG[entity.name];
+
+    // Исключаем сущности категории "Администрирование"
+    if (entityConfig?.category !== 'Администрирование') {
+      for (const action of entity.actions) {
+        fullAccessPermissions.push({
+          roleId: fullAccessRole.id,
+          entity: entity.name,
+          action,
+          allowed: true,
+        });
+      }
     }
   }
 
   await tx.rolePermission.createMany({
-    data: defaultPermissions,
+    data: fullAccessPermissions,
   });
 
-  logger.debug('Created permissions for "Default" role', {
-    roleId: defaultRole.id,
-    permissionsCount: defaultPermissions.length,
-    permissions: defaultPermissions.map((p) => `${p.entity}:${p.action}`),
+  logger.debug('Created permissions for "Full Access" role', {
+    roleId: fullAccessRole.id,
+    permissionsCount: fullAccessPermissions.length,
+    permissions: fullAccessPermissions.map((p) => `${p.entity}:${p.action}`),
+  });
+
+  // 7.2. Роль "Добавление операций" - создание операций + просмотр справочников
+  const operationsEditorRole = await tx.role.create({
+    data: {
+      companyId,
+      name: 'Добавление операций',
+      description:
+        'Возможность создавать и просматривать операции, а также просматривать справочники',
+      category: 'Предустановленные',
+      isSystem: false,
+      isActive: true,
+    },
+  });
+
+  logger.debug('Created "Operations Editor" role', {
+    roleId: operationsEditorRole.id,
+    companyId,
+    name: operationsEditorRole.name,
+    isSystem: operationsEditorRole.isSystem,
+  });
+
+  // Создаем права для роли "Добавление операций"
+  const operationsEditorPermissions = [];
+
+  // Для операций: create и read
+  operationsEditorPermissions.push({
+    roleId: operationsEditorRole.id,
+    entity: 'operations',
+    action: 'create',
+    allowed: true,
+  });
+  operationsEditorPermissions.push({
+    roleId: operationsEditorRole.id,
+    entity: 'operations',
+    action: 'read',
+    allowed: true,
+  });
+
+  // Для dashboard: read
+  operationsEditorPermissions.push({
+    roleId: operationsEditorRole.id,
+    entity: 'dashboard',
+    action: 'read',
+    allowed: true,
+  });
+
+  // Для всех справочников (кроме администрирования): только read
+  const catalogEntities = [
+    'articles',
+    'accounts',
+    'counterparties',
+    'departments',
+    'deals',
+    'salaries',
+  ];
+  for (const entityName of catalogEntities) {
+    operationsEditorPermissions.push({
+      roleId: operationsEditorRole.id,
+      entity: entityName,
+      action: 'read',
+      allowed: true,
+    });
+  }
+
+  // Для отчетов: только read (без export)
+  operationsEditorPermissions.push({
+    roleId: operationsEditorRole.id,
+    entity: 'reports',
+    action: 'read',
+    allowed: true,
+  });
+
+  await tx.rolePermission.createMany({
+    data: operationsEditorPermissions,
+  });
+
+  logger.debug('Created permissions for "Operations Editor" role', {
+    roleId: operationsEditorRole.id,
+    permissionsCount: operationsEditorPermissions.length,
+    permissions: operationsEditorPermissions.map(
+      (p) => `${p.entity}:${p.action}`
+    ),
   });
 
   // Назначаем роль "Супер-пользователь" первому пользователю, если он передан
@@ -358,9 +422,10 @@ export async function seedInitialData(
   logger.info('Initial data seeded successfully', {
     companyId,
     accounts: accounts.count,
-    rolesCreated: 2,
+    rolesCreated: 3,
     superAdminRoleId: superAdminRole.id,
-    defaultRoleId: defaultRole.id,
+    fullAccessRoleId: fullAccessRole.id,
+    operationsEditorRoleId: operationsEditorRole.id,
     firstUserId,
   });
 }

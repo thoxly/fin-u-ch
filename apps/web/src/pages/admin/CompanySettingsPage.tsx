@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Building2, Save, ArrowLeft, DollarSign } from 'lucide-react';
-import { Layout } from '../../shared/ui/Layout';
+import { Building2, Save, DollarSign } from 'lucide-react';
+import { AdminLayout } from '../../shared/ui/AdminLayout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Input } from '../../shared/ui/Input';
@@ -22,7 +21,6 @@ const CURRENCIES = [
 ];
 
 export const CompanySettingsPage = () => {
-  const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
   const { canRead } = usePermissions();
 
@@ -70,7 +68,7 @@ export const CompanySettingsPage = () => {
 
   if (!canRead('users')) {
     return (
-      <Layout>
+      <AdminLayout>
         <Card className="p-8 text-center max-w-md mx-auto">
           <Building2 size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -80,30 +78,20 @@ export const CompanySettingsPage = () => {
             У вас нет прав для просмотра настроек компании
           </p>
         </Card>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Настройки компании
-            </h1>
-            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Управление основными параметрами компании
-            </p>
-          </div>
-          <Button
-            onClick={() => navigate('/admin')}
-            variant="outline"
-            icon={<ArrowLeft size={20} />}
-            className="w-full sm:w-auto"
-          >
-            Назад
-          </Button>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Настройки компании
+          </h1>
+          <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+            Управление основными параметрами компании
+          </p>
         </div>
 
         {isLoading ? (
@@ -198,6 +186,6 @@ export const CompanySettingsPage = () => {
           </div>
         </Card>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };

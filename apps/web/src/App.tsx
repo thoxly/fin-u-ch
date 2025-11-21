@@ -16,23 +16,19 @@ import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { CompanyPage } from './pages/CompanyPage';
 import { AdminPage } from './pages/AdminPage';
-import { RolesPage } from './pages/admin/RolesPage';
-import { UsersPage } from './pages/admin/UsersPage';
-import { AuditLogsPage } from './pages/admin/AuditLogsPage';
-import { CompanySettingsPage } from './pages/admin/CompanySettingsPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
-import { useDarkMode } from './shared/hooks/useDarkMode';
 import { NotificationContainer } from './components/Notification';
+import { ThemeProvider } from './components/ThemeProvider';
 
 function App() {
-  // Автоматическое определение системной темы
-  useDarkMode();
-
   return (
     <>
+      <ThemeProvider />
       <NotificationContainer />
       <Routes>
         {/* Public routes */}
@@ -164,53 +160,31 @@ function App() {
             </PrivateRoute>
           }
         />
+
+        {/* Profile and Company routes - accessible to all authenticated users */}
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <ProfilePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company"
+          element={
+            <PrivateRoute>
+              <CompanyPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Admin route - single page with tabs */}
         <Route
           path="/admin"
           element={
             <PrivateRoute>
-              <ProtectedRoute entity="users" action="read">
-                <AdminPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/roles"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="users" action="manage_roles">
-                <RolesPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="users" action="read">
-                <UsersPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/audit-logs"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="audit" action="read">
-                <AuditLogsPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/admin/company-settings"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="users" action="read">
-                <CompanySettingsPage />
-              </ProtectedRoute>
+              <AdminPage />
             </PrivateRoute>
           }
         />

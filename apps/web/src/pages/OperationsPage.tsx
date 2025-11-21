@@ -40,6 +40,7 @@ import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
+import { usePermissions } from '../shared/hooks/usePermissions';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -193,6 +194,7 @@ export const OperationsPage = () => {
     useBulkSelection();
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
+  const { canCreate, canUpdate } = usePermissions();
 
   // Функция для ручной перезагрузки данных (после мутаций)
   const reloadOperationsData = useCallback(async () => {
@@ -736,31 +738,39 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-            <RecurringOperations onEdit={handleEdit} />
-            <MappingRules />
+            {canUpdate('operations') && (
+              <>
+                <RecurringOperations onEdit={handleEdit} />
+                <MappingRules />
+              </>
+            )}
             <ExportMenu
               filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
               buildRows={buildExportRows}
               columns={exportColumns}
             />
-            <button
-              onClick={handleImportClick}
-              className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
-              title="Импорт выписки"
-            >
-              <FileUp
-                size={18}
-                className="text-primary-600 dark:text-primary-400"
-              />
-            </button>
-            <Button
-              onClick={handleCreate}
-              size="sm"
-              className="text-sm sm:text-base whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">Создать операцию</span>
-              <span className="sm:hidden">Создать</span>
-            </Button>
+            {canUpdate('operations') && (
+              <button
+                onClick={handleImportClick}
+                className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+                title="Импорт выписки"
+              >
+                <FileUp
+                  size={18}
+                  className="text-primary-600 dark:text-primary-400"
+                />
+              </button>
+            )}
+            {canCreate('operations') && (
+              <Button
+                onClick={handleCreate}
+                size="sm"
+                className="text-sm sm:text-base whitespace-nowrap"
+              >
+                <span className="hidden sm:inline">Создать операцию</span>
+                <span className="sm:hidden">Создать</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -821,7 +831,7 @@ export const OperationsPage = () => {
             {showAdvancedFilters && (
               <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Контекст
+                  Дополнительные
                 </div>
                 {/* На мобильных устройствах - горизонтальная прокрутка в один ряд */}
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 filters-scroll md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-x-visible md:pb-0 md:-mx-0 md:px-0">

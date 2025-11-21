@@ -1,6 +1,7 @@
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { hashPassword, verifyPassword } from '../../utils/hash';
+import { Prisma } from '@prisma/client';
 import {
   validateEmail,
   validatePassword,
@@ -199,6 +200,10 @@ export class UsersService {
       throw new AppError('User not found or access denied', 404);
     }
 
+    if (!user.company) {
+      throw new AppError('Company not found for user', 500);
+    }
+
     return {
       ...user,
       companyName: user.company.name,
@@ -321,18 +326,23 @@ export class UsersService {
       throw new AppError('Cannot delete super administrator', 403);
     }
 
-    // Удаляем пользователя (soft delete - деактивируем)
+    // Удаляем пользователя (soft delete)
+    // Изменяем email, добавляя timestamp, чтобы освободить его для повторного использования
+    const deletedEmail = `${user.email}.deleted.${Date.now()}`;
+
     await prisma.user.update({
       where: { id: userId },
       data: {
         isActive: false,
+        email: deletedEmail, // Освобождаем email
       },
     });
 
     logger.debug('[UsersService.deleteUser] Пользователь успешно удалён', {
       userId,
       companyId,
-      email: user.email,
+      originalEmail: user.email,
+      deletedEmail,
     });
 
     return { success: true };
@@ -363,12 +373,12 @@ export class UsersService {
     if (existingUser) {
       if (existingUser.companyId === companyId) {
         throw new AppError(
-          'User with this email already exists in your company',
+          'Пользователь с таким email уже существует в вашей компании',
           409
         );
       } else {
         throw new AppError(
-          'User with this email already exists in another company',
+          'Пользователь с таким email уже существует в другой компании',
           409
         );
       }
@@ -451,93 +461,118 @@ export class UsersService {
     userId: string,
     companyId: string,
     data: {
-      email?: string;
       firstName?: string;
       lastName?: string;
-      isActive?: boolean;
     }
   ) {
+    // Email нельзя изменять через updateMe - для этого есть отдельный процесс с верификацией
     // Проверяем, что пользователь принадлежит к указанной компании перед обновлением
     const userCheck = await prisma.user.findFirst({
       where: {
         id: userId,
         companyId: companyId,
       },
-      select: { id: true, email: true },
+      select: { id: true },
     });
 
     if (!userCheck) {
       throw new AppError('User not found or access denied', 404);
     }
 
-    // Если обновляется email, валидируем его формат
-    if (data.email && data.email !== userCheck.email) {
-      validateEmail(data.email);
-    }
-
     // Обновляем пользователя в транзакции с проверкой companyId для предотвращения утечки данных
-    // Полагаемся на уникальное ограничение базы данных для предотвращения race condition.
-    try {
-      const updatedUser = await prisma.$transaction(async (tx) => {
-        // Проверяем, что пользователь принадлежит к этой компании перед обновлением
-        const userCheckInTx = await tx.user.findFirst({
-          where: {
-            id: userId,
-            companyId: companyId,
-          },
-          select: { id: true },
-        });
-
-        if (!userCheckInTx) {
-          throw new AppError('User not found or access denied', 404);
-        }
-
-        // Используем updateMany для безопасной фильтрации по companyId
-        const updateResult = await tx.user.updateMany({
-          where: {
-            id: userId,
-            companyId: companyId,
-          },
-          data,
-        });
-
-        if (updateResult.count === 0) {
-          throw new AppError('User not found or access denied', 404);
-        }
-
-        // Получаем обновленного пользователя
-        const updatedUser = await tx.user.findUniqueOrThrow({
-          where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            companyId: true,
-            isActive: true,
-            company: {
-              select: {
-                id: true,
-                name: true,
-                currencyBase: true,
-              },
-            },
-          },
-        });
-
-        return updatedUser;
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Используем updateMany для безопасной фильтрации по companyId
+      const updateResult = await tx.user.updateMany({
+        where: {
+          id: userId,
+          companyId: companyId,
+        },
+        data: {
+          ...(data.firstName !== undefined && { firstName: data.firstName }),
+          ...(data.lastName !== undefined && { lastName: data.lastName }),
+        },
       });
 
-      return {
-        ...updatedUser,
-        companyName: updatedUser.company.name,
-      };
-    } catch (error: unknown) {
-      if (error instanceof AppError) {
-        throw error;
+      if (updateResult.count === 0) {
+        throw new AppError('User not found or access denied', 404);
       }
-      handleUniqueConstraintError(error, 'email', 'Email already in use');
+
+      // Получаем обновленного пользователя
+      const updatedUser = await tx.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          companyId: true,
+          isActive: true,
+          isSuperAdmin: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+              currencyBase: true,
+            },
+          },
+        },
+      });
+
+      return updatedUser;
+    });
+
+    return {
+      ...updatedUser,
+      companyName: updatedUser.company.name,
+    };
+  }
+
+  async getPreferences(userId: string, companyId: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId: companyId,
+      },
+      select: {
+        preferences: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found or access denied', 404);
     }
+
+    return (user.preferences as Record<string, unknown>) || {};
+  }
+
+  async updatePreferences(
+    userId: string,
+    companyId: string,
+    preferences: Record<string, unknown>
+  ) {
+    const userCheck = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId: companyId,
+      },
+      select: { id: true },
+    });
+
+    if (!userCheck) {
+      throw new AppError('User not found or access denied', 404);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        preferences: preferences as Prisma.InputJsonValue,
+      },
+      select: {
+        preferences: true,
+      },
+    });
+
+    return (updatedUser.preferences as Record<string, unknown>) || {};
   }
 
   async changePassword(
