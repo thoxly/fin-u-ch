@@ -148,13 +148,13 @@ test.describe('RBAC Full Cycle', () => {
     await page.waitForLoadState('networkidle');
 
     // Проверяем, что кнопка создания либо видна (если есть права), либо скрыта/disabled
-    const createButton = page.locator(
+    const operationCreateButton = page.locator(
       'button:has-text("Создать операцию"), button:has-text("Создать")'
     );
-    const createButtonCount = await createButton.count();
+    const createButtonCount = await operationCreateButton.count();
 
     if (createButtonCount > 0) {
-      const firstButton = createButton.first();
+      const firstButton = operationCreateButton.first();
       const isVisible = await firstButton.isVisible().catch(() => false);
 
       if (isVisible) {
@@ -355,10 +355,10 @@ test.describe('RBAC Full Cycle', () => {
     await page.waitForLoadState('networkidle');
 
     // Права должны быть обновлены (кэш должен инвалидироваться)
-    const createButton = page.locator(
+    const operationCreateButton = page.locator(
       'button:has-text("Создать операцию"), button:has-text("Создать")'
     );
-    const createButtonCount = await createButton.count();
+    const createButtonCount = await operationCreateButton.count();
 
     // Кнопка должна быть либо видна, либо скрыта в зависимости от прав
     expect(createButtonCount >= 0).toBe(true);
