@@ -8,7 +8,6 @@ import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
-import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
 import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
 
@@ -32,7 +31,7 @@ const getEntityForMenuItem = (
   name: string
 ): { entity: string; action: string } | null => {
   const mapping: Record<string, { entity: string; action: string }> = {
-    Дашборд: { entity: 'reports', action: 'read' },
+    Дашборд: { entity: 'dashboard', action: 'read' }, // Исправлено: было 'reports'
     Операции: { entity: 'operations', action: 'read' },
     Бюджеты: { entity: 'budgets', action: 'read' },
     Отчеты: { entity: 'reports', action: 'read' },
@@ -52,7 +51,12 @@ const getEntityForMenuItem = (
 
 const getBaseNavigation = (): NavigationItem[] => {
   return [
-    { name: 'Дашборд', href: '/dashboard', entity: 'reports', action: 'read' },
+    {
+      name: 'Дашборд',
+      href: '/dashboard',
+      entity: 'dashboard',
+      action: 'read',
+    },
     {
       name: 'Операции',
       href: '/operations',
@@ -130,22 +134,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     permissions: permissionsMap,
   } = usePermissions();
 
-  // Получаем базовую навигацию
+  // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
   const baseNavigation = useMemo(() => {
-    const nav = getBaseNavigation();
-
-    // Добавляем раздел "Администрирование" только для супер-пользователя
-    if (user?.isSuperAdmin) {
-      nav.push({
-        name: 'Администрирование',
-        href: '/admin',
-        entity: 'users',
-        action: 'read',
-      });
-    }
-
-    return nav;
-  }, [user?.isSuperAdmin]);
+    return getBaseNavigation();
+  }, []);
 
   // Фильтруем навигацию по правам
   const navigation = useMemo(() => {
@@ -232,9 +224,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     catalogType: string;
     editingData?: unknown; // Данные для редактирования
   }>({ isOpen: false, title: '', catalogType: '' });
-
-  const [userProfileOffCanvasOpen, setUserProfileOffCanvasOpen] =
-    useState(false);
 
   const isActive = (href: string): boolean => location.pathname === href;
 
@@ -405,10 +394,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-            <UserMenu
-              userEmail={user?.email}
-              onProfileClick={() => setUserProfileOffCanvasOpen(true)}
-            />
+            <UserMenu userEmail={user?.email} />
           </div>
         </div>
       </header>
@@ -518,17 +504,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             onClose={handleCloseOffCanvas}
             editingData={offCanvasState.editingData}
           />
-        </OffCanvas>
-      )}
-
-      {/* User Profile OffCanvas */}
-      {userProfileOffCanvasOpen && (
-        <OffCanvas
-          isOpen={userProfileOffCanvasOpen}
-          onClose={() => setUserProfileOffCanvasOpen(false)}
-          title="Мой профиль"
-        >
-          <UserProfileForm onClose={() => setUserProfileOffCanvasOpen(false)} />
         </OffCanvas>
       )}
 

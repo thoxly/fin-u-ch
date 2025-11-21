@@ -1,30 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings } from 'lucide-react';
+import { User, LogOut, UserCircle, Building2, Shield } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
+import { usePermissions } from '../../shared/hooks/usePermissions';
 
 interface UserMenuProps {
   userEmail?: string;
-  onProfileClick: () => void;
 }
 
-export const UserMenu = ({
-  userEmail,
-  onProfileClick,
-}: UserMenuProps): JSX.Element => {
+export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
+
+  // Проверяем, есть ли у пользователя доступ к администрированию
+  const hasAdminAccess =
+    hasPermission('users', 'read') ||
+    hasPermission('users', 'manage_roles') ||
+    hasPermission('audit', 'read');
 
   const handleLogout = (): void => {
     dispatch(logout());
     navigate('/login');
   };
 
-  const handleProfileClick = (): void => {
-    onProfileClick();
+  const handleMenuItemClick = (path: string): void => {
+    navigate(path);
     setIsOpen(false);
   };
 
@@ -66,14 +70,33 @@ export const UserMenu = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-800 dark:border-gray-700">
+        <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 dark:bg-gray-800 dark:border-gray-700">
           <button
-            onClick={handleProfileClick}
+            onClick={() => handleMenuItemClick('/profile')}
             className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
           >
-            <Settings size={16} />
+            <UserCircle size={16} />
             Мой профиль
           </button>
+          <button
+            onClick={() => handleMenuItemClick('/company')}
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <Building2 size={16} />
+            Моя компания
+          </button>
+          {hasAdminAccess && (
+            <>
+              <hr className="my-1 border-gray-200 dark:border-gray-700" />
+              <button
+                onClick={() => handleMenuItemClick('/admin')}
+                className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <Shield size={16} />
+                Администрирование
+              </button>
+            </>
+          )}
           <hr className="my-1 border-gray-200 dark:border-gray-700" />
           <button
             onClick={handleLogout}
