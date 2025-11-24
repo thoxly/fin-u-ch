@@ -548,12 +548,10 @@ export const OperationsPage = () => {
   // Автоматически открываем модальное окно импорта, если есть флаг в sessionStorage
   useEffect(() => {
     const shouldOpen = sessionStorage.getItem('openImportModal');
-    const tab = sessionStorage.getItem('importModalTab');
 
     if (shouldOpen === 'true') {
       setIsImportModalOpen(true);
       sessionStorage.removeItem('openImportModal');
-      sessionStorage.removeItem('importModalTab');
     }
   }, []);
 
@@ -564,7 +562,6 @@ export const OperationsPage = () => {
       if (shouldOpen === 'true') {
         setIsImportModalOpen(true);
         sessionStorage.removeItem('openImportModal');
-        sessionStorage.removeItem('importModalTab');
       }
     };
 

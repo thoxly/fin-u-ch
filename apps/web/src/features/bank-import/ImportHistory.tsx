@@ -22,6 +22,7 @@ interface ImportHistoryProps {
   onCollapseChange?: (collapsed: boolean) => void;
   onViewSession?: (sessionId: string) => void;
   viewingSessionId?: string | null;
+  hideHeader?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -46,6 +47,7 @@ export const ImportHistory = ({
   onCollapseChange,
   onViewSession,
   viewingSessionId: propViewingSessionId,
+  hideHeader = false,
 }: ImportHistoryProps) => {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -250,26 +252,28 @@ export const ImportHistory = ({
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">История импортов</h2>
-          {onCollapseChange && (
-            <button
-              onClick={() => onCollapseChange(true)}
-              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Свернуть"
-            >
-              <ChevronDown size={20} />
-            </button>
+    <div className={`${hideHeader ? '' : 'p-6'} space-y-4`}>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">История импортов</h2>
+            {onCollapseChange && (
+              <button
+                onClick={() => onCollapseChange(true)}
+                className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Свернуть"
+              >
+                <ChevronDown size={20} />
+              </button>
+            )}
+          </div>
+          {onClose && (
+            <Button onClick={onClose} variant="secondary" size="sm">
+              Закрыть
+            </Button>
           )}
         </div>
-        {onClose && (
-          <Button onClick={onClose} variant="secondary" size="sm">
-            Закрыть
-          </Button>
-        )}
-      </div>
+      )}
 
       <div className="flex items-center gap-4 mb-4">
         <Select

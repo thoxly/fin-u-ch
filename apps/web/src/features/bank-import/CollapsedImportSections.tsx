@@ -11,7 +11,6 @@ interface StoredState {
   timestamp: number;
   collapsedHistory: boolean;
   collapsedMapping: boolean;
-  activeTab: 'upload' | 'history';
   viewingSessionId: string | null;
 }
 
@@ -84,7 +83,6 @@ export const CollapsedImportSections = () => {
         collapsedHistory: type === 'history' ? false : state.collapsedHistory,
         collapsedMapping: type === 'mapping' ? false : state.collapsedMapping,
         minimized: false,
-        activeTab: type === 'history' ? 'history' : 'upload',
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
       setState(updatedState);
@@ -94,10 +92,6 @@ export const CollapsedImportSections = () => {
 
     // Сохраняем флаг для открытия модального окна
     sessionStorage.setItem('openImportModal', 'true');
-    sessionStorage.setItem(
-      'importModalTab',
-      type === 'history' ? 'history' : 'upload'
-    );
 
     // Если мы уже на странице операций, просто обновляем страницу
     if (location.pathname === '/operations') {

@@ -6,8 +6,11 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 import { Modal } from '../../shared/ui/Modal';
+import { Breadcrumb, BreadcrumbItem } from '../../shared/ui/Breadcrumb';
+import { FadeTransition } from '../../shared/ui/FadeTransition';
 import { useUploadStatementMutation } from '../../store/api/importsApi';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { ImportMappingTable } from './ImportMappingTable';
@@ -26,23 +29,19 @@ interface StoredState {
   sessionId: string | null;
   minimized: boolean;
   timestamp: number;
+  viewingSessionId: string | null;
   collapsedHistory: boolean;
   collapsedMapping: boolean;
-  activeTab: 'upload' | 'history';
-  viewingSessionId: string | null;
 }
 
-type TabType = 'upload' | 'history';
+// Навигационные уровни
+type NavigationLevel = 'main' | 'session-details';
 
 export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('upload');
-  const [isViewingMapping, setIsViewingMapping] = useState(false);
   const [showInnInfo, setShowInnInfo] = useState(false);
-  const [collapsedHistory, setCollapsedHistory] = useState(false);
-  const [collapsedMapping, setCollapsedMapping] = useState(false);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
   const [navigationLevel, setNavigationLevel] =
     useState<NavigationLevel>('main');
@@ -87,15 +86,6 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
           setSessionId(state.sessionId);
         }
         setIsMinimized(state.minimized);
-        if (state.collapsedHistory !== undefined) {
-          setCollapsedHistory(state.collapsedHistory);
-        }
-        if (state.collapsedMapping !== undefined) {
-          setCollapsedMapping(state.collapsedMapping);
-        }
-        if (state.activeTab) {
-          setActiveTab(state.activeTab);
-        }
         if (state.viewingSessionId) {
           setViewingSessionId(state.viewingSessionId);
         }
@@ -104,77 +94,78 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         localStorage.removeItem(STORAGE_KEY);
       }
     }
-  }, [isOpen, onClose]); // Загружаем только при монтировании
+  }, []); // Загружаем только при монтировании
 
   // Обновляем состояние при изменении isOpen
   useEffect(() => {
     if (isOpen) {
+      // Сбрасываем флаг минимизации при открытии
+      setIsMinimizing(false);
+
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
           const state: StoredState = JSON.parse(stored);
+
+          console.log('📂 Восстанавливаем состояние модального окна:', state);
+
+          // Восстанавливаем sessionId и viewingSessionId
           if (state.sessionId) {
             setSessionId(state.sessionId);
           }
-          setIsMinimized(state.minimized);
-          if (state.collapsedHistory !== undefined) {
-            setCollapsedHistory(state.collapsedHistory);
-          }
-          if (state.collapsedMapping !== undefined) {
-            setCollapsedMapping(state.collapsedMapping);
-          }
-          if (state.activeTab) {
-            setActiveTab(state.activeTab);
-          }
           if (state.viewingSessionId) {
             setViewingSessionId(state.viewingSessionId);
+          }
+
+          setIsMinimized(state.minimized);
+
+          // ВАЖНО: восстанавливаем navigationLevel на основе состояния
+          // Если была свернута таблица маппинга, восстанавливаем её
+          if (
+            state.collapsedMapping &&
+            (state.sessionId || state.viewingSessionId)
+          ) {
+            console.log('🔄 Восстанавливаем navigationLevel в session-details');
+            setNavigationLevel('session-details');
+          } else {
+            setNavigationLevel('main');
           }
         } catch (error) {
           console.error('Failed to load modal state:', error);
         }
       }
-
-      // Проверяем, нужно ли открыть определенную вкладку
-      const tab = sessionStorage.getItem('importModalTab');
-      if (tab === 'history' || tab === 'upload') {
-        setActiveTab(tab);
-        sessionStorage.removeItem('importModalTab');
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  // Сохраняем состояние в localStorage
+  // Сохраняем состояние в localStorage только когда модальное окно открыто
   useEffect(() => {
-    // Сохраняем состояние, если модальное окно открыто, свернуто, или есть свернутые секции
-    if (isOpen || isMinimized || collapsedHistory || collapsedMapping) {
-      const state: StoredState = {
-        sessionId: isOpen || isMinimized ? sessionId : null,
-        minimized: isMinimized,
-        timestamp: Date.now(),
-        collapsedHistory,
-        collapsedMapping,
-        activeTab,
-        viewingSessionId: isOpen || isMinimized ? viewingSessionId : null,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      // Триггерим кастомное событие для обновления CollapsedImportSections
-      window.dispatchEvent(new Event('localStorageChange'));
+    // Не сохраняем состояние, если идет процесс сворачивания или окно закрыто/свернуто
+    if (isMinimizing || !isOpen || isMinimized) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    isOpen,
-    sessionId,
-    isMinimized,
-    collapsedHistory,
-    collapsedMapping,
-    activeTab,
-    viewingSessionId,
-  ]);
+
+    // Сохраняем состояние только если модальное окно открыто (не свернуто)
+    // Когда окно свернуто, состояние уже сохранено в handleMinimize
+    const state: StoredState = {
+      sessionId,
+      minimized: false,
+      timestamp: Date.now(),
+      viewingSessionId,
+      collapsedHistory: false, // Когда модальное окно открыто, секции не свернуты
+      collapsedMapping: false,
+    };
+    console.log('💾 Автосохранение состояния (окно открыто):', state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Триггерим кастомное событие для обновления CollapsedImportSections
+    window.dispatchEvent(new Event('localStorageChange'));
+  }, [isOpen, sessionId, isMinimized, viewingSessionId, isMinimizing]);
 
   // Очищаем localStorage при закрытии
   const clearStoredState = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
+    // Триггерим кастомное событие для обновления CollapsedImportSections
+    window.dispatchEvent(new Event('localStorageChange'));
   }, []);
 
   const handleFileUpload = useCallback(
@@ -192,12 +183,11 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
       }
 
       try {
-        const formData = new FormData();
+        const formData: FormData = new FormData();
         formData.append('file', file);
 
         const result = await uploadStatement(formData).unwrap();
         setSessionId(result.sessionId);
-        showSuccess(`Файл загружен. Найдено операций: ${result.importedCount}`);
         setSessionFileName(file.name);
         setCompanyAccountNumber(result.companyAccountNumber || null);
         setNavigationLevel('session-details');
@@ -231,31 +221,44 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         // где data это ответ сервера { status: 'error', message: '...' }
         let errorMessage = 'Ошибка при загрузке файла. Проверьте формат файла.';
 
-        if (error && typeof error === 'object' && 'data' in error) {
-          const errorData = error.data as
-            | { message?: string; error?: string }
-            | string;
-          // Если data это объект с message
-          if (typeof errorData === 'object') {
-            if (errorData.message) {
-              errorMessage = errorData.message;
-            } else if (errorData.error) {
-              errorMessage = errorData.error;
+        if (error && typeof error === 'object') {
+          if ('data' in error) {
+            const errorData = (error as { data?: unknown }).data;
+            // Если data это объект с message
+            if (errorData && typeof errorData === 'object') {
+              if (
+                'message' in errorData &&
+                typeof errorData.message === 'string'
+              ) {
+                errorMessage = errorData.message;
+              } else if (
+                'error' in errorData &&
+                typeof errorData.error === 'string'
+              ) {
+                errorMessage = errorData.error;
+              }
+            } else if (typeof errorData === 'string') {
+              errorMessage = errorData;
             }
-          } else if (typeof errorData === 'string') {
-            errorMessage = errorData;
+          } else if ('error' in error) {
+            const nestedError = (
+              error as { error?: { data?: { message?: string } } }
+            ).error;
+            if (nestedError?.data?.message) {
+              errorMessage = nestedError.data.message;
+            }
+          } else if (
+            'message' in error &&
+            typeof (error as { message: unknown }).message === 'string'
+          ) {
+            errorMessage = (error as { message: string }).message;
           }
-        } else if (error && typeof error === 'object' && 'error' in error) {
-          const nestedError = error.error as { data?: { message?: string } };
-          if (nestedError?.data?.message) {
-            errorMessage = nestedError.data.message;
-          }
-        } else if (error && typeof error === 'object' && 'message' in error) {
-          errorMessage = String(error.message);
         }
 
         console.error('Upload error details:', {
           error,
+          status: (error as { status?: unknown })?.status,
+          data: (error as { data?: unknown })?.data,
           fullError: JSON.stringify(error, null, 2),
         });
         showError(errorMessage);
@@ -300,35 +303,6 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
     [handleFileUpload]
   );
 
-  const handleClose = () => {
-    // Если секции были свернуты, сохраняем их состояние
-    const shouldKeepState = collapsedHistory || collapsedMapping;
-
-    if (!shouldKeepState) {
-      // Если ничего не свернуто, полностью очищаем состояние
-      setSessionId(null);
-      setIsMinimized(false);
-      setIsViewingMapping(false);
-      setCollapsedHistory(false);
-      setCollapsedMapping(false);
-      setViewingSessionId(null);
-      clearStoredState();
-    } else {
-      // Сохраняем состояние свернутых секций
-      const state: StoredState = {
-        sessionId: null, // Очищаем сессию при закрытии
-        minimized: false,
-        timestamp: Date.now(),
-        collapsedHistory,
-        collapsedMapping,
-        activeTab,
-        viewingSessionId: null,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      // Триггерим кастомное событие для обновления CollapsedImportSections
-      window.dispatchEvent(new Event('localStorageChange'));
-    }
-
   // Навигация назад к главному экрану
   const handleBackToMain = useCallback(() => {
     setNavigationLevel('main');
@@ -361,11 +335,79 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
   };
 
   const handleMinimize = () => {
-    setIsMinimized(true);
+    // Устанавливаем флаг, чтобы предотвратить перезапись в эффекте
+    setIsMinimizing(true);
+
+    // Определяем, какую секцию нужно свернуть
+    // Приоритет: таблица маппинга > история > загрузка
+
+    // Если мы на экране деталей сессии (таблица маппинга), сворачиваем ТОЛЬКО её
+    const collapsedMapping =
+      navigationLevel === 'session-details' &&
+      (sessionId !== null || viewingSessionId !== null);
+
+    // Если мы НЕ на экране маппинга, сворачиваем историю
+    const collapsedHistory = !collapsedMapping;
+
+    // Сохраняем состояние в localStorage перед закрытием модального окна
+    const state: StoredState = {
+      sessionId,
+      minimized: true,
+      timestamp: Date.now(),
+      viewingSessionId,
+      collapsedHistory,
+      collapsedMapping,
+    };
+
+    console.log('💾 Сворачиваем окно импорта:', {
+      navigationLevel,
+      sessionId,
+      viewingSessionId,
+      collapsedHistory,
+      collapsedMapping,
+      state,
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Триггерим кастомное событие для обновления CollapsedImportSections
+    window.dispatchEvent(new Event('localStorageChange'));
+
+    // Закрываем модальное окно
+    onClose();
+
+    // Сбрасываем флаг после небольшой задержки
+    setTimeout(() => {
+      setIsMinimizing(false);
+    }, 100);
   };
 
   const handleMaximize = () => {
     setIsMinimized(false);
+  };
+
+  // Генерация breadcrumbs на основе текущего уровня навигации
+  const getBreadcrumbs = (): BreadcrumbItem[] => {
+    const breadcrumbs: BreadcrumbItem[] = [];
+
+    if (navigationLevel === 'main') {
+      breadcrumbs.push({
+        label: 'Импорт банковской выписки',
+        isActive: true,
+      });
+    } else if (navigationLevel === 'session-details') {
+      breadcrumbs.push({
+        label: 'Импорт банковской выписки',
+        onClick: handleBackToMain,
+      });
+      breadcrumbs.push({
+        label: sessionFileName
+          ? `Операции: ${sessionFileName}`
+          : 'Импортированные операции',
+        isActive: true,
+      });
+    }
+
+    return breadcrumbs;
   };
 
   // Если модальное окно закрыто и не свернуто, не показываем ничего
@@ -393,12 +435,28 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
               onClick={handleClose}
               className="text-gray-500 hover:text-red-600 dark:hover:text-red-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               title="Закрыть"
+              disabled={isLoading}
             >
               <X size={20} />
             </button>
           </div>
         </div>
-        {sessionId ? (
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <Loader2
+              className="text-primary-600 dark:text-primary-400 animate-spin"
+              size={16}
+            />
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Загрузка выписки...
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                Это может занять несколько минут
+              </p>
+            </div>
+          </div>
+        ) : sessionId ? (
           <div className="flex items-center gap-2">
             <div className="relative">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-ping absolute"></div>
@@ -417,99 +475,34 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
     );
   }
 
-  // Если файл загружен и есть сессия, или просматривается сессия из истории, показываем таблицу маппинга
+  // Получаем breadcrumbs для текущего состояния
+  const breadcrumbs = getBreadcrumbs();
   const currentSessionId = sessionId || viewingSessionId;
-  if (currentSessionId) {
-    return (
-      <Modal
-        isOpen={isOpen}
-        onClose={handleClose}
-        title="Импортированные операции"
-        size="full"
-        onMinimize={handleMinimize}
-      >
-        <div className="p-6">
-          <ImportMappingTable
-            sessionId={currentSessionId}
-            onClose={handleClose}
-            isCollapsed={collapsedMapping}
-            onCollapseChange={setCollapsedMapping}
-          />
-        </div>
-      </Modal>
-    );
-  }
+  const modalSize = navigationLevel === 'session-details' ? 'full' : 'xl';
+  const modalTitle =
+    navigationLevel === 'session-details'
+      ? 'Импортированные операции'
+      : 'Импорт банковской выписки';
 
-  // Иначе показываем вкладки: загрузка или история
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Импорт банковской выписки"
-      size={isViewingMapping ? 'full' : 'xl'}
+      title={modalTitle}
+      size={modalSize}
       onMinimize={handleMinimize}
     >
       <div className="p-6 space-y-4">
-        {/* Вкладки */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="flex space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => {
-                setActiveTab('upload');
-                setIsViewingMapping(false);
-              }}
-              className={`
-                py-4 px-1 border-b-2 font-medium text-sm
-                ${
-                  activeTab === 'upload'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }
-              `}
-            >
-              Загрузка файла
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('history');
-                setIsViewingMapping(false);
-              }}
-              className={`
-                py-4 px-1 border-b-2 font-medium text-sm
-                ${
-                  activeTab === 'history'
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }
-              `}
-            >
-              История импортов
-            </button>
-          </nav>
-        </div>
+        {/* Breadcrumb навигация - показываем только на уровне session-details */}
+        {navigationLevel === 'session-details' && breadcrumbs.length > 0 && (
+          <div className="pb-2 border-b border-gray-200 dark:border-gray-700">
+            <Breadcrumb items={breadcrumbs} />
+          </div>
+        )}
 
-        {/* Содержимое вкладок */}
-        {activeTab === 'upload' ? (
-          <div className="space-y-4">
-            {/* Информационный блок про ИНН */}
-            <div
-              className={`rounded-lg p-4 ${
-                !company?.inn
-                  ? 'bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700'
-                  : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
-              }`}
-            >
-              <button
-                onClick={() => setShowInnInfo(!showInnInfo)}
-                className="w-full flex items-center justify-between text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Info
-                    className={
         {/* Контент с плавными переходами */}
         <FadeTransition show={navigationLevel === 'session-details'}>
           {navigationLevel === 'session-details' && currentSessionId && (
-            // Экран деталей сессии
             <ImportMappingTable
               sessionId={currentSessionId}
               companyAccountNumber={companyAccountNumber}
@@ -521,200 +514,202 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
 
         <FadeTransition show={navigationLevel === 'main'}>
           {navigationLevel === 'main' && (
-            // Главный экран с вкладками
-            <>
-              {/* Вкладки */}
-              <div className="border-b border-gray-200 dark:border-gray-700">
-                <nav className="flex space-x-8" aria-label="Tabs">
-                  <button
-                    onClick={() => setActiveTab('upload')}
-                    className={`
-                      py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                      ${
-                        activeTab === 'upload'
-                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                      }
-                    `}
-                  >
-                    Загрузка файла
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('history')}
-                    className={`
-                      py-4 px-1 border-b-2 font-medium text-sm transition-colors
-                      ${
-                        activeTab === 'history'
-                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                      }
-                    `}
-                  >
-                    История импортов
-                  </button>
-                </nav>
-              </div>
+            <div className="space-y-6">
+              {/* Секция загрузки файла */}
+              <div className="space-y-4 relative">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Загрузка файла
+                </h3>
 
-              {/* Содержимое вкладок */}
-              {activeTab === 'upload' ? (
-                <div className="space-y-4 mt-4 relative">
-                  {/* Индикатор загрузки */}
-                  {isLoading && (
-                    <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
-                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4 border border-gray-200 dark:border-gray-700">
-                        <div className="flex flex-col items-center gap-4">
-                          <Loader2
-                            className="animate-spin text-primary-600 dark:text-primary-400"
-                            size={48}
-                          />
-                          <div className="text-center space-y-2">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                              Загрузка выписки...
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Пожалуйста, подождите. Обработка большой выписки
-                              может занять несколько минут.
-                            </p>
-                            <p className="text-xs text-gray-500 dark:text-gray-500">
-                              Вы можете свернуть это окно, загрузка продолжится
-                              в фоновом режиме.
-                            </p>
-                          </div>
+                {/* Индикатор загрузки */}
+                {isLoading && (
+                  <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+                      <div className="flex flex-col items-center gap-4">
+                        <Loader2
+                          className="animate-spin text-primary-600 dark:text-primary-400"
+                          size={48}
+                        />
+                        <div className="text-center space-y-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            Загрузка выписки...
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Пожалуйста, подождите. Обработка большой выписки
+                            может занять несколько минут.
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-500">
+                            Вы можете свернуть это окно, загрузка продолжится в
+                            фоновом режиме.
+                          </p>
                         </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* Информационный блок про ИНН */}
-                  <div
-                    className={`rounded-lg p-4 ${
-                      !company?.inn
-                        ? 'text-orange-600 dark:text-orange-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }
-                    size={20}
-                  />
-                  <span
-                    className={`font-medium ${
-                      !company?.inn
-                        ? 'text-orange-900 dark:text-orange-100'
-                        : 'text-blue-900 dark:text-blue-100'
-                    }`}
-                  >
-                    {!company?.inn
-                      ? 'Рекомендуем указать ИНН компании'
-                      : 'Автоматическое определение направления операций'}
-                  </span>
-                </div>
-                {showInnInfo ? (
-                  <ChevronUp
-                    className={
-                      !company?.inn
-                        ? 'text-orange-600 dark:text-orange-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }
-                    size={20}
-                  />
-                ) : (
-                  <ChevronDown
-                    className={
-                      !company?.inn
-                        ? 'text-orange-600 dark:text-orange-400'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }
-                    size={20}
-                  />
+                  </div>
                 )}
-              </button>
-              {showInnInfo && (
+
+                {/* Информационный блок про ИНН */}
                 <div
-                  className={`mt-3 text-sm space-y-2 ${
+                  className={`rounded-lg p-4 ${
                     !company?.inn
-                      ? 'text-orange-800 dark:text-orange-200'
-                      : 'text-blue-800 dark:text-blue-200'
+                      ? 'bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700'
+                      : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
                   }`}
                 >
-                  <p>
-                    {!company?.inn
-                      ? 'Для автоматического определения направления операций (списание или поступление) рекомендуется указать ИНН компании в настройках. Без ИНН вам потребуется вручную указывать направление для каждой операции.'
-                      : 'Для автоматического определения направления операций (списание или поступление) используется ИНН компании из настроек.'}
-                  </p>
-                  <p>
-                    <strong>Как это работает:</strong>
-                  </p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>
-                      Если в платежном поручении в строке{' '}
-                      <strong>Плательщик</strong> указан ИНН вашей компании,
-                      система автоматически определит операцию как{' '}
-                      <strong>Списание</strong>.
-                    </li>
-                    <li>
-                      Если в строке <strong>Получатель</strong> указан ИНН вашей
-                      компании, система автоматически определит операцию как{' '}
-                      <strong>Поступление</strong>.
-                    </li>
-                  </ul>
-                  {!company?.inn && (
-                    <p className="mt-2 font-medium text-orange-700 dark:text-orange-300">
-                      💡 Перейдите в настройки профиля, чтобы добавить ИНН и
-                      упростить импорт выписок.
-                    </p>
+                  <button
+                    onClick={() => setShowInnInfo(!showInnInfo)}
+                    className="w-full flex items-center justify-between text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Info
+                        className={
+                          !company?.inn
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-blue-600 dark:text-blue-400'
+                        }
+                        size={20}
+                      />
+                      <span
+                        className={`font-medium ${
+                          !company?.inn
+                            ? 'text-orange-900 dark:text-orange-100'
+                            : 'text-blue-900 dark:text-blue-100'
+                        }`}
+                      >
+                        {!company?.inn
+                          ? 'Рекомендуем указать ИНН компании'
+                          : 'Как система понимает, деньги пришли или ушли'}
+                      </span>
+                    </div>
+                    {showInnInfo ? (
+                      <ChevronUp
+                        className={
+                          !company?.inn
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-blue-600 dark:text-blue-400'
+                        }
+                        size={20}
+                      />
+                    ) : (
+                      <ChevronDown
+                        className={
+                          !company?.inn
+                            ? 'text-orange-600 dark:text-orange-400'
+                            : 'text-blue-600 dark:text-blue-400'
+                        }
+                        size={20}
+                      />
+                    )}
+                  </button>
+                  {showInnInfo && (
+                    <div
+                      className={`mt-3 text-sm space-y-2 ${
+                        !company?.inn
+                          ? 'text-orange-800 dark:text-orange-200'
+                          : 'text-blue-800 dark:text-blue-200'
+                      }`}
+                    >
+                      <p>
+                        {!company?.inn
+                          ? 'Укажите ИНН компании в настройках — так система сама будет определять, это приход или расход денег. Без ИНН придётся выбирать вручную для каждой операции.'
+                          : 'Система смотрит на ваш ИНН в платёжке и сама понимает, это приход или расход.'}
+                      </p>
+                      <p>
+                        <strong>Как это работает:</strong>
+                      </p>
+                      <ul className="space-y-2 ml-2">
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-500 font-bold mt-0.5">
+                            ↗
+                          </span>
+                          <span>
+                            Ваш ИНН в поле <strong>"Плательщик"</strong> → это{' '}
+                            <strong>расход</strong> (деньги ушли)
+                          </span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-500 font-bold mt-0.5">
+                            ↙
+                          </span>
+                          <span>
+                            Ваш ИНН в поле <strong>"Получатель"</strong> → это{' '}
+                            <strong>приход</strong> (деньги пришли)
+                          </span>
+                        </li>
+                      </ul>
+                      {!company?.inn && (
+                        <p className="mt-2 font-medium text-orange-700 dark:text-orange-300">
+                          💡 Перейдите в настройки профиля, чтобы добавить ИНН и
+                          упростить импорт выписок.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-            <label className="block cursor-pointer">
-              <input
-                type="file"
-                accept=".txt"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={isLoading}
-              />
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`
+                <label
+                  className={`block ${isLoading ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <input
+                    type="file"
+                    accept=".txt"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    disabled={isLoading}
+                  />
+                  <div
+                    onDragOver={isLoading ? undefined : handleDragOver}
+                    onDragLeave={isLoading ? undefined : handleDragLeave}
+                    onDrop={isLoading ? undefined : handleDrop}
+                    className={`
                   border-2 border-dashed rounded-lg p-8 text-center transition-colors
                   ${
-                    isDragging
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
+                    isLoading
+                      ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 opacity-50'
+                      : isDragging
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-gray-300 dark:border-gray-600 hover:border-primary-400'
                   }
                 `}
-              >
-                <Upload
-                  className={`mx-auto mb-4 ${
-                    isDragging ? 'text-primary-500' : 'text-gray-400'
-                  }`}
-                  size={48}
-                />
-                <p className="text-lg font-medium mb-2">
-                  Перетащите файл сюда или кликните для выбора
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Поддерживаются файлы .txt до 10MB
-                </p>
+                  >
+                    <Upload
+                      className={`mx-auto mb-4 ${
+                        isLoading
+                          ? 'text-gray-300 dark:text-gray-600'
+                          : isDragging
+                            ? 'text-primary-500'
+                            : 'text-gray-400'
+                      }`}
+                      size={48}
+                    />
+                    <p className="text-lg font-medium mb-2">
+                      Перетащите файл сюда или кликните для выбора
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Поддерживаются файлы .txt до 10MB
+                    </p>
+                  </div>
+                </label>
               </div>
-            </label>
-          </div>
-        ) : (
-          <ImportHistory
-            onClose={handleClose}
-            onViewingChange={(isViewing) => {
-              setIsViewingMapping(isViewing);
-            }}
-            isCollapsed={collapsedHistory}
-            onCollapseChange={setCollapsedHistory}
-            onViewSession={(sessionId) => {
-              setViewingSessionId(sessionId);
-              setIsViewingMapping(true);
-            }}
-            viewingSessionId={viewingSessionId}
-          />
-        )}
+
+              {/* Разделитель */}
+              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+              {/* Секция истории импортов */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  История импортов
+                </h3>
+                <ImportHistory
+                  onClose={handleClose}
+                  onViewingChange={() => {}}
+                  onViewSession={handleViewSession}
+                  viewingSessionId={null}
+                  hideHeader={true}
+                />
+              </div>
+            </div>
+          )}
+        </FadeTransition>
       </div>
     </Modal>
   );
