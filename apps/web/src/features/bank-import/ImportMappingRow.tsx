@@ -85,9 +85,15 @@ const ImportMappingRowComponent = ({
   field,
   sessionId: _sessionId,
   onOpenCreateModal,
+  onFieldUpdate,
+  onRegisterChange,
   disabled = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [lastClickPosition, setLastClickPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
@@ -171,21 +177,18 @@ const ImportMappingRowComponent = ({
     switch (field) {
       case 'counterparty':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name }))
         );
         break;
       case 'article':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...articles.map((a) => ({ value: a.id, label: a.name }))
         );
         break;
       case 'account':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
@@ -194,21 +197,18 @@ const ImportMappingRowComponent = ({
         break;
       case 'deal':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...deals.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'department':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...departments.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'currency':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: 'RUB', label: 'RUB' },
           { value: 'USD', label: 'USD' },
           { value: 'EUR', label: 'EUR' }
@@ -237,23 +237,20 @@ const ImportMappingRowComponent = ({
     return baseOptions;
   };
 
-  const handleChange = async (value: string) => {
-    // Если выбрана опция создания, открываем offcanvas
-    if (value === '__create__') {
-      if (
-        field === 'counterparty' ||
-        field === 'article' ||
-        field === 'account' ||
-        field === 'deal' ||
-        field === 'department' ||
-        field === 'currency'
-      ) {
-        onOpenCreateModal(field, operation);
-        setIsEditing(false);
-      }
-      return;
+  const handleCreateNew = () => {
+    if (
+      field === 'counterparty' ||
+      field === 'article' ||
+      field === 'account' ||
+      field === 'deal' ||
+      field === 'department' ||
+      field === 'currency'
+    ) {
+      onOpenCreateModal(field, operation);
     }
+  };
 
+  const handleChange = async (value: string) => {
     try {
       const updateData: {
         matchedCounterpartyId?: string | null;
@@ -263,7 +260,7 @@ const ImportMappingRowComponent = ({
         matchedDepartmentId?: string | null;
         currency?: string;
         repeat?: string;
-        direction?: string | null;
+        direction?: 'income' | 'expense' | 'transfer' | null;
       } = {};
 
       if (field === 'counterparty') {
@@ -290,7 +287,8 @@ const ImportMappingRowComponent = ({
       } else if (field === 'repeat') {
         updateData.repeat = value;
       } else if (field === 'direction') {
-        updateData.direction = value || null;
+        updateData.direction =
+          (value as 'income' | 'expense' | 'transfer') || null;
       }
 
       setIsEditing(false);
@@ -365,7 +363,7 @@ const ImportMappingRowComponent = ({
               top: lastClickPosition.top - 40, // Примерная высота элемента
               bottom: lastClickPosition.top,
               left: lastClickPosition.left,
-              right: lastClickPosition.right,
+              right: lastClickPosition.left + 100, // Примерная ширина
             }),
           },
         } as React.MouseEvent;
@@ -386,12 +384,21 @@ const ImportMappingRowComponent = ({
   };
 
   if (isEditing && !disabled) {
+    const canCreate =
+      field === 'counterparty' ||
+      field === 'article' ||
+      field === 'account' ||
+      field === 'deal' ||
+      field === 'department' ||
+      field === 'currency';
+
     return (
       <div className="relative w-full">
         <Select
           value={getCurrentValue()}
           onChange={handleChange}
           options={getOptions()}
+          onCreateNew={canCreate ? handleCreateNew : undefined}
           className="w-full"
         />
       </div>
@@ -430,7 +437,10 @@ const ImportMappingRowComponent = ({
   // Для account показываем номер счета серым текстом (только если счет выбран)
   if (field === 'account') {
     // Показываем номер только выбранного счета из справочника
-    const selectedAccountNumber = operation.matchedAccount?.number;
+    const selectedAccount = accounts.find(
+      (acc) => acc.id === operation.matchedAccountId
+    );
+    const selectedAccountNumber = selectedAccount?.number;
 
     return (
       <div
