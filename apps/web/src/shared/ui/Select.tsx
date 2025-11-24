@@ -44,11 +44,13 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       onChange,
       disabled,
       required,
-      ..._props
+      onCreateNew,
     },
     _ref
   ) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isPositioned, setIsPositioned] = useState(false); // Флаг готовности позиции
     const [position, setPosition] = useState({
       top: 0,
       left: 0,
@@ -68,220 +70,198 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       }
     };
 
-    // Находим ближайший контейнер с overflow (модалка, таблица и т.д.)
-    const findScrollContainer = useCallback(
-      (
-        element: HTMLElement | null
-      ): {
-        top: number;
-        bottom: number;
-        left: number;
-        right: number;
-      } | null => {
-        if (!element) return null;
-
-        let current: HTMLElement | null = element;
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
-
-        // Ищем родительский элемент с overflow или модальное окно
-        while (current && current !== document.body) {
-          const style = window.getComputedStyle(current);
-          const overflow = style.overflow + style.overflowY + style.overflowX;
-          const isModal =
-            current.classList.contains('fixed') ||
-            current.getAttribute('role') === 'dialog' ||
-            current.classList.contains('modal') ||
-            current.classList.contains('offcanvas');
-
-          // Если это модальное окно или элемент с overflow, используем его границы
-          if (
-            isModal ||
-            overflow.includes('auto') ||
-            overflow.includes('scroll') ||
-            overflow.includes('hidden')
-          ) {
-            const rect = current.getBoundingClientRect();
-            // Проверяем, что элемент видим
-            if (rect.width > 0 && rect.height > 0) {
-              return {
-                top: Math.max(rect.top, 0),
-                bottom: Math.min(rect.bottom, viewportHeight),
-                left: Math.max(rect.left, 0),
-                right: Math.min(rect.right, viewportWidth),
-              };
-            }
-          }
-          current = current.parentElement;
-        }
-
-        // Если не нашли, используем viewport
-        return {
-          top: 0,
-          bottom: viewportHeight,
-          left: 0,
-          right: viewportWidth,
-        };
-      },
-      []
-    );
-
     const updatePosition = useCallback(() => {
-      if (buttonRef.current) {
-        const rect = buttonRef.current.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        const viewportWidth = window.innerWidth;
+      if (!buttonRef.current) return;
 
-        // Находим границы контейнера (модалка, таблица и т.д.)
-        const containerBounds = findScrollContainer(buttonRef.current);
-        const containerTop = containerBounds?.top ?? 0;
-        const containerBottom = containerBounds?.bottom ?? viewportHeight;
-        const containerLeft = containerBounds?.left ?? 0;
-        const containerRight = containerBounds?.right ?? viewportWidth;
+      const rect = buttonRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
 
-        // Максимальная высота списка
-        const maxListHeight = 300;
-        const gap = 4; // Отступ от кнопки
-        const padding = 8; // Отступ от краев
+      // ВАЖНО: getBoundingClientRect уже дает координаты относительно viewport
+      // с учетом всех скроллов, поэтому мы можем использовать их напрямую
 
-        // Вычисляем доступное место снизу и сверху относительно контейнера
-        const spaceBelow = containerBottom - rect.bottom;
-        const spaceAbove = rect.top - containerTop;
+      // Максимальная высота списка
+      const maxListHeight = 300;
+      const gap = 4; // Отступ от кнопки
+      const padding = 16; // Отступ от краев viewport
 
-        // Определяем направление открытия
-        // Открываем вниз, если есть достаточно места (больше чем половина maxListHeight)
-        // Или если места снизу больше, чем сверху
-        let openUpward = false;
-        let top: number;
-        let actualMaxHeight = maxListHeight;
+      // Вычисляем доступное место снизу и сверху от КНОПКИ
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
 
-        if (spaceBelow >= maxListHeight) {
-          // Достаточно места снизу - открываем вниз
-          openUpward = false;
-          top = rect.bottom + gap;
-        } else if (spaceAbove >= maxListHeight) {
-          // Достаточно места сверху - открываем вверх
-          openUpward = true;
-          top = rect.top - maxListHeight - gap;
+      // Определяем направление открытия
+      // СТРАТЕГИЯ: если кнопка в нижней половине экрана - ВСЕГДА открывать вниз
+      let openUpward = false;
+      let top: number;
+      let actualMaxHeight = maxListHeight;
+
+      const minUsableSpace = 100; // Минимум для обычных случаев
+      const minForceDownSpace = 10; // Минимум для принудительного открытия вниз (хоть что-то)
+      const isButtonInBottomHalf = rect.top > viewportHeight / 2;
+
+      if (isButtonInBottomHalf && spaceBelow >= minForceDownSpace) {
+        // Кнопка в нижней половине и есть хоть 10px снизу - ВСЕГДА открываем вниз
+        openUpward = false;
+        top = rect.bottom + gap;
+        // Используем ВСЕ доступное место снизу (даже если это всего 10px)
+        actualMaxHeight = Math.max(spaceBelow - gap - padding, 50); // минимум 50px для скроллинга
+      } else if (spaceBelow >= maxListHeight + padding) {
+        // Достаточно места снизу для полного списка
+        openUpward = false;
+        top = rect.bottom + gap;
+        actualMaxHeight = maxListHeight;
+      } else if (spaceAbove >= minUsableSpace && !isButtonInBottomHalf) {
+        // Снизу совсем мало - открываем вверх
+        openUpward = true;
+
+        if (spaceAbove >= maxListHeight + padding) {
+          // Достаточно места для полного списка
+          actualMaxHeight = maxListHeight;
         } else {
-          // Недостаточно места ни сверху, ни снизу
-          // Выбираем направление, где больше места
-          if (spaceAbove > spaceBelow) {
-            // Открываем вверх, ограничивая высоту доступным пространством
-            openUpward = true;
-            actualMaxHeight = Math.max(spaceAbove - gap - padding, 100); // Минимум 100px
-            top = rect.top - actualMaxHeight - gap;
-            // Если выходит за верхний край, прижимаем к верху
-            if (top < containerTop + padding) {
-              top = containerTop + padding;
-              actualMaxHeight = rect.top - top - gap;
-            }
-          } else {
-            // Открываем вниз, ограничивая высоту доступным пространством
-            openUpward = false;
-            actualMaxHeight = Math.max(spaceBelow - gap - padding, 100); // Минимум 100px
-            top = rect.bottom + gap;
-            // Если выходит за нижний край, прижимаем к низу
-            if (top + actualMaxHeight > containerBottom - padding) {
-              top = containerBottom - actualMaxHeight - padding;
-              actualMaxHeight = containerBottom - top - padding;
-            }
+          // Используем все доступное место сверху
+          actualMaxHeight = Math.max(
+            spaceAbove - gap - padding,
+            minUsableSpace
+          );
+        }
+
+        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: позиционируем так, чтобы НИЖНИЙ край списка был у ВЕРХНЕГО края кнопки
+        // Это создает визуальную связь между кнопкой и списком
+        top = rect.top - actualMaxHeight - gap;
+
+        // Финальная проверка границ
+        if (top < padding) {
+          top = padding;
+          actualMaxHeight = rect.top - padding - gap;
+        }
+      } else {
+        // Совсем мало места везде - выбираем где больше
+        if (spaceAbove > spaceBelow) {
+          openUpward = true;
+          actualMaxHeight = Math.max(spaceAbove - gap - padding, 100);
+          top = rect.top - actualMaxHeight - gap;
+          if (top < padding) {
+            top = padding;
+            actualMaxHeight = rect.top - padding - gap;
+          }
+        } else {
+          openUpward = false;
+          actualMaxHeight = Math.max(spaceBelow - gap - padding, 100);
+          top = rect.bottom + gap;
+          if (top + actualMaxHeight > viewportHeight - padding) {
+            actualMaxHeight = viewportHeight - top - padding;
           }
         }
-
-        // Вычисляем позицию по горизонтали
-        const minWidth = 280;
-        const maxWidth = 320;
-        let left = rect.left;
-        let width = Math.max(rect.width, minWidth);
-
-        // Ограничиваем ширину максимумом
-        if (width > maxWidth) {
-          width = maxWidth;
-        }
-
-        // Корректируем позицию, если список выходит за правый край контейнера
-        if (left + width > containerRight - padding) {
-          left = containerRight - width - padding;
-          // Если список выходит за левый край, прижимаем к левому краю
-          if (left < containerLeft + padding) {
-            left = containerLeft + padding;
-            // Уменьшаем ширину, если нужно
-            width = Math.min(
-              width,
-              containerRight - containerLeft - padding * 2
-            );
-          }
-        }
-
-        // Корректируем позицию, если список выходит за левый край
-        if (left < containerLeft + padding) {
-          left = containerLeft + padding;
-          width = Math.min(width, containerRight - containerLeft - padding * 2);
-        }
-
-        setPosition({
-          top,
-          left,
-          width,
-          openUpward,
-          maxHeight: actualMaxHeight,
-        });
       }
-    }, [findScrollContainer]);
+
+      // Вычисляем позицию по горизонтали
+      const minWidth = 280;
+      const maxWidth = 320;
+      let left = rect.left;
+      let width = Math.max(rect.width, minWidth);
+
+      // Ограничиваем ширину максимумом
+      if (width > maxWidth) {
+        width = maxWidth;
+      }
+
+      // Корректируем позицию, если список выходит за правый край viewport
+      if (left + width > viewportWidth - padding) {
+        left = viewportWidth - width - padding;
+      }
+
+      // Корректируем позицию, если список выходит за левый край viewport
+      if (left < padding) {
+        left = padding;
+        // Уменьшаем ширину, если все равно не помещается
+        if (left + width > viewportWidth - padding) {
+          width = viewportWidth - padding * 2;
+        }
+      }
+
+      setPosition({
+        top,
+        left,
+        width,
+        openUpward,
+        maxHeight: actualMaxHeight,
+      });
+      setIsPositioned(true); // Позиция рассчитана
+    }, []);
 
     useEffect(() => {
-      if (isOpen) {
-        updatePosition();
+      if (isOpen && buttonRef.current) {
+        setIsPositioned(false); // Сбрасываем флаг при открытии
 
-        const handleResize = () => updatePosition();
-        const handleScroll = (e: Event) => {
-          // Закрываем список при прокрутке таблицы или модалки
-          const target = e.target as HTMLElement;
-          if (target && buttonRef.current) {
-            // Проверяем, является ли прокручиваемый элемент родителем кнопки или контейнером
-            let isRelatedScroll = false;
-            let current: HTMLElement | null = buttonRef.current.parentElement;
+        // Сохраняем начальную позицию кнопки при открытии
+        const initialButtonTop = buttonRef.current.getBoundingClientRect().top;
 
-            while (current && current !== document.body) {
-              if (current === target || current.contains(target)) {
-                isRelatedScroll = true;
-                break;
-              }
-              current = current.parentElement;
-            }
-
-            // Если прокрутка происходит в контейнере с селектором или в модалке/таблице
-            if (
-              isRelatedScroll ||
-              target === document.body ||
-              target === document.documentElement
-            ) {
-              // Закрываем список через blur кнопки (Headless UI автоматически закроет)
-              if (
-                buttonRef.current &&
-                document.activeElement === buttonRef.current
-              ) {
-                buttonRef.current.blur();
-              }
-              setIsOpen(false);
-            } else {
-              // Иначе обновляем позицию
-              updatePosition();
-            }
-          }
+        // Обновляем позицию сразу при открытии - несколько раз для надежности
+        const updateMultipleTimes = () => {
+          updatePosition();
+          requestAnimationFrame(() => {
+            updatePosition();
+            setTimeout(() => {
+              updatePosition(); // Финальное обновление через 50мс
+            }, 50);
+          });
         };
 
+        updateMultipleTimes();
+
+        const handleResize = () => {
+          requestAnimationFrame(updatePosition);
+        };
+
+        const handleScroll = () => {
+          // Проверяем, насколько сместилась кнопка при скролле
+          if (buttonRef.current) {
+            const currentButtonTop =
+              buttonRef.current.getBoundingClientRect().top;
+            const movement = Math.abs(currentButtonTop - initialButtonTop);
+
+            // Если кнопка сместилась больше чем на 50px - закрываем селект
+            if (movement > 50) {
+              setIsOpen(false);
+              return;
+            }
+          }
+
+          // Небольшое смещение - обновляем позицию
+          requestAnimationFrame(updatePosition);
+        };
+
+        // ResizeObserver для отслеживания изменений размера кнопки
+        const resizeObserver = new ResizeObserver(() => {
+          requestAnimationFrame(updatePosition);
+        });
+
+        resizeObserver.observe(buttonRef.current);
+
+        // MutationObserver для отслеживания изменений DOM
+        const mutationObserver = new MutationObserver(() => {
+          requestAnimationFrame(updatePosition);
+        });
+
+        mutationObserver.observe(buttonRef.current, {
+          attributes: true,
+          childList: true,
+          subtree: true,
+        });
+
         window.addEventListener('resize', handleResize);
-        // Слушаем прокрутку на всех уровнях
         document.addEventListener('scroll', handleScroll, true);
 
         return () => {
+          resizeObserver.disconnect();
+          mutationObserver.disconnect();
           window.removeEventListener('resize', handleResize);
           document.removeEventListener('scroll', handleScroll, true);
         };
+      } else {
+        setIsPositioned(false); // Сбрасываем при закрытии
       }
-    }, [isOpen, updatePosition, findScrollContainer]);
+    }, [isOpen, updatePosition]);
 
     // Отслеживаем изменения aria-expanded для синхронизации состояния
     useEffect(() => {
@@ -294,8 +274,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           if (expanded !== isOpen) {
             setIsOpen(expanded);
             if (expanded) {
-              // Небольшая задержка для обновления позиции после открытия
-              setTimeout(updatePosition, 0);
+              // Используем requestAnimationFrame для синхронизации с рендером
+              requestAnimationFrame(() => {
+                requestAnimationFrame(updatePosition);
+              });
             }
           }
         }
@@ -313,6 +295,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       return () => observer.disconnect();
     }, [isOpen, updatePosition]);
 
+    // Фокусируемся на поле поиска при открытии
+    useEffect(() => {
+      if (isOpen && searchInputRef.current) {
+        // Используем requestAnimationFrame для синхронизации
+        requestAnimationFrame(() => {
+          searchInputRef.current?.focus();
+        });
+      }
+    }, [isOpen]);
+
     const optionsContent = (
       <Transition
         as={Fragment}
@@ -324,8 +316,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <Listbox.Options
           static
           className={classNames(
-            'fixed z-[10000] overflow-auto rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-lg focus:outline-none',
-            position.openUpward ? 'mb-1' : 'mt-1'
+            'fixed z-[10000] rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-xl focus:outline-none transition-opacity duration-100',
+            position.openUpward ? 'mb-1' : 'mt-1',
+            !isPositioned && 'opacity-0' // Скрываем до расчета позиции
           )}
           style={{
             top: `${position.top}px`,

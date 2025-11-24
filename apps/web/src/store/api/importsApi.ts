@@ -13,6 +13,7 @@ interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
   fileName: string;
+  companyAccountNumber?: string;
 }
 
 interface BulkUpdateRequest {
@@ -93,6 +94,26 @@ export const importsApi = apiSlice.injectEndpoints({
         { id, data },
         { dispatch, queryFulfilled, getState }
       ) {
+      ): Promise<void> {
+        // Функция для проверки, сопоставлена ли операция
+        const _checkOperationMatched = (op: ImportedOperation): boolean => {
+          if (!op.direction) return false;
+
+          const currency = op.currency || 'RUB';
+          const hasRequiredFields = !!(
+            op.matchedArticleId &&
+            op.matchedAccountId &&
+            currency
+          );
+
+          if (op.direction === 'transfer') {
+            return (
+              hasRequiredFields && !!(op.payerAccount && op.receiverAccount)
+            );
+          }
+          return hasRequiredFields;
+        };
+
         // Optimistic update - обновляем кеш локально без перезапроса
         // Находим все активные запросы getImportedOperations и обновляем их
         const state = getState() as RootState;
@@ -163,6 +184,12 @@ export const importsApi = apiSlice.injectEndpoints({
                     if (data.direction !== undefined) {
                       operation.direction = data.direction;
                     }
+
+                    // НЕ пересчитываем счетчики здесь!
+                    // draft.operations содержит только текущую страницу (20 операций),
+                    // а счетчики должны быть по ВСЕМ операциям сессии.
+                    // Счетчики приходят с бэкенда в изначальном ответе и остаются валидными.
+
                     // matchedBy будет обновлен из ответа сервера после успешного запроса
                   }
                 }
@@ -208,6 +235,11 @@ export const importsApi = apiSlice.injectEndpoints({
                       operation.matchedBy = updatedOperation.matchedBy ?? null;
                       operation.matchedRuleId =
                         updatedOperation.matchedRuleId ?? null;
+
+                      // НЕ пересчитываем счетчики!
+                      // Они актуальны из изначального ответа бэкенда.
+                      // При одиночном обновлении операции счетчики не сильно меняются,
+                      // а при массовом - будет вызван invalidatesTags.
                     }
                   }
                 }
@@ -220,6 +252,7 @@ export const importsApi = apiSlice.injectEndpoints({
         }
       },
       // Не инвалидируем теги, чтобы не вызывать перезапрос всего списка
+      // НЕ инвалидируем теги - используем оптимистичные обновления выше
       // invalidatesTags: ['Import'],
     }),
 

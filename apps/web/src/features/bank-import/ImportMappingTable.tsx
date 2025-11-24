@@ -5,6 +5,8 @@
  * Тесты должны покрывать: загрузку файла, редактирование маппинга, импорт операций
  */
 import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Check,
   Download,
@@ -26,8 +28,6 @@ import {
   useUpdateImportedOperationMutation,
 } from '../../store/api/importsApi';
 import {
-  useGetDealsQuery,
-  useGetDepartmentsQuery,
   useGetArticlesQuery,
   useGetAccountsQuery,
 } from '../../store/api/catalogsApi';
@@ -46,13 +46,32 @@ import { DepartmentForm } from '../catalog-forms/DepartmentForm/DepartmentForm';
 
 interface ImportMappingTableProps {
   sessionId: string;
+  companyAccountNumber?: string | null;
   onClose: () => void;
   isCollapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
 }
 
+type SortField =
+  | 'date'
+  | 'amount'
+  | 'number'
+  | 'description'
+  | 'payer'
+  | 'receiver'
+  | 'counterparty'
+  | 'article'
+  | 'account'
+  | 'deal'
+  | 'department'
+  | 'currency'
+  | 'direction'
+  | null;
+type SortDirection = 'asc' | 'desc';
+
 export const ImportMappingTable = ({
   sessionId,
+  companyAccountNumber,
   onClose,
   isCollapsed = false,
   onCollapseChange,
@@ -62,9 +81,19 @@ export const ImportMappingTable = ({
   const [matchedFilter, setMatchedFilter] = useState<boolean | undefined>(
     undefined
   );
+  const [duplicateFilter, setDuplicateFilter] = useState<boolean | undefined>(
+    undefined
+  );
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [operationsToSaveRules, setOperationsToSaveRules] = useState<
     Set<string>
   >(new Set());
+
+  // Отслеживание последних измененных операций для подсветки
+  const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<string>>(
+    new Set()
+  );
 
   // Состояние для модалки создания
   const [createModal, setCreateModal] = useState<{
@@ -86,6 +115,42 @@ export const ImportMappingTable = ({
 
   const limit = 20;
 
+  // Состояние для попо вера применения к похожим операциям
+  const [similarPopover, setSimilarPopover] = useState<{
+    isOpen: boolean;
+    field:
+      | 'counterparty'
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'currency'
+      | 'direction'
+      | null;
+    value: string;
+    operation: ImportedOperation | null;
+    similarOperations:
+      | Array<{
+          operation: ImportedOperation;
+          comparison: import('./utils/findSimilarOperations').OperationComparison;
+        }>
+      | ImportedOperation[];
+    anchorPosition: { top: number; left: number; right?: number };
+    updateData: Record<string, unknown>; // Данные для обновления, которые будут применены после выбора
+  }>({
+    isOpen: false,
+    field: null,
+    value: '',
+    operation: null,
+    similarOperations: [],
+    anchorPosition: { top: 0, left: 0 },
+    updateData: {},
+  });
+
+  const limit = 20;
+
+  const [getAllOperations] = useLazyGetAllImportedOperationsQuery();
+
   const { data, refetch } = useGetImportedOperationsQuery({
     sessionId,
     limit,
@@ -95,6 +160,7 @@ export const ImportMappingTable = ({
 
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
+  const { data: company } = useGetCompanyQuery();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bulkUpdate] = useBulkUpdateImportedOperationsMutation();
@@ -122,17 +188,271 @@ export const ImportMappingTable = ({
       isOpen: true,
       field,
       operation,
-    });
+  // Автовыбор счета на основе companyAccountNumber из файла
+  const [autoAccountApplied, setAutoAccountApplied] = useState(false);
+  useEffect(() => {
+    // Используем companyAccountNumber из API response (если доступен) или из props
+    const accountNumber = data?.companyAccountNumber || companyAccountNumber;
+
+    // Применяем автовыбор только один раз при загрузке данных
+    if (
+      !autoAccountApplied &&
+      accountNumber &&
+      accounts.length > 0 &&
+      data?.operations &&
+      data.operations.length > 0
+    ) {
+      // Ищем счет по номеру
+      const matchedAccount = accounts.find(
+        (acc) => acc.number === accountNumber && acc.isActive
+      );
+
+      if (matchedAccount) {
+        // Находим операции без назначенного счета
+        const operationsWithoutAccount = data.operations.filter(
+          (op) => !op.matchedAccountId && !op.processed
+        );
+
+        if (operationsWithoutAccount.length > 0) {
+          // Применяем счет ко всем операциям без счета
+          const operationIds = operationsWithoutAccount.map((op) => op.id);
+
+          bulkUpdate({
+            sessionId,
+            data: {
+              operationIds,
+              matchedAccountId: matchedAccount.id,
+            },
+          })
+            .unwrap()
+            .then(() => {
+              console.log(
+                `Автоматически применен счет "${matchedAccount.name}" к ${operationIds.length} операциям`
+              );
+              setAutoAccountApplied(true);
+            })
+            .catch((error) => {
+              console.error('Ошибка автовыбора счета:', error);
+              setAutoAccountApplied(true); // Помечаем как выполненное, чтобы не повторять
+            });
+        } else {
+          setAutoAccountApplied(true);
+        }
+      } else {
+        setAutoAccountApplied(true);
+      }
+    }
+  }, [
+    companyAccountNumber,
+    data?.companyAccountNumber,
+    accounts,
+    data?.operations,
+    autoAccountApplied,
+    bulkUpdate,
+    sessionId,
+  ]);
+
+  // Undo manager
+  const {
+    isUndoAvailable,
+    undoDescription,
+    undoAnchorPosition,
+    registerChange,
+    registerBulkChange,
+    undo,
+    cancelUndo,
+  } = useUndoManager({
+    sessionId,
+    onUndo: () => {
+      // Не нужен refetch - оптимистичные обновления работают
+      // refetch();
+    },
+  });
+
+  // Проверяем, все ли операции сопоставлены
+  const checkOperationMatched = (op: ImportedOperation): boolean => {
+    if (!op.direction) return false;
+
+    const currency = op.currency || 'RUB';
+    const hasRequiredFields = !!(
+      op.matchedArticleId &&
+      op.matchedAccountId &&
+      currency
+    );
+
+    if (op.direction === 'transfer') {
+      return hasRequiredFields && !!(op.payerAccount && op.receiverAccount);
+    }
+    return hasRequiredFields;
   };
 
-  // Функция для закрытия модалки
-  const handleCloseModal = () => {
+  const total = data?.total || 0;
+  const unmatchedCount = data?.unmatched || 0;
+  const duplicatesCount = data?.duplicates || 0;
+
+  // Мемоизируем отсортированные операции для производительности
+  const operations = useMemo(() => {
+    const ops = data?.operations || [];
+
+    // Сортировка операций - применяется только при явном выборе пользователя
+    // БЕЗ сортировки сохраняется исходный порядок из API
+    if (!sortField) {
+      return ops;
+    }
+
+    return [...ops].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+        case 'number': {
+          const numA = parseInt(a.number || '0', 10);
+          const numB = parseInt(b.number || '0', 10);
+          comparison = numA - numB;
+          break;
+        }
+        case 'description':
+          comparison = (a.description || '').localeCompare(
+            b.description || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'payer':
+          comparison = (a.payer || '').localeCompare(b.payer || '', 'ru', {
+            numeric: true,
+            sensitivity: 'base',
+          });
+          break;
+        case 'receiver':
+          comparison = (a.receiver || '').localeCompare(
+            b.receiver || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'counterparty':
+          comparison = (a.matchedCounterparty?.name || '').localeCompare(
+            b.matchedCounterparty?.name || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'article':
+          comparison = (a.matchedArticle?.name || '').localeCompare(
+            b.matchedArticle?.name || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'account':
+          comparison = (a.matchedAccount?.name || '').localeCompare(
+            b.matchedAccount?.name || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'deal':
+          comparison = (a.matchedDeal?.name || '').localeCompare(
+            b.matchedDeal?.name || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'department':
+          comparison = (a.matchedDepartment?.name || '').localeCompare(
+            b.matchedDepartment?.name || '',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'currency':
+          comparison = (a.currency || 'RUB').localeCompare(
+            b.currency || 'RUB',
+            'ru',
+            {
+              numeric: true,
+              sensitivity: 'base',
+            }
+          );
+          break;
+        case 'direction': {
+          const directionLabels: Record<string, string> = {
+            income: 'Доход',
+            expense: 'Расход',
+            transfer: 'Перевод',
+          };
+          const aLabel = directionLabels[a.direction || ''] || '';
+          const bLabel = directionLabels[b.direction || ''] || '';
+          comparison = aLabel.localeCompare(bLabel, 'ru', {
+            numeric: true,
+            sensitivity: 'base',
+          });
+          break;
+        }
+        default:
+          return 0;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [data?.operations, sortField, sortDirection]);
+
+  // Функция для открытия модалки создания (мемоизируем для производительности)
+  const handleOpenCreateModal = useCallback(
+    (
+      field:
+        | 'counterparty'
+        | 'article'
+        | 'account'
+        | 'deal'
+        | 'department'
+        | 'currency',
+      operation: ImportedOperation
+    ) => {
+      setCreateModal({
+        isOpen: true,
+        field,
+        operation,
+      });
+    },
+    []
+  );
+
+  // Функция для закрытия модалки (мемоизируем)
+  const handleCloseModal = useCallback(() => {
     setCreateModal({
       isOpen: false,
       field: null,
       operation: null,
     });
-  };
+  }, []);
 
   // Функция для обработки успешного создания элемента
   const handleCreateSuccess = async (createdId: string) => {
@@ -185,6 +505,291 @@ export const ImportMappingTable = ({
         showError('Ошибка при выборе созданного элемента');
       }
     }
+  };
+
+  // Функция для проверки наличия похожих операций после изменения поля
+  const handleFieldUpdate = async (
+    operation: ImportedOperation,
+    field:
+      | 'counterparty'
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'currency'
+      | 'direction',
+    value: string,
+    updateData: Record<string, unknown>,
+    event: React.MouseEvent
+  ) => {
+    try {
+      // Определяем обязательные поля
+      const requiredFields = ['direction', 'article', 'account', 'currency'];
+      const isRequiredField = requiredFields.includes(field);
+
+      // Проверяем, заполнены ли все обязательные поля ДО этого изменения
+      const wereAllRequiredFilled = !!(
+        operation.direction &&
+        operation.matchedArticleId &&
+        operation.matchedAccountId &&
+        operation.currency
+      );
+
+      // Проверяем, будут ли все обязательные поля заполнены ПОСЛЕ этого изменения
+      const updatedOperation = { ...operation, ...updateData };
+      const willBeFullyFilled = !!(
+        updatedOperation.direction &&
+        updatedOperation.matchedArticleId &&
+        updatedOperation.matchedAccountId &&
+        updatedOperation.currency
+      );
+
+      // Логика показа popover:
+      // 1. Для обязательных полей: показывать если после изменения все обязательные заполнены
+      // 2. Для необязательных полей: показывать только если все обязательные уже были заполнены ДО изменения
+      const shouldCheckSimilar = isRequiredField
+        ? willBeFullyFilled
+        : wereAllRequiredFilled;
+
+      // Не показываем popover, если условия не выполнены
+      if (!shouldCheckSimilar) {
+        return false;
+      }
+
+      // Получаем ВСЕ операции сессии для поиска похожих
+      const response = await getAllOperations({ sessionId }).unwrap();
+      const allOperations = response.operations || [];
+
+      console.log('🔍 Поиск похожих операций для:', {
+        operationId: operation.id,
+        description: operation.description,
+        field,
+        totalOperations: allOperations.length,
+      });
+
+      // Находим похожие операции (передаем поле для проверки lockedFields)
+      const similar = findSimilarOperations(
+        operation,
+        allOperations,
+        company?.inn || null,
+        24, // minScore - снижен до 24 для обнаружения похожих операций с одинаковой сутью, но разными деталями (НДС, номера счетов и т.д.)
+        field // поле для проверки блокировки
+      );
+
+      console.log(
+        '✅ Найдено похожих операций:',
+        similar.length,
+        similar.map((s) => ({
+          id: 'operation' in s ? s.operation.id : s.id,
+          description:
+            'operation' in s ? s.operation.description : s.description,
+          score: 'comparison' in s ? s.comparison.similarity.score : 'N/A',
+        }))
+      );
+
+      // Если есть похожие операции, показываем popover ПОСЛЕ обновления текущей операции
+      if (similar.length > 0) {
+        // Получаем позицию элемента для показа popover
+        const target = event.currentTarget as HTMLElement;
+        const rect = target.getBoundingClientRect();
+
+        setSimilarPopover({
+          isOpen: true,
+          field,
+          value,
+          operation: updatedOperation as ImportedOperation, // Используем обновленную операцию
+          similarOperations: similar,
+          anchorPosition: {
+            top: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+          },
+          updateData, // Сохраняем данные для применения к похожим операциям
+        });
+
+        return true; // Возвращаем true чтобы ImportMappingRow знал что нужно показать popover
+      }
+
+      return false; // Нет похожих операций
+    } catch (error) {
+      console.error('Error loading all operations:', error);
+      return false;
+    }
+  };
+
+  // Обработчик применения значения ко всем похожим операциям
+  const handleApplySimilar = async (selectedOperationIds: string[]) => {
+    if (!similarPopover.operation || !similarPopover.field) {
+      return;
+    }
+
+    try {
+      // Используем сохраненные данные для обновления
+      const updateData = similarPopover.updateData;
+
+      // Применяем обновление ТОЛЬКО к выбранным похожим операциям
+      // Текущая операция уже обновлена в ImportMappingRow
+      const similarOps = Array.isArray(similarPopover.similarOperations)
+        ? similarPopover.similarOperations
+        : [];
+
+      // Собираем ID только похожих операций (без текущей)
+      const operationIds: string[] = [];
+      const operationsData: ImportedOperation[] = [];
+
+      // Добавляем только выбранные похожие операции
+      for (const s of similarOps) {
+        const op = 'operation' in s ? s.operation : (s as ImportedOperation);
+        // Проверяем, что операция выбрана пользователем и это не текущая операция
+        if (
+          op.id &&
+          selectedOperationIds.includes(op.id) &&
+          op.id !== similarPopover.operation.id
+        ) {
+          operationIds.push(op.id);
+          operationsData.push(op);
+        }
+      }
+
+      // Если выбраны только похожие операции, обновляем их
+      if (operationIds.length > 0) {
+        // Сохраняем предыдущие состояния для отмены
+        const previousStates = operationsData.map((op) => {
+          const state: Record<string, unknown> = {};
+
+          // Сохраняем все поля которые будут изменены
+          if (updateData.matchedArticleId !== undefined) {
+            state.matchedArticleId = op.matchedArticleId;
+          }
+          if (updateData.matchedCounterpartyId !== undefined) {
+            state.matchedCounterpartyId = op.matchedCounterpartyId;
+          }
+          if (updateData.matchedAccountId !== undefined) {
+            state.matchedAccountId = op.matchedAccountId;
+          }
+          if (updateData.matchedDealId !== undefined) {
+            state.matchedDealId = op.matchedDealId;
+          }
+          if (updateData.matchedDepartmentId !== undefined) {
+            state.matchedDepartmentId = op.matchedDepartmentId;
+          }
+          if (updateData.currency !== undefined) {
+            state.currency = op.currency;
+          }
+          if (updateData.direction !== undefined) {
+            state.direction = op.direction;
+          }
+
+          return { id: op.id, state };
+        });
+
+        await bulkUpdate({
+          sessionId,
+          data: {
+            operationIds,
+            ...updateData,
+          },
+        }).unwrap();
+
+        // Регистрируем изменение для возможности отмены
+        const fieldNames: Record<string, string> = {
+          counterparty: 'Контрагент',
+          article: 'Статья',
+          account: 'Счет',
+          deal: 'Сделка',
+          department: 'Подразделение',
+          currency: 'Валюта',
+          direction: 'Тип операции',
+        };
+
+        registerBulkChange(
+          operationIds,
+          previousStates,
+          `Применено к ${operationIds.length} похожим операциям: ${fieldNames[similarPopover.field] || similarPopover.field}`,
+          {
+            top: similarPopover.anchorPosition.top,
+            left: similarPopover.anchorPosition.left,
+          }
+        );
+
+        // Подсвечиваем обновленные операции (включая текущую)
+        setRecentlyUpdatedIds(
+          new Set([similarPopover.operation.id, ...operationIds])
+        );
+        setTimeout(() => setRecentlyUpdatedIds(new Set()), 3000);
+      } else {
+        // Если не выбраны похожие операции, просто подсвечиваем текущую
+        setRecentlyUpdatedIds(new Set([similarPopover.operation.id]));
+        setTimeout(() => setRecentlyUpdatedIds(new Set()), 3000);
+      }
+
+      // Закрываем popover
+      setSimilarPopover({
+        isOpen: false,
+        field: null,
+        value: '',
+        operation: null,
+        similarOperations: [],
+        anchorPosition: { top: 0, left: 0 },
+        updateData: {},
+      });
+
+      // Обновляем данные - не нужен refetch, используем оптимистичные обновления
+      // refetch();
+    } catch (error: unknown) {
+      console.error('Error applying to similar operations:', error);
+
+      // Показываем более информативное сообщение об ошибке
+      const errorData = error as {
+        data?: { message?: string };
+        message?: string;
+      };
+      const errorMessage =
+        errorData?.data?.message ||
+        errorData?.message ||
+        'Ошибка при применении к похожим операциям';
+
+      if (
+        errorMessage.includes('already processed') ||
+        errorMessage.includes('not found')
+      ) {
+        showError(
+          'Некоторые операции уже обработаны или удалены. Обновите страницу.'
+        );
+        // Автоматически обновляем список после небольшой задержки (здесь refetch нужен)
+        setTimeout(() => refetch(), 1000);
+      } else {
+        showError(errorMessage);
+      }
+    }
+  };
+
+  // Обработчик пропуска применения к похожим операциям (текущая операция уже обновлена)
+  const handleSkipSimilar = () => {
+    // Операция уже обновлена в ImportMappingRow, просто закрываем popover
+    setSimilarPopover({
+      isOpen: false,
+      field: null,
+      value: '',
+      operation: null,
+      similarOperations: [],
+      anchorPosition: { top: 0, left: 0 },
+      updateData: {},
+    });
+  };
+
+  // Обработчик закрытия popover без действий (текущая операция уже обновлена)
+  const handleClosePopover = () => {
+    // Операция уже обновлена в ImportMappingRow, просто закрываем popover
+    setSimilarPopover({
+      isOpen: false,
+      field: null,
+      value: '',
+      operation: null,
+      similarOperations: [],
+      anchorPosition: { top: 0, left: 0 },
+      updateData: {},
+    });
   };
 
   // Функция для получения паттерна для предзаполнения
@@ -293,6 +898,36 @@ export const ImportMappingTable = ({
     });
   };
 
+  const handleSort = useCallback((field: SortField) => {
+    setSortField((prevField) => {
+      if (prevField === field) {
+        // Переключаем направление, если кликнули на ту же колонку
+        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+        return field;
+      } else {
+        // Устанавливаем новую колонку с направлением по умолчанию (asc, как в Excel)
+        setSortDirection('asc');
+        return field;
+      }
+    });
+  }, []);
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return (
+        <ArrowUp
+          size={14}
+          className="opacity-0 group-hover:opacity-30 transition-opacity"
+        />
+      );
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp size={14} className="text-primary-600 dark:text-primary-400" />
+    ) : (
+      <ArrowDown size={14} className="text-primary-600 dark:text-primary-400" />
+    );
+  };
+
   const handleImport = async () => {
     try {
       const operationIds = selectedIds.length > 0 ? selectedIds : undefined;
@@ -311,6 +946,7 @@ export const ImportMappingTable = ({
       showSuccess(
         `Импортировано операций: ${result.created}. Ошибок: ${result.errors}`
       );
+      // refetch нужен здесь, т.к. меняется статус processed
       refetch();
       if (result.errors === 0) {
         onClose();
@@ -362,7 +998,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'description',
-      header: 'Назначение',
+      header: (
+        <button
+          onClick={() => handleSort('description')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Назначение <SortIcon field="description" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <div className="truncate" title={op.description}>
           {op.description}
@@ -378,7 +1021,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'payer',
-      header: 'Плательщик',
+      header: (
+        <button
+          onClick={() => handleSort('payer')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Плательщик <SortIcon field="payer" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <div className="text-xs">
           <div className="truncate" title={op.payer || ''}>
@@ -395,7 +1045,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'receiver',
-      header: 'Получатель',
+      header: (
+        <button
+          onClick={() => handleSort('receiver')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Получатель <SortIcon field="receiver" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <div className="text-xs">
           <div className="truncate" title={op.receiver || ''}>
@@ -413,6 +1070,20 @@ export const ImportMappingTable = ({
     {
       key: 'direction',
       header: 'Тип операции',
+      header: (
+        <button
+          onClick={() => handleSort('direction')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Тип операции
+            <span className="text-red-500" title="Обязательное поле">
+              *
+            </span>
+          </span>
+          <SortIcon field="direction" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -426,7 +1097,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'counterparty',
-      header: 'Контрагент',
+      header: (
+        <button
+          onClick={() => handleSort('counterparty')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Контрагент <SortIcon field="counterparty" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -441,6 +1119,20 @@ export const ImportMappingTable = ({
     {
       key: 'article',
       header: 'Статья',
+      header: (
+        <button
+          onClick={() => handleSort('article')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Статья
+            <span className="text-red-500" title="Обязательное поле">
+              *
+            </span>
+          </span>
+          <SortIcon field="article" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -455,6 +1147,20 @@ export const ImportMappingTable = ({
     {
       key: 'account',
       header: 'Счет',
+      header: (
+        <button
+          onClick={() => handleSort('account')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Счет
+            <span className="text-red-500" title="Обязательное поле">
+              *
+            </span>
+          </span>
+          <SortIcon field="account" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -468,7 +1174,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'deal',
-      header: 'Сделка',
+      header: (
+        <button
+          onClick={() => handleSort('deal')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Сделка <SortIcon field="deal" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -482,7 +1195,14 @@ export const ImportMappingTable = ({
     },
     {
       key: 'department',
-      header: 'Подразделение',
+      header: (
+        <button
+          onClick={() => handleSort('department')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Подразделение <SortIcon field="department" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -497,6 +1217,20 @@ export const ImportMappingTable = ({
     {
       key: 'currency',
       header: 'Валюта',
+      header: (
+        <button
+          onClick={() => handleSort('currency')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Валюта
+            <span className="text-red-500" title="Обязательное поле">
+              *
+            </span>
+          </span>
+          <SortIcon field="currency" />
+        </button>
+      ),
       render: (op: ImportedOperation) => (
         <ImportMappingRow
           operation={op}
@@ -654,6 +1388,39 @@ export const ImportMappingTable = ({
                 ? 'bg-yellow-50 dark:bg-yellow-900/10'
                 : ''
           }
+          rowClassName={(op) => {
+            const classes: string[] = [];
+
+            if (op.processed) {
+              classes.push('bg-gray-100 dark:bg-gray-800/50 opacity-60');
+            } else {
+              const isMatched = checkOperationMatched(op);
+
+              const bgColor = isMatched
+                ? 'bg-green-50 dark:bg-green-900/20'
+                : 'bg-yellow-50 dark:bg-yellow-900/20';
+              classes.push(bgColor);
+
+              let borderColor = '';
+              if (op.isDuplicate) {
+                borderColor = 'border-orange-500';
+              } else {
+                borderColor = isMatched
+                  ? 'border-green-500'
+                  : 'border-yellow-500';
+              }
+              classes.push('border-l-4', borderColor);
+            }
+
+            // Добавляем анимацию подсветки для недавно обновленных операций
+            if (recentlyUpdatedIds.has(op.id)) {
+              classes.push(
+                'animate-pulse ring-2 ring-primary-500 dark:ring-primary-400'
+              );
+            }
+
+            return classes.join(' ');
+          }}
         />
       </div>
 
@@ -792,6 +1559,35 @@ export const ImportMappingTable = ({
           </div>
         ) : null}
       </OffCanvas>
+
+      {/* Popover для применения к похожим операциям */}
+      <ApplySimilarPopover
+        isOpen={similarPopover.isOpen}
+        onClose={handleClosePopover}
+        onApply={handleApplySimilar}
+        onSkip={handleSkipSimilar}
+        similarCount={similarPopover.similarOperations.length}
+        anchorPosition={similarPopover.anchorPosition}
+        fieldLabel={similarPopover.field || ''}
+        similarOperations={
+          Array.isArray(similarPopover.similarOperations) &&
+          'operation' in (similarPopover.similarOperations[0] || {})
+            ? (similarPopover.similarOperations as Array<{
+                operation: ImportedOperation;
+                comparison: import('./utils/findSimilarOperations').OperationComparison;
+              }>)
+            : []
+        }
+      />
+
+      {/* Toast для отмены изменений */}
+      <UndoToast
+        message={undoDescription}
+        isVisible={isUndoAvailable}
+        onUndo={undo}
+        onClose={cancelUndo}
+        anchorPosition={undoAnchorPosition}
+      />
     </div>
   );
 };

@@ -44,6 +44,13 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
   const [collapsedHistory, setCollapsedHistory] = useState(false);
   const [collapsedMapping, setCollapsedMapping] = useState(false);
   const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+  const [navigationLevel, setNavigationLevel] =
+    useState<NavigationLevel>('main');
+  const [sessionFileName, setSessionFileName] = useState<string | null>(null);
+  const [companyAccountNumber, setCompanyAccountNumber] = useState<
+    string | null
+  >(null);
+  const [isMinimizing, setIsMinimizing] = useState(false); // Флаг для предотвращения перезаписи при сворачивании
   const [uploadStatement, { isLoading }] = useUploadStatementMutation();
   const { showSuccess, showError } = useNotification();
   const { data: company } = useGetCompanyQuery();
@@ -134,6 +141,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         sessionStorage.removeItem('importModalTab');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Сохраняем состояние в localStorage
@@ -190,6 +198,34 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         const result = await uploadStatement(formData).unwrap();
         setSessionId(result.sessionId);
         showSuccess(`Файл загружен. Найдено операций: ${result.importedCount}`);
+        setSessionFileName(file.name);
+        setCompanyAccountNumber(result.companyAccountNumber || null);
+        setNavigationLevel('session-details');
+
+        // Формируем сообщение с учетом дубликатов и статистики парсинга
+        let message = `Файл загружен. Найдено операций: ${result.importedCount}`;
+        if (result.duplicatesCount > 0) {
+          message += `. Обнаружено дубликатов: ${result.duplicatesCount}`;
+        }
+
+        // Добавляем статистику парсинга, если доступна
+        if (result.parseStats) {
+          const stats = result.parseStats;
+          if (stats.documentsStarted > result.importedCount) {
+            message += `\n\nВнимание: В файле найдено ${stats.documentsStarted} документов, но обработано только ${result.importedCount}:`;
+            if (stats.documentsSkipped > 0) {
+              message += `\n• Пропущено (неподдерживаемый тип): ${stats.documentsSkipped}`;
+              if (stats.documentTypesFound.length > 0) {
+                message += ` (типы: ${stats.documentTypesFound.join(', ')})`;
+              }
+            }
+            if (stats.documentsInvalid > 0) {
+              message += `\n• Невалидных (нет даты или суммы): ${stats.documentsInvalid}`;
+            }
+          }
+        }
+
+        showSuccess(message);
       } catch (error: unknown) {
         // RTK Query возвращает ошибку в формате { error: { status, data } }
         // где data это ответ сервера { status: 'error', message: '...' }
@@ -293,6 +329,34 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
       window.dispatchEvent(new Event('localStorageChange'));
     }
 
+  // Навигация назад к главному экрану
+  const handleBackToMain = useCallback(() => {
+    setNavigationLevel('main');
+    setViewingSessionId(null);
+    setSessionId(null);
+    setSessionFileName(null);
+    setCompanyAccountNumber(null);
+  }, []);
+
+  // Просмотр сессии из истории
+  const handleViewSession = useCallback(
+    (sessionId: string, fileName?: string) => {
+      setViewingSessionId(sessionId);
+      setSessionFileName(fileName || null);
+      setNavigationLevel('session-details');
+    },
+    []
+  );
+
+  const handleClose = () => {
+    // Полностью очищаем состояние
+    setSessionId(null);
+    setIsMinimized(false);
+    setViewingSessionId(null);
+    setNavigationLevel('main');
+    setSessionFileName(null);
+    setCompanyAccountNumber(null);
+    clearStoredState();
     onClose();
   };
 
@@ -442,6 +506,88 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                 <div className="flex items-center gap-2">
                   <Info
                     className={
+        {/* Контент с плавными переходами */}
+        <FadeTransition show={navigationLevel === 'session-details'}>
+          {navigationLevel === 'session-details' && currentSessionId && (
+            // Экран деталей сессии
+            <ImportMappingTable
+              sessionId={currentSessionId}
+              companyAccountNumber={companyAccountNumber}
+              onClose={handleBackToMain}
+              onImportSuccess={handleClose}
+            />
+          )}
+        </FadeTransition>
+
+        <FadeTransition show={navigationLevel === 'main'}>
+          {navigationLevel === 'main' && (
+            // Главный экран с вкладками
+            <>
+              {/* Вкладки */}
+              <div className="border-b border-gray-200 dark:border-gray-700">
+                <nav className="flex space-x-8" aria-label="Tabs">
+                  <button
+                    onClick={() => setActiveTab('upload')}
+                    className={`
+                      py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                      ${
+                        activeTab === 'upload'
+                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                      }
+                    `}
+                  >
+                    Загрузка файла
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('history')}
+                    className={`
+                      py-4 px-1 border-b-2 font-medium text-sm transition-colors
+                      ${
+                        activeTab === 'history'
+                          ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                      }
+                    `}
+                  >
+                    История импортов
+                  </button>
+                </nav>
+              </div>
+
+              {/* Содержимое вкладок */}
+              {activeTab === 'upload' ? (
+                <div className="space-y-4 mt-4 relative">
+                  {/* Индикатор загрузки */}
+                  {isLoading && (
+                    <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-10 rounded-lg flex items-center justify-center">
+                      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+                        <div className="flex flex-col items-center gap-4">
+                          <Loader2
+                            className="animate-spin text-primary-600 dark:text-primary-400"
+                            size={48}
+                          />
+                          <div className="text-center space-y-2">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              Загрузка выписки...
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Пожалуйста, подождите. Обработка большой выписки
+                              может занять несколько минут.
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-500">
+                              Вы можете свернуть это окно, загрузка продолжится
+                              в фоновом режиме.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Информационный блок про ИНН */}
+                  <div
+                    className={`rounded-lg p-4 ${
                       !company?.inn
                         ? 'text-orange-600 dark:text-orange-400'
                         : 'text-blue-600 dark:text-blue-400'

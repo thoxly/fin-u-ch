@@ -7,16 +7,18 @@ import {
   ParsedFile,
 } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
-import operationsService from '../operations/operations.service';
-import articlesService from '../catalogs/articles/articles.service';
-import counterpartiesService from '../catalogs/counterparties/counterparties.service';
-
-export interface ImportFilters {
-  confirmed?: boolean;
-  matched?: boolean;
-  limit?: number;
-  offset?: number;
-}
+import {
+  ImportFilters,
+  UploadStatementResult,
+  ImportOperationsResult,
+  ApplyRulesResult,
+} from '@fin-u-ch/shared';
+import { invalidateReportCache } from '../reports/utils/cache';
+import duplicateDetectionService from './services/duplicate-detection.service';
+import sessionService from './services/session.service';
+import mappingRulesService from './services/mapping-rules.service';
+import operationImportService from './services/operation-import.service';
+import { BatchProcessor } from './utils/batch-processor';
 
 /**
  * TODO: Написать integration тесты для всех endpoints
@@ -40,7 +42,89 @@ export class ImportsService {
     }
 
     // Парсинг файла
-    let parsedFile: ParsedFile;
+    const parsedFile = await this.parseFile(fileName, fileBuffer);
+    const documents = parsedFile.documents;
+    const companyAccountNumber = parsedFile.companyAccountNumber;
+    const parseStats = parsedFile.stats;
+
+    // Валидация количества операций
+    if (documents.length > 5000) {
+      throw new AppError(
+        `File contains too many operations (${documents.length}). Maximum allowed is 5000.`,
+        400
+      );
+    }
+
+    // Получаем информацию о компании
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { inn: true },
+    });
+
+    // Проверка дубликатов по хэшу (быстрая проверка)
+    const { duplicatesCount } = await this.checkDuplicatesByHash(
+      companyId,
+      documents
+    );
+
+    // Создаем сессию импорта
+    const importSession = await sessionService.createSession(
+      companyId,
+      userId,
+      fileName,
+      documents.length,
+      companyAccountNumber
+    );
+
+    logger.info('Import session created', {
+      sessionId: importSession.id,
+      fileName,
+      companyId,
+      documentsCount: documents.length,
+    });
+
+    // Создаем черновики операций батчами
+    const importedOperations = await this.createImportedOperations(
+      importSession.id,
+      companyId,
+      documents,
+      company?.inn || null,
+      companyAccountNumber
+    );
+
+    logger.info('Upload statement processing completed', {
+      sessionId: importSession.id,
+      fileName,
+      companyId,
+      importedCount: importedOperations.length,
+      duplicatesCount,
+    });
+
+    return {
+      sessionId: importSession.id,
+      importedCount: importedOperations.length,
+      duplicatesCount,
+      fileName: importSession.fileName,
+      companyAccountNumber,
+      parseStats: parseStats
+        ? {
+            documentsStarted: parseStats.documentsStarted,
+            documentsFound: parseStats.documentsFound,
+            documentsSkipped: parseStats.documentsSkipped,
+            documentsInvalid: parseStats.documentsInvalid,
+            documentTypesFound: parseStats.documentTypesFound,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Парсит файл выписки
+   */
+  private async parseFile(
+    fileName: string,
+    fileBuffer: Buffer
+  ): Promise<ParsedFile> {
     try {
       // Логируем начало парсинга
       const filePreview = fileBuffer

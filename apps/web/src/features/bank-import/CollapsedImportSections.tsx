@@ -38,7 +38,6 @@ export const CollapsedImportSections = () => {
 
           setState(parsedState);
         } catch (error) {
-          console.error('Failed to load collapsed state:', error);
           localStorage.removeItem(STORAGE_KEY);
           setState(null);
         }
@@ -151,6 +150,12 @@ export const CollapsedImportSections = () => {
   if (!hasCollapsedSections) {
     return null;
   }
+
+  // Приоритет отображения: маппинг > история
+  // Показываем только ОДНО окошко
+  const shouldShowMapping =
+    state.collapsedMapping && (state.sessionId || state.viewingSessionId);
+  const shouldShowHistory = state.collapsedHistory && !shouldShowMapping;
 
   return (
     <div className="fixed bottom-6 right-6 z-40 space-y-3 flex flex-col items-end">
