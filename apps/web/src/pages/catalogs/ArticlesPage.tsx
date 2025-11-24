@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pencil, Trash2, Archive, RotateCcw, X } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Pencil, Trash2, X, List, Network } from 'lucide-react';
 
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
@@ -12,30 +12,40 @@ import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetArticlesQuery,
   useDeleteArticleMutation,
-  useArchiveArticleMutation,
-  useUnarchiveArticleMutation,
+  useUpdateArticleMutation,
 } from '../../store/api/catalogsApi';
-import { useBulkArchiveArticlesMutation } from '../../store/api/catalogsApi';
 import type { Article } from '@shared/types/catalogs';
 import { OffCanvas } from '@/shared/ui/OffCanvas';
 import { ArticleForm } from '@/features/catalog-forms/index';
 import { useBulkSelection } from '../../shared/hooks/useBulkSelection';
-import { BulkActionsBar } from '../../shared/ui/BulkActionsBar';
+import { useArticleTree } from '../../shared/hooks/useArticleTree';
+import {
+  ArticleTree,
+  ArticleTreeSearch,
+  ArticleParentSelect,
+} from '../../features/articles';
+import { findArticleInTree } from '../../shared/lib/articleTree';
 
 export const ArticlesPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<Article | null>(null);
+  const [viewMode, setViewMode] = useState<'table' | 'tree'>('tree');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showLeavesOnly, setShowLeavesOnly] = useState(false);
+  const [initialParentId, setInitialParentId] = useState<string | null>(null);
+  const [isChangeParentModalOpen, setIsChangeParentModalOpen] = useState(false);
+  const [articleToChangeParent, setArticleToChangeParent] =
+    useState<Article | null>(null);
+  const [newParentId, setNewParentId] = useState<string>('');
+  const [articleToDelete, setArticleToDelete] = useState<Article | null>(null);
 
   // Состояния для модалок подтверждения
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
     id: string | null;
-    type: 'delete' | 'archive' | 'bulk';
-    ids?: string[];
   }>({
     isOpen: false,
     id: null,
-    type: 'delete',
   });
 
   // Фильтры
@@ -43,16 +53,11 @@ export const ArticlesPage = () => {
   const [activityFilter, setActivityFilter] = useState<
     'operating' | 'investing' | 'financing' | ''
   >('');
-  const [isActiveFilter, setIsActiveFilter] = useState<boolean | undefined>(
-    undefined
-  );
-
   const filters = {
     ...(typeFilter && { type: typeFilter as 'income' | 'expense' }),
     ...(activityFilter && {
       activity: activityFilter as 'operating' | 'investing' | 'financing',
     }),
-    ...(isActiveFilter !== undefined && { isActive: isActiveFilter }),
   };
 
   const { canRead } = usePermissions();
@@ -65,12 +70,16 @@ export const ArticlesPage = () => {
     Object.keys(filters).length > 0 ? filters : undefined,
     { skip: !canRead('articles') }
   );
-  const [deleteArticle] = useDeleteArticleMutation();
-  const [archiveArticle] = useArchiveArticleMutation();
-  const [unarchiveArticle] = useUnarchiveArticleMutation();
-  const [bulkArchiveArticles] = useBulkArchiveArticlesMutation();
 
-  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
+  const {
+    tree,
+    isLoading: isTreeLoading,
+    error: treeError,
+  } = useArticleTree(Object.keys(filters).length > 0 ? filters : undefined);
+  const [deleteArticle] = useDeleteArticleMutation();
+  const [updateArticle] = useUpdateArticleMutation();
+
+  const { selectedIds, toggleSelectOne } = useBulkSelection();
 
   // Отладочная информация
   console.log('ArticlesPage - articles:', articles);
@@ -79,7 +88,70 @@ export const ArticlesPage = () => {
 
   const handleCreate = () => {
     setEditing(null);
+    setInitialParentId(null);
     setIsFormOpen(true);
+  };
+
+  const handleAddChild = (parentId: string) => {
+    setEditing(null);
+    setInitialParentId(parentId);
+    setIsFormOpen(true);
+  };
+
+  const handleChangeParent = (articleId: string) => {
+    // Находим статью в дереве
+    const articleNode = findArticleInTree(tree, articleId);
+    if (articleNode) {
+      setArticleToChangeParent(articleNode);
+      setNewParentId(articleNode.parentId || '');
+      setIsChangeParentModalOpen(true);
+    }
+  };
+
+  const handleConfirmChangeParent = async () => {
+    if (!articleToChangeParent) return;
+
+    try {
+      await updateArticle({
+        id: articleToChangeParent.id,
+        data: {
+          parentId: newParentId || undefined,
+        },
+      }).unwrap();
+      setIsChangeParentModalOpen(false);
+      setArticleToChangeParent(null);
+      setNewParentId('');
+    } catch (error) {
+      console.error('Failed to change parent:', error);
+    }
+  };
+
+  // Обработчик drag-and-drop для изменения родителя
+  const handleDragEnd = async (draggedId: string, targetId: string | null) => {
+    console.log('[ArticlesPage] handleDragEnd called', { draggedId, targetId });
+    try {
+      // Если targetId null, делаем статью корневой (передаем null, а не undefined)
+      const newParentId = targetId === null ? null : targetId;
+      console.log('[ArticlesPage] Updating article parent', {
+        draggedId,
+        newParentId,
+      });
+
+      await updateArticle({
+        id: draggedId,
+        data: {
+          parentId: newParentId,
+        },
+      }).unwrap();
+      console.log('[ArticlesPage] Article parent updated successfully');
+    } catch (error: unknown) {
+      console.error(
+        '[ArticlesPage] Failed to change parent via drag-and-drop:',
+        error
+      );
+      // Ошибка будет обработана бэкендом (валидация циклов и т.д.)
+      // Можно добавить уведомление, если нужно
+    }
   };
 
   const handleEdit = (article: Article) => {
@@ -89,44 +161,56 @@ export const ArticlesPage = () => {
   };
 
   const handleDelete = (id: string) => {
-    setDeleteModal({ isOpen: true, id, type: 'delete' });
+    console.log('[ArticlesPage] handleDelete called with id:', id);
+    // Находим статью в дереве для отображения информации
+    const articleNode = findArticleInTree(tree, id);
+    // Если не найдена в дереве, ищем в плоском списке
+    const article = articleNode || articles.find((a) => a.id === id);
+    console.log('[ArticlesPage] Found article:', article);
+    setArticleToDelete(article || null);
+    setDeleteModal({ isOpen: true, id });
+    console.log('[ArticlesPage] Delete modal opened, deleteModal:', {
+      isOpen: true,
+      id,
+    });
   };
 
-  const handleArchive = (id: string) => {
-    setDeleteModal({ isOpen: true, id, type: 'archive' });
+  // Подсчитываем общее количество потомков (включая вложенные)
+  const getTotalDescendantsCount = (article: Article | null): number => {
+    if (!article || !article.children) return 0;
+    let count = article.children.length;
+    article.children.forEach((child) => {
+      count += getTotalDescendantsCount(child as Article);
+    });
+    return count;
   };
 
   const confirmDelete = async () => {
-    if (!deleteModal.id) return;
-    await deleteArticle(deleteModal.id);
-    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
-  };
-
-  const confirmArchive = async () => {
-    if (!deleteModal.id) return;
-    await archiveArticle(deleteModal.id);
-    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
-  };
-
-  const confirmBulkArchive = async () => {
-    if (!deleteModal.ids || deleteModal.ids.length === 0) return;
-    await bulkArchiveArticles(deleteModal.ids);
-    clearSelection();
-    setDeleteModal({ isOpen: false, id: null, type: 'delete' });
-  };
-
-  const handleModalConfirm = async () => {
-    if (deleteModal.type === 'delete') {
-      await confirmDelete();
-    } else if (deleteModal.type === 'archive') {
-      await confirmArchive();
-    } else if (deleteModal.type === 'bulk') {
-      await confirmBulkArchive();
+    console.log(
+      '[ArticlesPage] confirmDelete called, deleteModal.id:',
+      deleteModal.id
+    );
+    if (!deleteModal.id) {
+      console.warn('[ArticlesPage] confirmDelete: no deleteModal.id');
+      return;
     }
-  };
-
-  const handleUnarchive = async (id: string) => {
-    await unarchiveArticle(id);
+    try {
+      console.log(
+        '[ArticlesPage] Calling deleteArticle mutation with id:',
+        deleteModal.id
+      );
+      const result = await deleteArticle(deleteModal.id).unwrap();
+      console.log('[ArticlesPage] deleteArticle success, result:', result);
+      setArticleToDelete(null);
+      console.log('[ArticlesPage] Delete completed successfully');
+    } catch (error) {
+      console.error('[ArticlesPage] Failed to delete article:', error);
+      console.error(
+        '[ArticlesPage] Error details:',
+        JSON.stringify(error, null, 2)
+      );
+      throw error;
+    }
   };
 
   const getActivityLabel = (activity: string | null | undefined) => {
@@ -141,11 +225,9 @@ export const ArticlesPage = () => {
   const handleClearFilters = () => {
     setTypeFilter('');
     setActivityFilter('');
-    setIsActiveFilter(undefined);
   };
 
-  const hasActiveFilters =
-    typeFilter || activityFilter || isActiveFilter !== undefined;
+  const hasActiveFilters = typeFilter || activityFilter;
 
   const columns = [
     {
@@ -183,11 +265,6 @@ export const ArticlesPage = () => {
         a.counterparty?.name || '-',
     },
     {
-      key: 'status',
-      header: 'Статус',
-      render: (a: Article) => (a.isActive ? 'Активна' : 'В архиве'),
-    },
-    {
       key: 'actions',
       header: 'Действия',
       render: (a: Article) => (
@@ -213,27 +290,6 @@ export const ArticlesPage = () => {
               <Pencil size={16} />
             </button>
           </ProtectedAction>
-          {a.isActive ? (
-            <ProtectedAction entity="articles" action="archive">
-              <button
-                onClick={() => handleArchive(a.id)}
-                className="text-amber-600 hover:text-amber-800 p-1 rounded hover:bg-amber-50 transition-colors"
-                title="Архивировать"
-              >
-                <Archive size={16} />
-              </button>
-            </ProtectedAction>
-          ) : (
-            <ProtectedAction entity="articles" action="restore">
-              <button
-                onClick={() => handleUnarchive(a.id)}
-                className="text-green-600 hover:text-green-800 p-1 rounded hover:bg-green-50 transition-colors"
-                title="Вернуть из архива"
-              >
-                <RotateCcw size={16} />
-              </button>
-            </ProtectedAction>
-          )}
           <ProtectedAction
             entity="articles"
             action="delete"
@@ -273,149 +329,233 @@ export const ArticlesPage = () => {
         </div>
 
         <Card>
-          <div className="mb-4 space-y-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <div className="flex-1 min-w-[200px]">
-                <Select
-                  label="Тип"
-                  value={typeFilter}
-                  onChange={(value) =>
-                    setTypeFilter(value as 'income' | 'expense' | '')
-                  }
-                  options={[
-                    { value: '', label: 'Все типы' },
-                    { value: 'income', label: 'Поступления' },
-                    { value: 'expense', label: 'Списания' },
-                  ]}
-                  placeholder="Выберите тип"
-                  fullWidth={false}
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Select
-                  label="Деятельность"
-                  value={activityFilter}
-                  onChange={(value) =>
-                    setActivityFilter(
-                      value as 'operating' | 'investing' | 'financing' | ''
-                    )
-                  }
-                  options={[
-                    { value: '', label: 'Все виды деятельности' },
-                    { value: 'operating', label: 'Операционная' },
-                    { value: 'investing', label: 'Инвестиционная' },
-                    { value: 'financing', label: 'Финансовая' },
-                  ]}
-                  placeholder="Выберите деятельность"
-                  fullWidth={false}
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <Select
-                  label="Статус"
-                  value={
-                    isActiveFilter === undefined
-                      ? ''
-                      : isActiveFilter
-                        ? 'true'
-                        : 'false'
-                  }
-                  onChange={(value) => {
-                    setIsActiveFilter(
-                      value === '' ? undefined : value === 'true'
-                    );
-                  }}
-                  options={[
-                    { value: '', label: 'Все статусы' },
-                    { value: 'true', label: 'Активна' },
-                    { value: 'false', label: 'В архиве' },
-                  ]}
-                  placeholder="Выберите статус"
-                  fullWidth={false}
-                />
-              </div>
-              {hasActiveFilters && (
-                <Button
-                  onClick={handleClearFilters}
-                  className="btn-secondary flex items-center gap-2"
-                >
-                  <X size={16} />
-                  Сбросить фильтры
-                </Button>
-              )}
+          {/* Переключатель вида */}
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setViewMode('tree')}
+                variant={viewMode === 'tree' ? 'primary' : 'secondary'}
+                size="sm"
+                icon={<Network size={16} />}
+              >
+                Дерево
+              </Button>
+              <Button
+                onClick={() => setViewMode('table')}
+                variant={viewMode === 'table' ? 'primary' : 'secondary'}
+                size="sm"
+                icon={<List size={16} />}
+              >
+                Таблица
+              </Button>
             </div>
           </div>
 
-          <>
-            <Table
-              columns={columns}
-              data={articles}
-              keyExtractor={(a) => a.id}
-              loading={isLoading}
-            />
-            <ProtectedAction entity="articles" action="archive">
-              <BulkActionsBar
-                selectedCount={selectedIds.length}
-                onClear={clearSelection}
-                actions={[
-                  {
-                    label: `В архив выбранные (${selectedIds.length})`,
-                    variant: 'warning',
-                    onClick: () => {
-                      setDeleteModal({
-                        isOpen: true,
-                        id: null,
-                        type: 'bulk',
-                        ids: selectedIds,
-                      });
-                    },
-                  },
-                ]}
+          {viewMode === 'tree' && (
+            <>
+              <ArticleTreeSearch
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                showLeavesOnly={showLeavesOnly}
+                onShowLeavesOnlyChange={setShowLeavesOnly}
               />
-            </ProtectedAction>
-          </>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+                <div className="bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                      Структура статей
+                    </h2>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <span>
+                        Найдено: {tree.length}{' '}
+                        {tree.length === 1 ? 'статья' : 'статей'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {isTreeLoading ? (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      Загрузка...
+                    </div>
+                  ) : treeError ? (
+                    <div className="text-center py-8 text-red-500">
+                      Ошибка загрузки статей
+                    </div>
+                  ) : (
+                    <ArticleTree
+                      tree={tree}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onAddChild={handleAddChild}
+                      onChangeParent={handleChangeParent}
+                      onDragEnd={handleDragEnd}
+                      searchQuery={searchQuery}
+                      showLeavesOnly={showLeavesOnly}
+                    />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {viewMode === 'table' && (
+            <>
+              <div className="mb-4 space-y-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <Select
+                      label="Тип"
+                      value={typeFilter}
+                      onChange={(value) =>
+                        setTypeFilter(value as 'income' | 'expense' | '')
+                      }
+                      options={[
+                        { value: '', label: 'Все типы' },
+                        { value: 'income', label: 'Поступления' },
+                        { value: 'expense', label: 'Списания' },
+                      ]}
+                      placeholder="Выберите тип"
+                      fullWidth={false}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <Select
+                      label="Деятельность"
+                      value={activityFilter}
+                      onChange={(value) =>
+                        setActivityFilter(
+                          value as 'operating' | 'investing' | 'financing' | ''
+                        )
+                      }
+                      options={[
+                        { value: '', label: 'Все виды деятельности' },
+                        { value: 'operating', label: 'Операционная' },
+                        { value: 'investing', label: 'Инвестиционная' },
+                        { value: 'financing', label: 'Финансовая' },
+                      ]}
+                      placeholder="Выберите деятельность"
+                      fullWidth={false}
+                    />
+                  </div>
+                  {hasActiveFilters && (
+                    <Button
+                      onClick={handleClearFilters}
+                      className="btn-secondary flex items-center gap-2"
+                    >
+                      <X size={16} />
+                      Сбросить фильтры
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <>
+                <Table
+                  columns={columns}
+                  data={articles}
+                  keyExtractor={(a) => a.id}
+                  loading={isLoading}
+                />
+              </>
+            </>
+          )}
         </Card>
       </div>
       <OffCanvas
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          setIsFormOpen(false);
+          setInitialParentId(null);
+        }}
         title={editing ? 'Редактировать статью' : 'Создать статью'}
       >
-        <ArticleForm article={editing} onClose={() => setIsFormOpen(false)} />
+        <ArticleForm
+          article={editing}
+          onClose={() => {
+            setIsFormOpen(false);
+            setInitialParentId(null);
+          }}
+          initialParentId={initialParentId || undefined}
+        />
+      </OffCanvas>
+
+      {/* Модальное окно для изменения родителя */}
+      <OffCanvas
+        isOpen={isChangeParentModalOpen}
+        onClose={() => {
+          setIsChangeParentModalOpen(false);
+          setArticleToChangeParent(null);
+          setNewParentId('');
+        }}
+        title="Изменить родительскую статью"
+      >
+        {articleToChangeParent && (
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                Текущая статья:
+              </p>
+              <p className="font-medium text-gray-900 dark:text-gray-100">
+                {articleToChangeParent.name}
+              </p>
+            </div>
+            {articleToChangeParent.type !== 'transfer' && (
+              <ArticleParentSelect
+                label="Новая родительская статья"
+                value={newParentId}
+                onChange={setNewParentId}
+                articleType={articleToChangeParent.type as 'income' | 'expense'}
+                excludeArticleId={articleToChangeParent.id}
+                placeholder="Корневая статья (без родителя)"
+              />
+            )}
+            <div className="flex gap-4 pt-4">
+              <Button
+                onClick={handleConfirmChangeParent}
+                disabled={
+                  newParentId === (articleToChangeParent.parentId || '')
+                }
+              >
+                Сохранить
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsChangeParentModalOpen(false);
+                  setArticleToChangeParent(null);
+                  setNewParentId('');
+                }}
+              >
+                Отмена
+              </Button>
+            </div>
+          </div>
+        )}
       </OffCanvas>
 
       <ConfirmDeleteModal
         isOpen={deleteModal.isOpen}
-        onClose={() =>
-          setDeleteModal({ isOpen: false, id: null, type: 'delete' })
-        }
-        onConfirm={handleModalConfirm}
-        title={
-          deleteModal.type === 'archive'
-            ? 'Подтверждение архивирования'
-            : deleteModal.type === 'bulk'
-              ? 'Подтверждение архивирования'
-              : 'Подтверждение удаления'
-        }
+        onClose={() => {
+          setDeleteModal({ isOpen: false, id: null });
+          setArticleToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        title="Подтверждение удаления"
         message={
-          deleteModal.type === 'archive'
-            ? 'Вы уверены, что хотите архивировать эту статью?'
-            : deleteModal.type === 'bulk'
-              ? `Отправить в архив выбранные статьи (${deleteModal.ids?.length || 0})?`
-              : 'Вы уверены, что хотите удалить эту статью?'
+          articleToDelete &&
+          articleToDelete.children &&
+          articleToDelete.children.length > 0
+            ? (() => {
+                const directChildren = articleToDelete.children.length;
+                const totalDescendants =
+                  getTotalDescendantsCount(articleToDelete);
+                return `Вы уверены, что хотите удалить статью "${articleToDelete.name}"? У неё есть ${directChildren} ${directChildren === 1 ? 'дочерняя статья' : 'дочерних статей'}${totalDescendants > directChildren ? ` (всего ${totalDescendants} ${totalDescendants === 1 ? 'потомок' : 'потомков'})` : ''}, которые станут корневыми.`;
+              })()
+            : 'Вы уверены, что хотите удалить эту статью?'
         }
-        confirmText={
-          deleteModal.type === 'archive'
-            ? 'Архивировать'
-            : deleteModal.type === 'bulk'
-              ? `В архив (${deleteModal.ids?.length || 0})`
-              : 'Удалить'
-        }
-        variant={
-          deleteModal.type === 'archive' || deleteModal.type === 'bulk'
-            ? 'warning'
-            : 'delete'
-        }
+        confirmText="Удалить"
+        variant="delete"
       />
     </Layout>
   );

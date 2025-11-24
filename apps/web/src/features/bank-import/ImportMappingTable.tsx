@@ -25,16 +25,11 @@ import {
   useImportOperationsMutation,
   useUpdateImportedOperationMutation,
 } from '../../store/api/importsApi';
-import {
-  useGetDealsQuery,
-  useGetDepartmentsQuery,
-  useGetArticlesQuery,
-  useGetAccountsQuery,
-} from '../../store/api/catalogsApi';
-import { useGetCompanyQuery } from '../../store/api/companiesApi';
+import { useGetAccountsQuery } from '../../store/api/catalogsApi';
 import { formatDate } from '../../shared/lib/date';
 import { formatMoney } from '../../shared/lib/money';
 import { useNotification } from '../../shared/hooks/useNotification';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import type { ImportedOperation } from '@shared/types/imports';
 import { ImportMappingRow } from './ImportMappingRow';
 import { SaveRulesCell } from './SaveRulesCell';
@@ -93,7 +88,8 @@ export const ImportMappingTable = ({
     matched: matchedFilter,
   });
 
-  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
+  // Используем только листья (статьи без дочерних) для операций
+  const { leafArticles: articles = [] } = useLeafArticles({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

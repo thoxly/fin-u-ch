@@ -1,12 +1,14 @@
 import prisma from '../../../config/db';
 import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
+import articlesService from '../../catalogs/articles/articles.service';
 
 export interface CashflowParams {
   periodFrom: Date;
   periodTo: Date;
   activity?: string;
   rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
+  parentArticleId?: string; // ID родительской статьи для суммирования по потомкам
 }
 
 // Internal aggregation row
@@ -57,6 +59,17 @@ export class CashflowService {
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached as CashflowReport;
 
+    // Если указан parentArticleId, получаем все ID потомков
+    let articleIdsFilter: string[] | undefined;
+    if (params.parentArticleId) {
+      const descendantIds = await articlesService.getDescendantIds(
+        params.parentArticleId,
+        companyId
+      );
+      // Включаем саму родительскую статью и всех потомков
+      articleIdsFilter = [params.parentArticleId, ...descendantIds];
+    }
+
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -67,6 +80,10 @@ export class CashflowService {
         type: { in: ['income', 'expense'] },
         isConfirmed: true,
         isTemplate: false,
+        // Если указан parentArticleId, фильтруем по статье и её потомкам
+        ...(articleIdsFilter && {
+          articleId: { in: articleIdsFilter },
+        }),
       },
       include: {
         article: {
@@ -78,20 +95,61 @@ export class CashflowService {
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
     const articleMap = new Map<string, CashflowRow>();
 
+    // Если указан parentArticleId, получаем данные родительской статьи один раз
+    let parentArticle: {
+      id: string;
+      name: string;
+      activity: string | null;
+      type: string;
+    } | null = null;
+    if (params.parentArticleId) {
+      parentArticle = await prisma.article.findFirst({
+        where: { id: params.parentArticleId, companyId },
+        select: { id: true, name: true, activity: true, type: true },
+      });
+      if (!parentArticle) {
+        // Если родительская статья не найдена, возвращаем пустой результат
+        const response: CashflowReport = {
+          periodFrom: params.periodFrom.toISOString().slice(0, 10),
+          periodTo: params.periodTo.toISOString().slice(0, 10),
+          activities: [],
+        };
+        return response;
+      }
+    }
+
+    // Если указан parentArticleId, группируем все операции под одной записью родительской статьи
+    const aggregationKey = params.parentArticleId || null;
+
     for (const op of operations) {
       if (!op.article) continue;
       if (params.activity && op.article.activity !== params.activity) continue;
 
-      const key = op.article.id;
+      // Если указан parentArticleId, используем его ID как ключ для агрегации
+      // Иначе используем ID самой статьи
+      const key = aggregationKey || op.article.id;
+
       if (!articleMap.has(key)) {
-        articleMap.set(key, {
-          articleId: op.article.id,
-          articleName: op.article.name,
-          activity: op.article.activity || 'unknown',
-          type: op.article.type,
-          months: Object.fromEntries(months.map((m) => [m, 0])),
-          total: 0,
-        });
+        // Если агрегируем по родительской статье, используем её данные
+        if (aggregationKey && parentArticle) {
+          articleMap.set(key, {
+            articleId: parentArticle.id,
+            articleName: parentArticle.name,
+            activity: parentArticle.activity || 'unknown',
+            type: parentArticle.type,
+            months: Object.fromEntries(months.map((m) => [m, 0])),
+            total: 0,
+          });
+        } else {
+          articleMap.set(key, {
+            articleId: op.article.id,
+            articleName: op.article.name,
+            activity: op.article.activity || 'unknown',
+            type: op.article.type,
+            months: Object.fromEntries(months.map((m) => [m, 0])),
+            total: 0,
+          });
+        }
       }
 
       const row = articleMap.get(key)!;

@@ -13,6 +13,7 @@ export class BDDSController {
           ? new Date(req.query.periodTo as string)
           : new Date(),
         budgetId: req.query.budgetId as string | undefined,
+        parentArticleId: req.query.parentArticleId as string | undefined,
       };
 
       const activities = await bddsService.getBDDS(req.companyId!, params);

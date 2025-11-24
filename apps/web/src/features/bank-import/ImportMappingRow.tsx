@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import {
   useGetCounterpartiesQuery,
-  useGetArticlesQuery,
   useGetAccountsQuery,
   useGetDealsQuery,
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import { useUpdateImportedOperationMutation } from '../../store/api/importsApi';
 import { Select } from '../../shared/ui/Select';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -46,7 +46,8 @@ export const ImportMappingRow = ({
   const [isEditing, setIsEditing] = useState(false);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
+  // Используем только листья (статьи без дочерних) для операций
+  const { leafArticles: articles = [] } = useLeafArticles({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
