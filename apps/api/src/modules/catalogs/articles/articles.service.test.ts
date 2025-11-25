@@ -452,7 +452,7 @@ describe('ArticlesService', () => {
           type: 'income',
           isActive: true,
         })
-        // Мокируем получение текущей статьи в checkForCycle
+        // Мокируем получение текущей статьи в checkForCycle (для получения parentId)
         .mockResolvedValueOnce({
           id: articleId,
           parentId: null,
@@ -460,11 +460,12 @@ describe('ArticlesService', () => {
 
       // Мокируем проверку циклов - parent является потомком article
       // checkDescendants начинает с articleId и проверяет всех его потомков
+      // Первый вызов findMany получает детей articleId, и среди них должен быть parentId
       mockedPrisma.article.findMany.mockResolvedValueOnce([{ id: parentId }]); // Дети article-1 включают parent-1 - цикл обнаружен!
 
       await expect(
         articlesService.update(articleId, companyId, { parentId })
-      ).rejects.toThrow('Невозможно создать цикл');
+      ).rejects.toThrow('Невозможно создать цикл в иерархии статей');
     });
 
     it('should allow creating article with valid parent', async () => {
@@ -527,16 +528,8 @@ describe('ArticlesService', () => {
   describe('getTree', () => {
     it('should return tree structure', async () => {
       const companyId = 'company-1';
+      // Статьи должны быть отсортированы по имени (orderBy: { name: 'asc' })
       const articles = [
-        {
-          id: 'article-1',
-          name: 'Parent',
-          companyId,
-          type: 'income',
-          parentId: null,
-          parent: null,
-          counterparty: null,
-        },
         {
           id: 'article-2',
           name: 'Child',
@@ -546,6 +539,15 @@ describe('ArticlesService', () => {
           parent: { id: 'article-1', name: 'Parent' },
           counterparty: null,
         },
+        {
+          id: 'article-1',
+          name: 'Parent',
+          companyId,
+          type: 'income',
+          parentId: null,
+          parent: null,
+          counterparty: null,
+        },
       ];
 
       mockedPrisma.article.findMany.mockResolvedValue(articles);
@@ -553,9 +555,13 @@ describe('ArticlesService', () => {
       const result = await articlesService.getTree(companyId);
 
       expect(result).toHaveLength(1);
+      // После сортировки по имени 'Parent' идет после 'Child', но так как только одна корневая статья,
+      // она будет первой в результате
       expect(result[0].id).toBe('article-1');
+      expect(result[0].name).toBe('Parent');
       expect(result[0].children).toHaveLength(1);
       expect(result[0].children[0].id).toBe('article-2');
+      expect(result[0].children[0].name).toBe('Child');
     });
 
     it('should handle articles with filtered parent (make them root)', async () => {
