@@ -345,6 +345,113 @@ export class IntegrationsController {
       });
     }
   }
+
+  /**
+   * Генерация операций Ozon для всех интеграций (для worker)
+   */
+  async generateOzonOperations(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      console.log('🔄 API: Generating Ozon operations for all integrations');
+
+      const result =
+        await ozonOperationService.createOperationsForAllIntegrations();
+
+      res.json({
+        success: true,
+        ...result,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Генерация операции Ozon для конкретной интеграции
+   */
+  async generateOzonOperationForIntegration(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { integrationId } = req.body;
+
+      if (!integrationId) {
+        return res.status(400).json({
+          success: false,
+          error: 'integrationId is required',
+        });
+      }
+
+      console.log(
+        `🔄 API: Generating Ozon operation for integration ${integrationId}`
+      );
+
+      // Проверяем что интеграция принадлежит компании
+      const integration = await integrationsService.getOzonIntegration(
+        req.companyId!
+      );
+      if (
+        !integration.success ||
+        !integration.data ||
+        integration.data.id !== integrationId
+      ) {
+        return res.status(404).json({
+          success: false,
+          error: 'Integration not found',
+        });
+      }
+
+      const created =
+        await ozonOperationService.createTestOperation(integrationId);
+
+      res.json({
+        success: true,
+        created,
+        integrationId,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Получение статуса генерации операций
+   */
+  async getOzonOperationsStatus(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const integrations = await ozonOperationService.getActiveIntegrations();
+      console.log('Защёл');
+
+      res.json({
+        success: true,
+        data: {
+          totalIntegrations: integrations.length,
+          lastRun: new Date().toISOString(),
+          nextScheduledRun: this.getNextScheduledRun(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  private getNextScheduledRun(): string {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    return tomorrow.toISOString();
+  }
 }
 
 export default new IntegrationsController();

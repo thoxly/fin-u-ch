@@ -12,6 +12,7 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || 'change-me-in-production',
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  WORKER_API_KEY: process.env.WORKER_API_KEY,
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://vect-a.ru',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '465', 10),

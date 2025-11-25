@@ -13,6 +13,11 @@ export const extractTenant = async (
   next: NextFunction
 ) => {
   try {
+    // Если это запрос от worker, пропускаем извлечение tenant
+    if (req.isWorker) {
+      return next();
+    }
+
     if (!req.userId) {
       throw new AppError('User ID not found in request', 401);
     }

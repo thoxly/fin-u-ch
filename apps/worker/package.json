@@ -12,6 +12,7 @@
     "type-check": "tsc --noEmit",
     "prisma:generate": "prisma generate",
     "ozon-test": "tsx src/index.ts run-ozon-test",
+    "ozon-now": "tsx src/index.ts run-ozon-now",
     "debug-ozon": "tsx src/scripts/debug-ozon-integration.ts"
   },
   "dependencies": {

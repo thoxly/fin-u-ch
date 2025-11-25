@@ -7,11 +7,21 @@ import {
   getCurrentMonth,
 } from './jobs/salary.generate.monthly';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
-import { generateOzonOperations } from './jobs/ozon.generate.operations';
+import {
+  generateOzonOperations,
+  shouldRunOzonTaskToday,
+  getNextRunInfo,
+  ozonOperationService,
+} from './jobs/ozon.generate.operations';
 import { prisma } from './config/prisma';
 
-logger.info('🚀 Worker starting...');
-logger.info(`Environment: ${env.NODE_ENV}`);
+logger.info(`⏰ Текущее время: ${new Date().toLocaleString('ru-RU')}`);
+
+// Выводим информацию о следующем запуске Ozon задачи
+const nextRunInfo = getNextRunInfo();
+const nextRunDate = new Date(nextRunInfo.nextRunDate);
+logger.info(`⏰ Дата и время: ${nextRunDate.toLocaleString('ru-RU')}`);
+logger.info(`📊 Дней до запуска: ${nextRunInfo.daysUntilNextRun}`);
 
 /**
  * Задача генерации зарплатных операций
@@ -60,30 +70,66 @@ const recurringOperationsTask = cron.schedule(
   }
 );
 
-/**
- * Задача генерации операций из Ozon за прошлую неделю
- * Запускается каждый день в 09:00 (можно изменить на нужное время)
- */
 const ozonOperationsTask = cron.schedule(
-  '0 9 * * *', // Каждый день в 09:00
+  '1 0 * * *',
   async () => {
-    logger.info(
-      '🔄 Running scheduled Ozon operations generation task for last week...'
-    );
+    const startTime = new Date();
 
     try {
-      const result = await generateOzonOperations();
-      logger.info(
-        `✅ Ozon operations generation completed: ${result.created} operations created`
-      );
+      const today = new Date();
+      const weekdayNames = [
+        'воскресенье',
+        'понедельник',
+        'вторник',
+        'среда',
+        'четверг',
+        'пятница',
+        'суббота',
+      ];
+      const todayName = weekdayNames[today.getDay()];
 
-      if (result.errors.length > 0) {
-        logger.warn(
-          `⚠️  Some Ozon operations failed: ${result.errors.length} errors`
+      if (!shouldRunOzonTaskToday()) {
+        return;
+      }
+
+      const result = await generateOzonOperations();
+
+      const endTime = new Date();
+      const duration = (
+        (endTime.getTime() - startTime.getTime()) /
+        1000
+      ).toFixed(2);
+
+      logger.info('📊 ИТОГОВЫЕ РЕЗУЛЬТАТЫ ГЕНЕРАЦИИ ОПЕРАЦИЙ OZON');
+
+      logger.info(`✅ Успешно создано операций: ${result.created}`);
+      logger.info(`❌ Количество ошибок: ${result.errors.length}`);
+
+      if (result.created > 0) {
+        logger.info(
+          `🎉 УСПЕХ! Создано ${result.created} операций через интеграцию Ozon!`
+        );
+      } else {
+        logger.info(
+          `ℹ️  Операции не были созданы (возможно, нет данных или payment >= 0)`
         );
       }
+
+      if (result.errors.length > 0) {
+        logger.warn('');
+        logger.warn('⚠️  ОШИБКИ ПРИ СОЗДАНИИ ОПЕРАЦИЙ:');
+        result.errors.forEach((error, index) => {
+          logger.warn(`   ${index + 1}. ${error}`);
+        });
+      }
     } catch (error) {
-      logger.error('❌ Ozon operations generation task failed:', error);
+      const endTime = new Date();
+      const duration = (
+        (endTime.getTime() - startTime.getTime()) /
+        1000
+      ).toFixed(2);
+      logger.error(`⏱️  Время до ошибки: ${duration} сек`);
+      logger.error('Ошибка:', error);
     }
   },
   {
@@ -130,12 +176,42 @@ export async function runOzonOperationsManually(
   logger.info('🔧 Manual Ozon operations generation triggered');
 
   try {
+    // Проверяем доступность API
+    const isHealthy = await ozonOperationService.healthCheck();
+    if (!isHealthy) {
+      throw new Error('API is not available for manual Ozon operations');
+    }
+
     const result = await generateOzonOperations({ testIntegrationId });
     logger.info('✅ Manual Ozon operations generation completed successfully');
     return result;
   } catch (error) {
     logger.error('❌ Manual Ozon operations generation failed:', error);
     throw error;
+  }
+}
+
+/**
+ * Функция для проверки статуса Ozon интеграций
+ */
+export async function checkOzonStatus() {
+  try {
+    logger.info('🔍 Checking Ozon integrations status');
+
+    const status = await ozonOperationService.getOperationsStatus();
+    const health = await ozonOperationService.healthCheck();
+
+    return {
+      apiHealth: health ? 'healthy' : 'unhealthy',
+      status,
+      nextRun: getNextRunInfo(),
+    };
+  } catch (error: any) {
+    logger.error('❌ Failed to check Ozon status:', error);
+    return {
+      apiHealth: 'unhealthy',
+      error: error.message,
+    };
   }
 }
 
@@ -163,6 +239,62 @@ if (process.argv[2] === 'run-ozon-test') {
     });
 }
 
+// Команда для немедленного запуска задачи Ozon (для всех интеграций)
+if (process.argv[2] === 'run-ozon-now') {
+  logger.info('═══════════════════════════════════════════════════════');
+  logger.info('🚀 РУЧНОЙ ЗАПУСК ЗАДАЧИ OZON');
+  logger.info('═══════════════════════════════════════════════════════');
+
+  prisma
+    .$connect()
+    .then(async () => {
+      logger.info('✅ Подключение к БД установлено');
+
+      try {
+        const result = await generateOzonOperations();
+
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info('📊 РЕЗУЛЬТАТЫ РУЧНОГО ЗАПУСКА');
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info(`✅ Создано операций: ${result.created}`);
+        logger.info(`❌ Ошибок: ${result.errors.length}`);
+
+        if (result.errors.length > 0) {
+          logger.warn('⚠️  Ошибки:');
+          result.errors.forEach((error, index) => {
+            logger.warn(`   ${index + 1}. ${error}`);
+          });
+        }
+
+        logger.info('═══════════════════════════════════════════════════════');
+
+        await prisma.$disconnect();
+        process.exit(0);
+      } catch (error: any) {
+        logger.error('❌ Ошибка при выполнении задачи:', error);
+        await prisma.$disconnect();
+        process.exit(1);
+      }
+    })
+    .catch((error: any) => {
+      logger.error('❌ Ошибка подключения к БД:', error);
+      process.exit(1);
+    });
+}
+
+// Команда для проверки статуса
+if (process.argv[2] === 'check-ozon-status') {
+  checkOzonStatus()
+    .then((status) => {
+      console.log('📊 Ozon Status:', JSON.stringify(status, null, 2));
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('❌ Ошибка при проверке статуса:', error);
+      process.exit(1);
+    });
+}
+
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully...`);
@@ -182,19 +314,63 @@ const shutdown = async (signal: string) => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// Проверка подключения к БД
+// Проверка подключения к БД и API
 prisma
   .$connect()
-  .then(() => {
+  .then(async () => {
     logger.info('✅ Database connection established');
+
+    // Проверяем доступность API (не критично для работы worker)
+    try {
+      const apiHealth = await ozonOperationService.healthCheck();
+      if (apiHealth) {
+        logger.info('✅ API connection established');
+      } else {
+        logger.warn('⚠️  API недоступен или требует аутентификации');
+        if (!env.WORKER_API_KEY) {
+          logger.warn(
+            '💡 Для работы через API настройте WORKER_API_KEY в .env файле'
+          );
+          logger.warn(
+            '   Worker будет использовать прямой режим (direct) при необходимости'
+          );
+        }
+      }
+    } catch (error: any) {
+      logger.warn('⚠️  API health check failed (не критично):', error.message);
+      if (!env.WORKER_API_KEY) {
+        logger.warn(
+          '💡 Для работы через API настройте WORKER_API_KEY в .env файле'
+        );
+      }
+    }
+
+    logger.info('═══════════════════════════════════════════════════════');
+    logger.info('✅ ВСЕ ЗАДАЧИ НАСТРОЕНЫ И ГОТОВЫ К РАБОТЕ');
+    logger.info('═══════════════════════════════════════════════════════');
+    logger.info('📋 Настроенные задачи:');
+    logger.info('   1. ✅ Генерация зарплатных операций');
+    logger.info('      Расписание: 1-е число каждого месяца в 00:00');
+    logger.info('');
+    logger.info('   2. ✅ Генерация периодических операций');
+    logger.info('      Расписание: Каждый день в 00:01');
+    logger.info('');
+    logger.info('   3. ✅ Генерация операций Ozon');
     logger.info(
-      '✅ Salary generation task scheduled (runs on 1st of each month at 00:00)'
+      '      Расписание: Каждый день в 00:01 (выполняется только по средам)'
     );
-    logger.info('✅ Recurring operations task scheduled (runs daily at 00:01)');
     logger.info(
-      '✅ Ozon operations task scheduled (runs daily at 09:00 for last week)'
+      '      Следующий запуск: ' + nextRunDate.toLocaleString('ru-RU')
     );
-    logger.info('👷 Worker is running and waiting for scheduled tasks...');
+    logger.info('═══════════════════════════════════════════════════════');
+    logger.info('👷 WORKER РАБОТАЕТ И ОЖИДАЕТ ЗАПЛАНИРОВАННЫХ ЗАДАЧ');
+    logger.info('═══════════════════════════════════════════════════════');
+    logger.info('');
+    logger.info(
+      '💡 Для просмотра логов выполнения задач следите за этой консолью'
+    );
+    logger.info('💡 Задачи будут выполняться автоматически по расписанию');
+    logger.info('');
   })
   .catch((error: unknown) => {
     logger.error('❌ Failed to connect to database:', error);

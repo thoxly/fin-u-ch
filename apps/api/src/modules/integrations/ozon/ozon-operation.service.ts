@@ -17,11 +17,105 @@ interface OzonCashFlowResponse {
       returns_amount: number;
       services_amount: number;
     }>;
+    details?: Array<{
+      period: {
+        begin: string;
+        end: string;
+        id: number;
+      };
+      payments: Array<{
+        payment: number;
+        currency_code: string;
+      }>;
+      begin_balance_amount: number;
+      delivery: {
+        total: number;
+        amount: number;
+        delivery_services: {
+          total: number;
+          items: Array<{
+            name: string;
+            price: number;
+          }>;
+        };
+      };
+      return: {
+        total: number;
+        amount: number;
+        return_services: {
+          total: number;
+          items: Array<{
+            name: string;
+            price: number;
+          }>;
+        };
+      };
+      loan: number;
+      invoice_transfer: number;
+      rfbs: {
+        total: number;
+        transfer_delivery: number;
+        transfer_delivery_return: number;
+        compensation_delivery_return: number;
+        partial_compensation: number;
+        partial_compensation_return: number;
+      };
+      services: {
+        total: number;
+        items: Array<{
+          name: string;
+          price: number;
+        }>;
+      };
+      others: {
+        total: number;
+        items: Array<{
+          name: string;
+          price: number;
+        }>;
+      };
+      end_balance_amount: number;
+    }>;
   };
   page_count: number;
 }
 
 export class OzonOperationService {
+  /**
+   * Получает интеграцию по ID
+   */
+  async getIntegrationById(integrationId: string) {
+    return prisma.integration.findFirst({
+      where: {
+        id: integrationId,
+        type: 'ozon',
+        isActive: true,
+      },
+      include: {
+        company: true,
+        article: true,
+        account: true,
+      },
+    });
+  }
+
+  /**
+   * Получает все активные интеграции Ozon
+   */
+  async getActiveIntegrations() {
+    return prisma.integration.findMany({
+      where: {
+        type: 'ozon',
+        isActive: true,
+      },
+      include: {
+        company: true,
+        article: true,
+        account: true,
+      },
+    });
+  }
+
   /**
    * Получает данные о денежных потоках из Ozon API
    */
@@ -49,7 +143,7 @@ export class OzonOperationService {
               from: dateFrom,
               to: dateTo,
             },
-            with_details: false, // Упрощаем запрос
+            with_details: true,
             page: 1,
             page_size: 100,
           }),
@@ -85,57 +179,75 @@ export class OzonOperationService {
   }
 
   /**
-   * Рассчитывает сумму выплаты на основе данных Ozon
+   * Рассчитывает сумму выплаты
    */
   calculatePaymentAmount(cashFlowData: OzonCashFlowResponse): number {
     if (!cashFlowData.result.cash_flows.length) {
+      console.log('❌ Нет данных cash_flows в ответе Ozon API');
       return 0;
     }
 
-    const cashFlow = cashFlowData.result.cash_flows[0];
+    // Смотрим на поле payment в details
+    const details = cashFlowData.result.details;
+    if (details && details.length > 0) {
+      const payments = details[0]?.payments;
+      if (payments && payments.length > 0) {
+        const payment = payments[0];
+        console.log(
+          `💰 Прямая сумма выплаты из Ozon: ${payment.payment} ${payment.currency_code}`
+        );
+        return payment.payment || 0;
+      }
+    }
 
-    // Упрощенная формула расчета
-    const paymentAmount =
+    // Fallback логика
+    console.log(`⚠️  Поле payment не найдено, используем расчетную сумму`);
+    const cashFlow = cashFlowData.result.cash_flows[0];
+    const calculatedAmount =
       cashFlow.orders_amount +
       cashFlow.services_amount -
       cashFlow.commission_amount -
       Math.abs(cashFlow.returns_amount);
 
-    return Math.max(0, paymentAmount);
+    console.log(`🧮 Расчетная сумма: ${calculatedAmount}`);
+    return calculatedAmount;
   }
 
   /**
-   * Получает период для запроса данных в зависимости от графика выплат
+   * Преобразует сумму в положительное значение для операции
    */
-  getQueryPeriod(paymentSchedule: 'next_week' | 'week_after'): {
-    from: Date;
-    to: Date;
-  } {
+  private getOperationAmount(calculatedAmount: number): number {
+    return calculatedAmount < 0 ? Math.abs(calculatedAmount) : calculatedAmount;
+  }
+
+  /**
+   * Определяет тип операции
+   */
+  private getOperationType(calculatedAmount: number): 'income' | 'expense' {
+    return calculatedAmount < 0 ? 'expense' : 'income';
+  }
+
+  /**
+   * Получает период за прошлую неделю
+   */
+  getLastWeekPeriod(): { from: Date; to: Date } {
     const now = new Date();
-
-    if (paymentSchedule === 'next_week') {
-      // Для "выплата на следующей неделе" берем данные за последнюю завершенную неделю
-      const to = new Date(now);
-      to.setDate(now.getDate() - now.getDay()); // Воскресенье текущей недели
-      to.setHours(23, 59, 59, 999);
-
-      const from = new Date(to);
-      from.setDate(to.getDate() - 6); // Понедельник той же недели
-      from.setHours(0, 0, 0, 0);
-
-      return { from, to };
+    const lastSunday = new Date(now);
+    // Находим воскресенье прошлой недели
+    if (now.getDay() === 0) {
+      // Если сегодня воскресенье, то прошлое воскресенье - это 7 дней назад
+      lastSunday.setDate(now.getDate() - 7);
     } else {
-      // Для "выплата через неделю" берем данные за неделю до последней
-      const to = new Date(now);
-      to.setDate(now.getDate() - now.getDay() - 7); // Воскресенье предыдущей недели
-      to.setHours(23, 59, 59, 999);
-
-      const from = new Date(to);
-      from.setDate(to.getDate() - 6); // Понедельник предыдущей недели
-      from.setHours(0, 0, 0, 0);
-
-      return { from, to };
+      // Иначе находим воскресенье текущей недели и отнимаем 7 дней
+      lastSunday.setDate(now.getDate() - now.getDay() - 7);
     }
+    lastSunday.setHours(23, 59, 59, 999);
+
+    const lastMonday = new Date(lastSunday);
+    lastMonday.setDate(lastSunday.getDate() - 6);
+    lastMonday.setHours(0, 0, 0, 0);
+
+    return { from: lastMonday, to: lastSunday };
   }
 
   /**
@@ -148,68 +260,120 @@ export class OzonOperationService {
     const periodEnd = new Date(periodEndDate);
 
     if (paymentSchedule === 'next_week') {
-      // Выплата на следующей неделе
       const calculationDate = new Date(periodEnd);
       calculationDate.setDate(
         periodEnd.getDate() + ((8 - periodEnd.getDay()) % 7) || 7
       );
-
       const paymentDate = new Date(calculationDate);
       paymentDate.setDate(calculationDate.getDate() + 2);
-
       return { calculationDate, paymentDate };
     } else {
-      // Выплата через неделю
       const calculationDate = new Date(periodEnd);
       calculationDate.setDate(
         periodEnd.getDate() + ((8 - periodEnd.getDay()) % 7) || 7 + 7
       );
-
       const paymentDate = new Date(calculationDate);
       paymentDate.setDate(calculationDate.getDate() + 2);
-
       return { calculationDate, paymentDate };
     }
   }
 
   /**
-   * Создает операции для всех активных интеграций Ozon за прошлую неделю
+   * Получает период для запроса данных
+   */
+  getQueryPeriod(paymentSchedule: 'next_week' | 'week_after'): {
+    from: Date;
+    to: Date;
+  } {
+    const now = new Date();
+
+    if (paymentSchedule === 'next_week') {
+      // Для "next_week" - текущая неделя (понедельник - воскресенье текущей недели)
+      const to = new Date(now);
+      // now.getDate() - now.getDay() дает воскресенье текущей недели
+      // Если сегодня воскресенье (getDay() = 0), то это и есть воскресенье текущей недели
+      if (now.getDay() === 0) {
+        to.setDate(now.getDate());
+      } else {
+        to.setDate(now.getDate() - now.getDay());
+      }
+      to.setHours(23, 59, 59, 999);
+
+      const from = new Date(to);
+      from.setDate(to.getDate() - 6); // Понедельник текущей недели
+      from.setHours(0, 0, 0, 0);
+
+      return { from, to };
+    } else {
+      // Для "week_after" - прошлая неделя (понедельник - воскресенье прошлой недели)
+      return this.getLastWeekPeriod();
+    }
+  }
+
+  /**
+   * Создает операции для всех активных интеграций Ozon
    */
   async createOperationsForAllIntegrations(): Promise<{
     created: number;
     errors: string[];
   }> {
-    const integrations = await prisma.integration.findMany({
-      where: {
-        type: 'ozon',
-        isActive: true,
-      },
-      include: {
-        company: true,
-        article: true,
-        account: true,
-      },
-    });
+    const integrations = await this.getActiveIntegrations();
 
     const results = {
       created: 0,
       errors: [] as string[],
     };
 
-    console.log(`🔍 Найдено активных интеграций: ${integrations.length}`);
+    console.log(`🔍 Найдено активных интеграций Ozon: ${integrations.length}`);
 
-    for (const integration of integrations) {
+    if (integrations.length === 0) {
+      console.log('ℹ️  Активных интеграций не найдено, операций не создано');
+      return results;
+    }
+
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('🔄 Начинаем обработку интеграций...');
+    console.log('═══════════════════════════════════════════════════════');
+
+    for (let i = 0; i < integrations.length; i++) {
+      const integration = integrations[i];
+      console.log(
+        `\n[${i + 1}/${integrations.length}] Обработка интеграции: ${integration.id}`
+      );
+      console.log(`   Компания: ${integration.company.name}`);
+      console.log(`   График выплат: ${integration.paymentSchedule}`);
+
       try {
-        const created = await this.createOperationForIntegration(integration);
+        const period = this.getQueryPeriod(
+          integration.paymentSchedule as 'next_week' | 'week_after'
+        );
+        const created = await this.createOperationForIntegration(
+          integration,
+          period
+        );
         if (created) {
           results.created++;
+          console.log(
+            `   ✅ Операция успешно создана для интеграции ${integration.id}`
+          );
+        } else {
+          console.log(
+            `   ⏭️  Операция не создана (сумма 0, payment >= 0 или дубликат)`
+          );
         }
       } catch (error: any) {
         const errorMsg = `Integration ${integration.id}: ${error.message}`;
-        console.error(`❌ ${errorMsg}`);
+        console.error(`   ❌ Ошибка: ${errorMsg}`);
         results.errors.push(errorMsg);
       }
     }
+
+    console.log('\n═══════════════════════════════════════════════════════');
+    console.log('📊 ИТОГИ ОБРАБОТКИ ИНТЕГРАЦИЙ');
+    console.log('═══════════════════════════════════════════════════════');
+    console.log(`✅ Успешно создано операций: ${results.created}`);
+    console.log(`❌ Ошибок: ${results.errors.length}`);
+    console.log('═══════════════════════════════════════════════════════\n');
 
     return results;
   }
@@ -217,17 +381,24 @@ export class OzonOperationService {
   /**
    * Создает операцию для конкретной интеграции
    */
-  async createOperationForIntegration(integration: any): Promise<boolean> {
+  async createOperationForIntegration(
+    integration: any,
+    period: { from: Date; to: Date }
+  ): Promise<boolean> {
     try {
       console.log(`🔄 Обрабатываем интеграцию: ${integration.id}`);
-
-      // Получаем период для запроса данных в зависимости от графика выплат
-      const period = this.getQueryPeriod(
-        integration.paymentSchedule as 'next_week' | 'week_after'
-      );
       console.log(
-        `📅 Период для запроса: ${period.from.toLocaleDateString('ru-RU')} - ${period.to.toLocaleDateString('ru-RU')}`
+        `📅 Период запроса: ${period.from.toLocaleDateString('ru-RU')} - ${period.to.toLocaleDateString('ru-RU')}`
       );
+
+      // Проверяем данные интеграции
+      console.log(`📋 Данные интеграции:`, {
+        articleId: integration.articleId,
+        articleName: integration.article?.name || 'N/A',
+        accountId: integration.accountId,
+        accountName: integration.account?.name || 'N/A',
+        companyId: integration.companyId,
+      });
 
       // Форматируем даты для Ozon API
       const fromISO = period.from.toISOString();
@@ -242,15 +413,31 @@ export class OzonOperationService {
         toISO
       );
 
-      // Рассчитываем сумму выплаты
-      const amount = this.calculatePaymentAmount(cashFlowData);
-      console.log(`💰 Рассчитанная сумма выплаты: ${amount}`);
+      // Получаем сумму выплаты
+      const calculatedAmount = this.calculatePaymentAmount(cashFlowData);
+      console.log(`💰 Рассчитанная сумма выплаты: ${calculatedAmount}`);
 
       // Если сумма 0, нет необходимости создавать операцию
-      if (amount <= 0) {
+      if (calculatedAmount === 0) {
         console.log(`⏭️ Сумма 0, пропускаем создание операции`);
         return false;
       }
+
+      // Проверяем, что payment < 0 для создания операции
+      if (calculatedAmount >= 0) {
+        console.log(
+          `⏭️ Payment ${calculatedAmount} >= 0, пропускаем создание операции (создаем только при payment < 0)`
+        );
+        return false;
+      }
+
+      // Преобразуем сумму для операции и определяем тип
+      const operationAmount = this.getOperationAmount(calculatedAmount);
+      const operationType = this.getOperationType(calculatedAmount);
+
+      console.log(
+        `📊 Создаем операцию: ${operationType} на сумму ${operationAmount}`
+      );
 
       // Проверяем, не была ли уже создана операция за этот период
       const existingOperation = await prisma.operation.findFirst({
@@ -280,40 +467,100 @@ export class OzonOperationService {
         period.to,
         integration.paymentSchedule as 'next_week' | 'week_after'
       );
+      console.log(
+        `📆 Дата выплаты: ${paymentDates.paymentDate.toLocaleDateString('ru-RU')}`
+      );
 
-      // Создаем операцию
+      // Получаем валюту
+      const currency =
+        cashFlowData.result.details?.[0]?.payments?.[0]?.currency_code ||
+        cashFlowData.result.cash_flows[0]?.currency_code ||
+        'RUB';
+
+      // Проверяем наличие обязательных полей
+      if (!integration.articleId) {
+        throw new AppError('Article ID is missing in integration', 400);
+      }
+      if (!integration.accountId) {
+        throw new AppError('Account ID is missing in integration', 400);
+      }
+
+      // Создаем операцию - явно указываем все поля
       const operationData = {
-        type: 'income' as const,
+        type: operationType,
         operationDate: paymentDates.paymentDate,
-        amount,
-        currency: cashFlowData.result.cash_flows[0]?.currency_code || 'RUB',
-        articleId: integration.articleId,
-        accountId: integration.accountId,
+        amount: operationAmount,
+        currency,
+        articleId: integration.articleId, // Явно указываем articleId
+        accountId: integration.accountId, // Явно указываем accountId
         description: this.generateOperationDescription(
           period.from,
           period.to,
-          amount,
+          operationAmount,
+          operationType,
           integration.paymentSchedule as 'next_week' | 'week_after'
         ),
         isConfirmed: true,
       };
 
       console.log(`🔄 Создаем операцию:`, {
+        type: operationData.type,
         amount: operationData.amount,
         currency: operationData.currency,
         date: operationData.operationDate.toLocaleDateString('ru-RU'),
-        article: integration.article.name,
-        account: integration.account.name,
+        articleId: operationData.articleId,
+        article: integration.article?.name || 'N/A',
+        accountId: operationData.accountId,
+        account: integration.account?.name || 'N/A',
       });
 
+      // Явно указываем все поля при создании, не используем spread
       const createdOperation = await prisma.operation.create({
         data: {
-          ...operationData,
+          type: operationData.type,
+          operationDate: operationData.operationDate,
+          amount: operationData.amount,
+          currency: operationData.currency,
+          articleId: operationData.articleId, // Явно указываем articleId
+          accountId: operationData.accountId, // Явно указываем accountId
+          description: operationData.description,
+          isConfirmed: operationData.isConfirmed,
           companyId: integration.companyId,
+        },
+        include: {
+          article: true,
+          account: true,
         },
       });
 
       console.log(`✅ Операция успешно создана: ${createdOperation.id}`);
+      console.log(`   📋 Детали созданной операции:`);
+      console.log(`      - ID: ${createdOperation.id}`);
+      console.log(`      - Тип: ${createdOperation.type}`);
+      console.log(
+        `      - Сумма: ${createdOperation.amount} ${createdOperation.currency}`
+      );
+      console.log(
+        `      - Дата: ${createdOperation.operationDate.toLocaleDateString('ru-RU')}`
+      );
+      console.log(
+        `      - Статья ID: ${createdOperation.articleId || 'ОТСУТСТВУЕТ!'}`
+      );
+      console.log(`      - Статья: ${createdOperation.article?.name || 'N/A'}`);
+      console.log(
+        `      - Счет ID: ${createdOperation.accountId || 'ОТСУТСТВУЕТ!'}`
+      );
+      console.log(`      - Счет: ${createdOperation.account?.name || 'N/A'}`);
+      console.log(
+        `      - Описание: ${createdOperation.description?.substring(0, 60)}...`
+      );
+
+      if (!createdOperation.articleId) {
+        console.error(`   ❌ ВНИМАНИЕ: articleId не сохранился в операции!`);
+      } else {
+        console.log(`   ✅ Операция создана корректно со всеми полями`);
+      }
+
       return true;
     } catch (error: any) {
       console.error(
@@ -334,6 +581,7 @@ export class OzonOperationService {
     periodFrom: Date,
     periodTo: Date,
     amount: number,
+    operationType: 'income' | 'expense',
     paymentSchedule: 'next_week' | 'week_after'
   ): string {
     const formatDate = (date: Date) => date.toLocaleDateString('ru-RU');
@@ -342,31 +590,24 @@ export class OzonOperationService {
         ? 'выплата на следующей неделе'
         : 'выплата через неделю';
 
-    return `Ozon выплата (${scheduleText}) за период ${formatDate(periodFrom)} - ${formatDate(periodTo)}. Сумма: ${amount.toLocaleString('ru-RU')} RUB`;
+    const typeText = operationType === 'income' ? 'доход' : 'расход';
+
+    return `Ozon ${typeText} (${scheduleText}) за период ${formatDate(periodFrom)} - ${formatDate(periodTo)}. Сумма: ${amount.toLocaleString('ru-RU')} RUB`;
   }
 
   /**
    * Тестовый метод для создания операции вручную
    */
   async createTestOperation(integrationId: string): Promise<boolean> {
-    const integration = await prisma.integration.findFirst({
-      where: {
-        id: integrationId,
-        type: 'ozon',
-        isActive: true,
-      },
-      include: {
-        company: true,
-        article: true,
-        account: true,
-      },
-    });
-
+    const integration = await this.getIntegrationById(integrationId);
     if (!integration) {
       throw new AppError('Integration not found or not active', 404);
     }
 
-    return this.createOperationForIntegration(integration);
+    const period = this.getQueryPeriod(
+      integration.paymentSchedule as 'next_week' | 'week_after'
+    );
+    return this.createOperationForIntegration(integration, period);
   }
 }
 
