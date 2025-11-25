@@ -96,29 +96,6 @@ router.get(
 
 /**
  * @swagger
- * /api/imports/sessions/{sessionId}/operations/all:
- *   get:
- *     summary: Get all imported operations for session (no pagination)
- *     tags: [Imports]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: sessionId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: All operations retrieved
- */
-router.get(
-  '/sessions/:sessionId/operations/all',
-  importsController.getAllImportedOperations
-);
-
-/**
- * @swagger
  * /api/imports/operations/{id}:
  *   patch:
  *     summary: Update imported operation
@@ -188,15 +165,6 @@ router.patch('/operations/:id', importsController.updateImportedOperation);
  *                 type: string
  *               matchedAccountId:
  *                 type: string
- *               matchedDealId:
- *                 type: string
- *               matchedDepartmentId:
- *                 type: string
- *               currency:
- *                 type: string
- *               direction:
- *                 type: string
- *                 enum: [income, expense, transfer]
  *               confirmed:
  *                 type: boolean
  *     responses:

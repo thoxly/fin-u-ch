@@ -1,21 +1,23 @@
 import { AppError } from '../../../middlewares/error';
 import logger from '../../../config/logger';
-import { createOperationHash, type ParsedDocument } from '@fin-u-ch/shared';
 import iconv from 'iconv-lite';
 
-// Re-export ParsedDocument for backward compatibility
-export type { ParsedDocument };
+export interface ParsedDocument {
+  date: Date;
+  number?: string;
+  amount: number;
+  payer?: string;
+  payerInn?: string;
+  payerAccount?: string;
+  receiver?: string;
+  receiverInn?: string;
+  receiverAccount?: string;
+  purpose?: string;
+}
 
 export interface ParsedFile {
   documents: ParsedDocument[];
   companyAccountNumber?: string; // РасчСчет из заголовка файла
-  stats?: {
-    documentsStarted: number;
-    documentsFound: number;
-    documentsSkipped: number;
-    documentsInvalid: number;
-    documentTypesFound: string[];
-  };
 }
 
 /**
@@ -91,14 +93,10 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
           );
         }
       }
-    } catch (decodeError: unknown) {
+    } catch (decodeError: any) {
       // Если не удалось декодировать как win1251, пробуем UTF-8
-      const errorMessage =
-        decodeError instanceof Error
-          ? decodeError.message
-          : String(decodeError);
       logger.warn('Parser: Failed to decode as win1251, trying UTF-8', {
-        error: errorMessage,
+        error: decodeError?.message || String(decodeError),
       });
       text = content.toString('utf8');
     }
@@ -179,371 +177,237 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
   let currentDocument: Partial<ParsedDocument> | null = null;
   let inDocument = false;
   let inHeader = true; // Флаг для обработки заголовка файла
-  const documentTypesFound: string[] = []; // Используется через push, поэтому const
+  const documentTypesFound: string[] = [];
   let documentsStarted = 0;
   let documentsSkipped = 0;
   let documentsInvalid = 0;
-  let lastSuccessfulDocumentLine = 0; // Для отладки
 
   for (let i = 0; i < fileLines.length; i++) {
-    try {
-      const line = fileLines[i].trim();
+    const line = fileLines[i].trim();
 
-      // Пропускаем пустые строки
-      if (!line) continue;
+    // Пропускаем пустые строки
+    if (!line) continue;
 
-      // Обработка заголовка файла (до первой секции документа)
-      if (inHeader) {
-        const equalIndex = line.indexOf('=');
-        if (equalIndex > 0) {
-          const key = line.substring(0, equalIndex).trim();
-          const value = line.substring(equalIndex + 1).trim();
-          const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
+    // Обработка заголовка файла (до первой секции документа)
+    if (inHeader) {
+      const equalIndex = line.indexOf('=');
+      if (equalIndex > 0) {
+        const key = line.substring(0, equalIndex).trim();
+        const value = line.substring(equalIndex + 1).trim();
+        const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
 
-          // Обрабатываем РасчСчет из заголовка
-          if (
-            normalizedKey === 'расчсчет' ||
-            normalizedKey === 'расчетныйсчет'
-          ) {
-            const validatedAccount = validateAccountNumber(value);
-            if (validatedAccount) {
-              companyAccountNumber = validatedAccount;
-              logger.info('Parser: Found company account number in header', {
-                accountNumber: `${validatedAccount.substring(0, 4)}****${validatedAccount.substring(validatedAccount.length - 4)}`,
-              });
-            }
-          }
-        }
-      }
-
-      // Начало документа - ищем различные варианты написания
-      // Может быть "СекцияДокумент=" или "СекцияДокумент =" или "СекцияДокумент=Платежное поручение"
-      // Также ищем без учета регистра и пробелов
-      const normalizedLine = line.toLowerCase().replace(/\s+/g, '');
-
-      if (normalizedLine.startsWith('секциядокумент')) {
-        // Если начинается новый документ, а предыдущий не был закрыт,
-        // обрабатываем его перед тем, как начать новый.
-        if (inDocument && currentDocument) {
-          if (!currentDocument.date || !currentDocument.amount) {
-            const missingFields = [];
-            if (!currentDocument.date) missingFields.push('Дата');
-            if (!currentDocument.amount) missingFields.push('Сумма');
-
-            logger.warn(
-              `Parser: Document missing required fields before new section started`,
-              {
-                lineNumber: i + 1,
-                missingFields,
-                document: currentDocument,
-              }
-            );
-            documentsInvalid++;
-          } else {
-            const parsedDoc: ParsedDocument = {
-              date: currentDocument.date,
-              number: currentDocument.number,
-              amount: currentDocument.amount,
-              payer: currentDocument.payer,
-              payerInn: currentDocument.payerInn,
-              payerAccount: currentDocument.payerAccount,
-              receiver: currentDocument.receiver,
-              receiverInn: currentDocument.receiverInn,
-              receiverAccount: currentDocument.receiverAccount,
-              purpose: currentDocument.purpose,
-            };
-
-            // Вычисляем и добавляем хэш
-            parsedDoc.hash = createOperationHash(parsedDoc);
-
-            documents.push(parsedDoc);
-            lastSuccessfulDocumentLine = i;
-
-            if (documents.length % 100 === 0) {
-              logger.info(
-                `Parser: Progress - parsed ${documents.length} documents so far (line ${i})`
-              );
-            }
-          }
-        }
-
-        // Заголовок закончился, начинается документ
-        inHeader = false;
-        const equalIndex = line.indexOf('=');
-        if (equalIndex > 0 || equalIndex === -1) {
-          // Если есть =, берем тип документа после него, иначе пустая строка
-          const docType =
-            equalIndex > 0 ? line.substring(equalIndex + 1).trim() : '';
-          documentsStarted++;
-
-          if (docType && !documentTypesFound.includes(docType)) {
-            documentTypesFound.push(docType);
-          }
-
-          // Принимаем разные типы документов (платежки, ордеры)
-          const normalizedDocType = docType.toLowerCase().replace(/\s/g, ''); // убираем все пробелы
-          const isSupportedDocument =
-            !docType || // Если тип не указан, все равно обрабатываем
-            normalizedDocType.includes('платеж') || // Ловим "платежное поручение"
-            normalizedDocType.includes('payment') ||
-            normalizedDocType.includes('ордер'); // Ловим "банковский ордер", "мемориальный ордер"
-
-          if (isSupportedDocument) {
-            inDocument = true;
-            currentDocument = {};
-            logger.info(`Parser: Found supported document at line ${i + 1}`, {
-              docType: docType || '(empty, treating as supported)',
-              originalLine: line.substring(0, 100),
+        // Обрабатываем РасчСчет из заголовка
+        if (normalizedKey === 'расчсчет' || normalizedKey === 'расчетныйсчет') {
+          const validatedAccount = validateAccountNumber(value);
+          if (validatedAccount) {
+            companyAccountNumber = validatedAccount;
+            logger.info('Parser: Found company account number in header', {
+              accountNumber: companyAccountNumber,
             });
-          } else {
-            logger.info(
-              `Parser: Skipping document type "${docType}" at line ${i + 1}`,
-              {
-                originalLine: line.substring(0, 100),
-              }
-            );
-            documentsSkipped++;
-            inDocument = false;
-            currentDocument = null;
           }
         }
-        continue;
       }
+    }
 
-      // Конец документа - используем нормализованное сравнение для гибкости
-      // Это позволит распознать "КонецДокумента", "КонецДокумента ", "конецдокумента" и т.д.
-      if (normalizedLine === 'конецдокумента') {
-        if (inDocument && currentDocument) {
-          // Валидация обязательных полей
-          if (!currentDocument.date || !currentDocument.amount) {
-            const missingFields = [];
-            if (!currentDocument.date) missingFields.push('Дата');
-            if (!currentDocument.amount) missingFields.push('Сумма');
+    // Начало документа - ищем различные варианты написания
+    // Может быть "СекцияДокумент=" или "СекцияДокумент =" или "СекцияДокумент=Платежное поручение"
+    // Также ищем без учета регистра и пробелов
+    const normalizedLine = line.toLowerCase().replace(/\s+/g, '');
 
-            logger.warn(
-              `Parser: Document at line ${i + 1} missing required fields: ${missingFields.join(', ')}`,
-              {
-                lineNumber: i + 1,
-                hasDate: !!currentDocument.date,
-                hasAmount: !!currentDocument.amount,
-                missingFields,
-                document: currentDocument,
-              }
-            );
-            documentsInvalid++;
-          } else {
-            const parsedDoc: ParsedDocument = {
-              date: currentDocument.date,
-              number: currentDocument.number,
-              amount: currentDocument.amount,
-              payer: currentDocument.payer,
-              payerInn: currentDocument.payerInn,
-              payerAccount: currentDocument.payerAccount,
-              receiver: currentDocument.receiver,
-              receiverInn: currentDocument.receiverInn,
-              receiverAccount: currentDocument.receiverAccount,
-              purpose: currentDocument.purpose,
-            };
+    if (normalizedLine.includes('секциядокумент')) {
+      // Заголовок закончился, начинается документ
+      inHeader = false;
+      const equalIndex = line.indexOf('=');
+      if (equalIndex > 0 || equalIndex === -1) {
+        // Если есть =, берем тип документа после него, иначе пустая строка
+        const docType =
+          equalIndex > 0 ? line.substring(equalIndex + 1).trim() : '';
+        documentsStarted++;
 
-            // Вычисляем и добавляем хэш
-            parsedDoc.hash = createOperationHash(parsedDoc);
+        if (docType && !documentTypesFound.includes(docType)) {
+          documentTypesFound.push(docType);
+        }
 
-            documents.push(parsedDoc);
-            lastSuccessfulDocumentLine = i + 1;
+        // Принимаем разные варианты названий платежных поручений
+        const normalizedDocType = docType.toLowerCase().replace(/\s+/g, ' ');
+        const isPaymentOrder =
+          !docType || // Если тип не указан, считаем платежным поручением
+          normalizedDocType === 'платежное поручение' ||
+          normalizedDocType === 'платежноепоручение' ||
+          normalizedDocType.includes('платеж') ||
+          normalizedDocType.includes('payment');
 
-            // Логируем каждый 100-й документ для отслеживания прогресса
-            if (documents.length % 100 === 0 || documents.length === 1) {
-              logger.info(
-                `Parser: Progress - parsed ${documents.length} documents so far (line ${i + 1})`
+        if (isPaymentOrder) {
+          inDocument = true;
+          currentDocument = {};
+          logger.info(`Parser: Found payment order at line ${i + 1}`, {
+            docType: docType || '(empty, treating as payment)',
+            originalLine: line.substring(0, 100),
+          });
+        } else {
+          logger.info(
+            `Parser: Skipping document type "${docType}" at line ${i + 1}`,
+            {
+              originalLine: line.substring(0, 100),
+            }
+          );
+          documentsSkipped++;
+          inDocument = false;
+          currentDocument = null;
+        }
+      }
+      continue;
+    }
+
+    // Конец документа
+    if (line === 'КонецДокумента' || line === 'КонецДокумента ') {
+      if (inDocument && currentDocument) {
+        // Валидация обязательных полей
+        if (!currentDocument.date || !currentDocument.amount) {
+          const missingFields = [];
+          if (!currentDocument.date) missingFields.push('Дата');
+          if (!currentDocument.amount) missingFields.push('Сумма');
+
+          logger.warn(
+            `Parser: Document at line ${i + 1} missing required fields: ${missingFields.join(', ')}`,
+            {
+              lineNumber: i + 1,
+              hasDate: !!currentDocument.date,
+              hasAmount: !!currentDocument.amount,
+              missingFields,
+              document: currentDocument,
+            }
+          );
+          documentsInvalid++;
+        } else {
+          const parsedDoc = {
+            date: currentDocument.date,
+            number: currentDocument.number,
+            amount: currentDocument.amount,
+            payer: currentDocument.payer,
+            payerInn: currentDocument.payerInn,
+            payerAccount: currentDocument.payerAccount,
+            receiver: currentDocument.receiver,
+            receiverInn: currentDocument.receiverInn,
+            receiverAccount: currentDocument.receiverAccount,
+            purpose: currentDocument.purpose,
+          };
+          documents.push(parsedDoc);
+          logger.info(`Parser: Successfully parsed document at line ${i + 1}`, {
+            lineNumber: i + 1,
+            receiver: parsedDoc.receiver,
+            receiverInn: parsedDoc.receiverInn,
+            payer: parsedDoc.payer,
+            payerInn: parsedDoc.payerInn,
+            amount: parsedDoc.amount,
+          });
+        }
+      }
+      inDocument = false;
+      currentDocument = null;
+      continue;
+    }
+
+    // Парсинг полей документа
+    if (inDocument && currentDocument) {
+      const equalIndex = line.indexOf('=');
+      if (equalIndex > 0) {
+        const key = line.substring(0, equalIndex).trim();
+        let value = line.substring(equalIndex + 1).trim();
+
+        // Убираем кавычки в начале и конце, если они есть
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1).trim();
+        }
+
+        // Используем более гибкое сравнение ключей (учитываем возможные пробелы и варианты)
+        const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
+
+        // Дополнительная проверка для ПолучательИНН - может быть написано по-разному
+        const isReceiverInn =
+          normalizedKey === 'получателинн' ||
+          normalizedKey === 'получательинн' ||
+          (normalizedKey.includes('получатель') &&
+            normalizedKey.includes('инн'));
+        const isPayerInn =
+          normalizedKey === 'плательщикинн' ||
+          normalizedKey === 'плательщикинн' ||
+          (normalizedKey.includes('плательщик') &&
+            normalizedKey.includes('инн'));
+
+        switch (normalizedKey) {
+          case 'дата':
+            try {
+              currentDocument.date = parseDate(value);
+            } catch (error: any) {
+              logger.warn(
+                `Parser: Failed to parse date "${value}" at line ${i + 1}`,
+                {
+                  lineNumber: i + 1,
+                  value,
+                  error: error?.message || String(error),
+                }
               );
             }
-
-            logger.debug(
-              `Parser: Successfully parsed document at line ${i + 1}`,
-              {
-                lineNumber: i + 1,
-                documentNumber: documents.length,
-                hasReceiver: !!parsedDoc.receiver,
-                hasReceiverInn: !!parsedDoc.receiverInn,
-                hasPayer: !!parsedDoc.payer,
-                hasPayerInn: !!parsedDoc.payerInn,
-                amount: parsedDoc.amount,
-              }
-            );
+            break;
+          case 'номер':
+            currentDocument.number = value || undefined;
+            break;
+          case 'сумма':
+            try {
+              currentDocument.amount = parseAmount(value);
+            } catch (error: any) {
+              logger.warn(
+                `Parser: Failed to parse amount "${value}" at line ${i + 1}`,
+                {
+                  lineNumber: i + 1,
+                  value,
+                  error: error?.message || String(error),
+                }
+              );
+            }
+            break;
+          case 'плательщик':
+            currentDocument.payer = value || undefined;
+            break;
+          case 'плательщикинн':
+            currentDocument.payerInn = validateInn(value) || undefined;
+            break;
+          case 'плательщиксчет':
+            currentDocument.payerAccount =
+              validateAccountNumber(value) || undefined;
+            break;
+          case 'получатель':
+            currentDocument.receiver = value || undefined;
+            break;
+          case 'получателинн':
+          case 'получательинн': {
+            const validatedReceiverInn = validateInn(value);
+            currentDocument.receiverInn = validatedReceiverInn || undefined;
+            break;
           }
-        }
-        inDocument = false;
-        currentDocument = null;
-        continue;
-      }
-
-      // Парсинг полей документа
-      if (inDocument && currentDocument) {
-        const equalIndex = line.indexOf('=');
-        if (equalIndex > 0) {
-          const key = line.substring(0, equalIndex).trim();
-          let value = line.substring(equalIndex + 1).trim();
-
-          // Убираем кавычки в начале и конце, если они есть
-          if (
-            (value.startsWith('"') && value.endsWith('"')) ||
-            (value.startsWith("'") && value.endsWith("'"))
-          ) {
-            value = value.slice(1, -1).trim();
-          }
-
-          // Используем более гибкое сравнение ключей (учитываем возможные пробелы и варианты)
-          const normalizedKey = key.replace(/\s+/g, '').toLowerCase();
-
-          // Дополнительная проверка для ПолучательИНН - может быть написано по-разному
-          const isReceiverInn =
-            normalizedKey === 'получателинн' ||
-            normalizedKey === 'получательинн' ||
-            (normalizedKey.includes('получатель') &&
-              normalizedKey.includes('инн'));
-          const isPayerInn =
-            normalizedKey === 'плательщикинн' ||
-            (normalizedKey.includes('плательщик') &&
-              normalizedKey.includes('инн'));
-
-          switch (normalizedKey) {
-            case 'дата':
-              try {
-                currentDocument.date = parseDate(value);
-              } catch (error: unknown) {
-                const errorMessage =
-                  error instanceof Error ? error.message : String(error);
-                logger.warn(
-                  `Parser: Failed to parse date "${value}" at line ${i + 1}`,
-                  {
-                    lineNumber: i + 1,
-                    value,
-                    error: errorMessage,
-                  }
-                );
-              }
-              break;
-            case 'номер':
-              currentDocument.number = value || undefined;
-              break;
-            case 'сумма':
-              try {
-                currentDocument.amount = parseAmount(value);
-              } catch (error: unknown) {
-                const errorMessage =
-                  error instanceof Error ? error.message : String(error);
-                logger.warn(
-                  `Parser: Failed to parse amount "${value}" at line ${i + 1}`,
-                  {
-                    lineNumber: i + 1,
-                    value,
-                    error: errorMessage,
-                  }
-                );
-              }
-              break;
-            case 'плательщик':
-              currentDocument.payer = value || undefined;
-              break;
-            case 'плательщикинн':
-              currentDocument.payerInn = validateInn(value) || undefined;
-              break;
-            case 'плательщиксчет':
-              currentDocument.payerAccount =
-                validateAccountNumber(value) || undefined;
-              break;
-            case 'получатель':
-              currentDocument.receiver = value || undefined;
-              break;
-            case 'получателинн':
-            case 'получательинн': {
+          case 'получательсчет':
+            currentDocument.receiverAccount =
+              validateAccountNumber(value) || undefined;
+            break;
+          case 'назначениеплатежа':
+            currentDocument.purpose = value || undefined;
+            break;
+          default:
+            // Fallback для полей с ИНН, которые могли не попасть в switch
+            if (isReceiverInn && !currentDocument.receiverInn) {
               const validatedReceiverInn = validateInn(value);
               currentDocument.receiverInn = validatedReceiverInn || undefined;
-              break;
+            } else if (isPayerInn && !currentDocument.payerInn) {
+              const validatedPayerInn = validateInn(value);
+              currentDocument.payerInn = validatedPayerInn || undefined;
             }
-            case 'получательсчет':
-              currentDocument.receiverAccount =
-                validateAccountNumber(value) || undefined;
-              break;
-            case 'назначениеплатежа':
-              currentDocument.purpose = value || undefined;
-              break;
-            default:
-              // Fallback для полей с ИНН, которые могли не попасть в switch
-              if (isReceiverInn && !currentDocument.receiverInn) {
-                const validatedReceiverInn = validateInn(value);
-                currentDocument.receiverInn = validatedReceiverInn || undefined;
-              } else if (isPayerInn && !currentDocument.payerInn) {
-                const validatedPayerInn = validateInn(value);
-                currentDocument.payerInn = validatedPayerInn || undefined;
-              }
-              break;
-          }
+            break;
         }
       }
-    } catch (error: unknown) {
-      // Логируем ошибку и продолжаем обработку следующих строк
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      logger.error('Parser: Error processing line', {
-        lineNumber: i + 1,
-        line: fileLines[i]?.substring(0, 100),
-        error: errorMessage,
-        stack: errorStack,
-      });
-      // Продолжаем обработку, не прерывая парсинг
-    }
-  }
-
-  // Обрабатываем последний документ, если он не был закрыт маркером "КонецДокумента"
-  if (inDocument && currentDocument) {
-    logger.info('Parser: Processing final document without closing marker');
-    if (!currentDocument.date || !currentDocument.amount) {
-      const missingFields = [];
-      if (!currentDocument.date) missingFields.push('Дата');
-      if (!currentDocument.amount) missingFields.push('Сумма');
-
-      logger.warn(
-        `Parser: Final document missing required fields: ${missingFields.join(', ')}`,
-        {
-          hasDate: !!currentDocument.date,
-          hasAmount: !!currentDocument.amount,
-          missingFields,
-          document: currentDocument,
-        }
-      );
-      documentsInvalid++;
-    } else {
-      const parsedDoc: ParsedDocument = {
-        date: currentDocument.date,
-        number: currentDocument.number,
-        amount: currentDocument.amount,
-        payer: currentDocument.payer,
-        payerInn: currentDocument.payerInn,
-        payerAccount: currentDocument.payerAccount,
-        receiver: currentDocument.receiver,
-        receiverInn: currentDocument.receiverInn,
-        receiverAccount: currentDocument.receiverAccount,
-        purpose: currentDocument.purpose,
-      };
-
-      // Вычисляем и добавляем хэш
-      parsedDoc.hash = createOperationHash(parsedDoc);
-
-      documents.push(parsedDoc);
-      lastSuccessfulDocumentLine = fileLines.length;
-      logger.info(
-        'Parser: Successfully parsed final document (no closing marker)',
-        {
-          documentNumber: documents.length,
-          hasReceiver: !!parsedDoc.receiver,
-          hasReceiverInn: !!parsedDoc.receiverInn,
-          hasPayer: !!parsedDoc.payer,
-          hasPayerInn: !!parsedDoc.payerInn,
-          amount: parsedDoc.amount,
-        }
-      );
     }
   }
 
@@ -554,12 +418,6 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
     documentsSkipped,
     documentsInvalid,
     documentTypesFound,
-    lastSuccessfulDocumentLine,
-    percentageParsed:
-      fileLines.length > 0
-        ? ((lastSuccessfulDocumentLine / fileLines.length) * 100).toFixed(2) +
-          '%'
-        : '0%',
   });
 
   // Если документов нет, выбрасываем детальную ошибку
@@ -584,13 +442,6 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
   return {
     documents,
     companyAccountNumber,
-    stats: {
-      documentsStarted,
-      documentsFound: documents.length,
-      documentsSkipped,
-      documentsInvalid,
-      documentTypesFound,
-    },
   };
 }
 
@@ -618,21 +469,9 @@ function parseDate(dateStr: string): Date {
     throw new AppError(`Invalid date format: ${dateStr}`, 400);
   }
 
-  // Валидация диапазонов: день 1-31, месяц 0-11 (после вычитания 1), год > 0
-  if (day < 1 || day > 31 || month < 0 || month > 11 || year < 1) {
-    throw new AppError(`Invalid date: ${dateStr}`, 400);
-  }
-
   const date = new Date(year, month, day);
 
-  // Дополнительная проверка: убеждаемся, что созданная дата соответствует введенным значениям
-  // (JavaScript Date может "нормализовать" невалидные даты, например 32.01.2025 станет 01.02.2025)
-  if (
-    isNaN(date.getTime()) ||
-    date.getDate() !== day ||
-    date.getMonth() !== month ||
-    date.getFullYear() !== year
-  ) {
+  if (isNaN(date.getTime())) {
     throw new AppError(`Invalid date: ${dateStr}`, 400);
   }
 
@@ -655,8 +494,8 @@ function parseAmount(amountStr: string): number {
     throw new AppError(`Invalid amount format: ${amountStr}`, 400);
   }
 
-  if (amount < 0) {
-    throw new AppError(`Amount cannot be negative: ${amountStr}`, 400);
+  if (amount <= 0) {
+    throw new AppError(`Amount must be positive: ${amountStr}`, 400);
   }
 
   return amount;

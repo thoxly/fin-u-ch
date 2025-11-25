@@ -96,7 +96,6 @@ export const ArticleForm = ({
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
-          { value: 'transfer', label: 'Переводы' },
         ]}
         required
       />

@@ -10,7 +10,13 @@ import {
 } from '../../store/api/catalogsApi';
 import type { Operation } from '@fin-u-ch/shared';
 import { OperationType, Periodicity } from '@fin-u-ch/shared';
-import { formatAmountInput } from '../../shared/lib/numberInput';
+import { useNotification } from '../../shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
+import {
+  formatAmountInput,
+  parseAmountInputToNumber,
+} from '../../shared/lib/numberInput';
+import { usePermissions } from '../../shared/hooks/usePermissions';
 import { useOperationValidation } from './useOperationValidation';
 import { useFilteredDeals } from './useFilteredDeals';
 import { useOperationSubmit } from './useOperationSubmit';
@@ -92,6 +98,12 @@ export const OperationForm = ({
 
   const filteredDeals = useFilteredDeals(counterpartyId, deals);
 
+  const { showSuccess, showError } = useNotification();
+  const { canCreate, canUpdate } = usePermissions();
+
+  // Определяем, можем ли редактировать форму
+  const isEditing = operation?.id && !isCopy;
+  const canEdit = isEditing ? canUpdate('operations') : canCreate('operations');
   // Состояние для модалок создания
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;

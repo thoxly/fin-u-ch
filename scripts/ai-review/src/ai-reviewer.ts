@@ -33,7 +33,53 @@ export class AiReviewer {
     this.openai = new OpenAI({
       apiKey: CONFIG.deepseek.apiKey,
       baseURL: 'https://api.deepseek.com/v1',
+      timeout: 300000, // 5 minutes timeout
+      maxRetries: 3,
     });
+  }
+
+  /**
+   * Retry wrapper for API calls with exponential backoff
+   */
+  private async retryApiCall<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+
+        // Check if it's a retryable error
+        const isRetryable =
+          error?.code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+          error?.message?.includes('Premature close') ||
+          error?.message?.includes('ECONNRESET') ||
+          error?.message?.includes('ETIMEDOUT') ||
+          error?.status === 429 || // Rate limit
+          error?.status === 500 || // Server error
+          error?.status === 502 || // Bad gateway
+          error?.status === 503 || // Service unavailable
+          error?.status === 504; // Gateway timeout
+
+        if (!isRetryable || attempt === maxRetries - 1) {
+          throw error;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.warn(
+          `  ⚠ API call failed (attempt ${attempt + 1}/${maxRetries}): ${error?.message || error}. Retrying in ${delay}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError || new Error('API call failed after retries');
   }
 
   async reviewCode(
@@ -81,15 +127,17 @@ export class AiReviewer {
           // an empty result (no issues) rather than fail the entire CI job.
           return { comments: [], issues: [], issuesWithoutInline: [] };
         }
-        const completion = await this.openai.chat.completions.create({
-          model: CONFIG.deepseek.model,
-          max_tokens: CONFIG.deepseek.maxTokens,
-          messages,
-          tools,
-          tool_choice: 'auto',
-          // Note: We don't use response_format here because we need a JSON array,
-          // not a JSON object. The prompt explicitly requests an array format.
-        });
+        const completion = await this.retryApiCall(() =>
+          this.openai.chat.completions.create({
+            model: CONFIG.deepseek.model,
+            max_tokens: CONFIG.deepseek.maxTokens,
+            messages,
+            tools,
+            tool_choice: 'auto',
+            // Note: We don't use response_format here because we need a JSON array,
+            // not a JSON object. The prompt explicitly requests an array format.
+          })
+        );
 
         const message = completion.choices[0]?.message;
 
@@ -332,13 +380,15 @@ IMPORTANT:
         );
         return issues;
       }
-      const completion = await this.openai.chat.completions.create({
-        model: CONFIG.deepseek.model,
-        max_tokens: CONFIG.deepseek.maxTokens,
-        messages,
-        tools,
-        tool_choice: 'auto',
-      });
+      const completion = await this.retryApiCall(() =>
+        this.openai.chat.completions.create({
+          model: CONFIG.deepseek.model,
+          max_tokens: CONFIG.deepseek.maxTokens,
+          messages,
+          tools,
+          tool_choice: 'auto',
+        })
+      );
 
       const message = completion.choices[0]?.message;
 

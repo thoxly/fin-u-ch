@@ -88,13 +88,19 @@ export const OperationBasicInfo = ({
           label="Валюта"
           value={currency}
           onChange={(value) => {
-            onCurrencyChange(value);
-            onValidationErrorClear('currency');
+            if (value === '__create__' && onOpenCreateModal) {
+              onOpenCreateModal('currency');
+            } else {
+              onCurrencyChange(value);
+              onValidationErrorClear('currency');
+            }
           }}
-          onCreateNew={
-            onOpenCreateModal ? () => onOpenCreateModal('currency') : undefined
-          }
-          options={currencyOptions}
+          options={[
+            ...(onOpenCreateModal
+              ? [{ value: '__create__', label: '+ Добавить новый' }]
+              : []),
+            ...currencyOptions,
+          ]}
           error={validationErrors.currency}
           required
         />

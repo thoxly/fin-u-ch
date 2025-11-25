@@ -1,5 +1,13 @@
-import * as XLSX from 'xlsx';
 import type { ExportRow } from './exportData';
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 export function downloadExcelXml(
   rows: ExportRow[],
@@ -15,45 +23,40 @@ export function downloadExcelXml(
       }, new Set<string>())
     );
 
-  // Создаем массив данных для Excel
-  const data: (string | number)[][] = [];
+  const headerCells = headers
+    .map((h) => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`)
+    .join('');
 
-  // Добавляем заголовки
-  data.push(headers);
+  const rowXml = rows
+    .map((row) => {
+      const cells = headers
+        .map((h) => {
+          const v = row[h];
+          if (typeof v === 'number') {
+            return `<Cell><Data ss:Type="Number">${v}</Data></Cell>`;
+          }
+          const s = v == null ? '' : String(v);
+          return `<Cell><Data ss:Type="String">${escapeXml(s)}</Data></Cell>`;
+        })
+        .join('');
+      return `<Row>${cells}</Row>`;
+    })
+    .join('');
 
-  // Добавляем строки данных
-  rows.forEach((row) => {
-    const rowData = headers.map((h) => {
-      const value = row[h];
-      // Преобразуем значения: числа остаются числами, остальное - строки
-      if (typeof value === 'number') {
-        return value;
-      }
-      return value == null ? '' : String(value);
-    });
-    data.push(rowData);
-  });
+  const xml = `<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Export">
+    <Table>
+      <Row>${headerCells}</Row>
+      ${rowXml}
+    </Table>
+  </Worksheet>
+</Workbook>`;
 
-  // Создаем рабочую книгу
-  const wb = XLSX.utils.book_new();
-
-  // Создаем рабочий лист из данных
-  const ws = XLSX.utils.aoa_to_sheet(data);
-
-  // Добавляем рабочий лист в книгу
-  XLSX.utils.book_append_sheet(wb, ws, 'Export');
-
-  // Генерируем бинарный файл .xlsx
-  const excelBuffer = XLSX.write(wb, {
-    bookType: 'xlsx',
-    type: 'array',
-    cellStyles: false,
-  });
-
-  // Создаем Blob и скачиваем файл
-  const blob = new Blob([excelBuffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  });
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

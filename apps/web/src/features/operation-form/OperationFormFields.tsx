@@ -2,7 +2,7 @@ import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { OperationBasicInfo } from './OperationBasicInfo';
 import { OperationFinancialParams } from './OperationFinancialParams';
 import { OperationRecurrenceSection } from './OperationRecurrenceSection';
-import { OperationType, Periodicity } from '@fin-u-ch/shared';
+import { OperationType, Periodicity, type Deal } from '@fin-u-ch/shared';
 
 interface Article {
   id: string;
@@ -18,12 +18,6 @@ interface Account {
 interface Counterparty {
   id: string;
   name: string;
-}
-
-interface Deal {
-  id: string;
-  name: string;
-  counterpartyId: string;
 }
 
 interface Department {

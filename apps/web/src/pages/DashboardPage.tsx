@@ -13,6 +13,7 @@ import {
 } from '../store/api/reportsApi';
 import { useGetOperationsQuery } from '../store/api/operationsApi';
 import { formatMoney } from '../shared/lib/money';
+import { usePermissions } from '../shared/hooks/usePermissions';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
@@ -48,6 +49,7 @@ const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
 
 export const DashboardPage = () => {
   const today = new Date();
+  const { canRead } = usePermissions();
 
   // Инициализируем фильтры периода с текущим месяцем
   const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
@@ -58,6 +60,12 @@ export const DashboardPage = () => {
     };
   });
 
+  // Проверяем права на просмотр различных виджетов
+  const canViewOperations = canRead('operations');
+  const canViewReports = canRead('reports');
+  const canViewAccounts = canRead('accounts');
+
+  // Получаем данные дашборда из API (только если есть права на просмотр)
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
     const format = detectPeriodFormat(
@@ -103,27 +111,36 @@ export const DashboardPage = () => {
     data: dashboardData,
     isLoading,
     error,
-  } = useGetDashboardQuery({
-    periodFrom: periodFilters.range.from,
-    periodTo: periodFilters.range.to,
-    mode: 'both',
-    periodFormat: periodFilters.format, // Передаем формат периода
-  });
-
-  // Получаем накопительные данные для графика поступлений/списаний
-  const { data: cumulativeData, isLoading: cumulativeLoading } =
-    useGetCumulativeCashFlowQuery({
+  } = useGetDashboardQuery(
+    {
       periodFrom: periodFilters.range.from,
       periodTo: periodFilters.range.to,
       mode: 'both',
-      periodFormat: periodFilters.format,
-    });
+      periodFormat: periodFilters.format, // Передаем формат периода
+    },
+    { skip: !canViewOperations && !canViewReports }
+  );
 
-  // Получаем последние операции
-  const { data: operations = [] } = useGetOperationsQuery({
-    dateFrom: periodFilters.range.from,
-    dateTo: periodFilters.range.to,
-  });
+  // Получаем накопительные данные для графика поступлений/списаний
+  const { data: cumulativeData, isLoading: cumulativeLoading } =
+    useGetCumulativeCashFlowQuery(
+      {
+        periodFrom: periodFilters.range.from,
+        periodTo: periodFilters.range.to,
+        mode: 'both',
+        periodFormat: periodFilters.format,
+      },
+      { skip: !canViewOperations && !canViewReports }
+    );
+
+  // Получаем последние операции (только если есть права на просмотр операций)
+  const { data: operations = [] } = useGetOperationsQuery(
+    {
+      dateFrom: periodFilters.range.from,
+      dateTo: periodFilters.range.to,
+    },
+    { skip: !canViewOperations }
+  );
 
   // Трансформируем данные для графиков
   const incomeExpenseData = cumulativeData?.cumulativeSeries || [];
@@ -335,11 +352,6 @@ export const DashboardPage = () => {
         {/* Loading state */}
         {(isLoading || cumulativeLoading) && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <CardSkeleton size="md" lines={2} />
-              <CardSkeleton size="md" lines={2} />
-              <CardSkeleton size="md" lines={2} />
-            </div>
             <CardSkeleton size="lg" lines={4} />
             <CardSkeleton size="lg" lines={6} />
           </>
@@ -358,23 +370,29 @@ export const DashboardPage = () => {
         {dashboardData && (
           <>
             {/* Графики и таблицы */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* График поступлений/списаний/чистого потока */}
-              <IncomeExpenseChart data={incomeExpenseData} />
+            {canViewReports && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* График поступлений/списаний/чистого потока */}
+                <IncomeExpenseChart data={incomeExpenseData} />
 
-              {/* График динамики поступлений и списаний */}
-              <WeeklyFlowChart data={weeklyFlowData} />
-            </div>
+                {/* График динамики поступлений и списаний */}
+                <WeeklyFlowChart data={weeklyFlowData} />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* График остатков на счетах */}
-              <AccountBalancesChart
-                data={accountBalancesData}
-                accounts={dashboardData?.accounts || []}
-              />
+              {canViewAccounts && (
+                <AccountBalancesChart
+                  data={accountBalancesData}
+                  accounts={dashboardData?.accounts || []}
+                />
+              )}
 
               {/* Таблица последних операций */}
-              <RecentOperationsTable operations={operations} />
+              {canViewOperations && (
+                <RecentOperationsTable operations={operations} />
+              )}
             </div>
           </>
         )}

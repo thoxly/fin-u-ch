@@ -29,18 +29,8 @@ export const CollapsedImportSections = () => {
           const now = Date.now();
           const hoursPassed = (now - parsedState.timestamp) / (1000 * 60 * 60);
 
-          console.log('📦 Загружено состояние из localStorage:', {
-            collapsedHistory: parsedState.collapsedHistory,
-            collapsedMapping: parsedState.collapsedMapping,
-            minimized: parsedState.minimized,
-            sessionId: parsedState.sessionId,
-            viewingSessionId: parsedState.viewingSessionId,
-            hoursPassed: hoursPassed.toFixed(2),
-          });
-
           // Если прошло больше 24 часов, удаляем состояние
           if (hoursPassed >= EXPIRY_HOURS) {
-            console.log('⏰ Состояние устарело, удаляем');
             localStorage.removeItem(STORAGE_KEY);
             setState(null);
             return;
@@ -53,7 +43,6 @@ export const CollapsedImportSections = () => {
           setState(null);
         }
       } else {
-        console.log('📭 Нет сохраненного состояния в localStorage');
         setState(null);
       }
     };
@@ -63,14 +52,12 @@ export const CollapsedImportSections = () => {
     // Слушаем изменения в localStorage (для других вкладок)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
-        console.log('🔄 Storage event received');
         loadState();
       }
     };
 
     // Слушаем кастомное событие для изменений в той же вкладке
     const handleLocalStorageChange = () => {
-      console.log('🔄 Local storage change event received');
       loadState();
     };
 
@@ -91,24 +78,15 @@ export const CollapsedImportSections = () => {
   }, []);
 
   const handleExpand = (type: 'history' | 'mapping') => {
-    console.log('🔄 Разворачиваем секцию:', type);
-
     // Обновляем состояние в localStorage, чтобы развернуть секцию
     if (state) {
       const updatedState: StoredState = {
         ...state,
-        collapsedHistory: false,
-        collapsedMapping: false,
+        collapsedHistory: type === 'history' ? false : state.collapsedHistory,
+        collapsedMapping: type === 'mapping' ? false : state.collapsedMapping,
         minimized: false,
-        // Важно: сохраняем правильную вкладку
-        activeTab: type === 'history' ? 'history' : state.activeTab,
+        activeTab: type === 'history' ? 'history' : 'upload',
       };
-
-      console.log(
-        '💾 Сохраняем обновленное состояние для разворачивания:',
-        updatedState
-      );
-
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
       setState(updatedState);
       // Триггерим кастомное событие для обновления других компонентов
@@ -122,12 +100,16 @@ export const CollapsedImportSections = () => {
       type === 'history' ? 'history' : 'upload'
     );
 
-    // Если мы не на странице операций, переходим туда
-    if (location.pathname !== '/operations') {
-      navigate('/operations');
-    } else {
-      // Если мы уже на странице операций, триггерим событие для открытия модального окна
+    // Если мы уже на странице операций, просто обновляем страницу
+    if (location.pathname === '/operations') {
       window.dispatchEvent(new Event('storage'));
+      // Даем время на обновление состояния, затем триггерим событие для открытия модального окна
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    } else {
+      // Переходим на страницу операций
+      navigate('/operations');
     }
   };
 
@@ -158,7 +140,6 @@ export const CollapsedImportSections = () => {
 
   // Отображаем компонент, если есть свернутые секции
   if (!state) {
-    console.log('👻 CollapsedImportSections: нет состояния, не рендерим');
     return null;
   }
 
@@ -167,31 +148,13 @@ export const CollapsedImportSections = () => {
     state.collapsedHistory ||
     (state.collapsedMapping && (state.sessionId || state.viewingSessionId));
 
-  console.log('✅ CollapsedImportSections: проверка отображения:', {
-    hasCollapsedSections,
-    collapsedHistory: state.collapsedHistory,
-    collapsedMapping: state.collapsedMapping,
-    hasSession: !!(state.sessionId || state.viewingSessionId),
-  });
-
   if (!hasCollapsedSections) {
-    console.log(
-      '👻 CollapsedImportSections: нет свернутых секций, не рендерим'
-    );
     return null;
   }
 
-  console.log('🎨 CollapsedImportSections: рендерим свернутые секции!');
-
-  // Приоритет отображения: маппинг > история
-  // Показываем только ОДНО окошко
-  const shouldShowMapping =
-    state.collapsedMapping && (state.sessionId || state.viewingSessionId);
-  const shouldShowHistory = state.collapsedHistory && !shouldShowMapping;
-
   return (
     <div className="fixed bottom-6 right-6 z-40 space-y-3 flex flex-col items-end">
-      {shouldShowHistory && (
+      {state.collapsedHistory && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border-2 border-primary-500 dark:border-primary-400 p-4 min-w-[280px] max-w-[320px]">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -226,40 +189,41 @@ export const CollapsedImportSections = () => {
         </div>
       )}
 
-      {shouldShowMapping && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border-2 border-primary-500 dark:border-primary-400 p-4 min-w-[280px] max-w-[320px]">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <FileCheck
-                size={18}
-                className="text-primary-600 dark:text-primary-400"
-              />
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                Импортированные операции
-              </h3>
+      {state.collapsedMapping &&
+        (state.sessionId || state.viewingSessionId) && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border-2 border-primary-500 dark:border-primary-400 p-4 min-w-[280px] max-w-[320px]">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <FileCheck
+                  size={18}
+                  className="text-primary-600 dark:text-primary-400"
+                />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  Импортированные операции
+                </h3>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleExpand('mapping')}
+                  className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  title="Развернуть"
+                >
+                  <Maximize2 size={16} />
+                </button>
+                <button
+                  onClick={() => handleClose('mapping')}
+                  className="text-gray-500 hover:text-red-600 dark:hover:text-red-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                  title="Закрыть"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleExpand('mapping')}
-                className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                title="Развернуть"
-              >
-                <Maximize2 size={16} />
-              </button>
-              <button
-                onClick={() => handleClose('mapping')}
-                className="text-gray-500 hover:text-red-600 dark:hover:text-red-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                title="Закрыть"
-              >
-                <X size={16} />
-              </button>
-            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Таблица маппинга свернута
+            </p>
           </div>
-          <p className="text-xs text-gray-600 dark:text-gray-400">
-            Таблица маппинга свернута
-          </p>
-        </div>
-      )}
+        )}
     </div>
   );
 };

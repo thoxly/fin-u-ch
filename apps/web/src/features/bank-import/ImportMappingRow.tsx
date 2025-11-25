@@ -22,7 +22,7 @@ interface ImportMappingRowProps {
     | 'currency'
     | 'repeat'
     | 'direction';
-  _sessionId: string;
+  sessionId: string;
   onOpenCreateModal: (
     field:
       | 'counterparty'
@@ -33,67 +33,17 @@ interface ImportMappingRowProps {
       | 'currency',
     operation: ImportedOperation
   ) => void;
-  onFieldUpdate?: (
-    operation: ImportedOperation,
-    field:
-      | 'counterparty'
-      | 'article'
-      | 'account'
-      | 'deal'
-      | 'department'
-      | 'currency'
-      | 'direction',
-    value: string,
-    updateData: Record<string, unknown>,
-    event: React.MouseEvent
-  ) => Promise<boolean>; // Возвращает true если показан popover, false если нет
-  onRegisterChange?: (
-    operationId: string,
-    previousState: Record<string, unknown>,
-    description: string
-  ) => void;
   disabled?: boolean;
 }
-
-// Проверяем, является ли поле обязательным
-const isRequiredField = (field: string): boolean => {
-  return ['direction', 'article', 'account', 'currency'].includes(field);
-};
-
-// Проверяем, заполнено ли обязательное поле
-const isFieldFilled = (
-  operation: ImportedOperation,
-  field: string
-): boolean => {
-  switch (field) {
-    case 'direction':
-      return !!operation.direction;
-    case 'article':
-      return !!operation.matchedArticleId;
-    case 'account':
-      return !!operation.matchedAccountId;
-    case 'currency':
-      return !!operation.currency;
-    default:
-      return true;
-  }
-};
 
 export const ImportMappingRow = ({
   operation,
   field,
-  _sessionId,
+  sessionId: _sessionId,
   onOpenCreateModal,
-  onFieldUpdate,
-  onRegisterChange,
   disabled = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [lastClickPosition, setLastClickPosition] = useState<{
-    top: number;
-    left: number;
-    right: number;
-  } | null>(null);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
@@ -177,18 +127,21 @@ export const ImportMappingRow = ({
     switch (field) {
       case 'counterparty':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name }))
         );
         break;
       case 'article':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...articles.map((a) => ({ value: a.id, label: a.name }))
         );
         break;
       case 'account':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
@@ -197,18 +150,21 @@ export const ImportMappingRow = ({
         break;
       case 'deal':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...deals.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'department':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...departments.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'currency':
         baseOptions.push(
+          { value: '__create__', label: '+ Добавить новый' },
           { value: 'RUB', label: 'RUB' },
           { value: 'USD', label: 'USD' },
           { value: 'EUR', label: 'EUR' }
@@ -228,37 +184,43 @@ export const ImportMappingRow = ({
       case 'direction':
         baseOptions.push(
           { value: '', label: 'Не определено' },
-          { value: 'income' as const, label: 'Поступление' },
-          { value: 'expense' as const, label: 'Расход' },
-          { value: 'transfer' as const, label: 'Перевод' }
+          { value: 'income', label: 'Поступление' },
+          { value: 'expense', label: 'Расход' },
+          { value: 'transfer', label: 'Перевод' }
         );
         break;
     }
     return baseOptions;
   };
 
-  // Проверяем, можно ли создавать новые элементы для данного поля
-  const canCreateNew =
-    field === 'counterparty' ||
-    field === 'article' ||
-    field === 'account' ||
-    field === 'deal' ||
-    field === 'department' ||
-    field === 'currency';
-
-  const handleClick = (event: React.MouseEvent) => {
-    const target = event.currentTarget as HTMLElement;
-    const rect = target.getBoundingClientRect();
-    setLastClickPosition({
-      top: rect.bottom,
-      left: rect.left,
-      right: rect.right,
-    });
-  };
-
   const handleChange = async (value: string) => {
+    // Если выбрана опция создания, открываем offcanvas
+    if (value === '__create__') {
+      if (
+        field === 'counterparty' ||
+        field === 'article' ||
+        field === 'account' ||
+        field === 'deal' ||
+        field === 'department' ||
+        field === 'currency'
+      ) {
+        onOpenCreateModal(field, operation);
+        setIsEditing(false);
+      }
+      return;
+    }
+
     try {
-      const updateData: Record<string, unknown> = {};
+      const updateData: {
+        matchedCounterpartyId?: string | null;
+        matchedArticleId?: string | null;
+        matchedAccountId?: string | null;
+        matchedDealId?: string | null;
+        matchedDepartmentId?: string | null;
+        currency?: string;
+        repeat?: string;
+        direction?: string | null;
+      } = {};
 
       if (field === 'counterparty') {
         updateData.matchedCounterpartyId = value || null;
@@ -267,8 +229,10 @@ export const ImportMappingRow = ({
         if (value) {
           const selectedArticle = articles.find((a) => a.id === value);
           if (selectedArticle && selectedArticle.type) {
-            // Статьи могут быть только income или expense, не transfer
-            updateData.direction = selectedArticle.type as 'income' | 'expense';
+            updateData.direction = selectedArticle.type as
+              | 'income'
+              | 'expense'
+              | 'transfer';
           }
         }
       } else if (field === 'account') {
@@ -285,113 +249,15 @@ export const ImportMappingRow = ({
         updateData.direction = value || null;
       }
 
-      setIsEditing(false);
-
-      // Проверяем похожие операции (только для значимых полей)
-      if (
-        field !== 'repeat' &&
-        onFieldUpdate &&
-        lastClickPosition &&
-        (field === 'counterparty' ||
-          field === 'article' ||
-          field === 'account' ||
-          field === 'deal' ||
-          field === 'department' ||
-          field === 'currency' ||
-          field === 'direction')
-      ) {
-        // Создаем синтетическое событие с сохраненной позицией
-        const syntheticEvent = {
-          currentTarget: {
-            getBoundingClientRect: () => ({
-              top: lastClickPosition.top - 40, // Примерная высота элемента
-              bottom: lastClickPosition.top,
-              left: lastClickPosition.left,
-              right: lastClickPosition.right,
-            }),
-          },
-        } as React.MouseEvent;
-
-        // Проверяем наличие похожих операций
-        const hasPopover = await onFieldUpdate(
-          operation,
-          field,
-          value,
-          updateData,
-          syntheticEvent
-        );
-
-        // Если показан popover - не обновляем операцию сейчас
-        // Обновление произойдет после выбора в popover
-        if (hasPopover) {
-          return;
-        }
-      }
-
-      // Регистрируем изменение для возможности отмены (если есть callback)
-      if (onRegisterChange) {
-        // Сохраняем предыдущее состояние
-        const previousState: Record<string, unknown> = {};
-        if (field === 'counterparty') {
-          previousState.matchedCounterpartyId = operation.matchedCounterpartyId;
-        } else if (field === 'article') {
-          previousState.matchedArticleId = operation.matchedArticleId;
-          previousState.direction = operation.direction;
-        } else if (field === 'account') {
-          previousState.matchedAccountId = operation.matchedAccountId;
-        } else if (field === 'deal') {
-          previousState.matchedDealId = operation.matchedDealId;
-        } else if (field === 'department') {
-          previousState.matchedDepartmentId = operation.matchedDepartmentId;
-        } else if (field === 'currency') {
-          previousState.currency = operation.currency;
-        } else if (field === 'repeat') {
-          previousState.repeat = operation.repeat;
-        } else if (field === 'direction') {
-          previousState.direction = operation.direction;
-        }
-
-        // Формируем описание изменения
-        const fieldNames: Record<string, string> = {
-          counterparty: 'Контрагент',
-          article: 'Статья',
-          account: 'Счет',
-          deal: 'Сделка',
-          department: 'Подразделение',
-          currency: 'Валюта',
-          repeat: 'Повтор',
-          direction: 'Тип операции',
-        };
-        const description = `Изменено: ${fieldNames[field] || field}`;
-
-        onRegisterChange(operation.id, previousState, description);
-      }
-
-      // Нет похожих операций или поле не требует проверки - обновляем сразу
       await updateOperation({
         id: operation.id,
         data: updateData,
       }).unwrap();
 
+      setIsEditing(false);
       showSuccess('Обновлено');
     } catch (error) {
       showError('Ошибка при обновлении');
-    }
-  };
-
-  const handleCreateNew = () => {
-    if (canCreateNew) {
-      onOpenCreateModal(
-        field as
-          | 'counterparty'
-          | 'article'
-          | 'account'
-          | 'deal'
-          | 'department'
-          | 'currency',
-        operation
-      );
-      setIsEditing(false);
     }
   };
 
@@ -402,16 +268,11 @@ export const ImportMappingRow = ({
           value={getCurrentValue()}
           onChange={handleChange}
           options={getOptions()}
-          onCreateNew={canCreateNew ? handleCreateNew : undefined}
           className="w-full"
         />
       </div>
     );
   }
-
-  const isRequired = isRequiredField(field);
-  const isFilled = isFieldFilled(operation, field);
-  const showWarning = isRequired && !isFilled && !disabled;
 
   // Для direction показываем badge, для остальных полей - обычный текст
   if (field === 'direction') {
@@ -431,19 +292,10 @@ export const ImportMappingRow = ({
           disabled
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:opacity-80'
-        } ${showWarning ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
-        onClick={(e) => {
-          if (!disabled) {
-            handleClick(e);
-            setIsEditing(true);
-          }
-        }}
+        }`}
+        onClick={() => !disabled && setIsEditing(true)}
         title={
-          disabled
-            ? 'Операция распределена'
-            : showWarning
-              ? 'Обязательное поле - нажмите для выбора'
-              : 'Нажмите для редактирования'
+          disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
       >
         {getDisplayValue()}
@@ -464,19 +316,10 @@ export const ImportMappingRow = ({
           disabled
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
-        } ${showWarning ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
-        onClick={(e) => {
-          if (!disabled) {
-            handleClick(e);
-            setIsEditing(true);
-          }
-        }}
+        }`}
+        onClick={() => !disabled && setIsEditing(true)}
         title={
-          disabled
-            ? 'Операция распределена'
-            : showWarning
-              ? 'Обязательное поле - нажмите для выбора'
-              : 'Нажмите для редактирования'
+          disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
       >
         <div className="truncate">{getDisplayValue()}</div>
@@ -495,20 +338,9 @@ export const ImportMappingRow = ({
         disabled
           ? 'opacity-60 cursor-not-allowed'
           : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
-      } ${showWarning ? 'ring-2 ring-red-500 ring-offset-1' : ''}`}
-      onClick={(e) => {
-        if (!disabled) {
-          handleClick(e);
-          setIsEditing(true);
-        }
-      }}
-      title={
-        disabled
-          ? 'Операция распределена'
-          : showWarning
-            ? 'Обязательное поле - нажмите для выбора'
-            : 'Нажмите для редактирования'
-      }
+      }`}
+      onClick={() => !disabled && setIsEditing(true)}
+      title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
     >
       {getDisplayValue()}
     </div>

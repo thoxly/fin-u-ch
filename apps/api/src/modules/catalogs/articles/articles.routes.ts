@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth';
 import { extractTenant } from '../../../middlewares/tenant';
+import { requirePermission } from '../../../middlewares/permissions';
 import articlesController from './articles.controller';
 
 const router: Router = Router();
@@ -20,7 +21,11 @@ router.use(extractTenant);
  *       200:
  *         description: List of articles
  */
-router.get('/', articlesController.getAll);
+router.get(
+  '/',
+  requirePermission('articles', 'read'),
+  articlesController.getAll
+);
 
 /**
  * @swagger
@@ -42,7 +47,11 @@ router.get('/', articlesController.getAll);
  *       404:
  *         description: Article not found
  */
-router.get('/:id', articlesController.getById);
+router.get(
+  '/:id',
+  requirePermission('articles', 'read'),
+  articlesController.getById
+);
 
 /**
  * @swagger
@@ -56,7 +65,11 @@ router.get('/:id', articlesController.getById);
  *       201:
  *         description: Article created
  */
-router.post('/', articlesController.create);
+router.post(
+  '/',
+  requirePermission('articles', 'create'),
+  articlesController.create
+);
 
 /**
  * @swagger
@@ -76,7 +89,11 @@ router.post('/', articlesController.create);
  *       200:
  *         description: Article updated
  */
-router.patch('/:id', articlesController.update);
+router.patch(
+  '/:id',
+  requirePermission('articles', 'update'),
+  articlesController.update
+);
 
 /**
  * @swagger
@@ -96,7 +113,11 @@ router.patch('/:id', articlesController.update);
  *       200:
  *         description: Article deleted
  */
-router.delete('/:id', articlesController.delete);
+router.delete(
+  '/:id',
+  requirePermission('articles', 'delete'),
+  articlesController.delete
+);
 
 /**
  * @swagger
@@ -116,7 +137,11 @@ router.delete('/:id', articlesController.delete);
  *       200:
  *         description: Article archived
  */
-router.post('/:id/archive', articlesController.archive);
+router.post(
+  '/:id/archive',
+  requirePermission('articles', 'archive'),
+  articlesController.archive
+);
 
 /**
  * @swagger
@@ -136,7 +161,11 @@ router.post('/:id/archive', articlesController.archive);
  *       200:
  *         description: Article unarchived
  */
-router.post('/:id/unarchive', articlesController.unarchive);
+router.post(
+  '/:id/unarchive',
+  requirePermission('articles', 'restore'),
+  articlesController.unarchive
+);
 
 /**
  * @swagger
@@ -161,6 +190,10 @@ router.post('/:id/unarchive', articlesController.unarchive);
  *       200:
  *         description: UpdateMany result
  */
-router.post('/bulk-archive', articlesController.bulkArchive);
+router.post(
+  '/bulk-archive',
+  requirePermission('articles', 'archive'),
+  articlesController.bulkArchive
+);
 
 export default router;

@@ -73,9 +73,33 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
       <div
         className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${className}`}
       >
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Динамика поступлений и списаний
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Динамика поступлений и списаний
+            </h3>
+            <InfoHint
+              content={
+                <div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">
+                    Динамика поступлений и списаний
+                  </div>
+                  <div>
+                    Показывает активность по операциям: когда и в каком объёме
+                    поступали поступления и выполнялись списания. Помогает
+                    выявить пики и спады финансовой активности.
+                  </div>
+                </div>
+              }
+            />
+          </div>
+          <ExportMenu
+            filenameBase="weekly_flow"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+            entity="reports"
+          />
+        </div>
 
         <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">

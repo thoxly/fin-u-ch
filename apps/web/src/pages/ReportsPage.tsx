@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
+import { usePermissions } from '../shared/hooks/usePermissions';
 import { DateRangePicker } from '../shared/ui/DateRangePicker';
 import {
   useGetCashflowReportQuery,
@@ -49,8 +50,10 @@ export const ReportsPage = () => {
   const [searchParams] = useSearchParams();
   const today = new Date();
 
-  // Читаем тип отчета из URL параметров
-  const _reportType = (searchParams.get('type') as ReportType) || 'cashflow';
+  // Читаем тип отчета из URL параметров (используется для будущего расширения)
+  const reportType = (searchParams.get('type') as ReportType) || 'cashflow';
+  // Suppress unused variable warning - reserved for future use
+  void reportType;
 
   // Инициализируем фильтры периода
   const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
@@ -68,11 +71,19 @@ export const ReportsPage = () => {
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
 
-  // Загружаем активные бюджеты
-  const { data: budgets = [] } = useGetBudgetsQuery({ status: 'active' });
+  // Проверка прав на просмотр отчётов
+  const { canRead } = usePermissions();
 
-  // Проверяем наличие планов
-  const { data: plans = [] } = useGetPlansQuery();
+  // Загружаем активные бюджеты (только если есть права на просмотр отчётов)
+  const { data: budgets = [] } = useGetBudgetsQuery(
+    { status: 'active' },
+    { skip: !canRead('reports') }
+  );
+
+  // Проверяем наличие планов (только если есть права на просмотр отчётов)
+  const { data: plans = [] } = useGetPlansQuery(undefined, {
+    skip: !canRead('reports'),
+  });
   const hasPlans = plans.length > 0;
 
   // Если планов нет, принудительно устанавливаем режим "Факт"
@@ -203,6 +214,24 @@ export const ReportsPage = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showBudgetMenu]);
+
+  // Если нет прав на просмотр, показываем сообщение
+  if (!canRead('reports')) {
+    return (
+      <Layout>
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Отчеты
+          </h1>
+          <Card>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>У вас нет прав для просмотра отчётов</p>
+            </div>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -435,8 +464,11 @@ const CashflowTab = ({
   reportMode: ReportMode;
   selectedBudget: Budget | null;
 }) => {
-  // Загружаем фактические данные только если режим "Факт" или "План-Факт"
-  const shouldLoadFact = reportMode === 'fact' || reportMode === 'both';
+  const { canRead } = usePermissions();
+
+  // Загружаем фактические данные только если режим "Факт" или "План-Факт" и есть права
+  const shouldLoadFact =
+    (reportMode === 'fact' || reportMode === 'both') && canRead('reports');
   const { data, isLoading, error } = useGetCashflowReportQuery(
     shouldLoadFact
       ? {
@@ -446,9 +478,11 @@ const CashflowTab = ({
       : skipToken
   );
 
-  // Загружаем плановые данные только если режим "План" или "План-Факт" и выбран бюджет
+  // Загружаем плановые данные только если режим "План" или "План-Факт" и выбран бюджет и есть права
   const shouldLoadPlan =
-    (reportMode === 'plan' || reportMode === 'both') && selectedBudget;
+    (reportMode === 'plan' || reportMode === 'both') &&
+    selectedBudget &&
+    canRead('reports');
   const { data: planData, isLoading: planLoading } = useGetBddsReportQuery(
     shouldLoadPlan
       ? {

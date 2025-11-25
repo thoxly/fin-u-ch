@@ -6,8 +6,9 @@ import {
   FetchBaseQueryError,
 } from '@reduxjs/toolkit/query/react';
 import { config } from '../../shared/config/env';
-import type { RootState } from '../store';
+import type { RootState, AppDispatch } from '../store';
 import { setCredentials, logout } from '../slices/authSlice';
+import { showNotification } from '../slices/notificationSlice';
 
 const baseQueryWithoutReauth = fetchBaseQuery({
   baseUrl: config.apiUrl,
@@ -27,6 +28,23 @@ const baseQueryWithReauth: BaseQueryFn<
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
   let result = await baseQueryWithoutReauth(args, api, extraOptions);
+
+  // Обработка ошибки 403 (Доступ запрещён)
+  if (result.error && result.error.status === 403) {
+    const dispatch = api.dispatch as AppDispatch;
+    const errorMessage =
+      (result.error.data as { message?: string })?.message ||
+      'У вас нет прав для выполнения этого действия';
+
+    dispatch(
+      showNotification({
+        type: 'error',
+        title: 'Доступ запрещён',
+        message: errorMessage,
+        duration: 5000,
+      })
+    );
+  }
 
   // Если получили 401, пытаемся рефрешить токен
   if (result.error && result.error.status === 401) {
@@ -107,6 +125,9 @@ export const apiSlice = createApi({
     'Budget',
     'Dashboard',
     'Report',
+    'Role',
+    'Permission',
+    'AuditLog',
     'Import',
     'MappingRule',
     'Integration',

@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import type {
   CashflowReport,
   BDDSReport,
   ActivityGroup,
 } from '@fin-u-ch/shared';
 import { formatNumber } from '../../shared/lib/money';
+import { ExportMenu } from '../../shared/ui/ExportMenu';
+import { type ExportRow } from '../../shared/lib/exportData';
 
 interface CashflowTableProps {
   data: CashflowReport | BDDSReport;
@@ -47,89 +49,14 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>(
     {}
   );
-  const [draggedActivity, setDraggedActivity] = useState<string | null>(null);
-  const [dragOverActivity, setDragOverActivity] = useState<string | null>(null);
-  const [activityOrder, setActivityOrder] = useState<string[]>([]);
 
   const hasFactData = data.activities.length > 0;
-
-  const activitiesToRender = hasFactData
-    ? data.activities
-    : planData?.activities || [];
-
-  // Initialize activity order on first render or when activities change
-  React.useEffect(() => {
-    const currentActivities = activitiesToRender.map((a) => a.activity);
-    if (
-      activityOrder.length === 0 ||
-      !currentActivities.every((a) => activityOrder.includes(a))
-    ) {
-      setActivityOrder(currentActivities);
-    }
-  }, [data.activities, planData?.activities]);
 
   const toggleSection = (activity: string) => {
     setExpandedSections((prev) => ({
       ...prev,
       [activity]: !prev[activity],
     }));
-  };
-
-  const handleDragStart = (e: React.DragEvent, activity: string) => {
-    e.stopPropagation();
-    setDraggedActivity(activity);
-    e.dataTransfer.effectAllowed = 'move';
-    // Add a semi-transparent drag image
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '0.5';
-    }
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    e.stopPropagation();
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '1';
-    }
-    setDraggedActivity(null);
-    setDragOverActivity(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, activity: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedActivity && draggedActivity !== activity) {
-      setDragOverActivity(activity);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.stopPropagation();
-    setDragOverActivity(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetActivity: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!draggedActivity || draggedActivity === targetActivity) {
-      setDraggedActivity(null);
-      setDragOverActivity(null);
-      return;
-    }
-
-    const newOrder = [...activityOrder];
-    const draggedIndex = newOrder.indexOf(draggedActivity);
-    const targetIndex = newOrder.indexOf(targetActivity);
-
-    if (draggedIndex !== -1 && targetIndex !== -1) {
-      // Remove dragged item and insert at target position
-      newOrder.splice(draggedIndex, 1);
-      newOrder.splice(targetIndex, 0, draggedActivity);
-      setActivityOrder(newOrder);
-    }
-
-    setDraggedActivity(null);
-    setDragOverActivity(null);
   };
 
   const allMonths = useMemo(() => {
@@ -212,17 +139,26 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return map;
   }, [planData]);
 
-  const getPlanAmount = (articleId: string, month: string) => {
-    return planLookups.articleMonth.get(`${articleId}__${month}`) ?? 0;
-  };
+  const getPlanAmount = useCallback(
+    (articleId: string, month: string) => {
+      return planLookups.articleMonth.get(`${articleId}__${month}`) ?? 0;
+    },
+    [planLookups]
+  );
 
-  const getPlanActivityNet = (activity: string, month: string) => {
-    return planLookups.activityMonth.get(`${activity}__${month}`) ?? 0;
-  };
+  const getPlanActivityNet = useCallback(
+    (activity: string, month: string) => {
+      return planLookups.activityMonth.get(`${activity}__${month}`) ?? 0;
+    },
+    [planLookups]
+  );
 
-  const getPlanMonthNet = (month: string) => {
-    return planLookups.monthlyNet.get(month) ?? 0;
-  };
+  const getPlanMonthNet = useCallback(
+    (month: string) => {
+      return planLookups.monthlyNet.get(month) ?? 0;
+    },
+    [planLookups]
+  );
 
   const columnWidths = useMemo(() => {
     const articleColumnWidth = 240;
@@ -279,7 +215,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       balance += getPlanMonthNet(month);
       return { month, balance };
     });
-  }, [planData, allMonths, planLookups, getPlanMonthNet]);
+  }, [planData, allMonths, getPlanMonthNet]);
 
   const totalNetCashflow = data.activities.reduce(
     (sum, activity) => sum + activity.netCashflow,
@@ -291,21 +227,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     0
   );
 
-  // Sort activities according to the user-defined order
-  const sortedActivities = useMemo(() => {
-    if (activityOrder.length === 0) return activitiesToRender;
-
-    return [...activitiesToRender].sort((a, b) => {
-      const indexA = activityOrder.indexOf(a.activity);
-      const indexB = activityOrder.indexOf(b.activity);
-
-      // If activity not in order, place it at the end
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-
-      return indexA - indexB;
-    });
-  }, [activitiesToRender, activityOrder]);
+  const activitiesToRender = useMemo(() => {
+    return hasFactData ? data.activities : planData?.activities || [];
+  }, [hasFactData, data.activities, planData?.activities]);
 
   const formatMonthLabel = (month: string) =>
     new Date(`${month}-01`)
@@ -322,6 +246,108 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return names[activity] || activity;
   };
 
+  // Функция для построения данных экспорта
+  const buildExportRows = useMemo(() => {
+    return (): ExportRow[] => {
+      const rows: ExportRow[] = [];
+
+      for (const activity of activitiesToRender) {
+        // Добавляем строку с итогом по деятельности
+        const activityRow: ExportRow = {
+          'Вид деятельности': getActivityDisplayName(activity.activity),
+          Тип: 'Итого',
+        };
+        for (const month of allMonths) {
+          const factNet = hasFactData
+            ? activity.incomeGroups.reduce((sum, group) => {
+                const monthData = group.months.find((m) => m.month === month);
+                return sum + (monthData?.amount || 0);
+              }, 0) -
+              activity.expenseGroups.reduce((sum, group) => {
+                const monthData = group.months.find((m) => m.month === month);
+                return sum + (monthData?.amount || 0);
+              }, 0)
+            : 0;
+          const planNet = getPlanActivityNet(activity.activity, month);
+          if (showPlan) {
+            activityRow[`${formatMonthLabel(month)} (План)`] = planNet;
+            activityRow[`${formatMonthLabel(month)} (Факт)`] = factNet;
+          } else {
+            activityRow[formatMonthLabel(month)] = factNet;
+          }
+        }
+        activityRow['Итого'] = hasFactData
+          ? activity.netCashflow
+          : (planData?.activities.find((a) => a.activity === activity.activity)
+              ?.netCashflow ?? activity.netCashflow);
+        rows.push(activityRow);
+
+        // Добавляем строки по статьям доходов
+        for (const group of activity.incomeGroups) {
+          const articleName = group.articleName;
+          const groupRow: ExportRow = {
+            'Вид деятельности': getActivityDisplayName(activity.activity),
+            Тип: 'Поступления',
+            Статья: articleName,
+          };
+          for (const month of allMonths) {
+            const factAmount = hasFactData
+              ? group.months.find((m) => m.month === month)?.amount || 0
+              : 0;
+            const planAmount = getPlanAmount(group.articleId, month);
+            if (showPlan) {
+              groupRow[`${formatMonthLabel(month)} (План)`] = planAmount;
+              groupRow[`${formatMonthLabel(month)} (Факт)`] = factAmount;
+            } else {
+              groupRow[formatMonthLabel(month)] = factAmount;
+            }
+          }
+          const total = hasFactData
+            ? group.months.reduce((sum, m) => sum + m.amount, 0)
+            : 0;
+          groupRow['Итого'] = total;
+          rows.push(groupRow);
+        }
+
+        // Добавляем строки по статьям расходов
+        for (const group of activity.expenseGroups) {
+          const articleName = group.articleName;
+          const groupRow: ExportRow = {
+            'Вид деятельности': getActivityDisplayName(activity.activity),
+            Тип: 'Списания',
+            Статья: articleName,
+          };
+          for (const month of allMonths) {
+            const factAmount = hasFactData
+              ? group.months.find((m) => m.month === month)?.amount || 0
+              : 0;
+            const planAmount = getPlanAmount(group.articleId, month);
+            if (showPlan) {
+              groupRow[`${formatMonthLabel(month)} (План)`] = planAmount;
+              groupRow[`${formatMonthLabel(month)} (Факт)`] = factAmount;
+            } else {
+              groupRow[formatMonthLabel(month)] = factAmount;
+            }
+          }
+          const total = hasFactData
+            ? group.months.reduce((sum, m) => sum + m.amount, 0)
+            : 0;
+          groupRow['Итого'] = total;
+          rows.push(groupRow);
+        }
+      }
+
+      return rows;
+    };
+  }, [
+    activitiesToRender,
+    allMonths,
+    hasFactData,
+    showPlan,
+    planData,
+    getPlanAmount,
+    getPlanActivityNet,
+  ]);
   const getActivityColor = (activity: string) => {
     const colors: Record<string, string> = {
       operating: 'bg-blue-50 dark:bg-[#1F1F1F]',
@@ -385,13 +411,18 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
-      <div className="bg-zinc-50 dark:bg-zinc-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
+      <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
           {title || 'Отчет о движении денежных средств'}:{' '}
           {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
           {new Date(periodTo).toLocaleDateString('ru-RU')}
         </div>
+        <ExportMenu
+          filenameBase={`cashflow_${periodFrom}_${periodTo}`}
+          buildRows={buildExportRows}
+          entity="reports"
+        />
       </div>
 
       <div className="w-full overflow-x-auto overflow-y-visible max-h-[calc(100vh-380px)] md:max-h-[80vh]">
@@ -457,37 +488,19 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             )}
           </thead>
           <tbody className="text-sm bg-zinc-50 dark:bg-zinc-900">
-            {sortedActivities.map((activity) => {
+            {activitiesToRender.map((activity) => {
               const planActivity = planActivityMap.get(activity.activity);
               const planSource: ActivityGroup | undefined =
                 planActivity || (!hasFactData ? activity : undefined);
 
               const activityColor = getActivityColor(activity.activity);
               const borderColor = getActivityBorderColor(activity.activity);
-              const isDragging = draggedActivity === activity.activity;
-              const isDragOver = dragOverActivity === activity.activity;
-
               return (
                 <React.Fragment key={activity.activity}>
                   <tr
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, activity.activity)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => handleDragOver(e, activity.activity)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, activity.activity)}
-                    className={`${activityColor} cursor-move border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5 ${
-                      isDragging ? 'opacity-50' : ''
-                    } ${
-                      isDragOver
-                        ? 'outline outline-2 outline-blue-500 dark:outline-blue-400'
-                        : ''
-                    }`}
+                    className={`${activityColor} cursor-pointer border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5`}
                     onClick={() => toggleSection(activity.activity)}
-                    style={{
-                      borderLeft: `3px solid ${borderColor}`,
-                      cursor: 'grab',
-                    }}
+                    style={{ borderLeft: `3px solid ${borderColor}` }}
                   >
                     <td
                       className={`px-4 py-2 font-semibold text-sm text-gray-900 dark:text-zinc-50 sticky left-0 ${activityColor} z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]`}
@@ -495,13 +508,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         width: `${columnWidths.article}px`,
                       }}
                     >
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className="text-gray-400 dark:text-gray-500 cursor-grab active:cursor-grabbing text-lg leading-none"
-                          title="Перетащите для изменения порядка"
-                        >
-                          ⋮⋮
-                        </span>
+                      <div className="flex items-center space-x-3">
                         <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
                           {expandedSections[activity.activity] ? '▾' : '▸'}
                         </span>
@@ -901,7 +908,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
               {cumulativeBalances.map(({ month, balance }, idx) => {
                 const planBalance = planCumulativeBalances[idx]?.balance ?? 0;
                 const isPositive = balance >= 0;
-                const _isPlanPositive = planBalance >= 0;
 
                 if (showPlan) {
                   return (

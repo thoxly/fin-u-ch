@@ -1,5 +1,4 @@
 import { apiSlice } from './apiSlice';
-import type { RootState } from '../store';
 import type {
   ImportedOperation,
   MappingRule,
@@ -7,11 +6,12 @@ import type {
   ImportSessionsResponse,
   ImportOperationsRequest,
 } from '@shared/types/imports';
+import type { RootState } from '../store';
+import type { PatchCollection } from '@reduxjs/toolkit';
 
 interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
-  duplicatesCount: number;
   fileName: string;
 }
 
@@ -20,10 +20,6 @@ interface BulkUpdateRequest {
   matchedArticleId?: string | null;
   matchedCounterpartyId?: string | null;
   matchedAccountId?: string | null;
-  matchedDealId?: string | null;
-  matchedDepartmentId?: string | null;
-  currency?: string;
-  direction?: 'income' | 'expense' | 'transfer' | null;
   confirmed?: boolean;
 }
 
@@ -60,7 +56,6 @@ export const importsApi = apiSlice.injectEndpoints({
         sessionId: string;
         confirmed?: boolean;
         matched?: boolean;
-        duplicate?: boolean;
         limit?: number;
         offset?: number;
       }
@@ -68,16 +63,6 @@ export const importsApi = apiSlice.injectEndpoints({
       query: ({ sessionId, ...params }) => ({
         url: `/imports/sessions/${sessionId}/operations`,
         params,
-      }),
-      providesTags: ['Import'],
-    }),
-
-    getAllImportedOperations: builder.query<
-      { operations: ImportedOperation[] },
-      { sessionId: string }
-    >({
-      query: ({ sessionId }) => ({
-        url: `/imports/sessions/${sessionId}/operations/all`,
       }),
       providesTags: ['Import'],
     }),
@@ -95,7 +80,7 @@ export const importsApi = apiSlice.injectEndpoints({
           currency?: string;
           repeat?: string;
           confirmed?: boolean;
-          direction?: 'income' | 'expense' | 'transfer' | null;
+          direction?: 'income' | 'expense' | 'transfer';
         };
       }
     >({
@@ -107,33 +92,20 @@ export const importsApi = apiSlice.injectEndpoints({
       async onQueryStarted(
         { id, data },
         { dispatch, queryFulfilled, getState }
-      ): Promise<void> {
-        // Функция для проверки, сопоставлена ли операция
-        const checkOperationMatched = (op: ImportedOperation): boolean => {
-          if (!op.direction) return false;
-
-          const currency = op.currency || 'RUB';
-          const hasRequiredFields = !!(
-            op.matchedArticleId &&
-            op.matchedAccountId &&
-            currency
-          );
-
-          if (op.direction === 'transfer') {
-            return (
-              hasRequiredFields && !!(op.payerAccount && op.receiverAccount)
-            );
-          }
-          return hasRequiredFields;
-        };
-
+      ) {
         // Optimistic update - обновляем кеш локально без перезапроса
         // Находим все активные запросы getImportedOperations и обновляем их
         const state = getState() as RootState;
 
         // Собираем все ключи кеша для getImportedOperations
-        const cacheKeys: Array<{ sessionId: string; [key: string]: unknown }> =
-          [];
+        type GetImportedOperationsArgs = {
+          sessionId: string;
+          confirmed?: boolean;
+          matched?: boolean;
+          limit?: number;
+          offset?: number;
+        };
+        const cacheKeys: GetImportedOperationsArgs[] = [];
         if (state.api?.queries) {
           Object.keys(state.api.queries).forEach((key) => {
             const query = state.api.queries[key];
@@ -141,18 +113,18 @@ export const importsApi = apiSlice.injectEndpoints({
               query?.endpointName === 'getImportedOperations' &&
               query?.data
             ) {
-              cacheKeys.push(
-                (query.originalArgs as {
-                  sessionId: string;
-                  [key: string]: unknown;
-                }) || { sessionId: '' }
-              );
+              const args = query.originalArgs as
+                | GetImportedOperationsArgs
+                | undefined;
+              if (args) {
+                cacheKeys.push(args);
+              }
             }
           });
         }
 
-        // Обновляем каждый найденный запрос и сохраняем результаты для возможного отката
-        const patchResults: Array<{ undo: () => void }> = [];
+        // Обновляем каждый найденный запрос
+        const patchResults: PatchCollection[] = [];
         cacheKeys.forEach((args) => {
           const patchResult = dispatch(
             importsApi.util.updateQueryData(
@@ -191,25 +163,13 @@ export const importsApi = apiSlice.injectEndpoints({
                     if (data.direction !== undefined) {
                       operation.direction = data.direction;
                     }
-
-                    // Пересчитываем unmatched и duplicates после обновления операции
-                    // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
-                    draft.unmatched = draft.operations.filter(
-                      (op) => !checkOperationMatched(op)
-                    ).length;
-                    draft.duplicates = draft.operations.filter(
-                      (op) => op.isDuplicate
-                    ).length;
-
                     // matchedBy будет обновлен из ответа сервера после успешного запроса
                   }
                 }
               }
             )
           );
-          if (patchResult) {
-            patchResults.push(patchResult);
-          }
+          patchResults.push(patchResult);
         });
 
         try {
@@ -248,15 +208,6 @@ export const importsApi = apiSlice.injectEndpoints({
                       operation.matchedBy = updatedOperation.matchedBy ?? null;
                       operation.matchedRuleId =
                         updatedOperation.matchedRuleId ?? null;
-
-                      // Пересчитываем unmatched и duplicates после обновления из ответа сервера
-                      // Всегда пересчитываем, чтобы гарантировать актуальность счетчиков
-                      draft.unmatched = draft.operations.filter(
-                        (op) => !checkOperationMatched(op)
-                      ).length;
-                      draft.duplicates = draft.operations.filter(
-                        (op) => op.isDuplicate
-                      ).length;
                     }
                   }
                 }
@@ -268,8 +219,8 @@ export const importsApi = apiSlice.injectEndpoints({
           patchResults.forEach((patchResult) => patchResult.undo());
         }
       },
-      // Инвалидируем теги для обновления данных в истории импортов
-      invalidatesTags: ['Import'],
+      // Не инвалидируем теги, чтобы не вызывать перезапрос всего списка
+      // invalidatesTags: ['Import'],
     }),
 
     bulkUpdateImportedOperations: builder.mutation<
@@ -383,8 +334,6 @@ export const importsApi = apiSlice.injectEndpoints({
         status?: string;
         limit?: number;
         offset?: number;
-        dateFrom?: string;
-        dateTo?: string;
       } | void
     >({
       query: (params) => ({
@@ -399,8 +348,6 @@ export const importsApi = apiSlice.injectEndpoints({
 export const {
   useUploadStatementMutation,
   useGetImportedOperationsQuery,
-  useGetAllImportedOperationsQuery,
-  useLazyGetAllImportedOperationsQuery,
   useUpdateImportedOperationMutation,
   useBulkUpdateImportedOperationsMutation,
   useApplyRulesMutation,

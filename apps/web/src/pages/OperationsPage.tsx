@@ -17,7 +17,7 @@ import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
 import { MappingRules } from '../features/bank-import/MappingRules';
 import {
-  useLazyGetOperationsQuery,
+  useGetOperationsQuery,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
   useBulkDeleteOperationsMutation,
@@ -36,18 +36,21 @@ import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 import { useBulkSelection } from '../shared/hooks/useBulkSelection';
-import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
+<<<<<<< HEAD
 import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
 import { OzonIcon } from '../features/integrations/OzonIcon';
 import {
   useDisconnectOzonIntegrationMutation,
   useGetOzonIntegrationQuery,
 } from '../store/api/integrationsApi';
+=======
+import { usePermissions } from '../shared/hooks/usePermissions';
+>>>>>>> dev
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -240,11 +243,18 @@ export const OperationsPage = () => {
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
-  const PAGE_SIZE = 50;
-  const [items, setItems] = useState<OperationWithRelations[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [trigger, { isFetching }] = useLazyGetOperationsQuery();
+  // Загружаем данные один раз при монтировании с текущими фильтрами
+  const {
+    data: operationsData = [],
+    isLoading: isFetching,
+    refetch,
+  } = useGetOperationsQuery(hasActiveFilters ? filters : undefined, {
+    // Отключаем автоматическую перезагрузку при изменении фильтров
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
@@ -254,6 +264,8 @@ export const OperationsPage = () => {
     useBulkSelection();
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
+  const { canCreate, canUpdate } = usePermissions();
+
 
   const handleIntegrationUpdate = (integrationId: string, data: any) => {
     setIntegrations((prev) =>
@@ -275,73 +287,13 @@ export const OperationsPage = () => {
   };
 
   // Extract data reloading logic to avoid duplication
+
+  // Функция для ручной перезагрузки данных (после мутаций)
+
   const reloadOperationsData = useCallback(async () => {
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
     clearSelection();
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset: 0,
-    };
-    const result = await trigger(params).unwrap();
-    setItems(result as OperationWithRelations[]);
-    setHasMore(result.length === PAGE_SIZE);
-    setOffset(result.length);
-  }, [hasActiveFilters, filters, trigger, clearSelection]);
-
-  // Memoize loadMore callback to prevent unnecessary re-renders
-  const loadMore = useCallback(async () => {
-    if (isFetching || !hasMore) return;
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset,
-    };
-    const result = await trigger(params).unwrap();
-    const page = result || [];
-    // Фильтруем дубликаты по id при добавлении новых элементов
-    setItems((prev) => {
-      const existingIds = new Set(prev.map((item) => item.id));
-      const newItems = page.filter((item) => !existingIds.has(item.id));
-      return [...prev, ...newItems];
-    });
-    setOffset((prevOffset) => prevOffset + page.length);
-    setHasMore(page.length === PAGE_SIZE);
-  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
-
-  // Initial and filters-changed load with proper dependencies
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      await reloadOperationsData();
-      if (cancelled) {
-        // Reset state if cancelled
-        setItems([]);
-        setOffset(0);
-        setHasMore(true);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadOperationsData]);
-
-  // Use IntersectionObserver hook for infinite scroll
-  const sentinelRef = useIntersectionObserver(
-    useCallback(
-      (entry) => {
-        if (entry.isIntersecting && !isFetching && hasMore) {
-          loadMore();
-        }
-      },
-      [isFetching, hasMore, loadMore]
-    ),
-    { rootMargin: '200px', enabled: hasMore && !isFetching }
-  );
+    await refetch();
+  }, [refetch, clearSelection]);
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -514,9 +466,9 @@ export const OperationsPage = () => {
 
   // Сортированные данные
   const sortedItems = useMemo(() => {
-    if (!sortKey) return items;
+    if (!sortKey) return operationsData as OperationWithRelations[];
 
-    return [...items].sort((a, b) => {
+    return [...(operationsData as OperationWithRelations[])].sort((a, b) => {
       let aValue: unknown;
       let bValue: unknown;
 
@@ -571,7 +523,7 @@ export const OperationsPage = () => {
       if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [items, sortKey, sortDirection]);
+  }, [operationsData, sortKey, sortDirection]);
 
   const selectableIds = useMemo(
     () =>
@@ -887,29 +839,41 @@ export const OperationsPage = () => {
             />
             <RecurringOperations onEdit={handleEdit} />
             <MappingRules />
+
+            {canUpdate('operations') && (
+              <>
+                <RecurringOperations onEdit={handleEdit} />
+                <MappingRules />
+              </>
+            )}
+
             <ExportMenu
               filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
               buildRows={buildExportRows}
               columns={exportColumns}
             />
-            <button
-              onClick={handleImportClick}
-              className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
-              title="Импорт выписки"
-            >
-              <FileUp
-                size={18}
-                className="text-primary-600 dark:text-primary-400"
-              />
-            </button>
-            <Button
-              onClick={handleCreate}
-              size="sm"
-              className="text-sm sm:text-base whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">Создать операцию</span>
-              <span className="sm:hidden">Создать</span>
-            </Button>
+            {canUpdate('operations') && (
+              <button
+                onClick={handleImportClick}
+                className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+                title="Импорт выписки"
+              >
+                <FileUp
+                  size={18}
+                  className="text-primary-600 dark:text-primary-400"
+                />
+              </button>
+            )}
+            {canCreate('operations') && (
+              <Button
+                onClick={handleCreate}
+                size="sm"
+                className="text-sm sm:text-base whitespace-nowrap"
+              >
+                <span className="hidden sm:inline">Создать операцию</span>
+                <span className="sm:hidden">Создать</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -970,7 +934,7 @@ export const OperationsPage = () => {
             {showAdvancedFilters && (
               <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Контекст
+                  Дополнительные
                 </div>
                 {/* На мобильных устройствах - горизонтальная прокрутка в один ряд */}
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 filters-scroll md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-x-visible md:pb-0 md:-mx-0 md:px-0">
@@ -1073,9 +1037,9 @@ export const OperationsPage = () => {
             </div>
           </div>
 
-          {items.length === 0 && isFetching ? (
+          {operationsData.length === 0 && isFetching ? (
             <TableSkeleton rows={5} columns={6} />
-          ) : items.length === 0 ? (
+          ) : operationsData.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="Нет операций"
@@ -1251,7 +1215,6 @@ export const OperationsPage = () => {
               },
             ]}
           />
-          <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
         <Modal
