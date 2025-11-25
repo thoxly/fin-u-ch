@@ -11,6 +11,7 @@ model Company {
   id           String    @id @default(uuid())
   name         String
   currencyBase String    @default("RUB")
+  inn          String? // ИНН компании для определения направления операций
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?

@@ -37,6 +37,7 @@ model Company {
   @@map("companies")
 }
 
+
 model User {
   id                  String   @id @default(uuid())
   companyId           String
