@@ -117,6 +117,11 @@ describe('ArticlesService', () => {
       expect(result).toEqual(mockArticle);
       expect(mockedPrisma.article.create).toHaveBeenCalledWith({
         data: { ...data, companyId },
+        include: {
+          parent: { select: { id: true, name: true } },
+          children: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+        },
       });
     });
 
@@ -426,7 +431,7 @@ describe('ArticlesService', () => {
       const articleId = 'article-1';
       const parentId = 'parent-1';
 
-      // Мокируем getById для update
+      // Мокируем getById (вызывается в update) - возвращает полную статью с include
       mockedPrisma.article.findFirst
         .mockResolvedValueOnce({
           id: articleId,
@@ -434,19 +439,28 @@ describe('ArticlesService', () => {
           companyId,
           type: 'income',
           parentId: null,
+          isActive: true,
+          parent: null,
+          children: [],
+          counterparty: null,
         })
+        // Мокируем проверку родителя в validateArticleHierarchy
         .mockResolvedValueOnce({
           id: parentId,
           name: 'Parent',
           companyId,
           type: 'income',
           isActive: true,
+        })
+        // Мокируем получение текущей статьи в checkForCycle
+        .mockResolvedValueOnce({
+          id: articleId,
+          parentId: null,
         });
 
       // Мокируем проверку циклов - parent является потомком article
-      mockedPrisma.article.findMany
-        .mockResolvedValueOnce([{ id: parentId }]) // Дети article-1 включают parent-1
-        .mockResolvedValueOnce([]); // Дети parent-1
+      // checkDescendants начинает с articleId и проверяет всех его потомков
+      mockedPrisma.article.findMany.mockResolvedValueOnce([{ id: parentId }]); // Дети article-1 включают parent-1 - цикл обнаружен!
 
       await expect(
         articlesService.update(articleId, companyId, { parentId })
@@ -520,6 +534,8 @@ describe('ArticlesService', () => {
           companyId,
           type: 'income',
           parentId: null,
+          parent: null,
+          counterparty: null,
         },
         {
           id: 'article-2',
@@ -527,6 +543,8 @@ describe('ArticlesService', () => {
           companyId,
           type: 'income',
           parentId: 'article-1',
+          parent: { id: 'article-1', name: 'Parent' },
+          counterparty: null,
         },
       ];
 
@@ -549,6 +567,8 @@ describe('ArticlesService', () => {
           companyId,
           type: 'income',
           parentId: 'article-1', // Родитель не в списке (отфильтрован)
+          parent: null, // Родитель не найден (отфильтрован)
+          counterparty: null,
         },
       ];
 
