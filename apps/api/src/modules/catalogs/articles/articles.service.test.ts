@@ -39,6 +39,13 @@ describe('ArticlesService', () => {
   beforeEach(() => {
     articlesService = new ArticlesService();
     jest.clearAllMocks();
+    // Сбрасываем все моки, чтобы они не влияли на другие тесты
+    mockedPrisma.article.findMany.mockReset();
+    mockedPrisma.article.findFirst.mockReset();
+    mockedPrisma.article.create.mockReset();
+    mockedPrisma.article.update.mockReset();
+    mockedPrisma.article.updateMany.mockReset();
+    mockedPrisma.article.count.mockReset();
   });
 
   describe('getAll', () => {
@@ -466,6 +473,9 @@ describe('ArticlesService', () => {
       await expect(
         articlesService.update(articleId, companyId, { parentId })
       ).rejects.toThrow('Невозможно создать цикл в иерархии статей');
+
+      // Проверяем, что update не был вызван (валидация должна была выбросить ошибку)
+      expect(mockedPrisma.article.update).not.toHaveBeenCalled();
     });
 
     it('should allow creating article with valid parent', async () => {

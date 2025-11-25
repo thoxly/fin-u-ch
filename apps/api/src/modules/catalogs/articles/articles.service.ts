@@ -150,12 +150,7 @@ export class ArticlesService {
       }
       visited.add(currentId);
 
-      // Пропускаем статьи из исключаемого пути
-      if (excludePath.has(currentId)) {
-        return false;
-      }
-
-      // Находим все дочерние статьи
+      // Находим все дочерние статьи (даже если currentId в excludePath, нужно проверить его детей)
       const children = await prisma.article.findMany({
         where: {
           parentId: currentId,
