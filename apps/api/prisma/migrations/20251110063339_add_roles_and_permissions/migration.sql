@@ -1,12 +1,7 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `onboardingCompleted` on the `users` table. All the data in the column will be lost.
-
-*/
 -- AlterTable
-ALTER TABLE "users" DROP COLUMN "onboardingCompleted",
-ADD COLUMN     "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
+-- Удаляем onboardingCompleted только если она существует (она уже была удалена в миграции 20251120000000)
+ALTER TABLE "users" DROP COLUMN IF EXISTS "onboardingCompleted";
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
 
 -- CreateTable
 CREATE TABLE "roles" (

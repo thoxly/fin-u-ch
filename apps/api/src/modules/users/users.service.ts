@@ -190,7 +190,6 @@ export class UsersService {
             id: true,
             name: true,
             currencyBase: true,
-            inn: true,
           },
         },
       },

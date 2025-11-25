@@ -41,16 +41,15 @@ import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
-<<<<<<< HEAD
+
 import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
 import { OzonIcon } from '../features/integrations/OzonIcon';
 import {
   useDisconnectOzonIntegrationMutation,
   useGetOzonIntegrationQuery,
 } from '../store/api/integrationsApi';
-=======
+
 import { usePermissions } from '../shared/hooks/usePermissions';
->>>>>>> dev
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -265,7 +264,6 @@ export const OperationsPage = () => {
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
   const { canCreate, canUpdate } = usePermissions();
-
 
   const handleIntegrationUpdate = (integrationId: string, data: any) => {
     setIntegrations((prev) =>
