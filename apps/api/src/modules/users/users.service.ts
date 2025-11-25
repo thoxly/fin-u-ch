@@ -225,21 +225,19 @@ export class UsersService {
     }
 
     return {
-      ...user,
-      companyName: user.company.name,
       id: user.id,
       email: user.email,
-      firstName: userWithCompany.firstName,
-      lastName: userWithCompany.lastName,
+      firstName: user.firstName,
+      lastName: user.lastName,
       companyId: user.companyId,
       isActive: user.isActive,
       createdAt: user.createdAt,
-      companyName: userWithCompany.company.name,
+      companyName: user.company.name,
       company: {
-        id: userWithCompany.company.id,
-        name: userWithCompany.company.name,
-        currencyBase: userWithCompany.company.currencyBase,
-        inn: userWithCompany.company.inn,
+        id: user.company.id,
+        name: user.company.name,
+        currencyBase: user.company.currencyBase,
+        inn: user.company.inn,
       },
     };
   }
@@ -514,66 +512,6 @@ export class UsersService {
     }
 
     // Обновляем пользователя в транзакции с проверкой companyId для предотвращения утечки данных
-    const updatedUser = await prisma.$transaction(async (tx) => {
-      // Используем updateMany для безопасной фильтрации по companyId
-      const updateResult = await tx.user.updateMany({
-        where: {
-          id: userId,
-          companyId: companyId,
-        },
-        data: {
-          ...(data.firstName !== undefined && { firstName: data.firstName }),
-          ...(data.lastName !== undefined && { lastName: data.lastName }),
-        },
-      });
-
-      if (updateResult.count === 0) {
-        throw new AppError('User not found or access denied', 404);
-      }
-
-      // Получаем обновленного пользователя
-      const updatedUser = await tx.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          companyId: true,
-          isActive: true,
-          isSuperAdmin: true,
-          company: {
-            select: {
-              id: true,
-              name: true,
-              currencyBase: true,
-            },
-          },
-        },
-      });
-
-      return updatedUser;
-    });
-
-    return {
-      ...updatedUser,
-      companyName: updatedUser.company.name,
-    };
-  }
-
-  async getPreferences(userId: string, companyId: string) {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: userId,
-        companyId: companyId,
-      },
-      select: {
-        preferences: true,
-      },
-    });
-
-    if (!user) {
-      throw new AppError('User not found or access denied', 404);
     // Полагаемся на уникальное ограничение базы данных для предотвращения race condition.
     try {
       const updatedUser = await prisma.$transaction(async (tx) => {
@@ -666,9 +604,8 @@ export class UsersService {
         throw error;
       }
       handleUniqueConstraintError(error, 'email', 'Email already in use');
+      throw error; // Re-throw after handling
     }
-
-    return (user.preferences as Record<string, unknown>) || {};
   }
 
   async updatePreferences(
@@ -699,6 +636,24 @@ export class UsersService {
     });
 
     return (updatedUser.preferences as Record<string, unknown>) || {};
+  }
+
+  async getPreferences(userId: string, companyId: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId: companyId,
+      },
+      select: {
+        preferences: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found or access denied', 404);
+    }
+
+    return (user.preferences as Record<string, unknown>) || {};
   }
 
   async changePassword(

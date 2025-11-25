@@ -345,7 +345,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <Listbox.Options
           static
           className={classNames(
-            'fixed z-[10000] rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-xl focus:outline-none transition-opacity duration-100 overflow-hidden',
+            'fixed z-[9999] rounded-lg bg-white dark:bg-zinc-900 border border-gray-300 dark:border-zinc-700 shadow-xl focus:outline-none transition-opacity duration-100 overflow-hidden',
             position.openUpward ? 'mb-1' : 'mt-1',
             !isPositioned && 'opacity-0' // Скрываем до расчета позиции
           )}

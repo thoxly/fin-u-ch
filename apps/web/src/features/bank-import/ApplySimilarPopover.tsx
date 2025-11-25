@@ -417,9 +417,9 @@ export const ApplySimilarPopover = ({
                                   </div>
                                 </div>
                                 <div className="flex-shrink-0 text-right">
-                                  <div className="text-blue-600 dark:text-blue-400 font-medium">
+                                  {/* <div className="text-blue-600 dark:text-blue-400 font-medium">
                                     {Math.round(comparison.similarity.score)}%
-                                  </div>
+                                  </div> */}
                                   {comparison.similarity.requiresReview && (
                                     <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                                       ⚠ Проверка

@@ -14,6 +14,21 @@ export const IMPORT_SESSION_STATUS = {
 } as const;
 
 /**
+ * Transforms Prisma ImportedOperation with relations to match frontend format
+ */
+function transformImportedOperation(op: any): any {
+  const { article, counterparty, account, deal, department, ...rest } = op;
+  return {
+    ...rest,
+    matchedArticle: article,
+    matchedCounterparty: counterparty,
+    matchedAccount: account,
+    matchedDeal: deal,
+    matchedDepartment: department,
+  };
+}
+
+/**
  * Service for managing import sessions
  */
 export class SessionService {
@@ -34,7 +49,7 @@ export class SessionService {
         fileName,
         status: IMPORT_SESSION_STATUS.DRAFT,
         importedCount,
-        companyAccountNumber,
+        ...(companyAccountNumber !== undefined && { companyAccountNumber }),
       },
     });
   }
@@ -170,15 +185,7 @@ export class SessionService {
     companyId: string,
     filters?: ImportFilters
   ): Promise<{
-    operations: Prisma.ImportedOperationGetPayload<{
-      include: {
-        matchedArticle: { select: { id: true; name: true } };
-        matchedCounterparty: { select: { id: true; name: true } };
-        matchedAccount: { select: { id: true; name: true } };
-        matchedDeal: { select: { id: true; name: true } };
-        matchedDepartment: { select: { id: true; name: true } };
-      };
-    }>[];
+    operations: ReturnType<typeof transformImportedOperation>[];
     total: number;
     confirmed: number;
     unmatched: number;
@@ -219,18 +226,14 @@ export class SessionService {
       prisma.importedOperation.findMany({
         where,
         include: {
-          matchedArticle: { select: { id: true, name: true } },
-          matchedCounterparty: { select: { id: true, name: true } },
-          matchedAccount: { select: { id: true, name: true } },
-          matchedDeal: { select: { id: true, name: true } },
-          matchedDepartment: { select: { id: true, name: true } },
-        },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          account: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+        } as any,
         take: filters?.limit || 20,
         skip: filters?.offset || 0,
-        orderBy: [
-          { matchedBy: 'asc' }, // NULL значения (несопоставленные) будут первыми
-          { date: 'desc' },
-        ],
       }),
       prisma.importedOperation.count({ where }),
     ]);
@@ -249,7 +252,7 @@ export class SessionService {
     });
 
     return {
-      operations,
+      operations: operations.map(transformImportedOperation),
       total,
       confirmed: confirmedCount,
       unmatched: unmatchedCount,
@@ -266,15 +269,7 @@ export class SessionService {
     sessionId: string,
     companyId: string
   ): Promise<{
-    operations: Prisma.ImportedOperationGetPayload<{
-      include: {
-        matchedArticle: { select: { id: true; name: true } };
-        matchedCounterparty: { select: { id: true; name: true } };
-        matchedAccount: { select: { id: true; name: true } };
-        matchedDeal: { select: { id: true; name: true } };
-        matchedDepartment: { select: { id: true; name: true } };
-      };
-    }>[];
+    operations: ReturnType<typeof transformImportedOperation>[];
   }> {
     // Проверяем, что сессия принадлежит компании
     await this.getSession(sessionId, companyId);
@@ -287,16 +282,16 @@ export class SessionService {
         processed: false, // Только необработанные операции
       },
       include: {
-        matchedArticle: { select: { id: true, name: true } },
-        matchedCounterparty: { select: { id: true, name: true } },
-        matchedAccount: { select: { id: true, name: true } },
-        matchedDeal: { select: { id: true, name: true } },
-        matchedDepartment: { select: { id: true, name: true } },
+        article: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
+        deal: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
       },
       orderBy: { date: 'desc' },
     });
 
-    return { operations };
+    return { operations: operations.map(transformImportedOperation) };
   }
 
   /**
@@ -316,17 +311,7 @@ export class SessionService {
       confirmed?: boolean;
       direction?: 'income' | 'expense' | 'transfer';
     }
-  ): Promise<
-    Prisma.ImportedOperationGetPayload<{
-      include: {
-        matchedArticle: { select: { id: true; name: true } };
-        matchedCounterparty: { select: { id: true; name: true } };
-        matchedAccount: { select: { id: true; name: true } };
-        matchedDeal: { select: { id: true; name: true } };
-        matchedDepartment: { select: { id: true; name: true } };
-      };
-    }>
-  > {
+  ): Promise<ReturnType<typeof transformImportedOperation>> {
     const operation = await prisma.importedOperation.findFirst({
       where: { id, companyId },
     });
@@ -338,33 +323,38 @@ export class SessionService {
     const updateData: Prisma.ImportedOperationUpdateInput = {};
 
     if (data.matchedArticleId !== undefined) {
-      updateData.matchedArticle = data.matchedArticleId
+      updateData.article = data.matchedArticleId
         ? { connect: { id: data.matchedArticleId } }
         : { disconnect: true };
+      updateData.matchedArticleId = data.matchedArticleId;
     }
 
     if (data.matchedCounterpartyId !== undefined) {
-      updateData.matchedCounterparty = data.matchedCounterpartyId
+      updateData.counterparty = data.matchedCounterpartyId
         ? { connect: { id: data.matchedCounterpartyId } }
         : { disconnect: true };
+      updateData.matchedCounterpartyId = data.matchedCounterpartyId;
     }
 
     if (data.matchedAccountId !== undefined) {
-      updateData.matchedAccount = data.matchedAccountId
+      updateData.account = data.matchedAccountId
         ? { connect: { id: data.matchedAccountId } }
         : { disconnect: true };
+      updateData.matchedAccountId = data.matchedAccountId;
     }
 
     if (data.matchedDealId !== undefined) {
-      updateData.matchedDeal = data.matchedDealId
+      updateData.deal = data.matchedDealId
         ? { connect: { id: data.matchedDealId } }
         : { disconnect: true };
+      updateData.matchedDealId = data.matchedDealId;
     }
 
     if (data.matchedDepartmentId !== undefined) {
-      updateData.matchedDepartment = data.matchedDepartmentId
+      updateData.department = data.matchedDepartmentId
         ? { connect: { id: data.matchedDepartmentId } }
         : { disconnect: true };
+      updateData.matchedDepartmentId = data.matchedDepartmentId;
     }
 
     if (data.currency !== undefined) {
@@ -388,11 +378,11 @@ export class SessionService {
       where: { id, companyId },
       data: updateData,
       include: {
-        matchedArticle: { select: { id: true, name: true } },
-        matchedCounterparty: { select: { id: true, name: true } },
-        matchedAccount: { select: { id: true, name: true } },
-        matchedDeal: { select: { id: true, name: true } },
-        matchedDepartment: { select: { id: true, name: true } },
+        article: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
+        deal: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
       },
     });
 
@@ -412,34 +402,34 @@ export class SessionService {
         where: { id, companyId },
         data: { matchedBy: 'manual' },
         include: {
-          matchedArticle: { select: { id: true, name: true } },
-          matchedCounterparty: { select: { id: true, name: true } },
-          matchedAccount: { select: { id: true, name: true } },
-          matchedDeal: { select: { id: true, name: true } },
-          matchedDepartment: { select: { id: true, name: true } },
-        },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          account: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+        } as any,
       });
     } else if (!isFullyMatched && updatedOperation.matchedBy) {
       finalOperation = await prisma.importedOperation.update({
         where: { id, companyId },
         data: {
           matchedBy: null,
-          matchedRule: { disconnect: true },
+          matchedRuleId: null,
         },
         include: {
-          matchedArticle: { select: { id: true, name: true } },
-          matchedCounterparty: { select: { id: true, name: true } },
-          matchedAccount: { select: { id: true, name: true } },
-          matchedDeal: { select: { id: true, name: true } },
-          matchedDepartment: { select: { id: true, name: true } },
-        },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          account: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+        } as any,
       });
     }
 
     // Обновляем счетчики сессии
     await this.updateSessionCounters(finalOperation.importSessionId, companyId);
 
-    return finalOperation;
+    return transformImportedOperation(finalOperation);
   }
 
   /**
@@ -526,9 +516,10 @@ export class SessionService {
         data.matchedArticleId !== undefined &&
         !lockedFields.includes('matchedArticleId')
       ) {
-        updateData.matchedArticle = data.matchedArticleId
+        updateData.article = data.matchedArticleId
           ? { connect: { id: data.matchedArticleId } }
           : { disconnect: true };
+        updateData.matchedArticleId = data.matchedArticleId;
         updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
       }
 
@@ -536,9 +527,10 @@ export class SessionService {
         data.matchedCounterpartyId !== undefined &&
         !lockedFields.includes('matchedCounterpartyId')
       ) {
-        updateData.matchedCounterparty = data.matchedCounterpartyId
+        updateData.counterparty = data.matchedCounterpartyId
           ? { connect: { id: data.matchedCounterpartyId } }
           : { disconnect: true };
+        updateData.matchedCounterpartyId = data.matchedCounterpartyId;
         if (!updateData.matchedBy) {
           updateData.matchedBy = data.matchedCounterpartyId ? 'manual' : null;
         }
@@ -548,27 +540,30 @@ export class SessionService {
         data.matchedAccountId !== undefined &&
         !lockedFields.includes('matchedAccountId')
       ) {
-        updateData.matchedAccount = data.matchedAccountId
+        updateData.account = data.matchedAccountId
           ? { connect: { id: data.matchedAccountId } }
           : { disconnect: true };
+        updateData.matchedAccountId = data.matchedAccountId;
       }
 
       if (
         data.matchedDealId !== undefined &&
         !lockedFields.includes('matchedDealId')
       ) {
-        updateData.matchedDeal = data.matchedDealId
+        updateData.deal = data.matchedDealId
           ? { connect: { id: data.matchedDealId } }
           : { disconnect: true };
+        updateData.matchedDealId = data.matchedDealId;
       }
 
       if (
         data.matchedDepartmentId !== undefined &&
         !lockedFields.includes('matchedDepartmentId')
       ) {
-        updateData.matchedDepartment = data.matchedDepartmentId
+        updateData.department = data.matchedDepartmentId
           ? { connect: { id: data.matchedDepartmentId } }
           : { disconnect: true };
+        updateData.matchedDepartmentId = data.matchedDepartmentId;
       }
 
       if (data.currency !== undefined && !lockedFields.includes('currency')) {

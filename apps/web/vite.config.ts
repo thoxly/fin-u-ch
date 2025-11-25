@@ -20,8 +20,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['@fin-u-ch/shared'],
-    force: false, // Set to true if you need to force re-optimization
-    force: true, // Force re-optimization to pick up new exports
+    force: true, // Force re-optimization to pick up new exports.
     exclude: ['crypto'], // Exclude Node.js crypto module
   },
   build: {

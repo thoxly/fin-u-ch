@@ -7,13 +7,21 @@ import type {
   ImportOperationsRequest,
 } from '@shared/types/imports';
 import type { RootState } from '../store';
-import type { PatchCollection } from '@reduxjs/toolkit';
+// PatchCollection is not exported from @reduxjs/toolkit, using ReturnType instead
 
 interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
+  duplicatesCount?: number;
   fileName: string;
   companyAccountNumber?: string;
+  parseStats?: {
+    documentsStarted: number;
+    documentsFound: number;
+    documentsSkipped: number;
+    documentsInvalid: number;
+    documentTypesFound: string[];
+  };
 }
 
 interface BulkUpdateRequest {
@@ -93,7 +101,6 @@ export const importsApi = apiSlice.injectEndpoints({
       async onQueryStarted(
         { id, data },
         { dispatch, queryFulfilled, getState }
-      ) {
       ): Promise<void> {
         // Функция для проверки, сопоставлена ли операция
         const _checkOperationMatched = (op: ImportedOperation): boolean => {
@@ -145,7 +152,8 @@ export const importsApi = apiSlice.injectEndpoints({
         }
 
         // Обновляем каждый найденный запрос
-        const patchResults: PatchCollection[] = [];
+        const patchResults: Array<{ patches: unknown[]; undo: () => void }> =
+          [];
         cacheKeys.forEach((args) => {
           const patchResult = dispatch(
             importsApi.util.updateQueryData(
@@ -251,7 +259,6 @@ export const importsApi = apiSlice.injectEndpoints({
           patchResults.forEach((patchResult) => patchResult.undo());
         }
       },
-      // Не инвалидируем теги, чтобы не вызывать перезапрос всего списка
       // НЕ инвалидируем теги - используем оптимистичные обновления выше
       // invalidatesTags: ['Import'],
     }),
@@ -314,7 +321,7 @@ export const importsApi = apiSlice.injectEndpoints({
     >({
       query: (params) => ({
         url: '/imports/rules',
-        params,
+        params: params || {},
       }),
       providesTags: ['MappingRule'],
     }),
@@ -371,7 +378,7 @@ export const importsApi = apiSlice.injectEndpoints({
     >({
       query: (params) => ({
         url: '/imports/sessions',
-        params,
+        params: params || {},
       }),
       providesTags: ['Import'],
     }),

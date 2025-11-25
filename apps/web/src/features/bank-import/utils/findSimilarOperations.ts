@@ -1,8 +1,22 @@
 import type { ImportedOperation } from '@shared/types/imports';
 import {
   findSimilarOperations as findSimilarOperationsShared,
-  type OperationComparison,
+  extractTags,
 } from '@fin-u-ch/shared';
+
+export interface OperationComparison {
+  similarity: {
+    score: number;
+    matchReasons: string[];
+    requiresReview: boolean;
+    directionHint?: 'income' | 'expense' | null;
+  };
+  descriptionScore: number;
+  counterpartyScore: number;
+  innScore: number;
+  amountScore: number;
+  directionScore: number;
+}
 
 /**
  * Результат поиска похожих операций с дополнительной информацией
@@ -12,23 +26,20 @@ export interface SimilarOperationResult {
   comparison: OperationComparison;
 }
 
-// Re-export для удобства
-export type { OperationComparison };
-
 /**
  * Функция для определения похожих операций
- * Использует улучшенный алгоритм из shared пакета
- * Фильтрует операции с заблокированными полями и требующие проверки
+ * Использует новый алгоритм на основе тегов
  */
 export const findSimilarOperations = (
   targetOperation: ImportedOperation,
   allOperations: ImportedOperation[],
-  companyInn?: string | null,
-  minScore: number = 40,
+  _companyInn?: string | null, // ИНН компании больше не используется для поиска похожих
+  _minScore: number = 40, // minScore больше не используется
   fieldToUpdate?: string // Поле, которое будет обновляться
 ): SimilarOperationResult[] => {
-  // Преобразуем ImportedOperation в ParsedDocument для сравнения
+  // Преобразуем ImportedOperation в формат, понятный shared функции
   const targetDoc = {
+    id: targetOperation.id,
     date: new Date(targetOperation.date),
     amount: targetOperation.amount,
     payer: targetOperation.payer || undefined,
@@ -38,6 +49,15 @@ export const findSimilarOperations = (
     purpose: targetOperation.description || undefined,
     direction: targetOperation.direction || undefined,
   };
+
+  // Получаем теги для целевой операции
+  const targetTags = extractTags(targetDoc);
+  const primaryTag = targetTags[0];
+
+  // Если тег 'other', то похожих не ищем
+  if (primaryTag === 'other') {
+    return [];
+  }
 
   // Фильтруем операции (исключаем обработанные, саму операцию и с заблокированными полями)
   const candidateOperations = allOperations.filter((op) => {
@@ -74,8 +94,9 @@ export const findSimilarOperations = (
     return true;
   });
 
-  // Используем shared функцию для поиска похожих
+  // Преобразуем кандидатов
   const candidateDocs = candidateOperations.map((op) => ({
+    id: op.id,
     date: new Date(op.date),
     amount: op.amount,
     payer: op.payer || undefined,
@@ -86,40 +107,40 @@ export const findSimilarOperations = (
     direction: op.direction || undefined,
   }));
 
-  const results = findSimilarOperationsShared(
-    targetDoc,
-    candidateDocs,
-    companyInn,
-    minScore
-  );
+  // Ищем похожие через shared функцию
+  // Она возвращает массив похожих операций (ParsedDocument[])
+  const similarDocs = findSimilarOperationsShared(targetDoc, candidateDocs);
 
-  // Создаем мапу для быстрого поиска операций по индексу
-  const resultsWithOperations: SimilarOperationResult[] = [];
-  for (const result of results) {
-    // Находим соответствующую операцию по индексу в candidateDocs
-    const docIndex = candidateDocs.findIndex(
-      (doc) =>
-        doc.purpose === result.operation.purpose &&
-        doc.amount === result.operation.amount &&
-        Math.abs(
-          new Date(doc.date).getTime() -
-            new Date(result.operation.date).getTime()
-        ) < 1000
-    );
-    if (docIndex >= 0) {
-      // Показываем все похожие операции, даже с разным направлением
-      // Пользователь должен иметь возможность сам решить, применять ли сопоставление
-      // Предупреждение о разном направлении уже включено в requiresReview
-      const comparison = result.comparison;
+  // Собираем результаты
+  const results: SimilarOperationResult[] = [];
 
-      resultsWithOperations.push({
-        operation: candidateOperations[docIndex],
-        comparison: comparison,
+  // Создаем мапу id -> ImportedOperation для быстрого доступа
+  const operationsMap = new Map(candidateOperations.map((op) => [op.id, op]));
+
+  for (const doc of similarDocs) {
+    // @ts-expect-error: doc имеет id, так как мы его передавали
+    const op = operationsMap.get(doc.id);
+    if (op) {
+      results.push({
+        operation: op,
+        comparison: {
+          similarity: {
+            score: 100, // В новой логике совпадение тега = 100% (условно)
+            matchReasons: [`Тег: ${primaryTag}`],
+            requiresReview: false, // Теговая логика считается надежной
+            directionHint: null,
+          },
+          descriptionScore: 100,
+          counterpartyScore: 0,
+          innScore: 0,
+          amountScore: 0,
+          directionScore: 0,
+        },
       });
     }
   }
 
-  return resultsWithOperations;
+  return results;
 };
 
 /**

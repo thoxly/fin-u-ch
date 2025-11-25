@@ -4,7 +4,6 @@
  * См. ТЗ: раздел "Тестирование" → "E2E тесты (Playwright)"
  * Тесты должны покрывать: загрузку файла, редактирование маппинга, импорт операций
  */
-import { useState } from 'react';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -16,6 +15,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -27,6 +28,10 @@ import {
   useImportOperationsMutation,
   useUpdateImportedOperationMutation,
 } from '../../store/api/importsApi';
+import { findSimilarOperations } from './utils/findSimilarOperations';
+import { useUndoManager } from './hooks/useUndoManager';
+import { ApplySimilarPopover } from './ApplySimilarPopover';
+import { UndoToast } from '../../shared/ui/UndoToast';
 import {
   useGetArticlesQuery,
   useGetAccountsQuery,
@@ -48,6 +53,7 @@ interface ImportMappingTableProps {
   sessionId: string;
   companyAccountNumber?: string | null;
   onClose: () => void;
+  onImportSuccess?: () => void;
   isCollapsed?: boolean;
   onCollapseChange?: (collapsed: boolean) => void;
 }
@@ -73,6 +79,7 @@ export const ImportMappingTable = ({
   sessionId,
   companyAccountNumber,
   onClose,
+  onImportSuccess,
   isCollapsed = false,
   onCollapseChange,
 }: ImportMappingTableProps) => {
@@ -113,8 +120,6 @@ export const ImportMappingTable = ({
     operation: null,
   });
 
-  const limit = 20;
-
   // Состояние для попо вера применения к похожим операциям
   const [similarPopover, setSimilarPopover] = useState<{
     isOpen: boolean;
@@ -149,8 +154,6 @@ export const ImportMappingTable = ({
 
   const limit = 20;
 
-  const [getAllOperations] = useLazyGetAllImportedOperationsQuery();
-
   const { data, refetch } = useGetImportedOperationsQuery({
     sessionId,
     limit,
@@ -169,25 +172,6 @@ export const ImportMappingTable = ({
   const [updateImportedOperation] = useUpdateImportedOperationMutation();
   const { showSuccess, showError } = useNotification();
 
-  const operations = data?.operations || [];
-  const total = data?.total || 0;
-  const unmatchedCount = data?.unmatched || 0;
-
-  // Функция для открытия модалки создания
-  const handleOpenCreateModal = (
-    field:
-      | 'counterparty'
-      | 'article'
-      | 'account'
-      | 'deal'
-      | 'department'
-      | 'currency',
-    operation: ImportedOperation
-  ) => {
-    setCreateModal({
-      isOpen: true,
-      field,
-      operation,
   // Автовыбор счета на основе companyAccountNumber из файла
   const [autoAccountApplied, setAutoAccountApplied] = useState(false);
   useEffect(() => {
@@ -557,8 +541,9 @@ export const ImportMappingTable = ({
       }
 
       // Получаем ВСЕ операции сессии для поиска похожих
-      const response = await getAllOperations({ sessionId }).unwrap();
-      const allOperations = response.operations || [];
+      // Используем refetch с большим лимитом для получения всех операций
+      const response = await refetch();
+      const allOperations = response.data?.operations || data?.operations || [];
 
       console.log('🔍 Поиск похожих операций для:', {
         operationId: operation.id,
@@ -579,11 +564,21 @@ export const ImportMappingTable = ({
       console.log(
         '✅ Найдено похожих операций:',
         similar.length,
-        similar.map((s) => ({
-          id: 'operation' in s ? s.operation.id : s.id,
+        similar.map((s: unknown) => ({
+          id:
+            'operation' in (s as object)
+              ? (s as { operation: { id: string } }).operation.id
+              : (s as { id: string }).id,
           description:
-            'operation' in s ? s.operation.description : s.description,
-          score: 'comparison' in s ? s.comparison.similarity.score : 'N/A',
+            'operation' in (s as object)
+              ? (s as { operation: { description: string } }).operation
+                  .description
+              : (s as { description: string }).description,
+          score:
+            'comparison' in (s as object)
+              ? (s as { comparison: { similarity: { score: number } } })
+                  .comparison.similarity.score
+              : 'N/A',
         }))
       );
 
@@ -835,23 +830,7 @@ export const ImportMappingTable = ({
     return null;
   };
 
-  // Проверяем, все ли операции сопоставлены
-  const checkOperationMatched = (op: ImportedOperation): boolean => {
-    if (!op.direction) return false;
-
-    const currency = op.currency || 'RUB';
-    const hasRequiredFields = !!(
-      op.matchedArticleId &&
-      op.matchedAccountId &&
-      currency
-    );
-
-    if (op.direction === 'transfer') {
-      return hasRequiredFields && !!(op.payerAccount && op.receiverAccount);
-    }
-    return hasRequiredFields;
-  };
-
+  // checkOperationMatched определена выше, используем её
   const isAllMatched = operations.every(checkOperationMatched);
   const selectedOperations = operations.filter((op) =>
     selectedIds.includes(op.id)
@@ -949,7 +928,12 @@ export const ImportMappingTable = ({
       // refetch нужен здесь, т.к. меняется статус processed
       refetch();
       if (result.errors === 0) {
-        onClose();
+        if (onImportSuccess) {
+          onImportSuccess();
+        } else {
+          // Fallback: просто закрываем текущий экран
+          onClose();
+        }
       }
     } catch (error) {
       showError('Ошибка при импорте операций');
@@ -1069,7 +1053,6 @@ export const ImportMappingTable = ({
     },
     {
       key: 'direction',
-      header: 'Тип операции',
       header: (
         <button
           onClick={() => handleSort('direction')}
@@ -1090,7 +1073,10 @@ export const ImportMappingTable = ({
           field="direction"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '120px',
@@ -1111,14 +1097,16 @@ export const ImportMappingTable = ({
           field="counterparty"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '180px',
     },
     {
       key: 'article',
-      header: 'Статья',
       header: (
         <button
           onClick={() => handleSort('article')}
@@ -1139,14 +1127,16 @@ export const ImportMappingTable = ({
           field="article"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '180px',
     },
     {
       key: 'account',
-      header: 'Счет',
       header: (
         <button
           onClick={() => handleSort('account')}
@@ -1167,7 +1157,10 @@ export const ImportMappingTable = ({
           field="account"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '150px',
@@ -1188,7 +1181,10 @@ export const ImportMappingTable = ({
           field="deal"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '150px',
@@ -1209,14 +1205,16 @@ export const ImportMappingTable = ({
           field="department"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '150px',
     },
     {
       key: 'currency',
-      header: 'Валюта',
       header: (
         <button
           onClick={() => handleSort('currency')}
@@ -1237,7 +1235,10 @@ export const ImportMappingTable = ({
           field="currency"
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          onRegisterChange={registerChange}
           disabled={op.processed}
+          isModalOpen={createModal.isOpen}
         />
       ),
       width: '100px',
@@ -1323,9 +1324,8 @@ export const ImportMappingTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Заголовок с кнопкой сворачивания */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Импортированные операции</h2>
+      {/* Кнопки управления */}
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           {onCollapseChange && (
             <button
@@ -1360,10 +1360,8 @@ export const ImportMappingTable = ({
         <div className="flex items-center gap-2">
           <Select
             value={matchedFilter === undefined ? '' : String(matchedFilter)}
-            onChange={(e) =>
-              setMatchedFilter(
-                e.target.value === '' ? undefined : e.target.value === 'true'
-              )
+            onChange={(value) =>
+              setMatchedFilter(value === '' ? undefined : value === 'true')
             }
             options={[
               { value: '', label: 'Все' },
@@ -1381,13 +1379,6 @@ export const ImportMappingTable = ({
           columns={columns}
           data={operations}
           keyExtractor={(op) => op.id}
-          rowClassName={(op) =>
-            op.processed
-              ? 'bg-gray-100 dark:bg-gray-800/50 opacity-60'
-              : !op.confirmed
-                ? 'bg-yellow-50 dark:bg-yellow-900/10'
-                : ''
-          }
           rowClassName={(op) => {
             const classes: string[] = [];
 

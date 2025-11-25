@@ -677,6 +677,9 @@ export async function matchArticle(
           continue;
         }
 
+        // Нормализуем purpose для проверок
+        const purposeLower = purpose?.toLowerCase() || '';
+
         // Специальная проверка: если в тексте есть "т.ч." (в любом виде) и "НДС",
         // то это почти наверняка НДС в составе оплаты, а не налоговый платеж
         const hasTchPattern = /т\.?\s*ч\.?/i.test(purpose);

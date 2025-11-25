@@ -1,4 +1,4 @@
-import { useState, memo } from 'react';
+import { useState, memo, useEffect } from 'react';
 import {
   useGetCounterpartiesQuery,
   useGetArticlesQuery,
@@ -54,6 +54,7 @@ interface ImportMappingRowProps {
     anchorPosition?: { top: number; left: number }
   ) => void;
   disabled?: boolean;
+  isModalOpen?: boolean; // Флаг открытия модалки создания
 }
 
 // Проверяем, является ли поле обязательным
@@ -88,12 +89,20 @@ const ImportMappingRowComponent = ({
   onFieldUpdate,
   onRegisterChange,
   disabled = false,
+  isModalOpen = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [lastClickPosition, setLastClickPosition] = useState<{
     top: number;
     left: number;
   } | null>(null);
+
+  // Закрываем селектор при открытии модалки создания
+  useEffect(() => {
+    if (isModalOpen) {
+      setIsEditing(false);
+    }
+  }, [isModalOpen]);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
@@ -424,7 +433,16 @@ const ImportMappingRowComponent = ({
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:opacity-80'
         }`}
-        onClick={() => !disabled && setIsEditing(true)}
+        onClick={(e) => {
+          if (!disabled) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setLastClickPosition({
+              top: rect.top,
+              left: rect.left,
+            });
+            setIsEditing(true);
+          }
+        }}
         title={
           disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
@@ -449,7 +467,16 @@ const ImportMappingRowComponent = ({
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
         }`}
-        onClick={() => !disabled && setIsEditing(true)}
+        onClick={(e) => {
+          if (!disabled) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setLastClickPosition({
+              top: rect.top,
+              left: rect.left,
+            });
+            setIsEditing(true);
+          }
+        }}
         title={
           disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
@@ -471,7 +498,16 @@ const ImportMappingRowComponent = ({
           ? 'opacity-60 cursor-not-allowed'
           : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
       }`}
-      onClick={() => !disabled && setIsEditing(true)}
+      onClick={(e) => {
+        if (!disabled) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setLastClickPosition({
+            top: rect.top,
+            left: rect.left,
+          });
+          setIsEditing(true);
+        }
+      }}
       title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
     >
       {getDisplayValue()}
@@ -489,6 +525,7 @@ export const ImportMappingRow = memo(
       prevProps.operation.id === nextProps.operation.id &&
       prevProps.field === nextProps.field &&
       prevProps.disabled === nextProps.disabled &&
+      prevProps.isModalOpen === nextProps.isModalOpen &&
       // Сравниваем только те поля операции которые используются в компоненте
       JSON.stringify(
         getRelevantOperationFields(prevProps.operation, prevProps.field)

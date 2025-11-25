@@ -1,230 +1,128 @@
 import {
-  compareOperations,
   determineOperationDirection,
   findSimilarOperations,
+  extractTags,
+  normalizeText,
 } from '../operationSimilarity';
 import type { ParsedDocument } from '../../types/imports';
 
 describe('operationSimilarity', () => {
-  describe('determineOperationDirection', () => {
-    it('должен определить расход по "комиссия за операции"', () => {
-      const operation: ParsedDocument = {
-        date: new Date(),
-        amount: 100,
-        purpose:
-          'Комиссия за операции по терминалам эквайринга от 31.10.2025. Договор 7009738104',
-      };
-
-      const result = determineOperationDirection(operation);
-
-      expect(result.direction).toBe('expense');
-      expect(result.confidence).toBe('medium');
-    });
-
-    it('должен определить приход по "зачисление средств по терминалам"', () => {
-      const operation: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        purpose:
-          'Зачисление средств по терминалам эквайринга от 31.10.2025. Без НДС',
-      };
-
-      const result = determineOperationDirection(operation);
-
-      expect(result.direction).toBe('income');
-      expect(result.confidence).toBe('medium');
-    });
-
-    it('должен различать "комиссия" (расход) и "зачисление" (приход)', () => {
-      const expenseOp: ParsedDocument = {
-        date: new Date(),
-        amount: 50,
-        purpose: 'Комиссия за операции по терминалам эквайринга от 31.10.2025',
-      };
-
-      const incomeOp: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        purpose: 'Зачисление средств по терминалам эквайринга от 31.10.2025',
-      };
-
-      const expenseResult = determineOperationDirection(expenseOp);
-      const incomeResult = determineOperationDirection(incomeOp);
-
-      expect(expenseResult.direction).toBe('expense');
-      expect(incomeResult.direction).toBe('income');
-    });
-
-    it('должен определить направление по ИНН компании', () => {
-      const companyInn = '1234567890';
-      const operation: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        payerInn: companyInn,
-        receiverInn: '9876543210',
-        purpose: 'Оплата услуг',
-      };
-
-      const result = determineOperationDirection(operation, companyInn);
-
-      expect(result.direction).toBe('expense');
-      expect(result.confidence).toBe('high');
+  describe('normalizeText', () => {
+    it('should normalize text correctly', () => {
+      const text = 'Оплата по счету № 123-45 от 01.01.2025 в т.ч. НДС 20%';
+      const normalized = normalizeText(text);
+      expect(normalized).not.toContain('123-45');
+      expect(normalized).not.toContain('01.01.2025');
+      expect(normalized).not.toContain('ндс');
     });
   });
 
-  describe('compareOperations', () => {
-    it('должен находить похожие операции по описанию', () => {
-      const op1: ParsedDocument = {
+  describe('extractTags', () => {
+    it('should extract travel_accommodation tag', () => {
+      const op: ParsedDocument = {
         date: new Date(),
-        amount: 1000,
-        purpose: 'Комиссия за операции по терминалам эквайринга от 31.10.2025',
+        amount: 100,
+        purpose: 'Оплата за проживание в гостинице',
       };
-
-      const op2: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        purpose: 'Комиссия за операции по терминалам эквайринга от 15.11.2025',
-      };
-
-      const comparison = compareOperations(op1, op2);
-
-      expect(comparison.similarity.score).toBeGreaterThan(40);
-      expect(comparison.descriptionScore).toBeGreaterThan(50);
-      expect(comparison.similarity.matchReasons).toContain('описание');
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('travel_accommodation');
     });
 
-    it('должен различать операции с разным направлением', () => {
-      const expenseOp: ParsedDocument = {
+    it('should extract acquiring_fee tag', () => {
+      const op: ParsedDocument = {
         date: new Date(),
-        amount: 50,
-        purpose: 'Комиссия за операции по терминалам эквайринга от 31.10.2025',
-        direction: 'expense',
+        amount: 100,
+        purpose: 'Комиссия за операции по терминалам',
       };
-
-      const incomeOp: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        purpose: 'Зачисление средств по терминалам эквайринга от 31.10.2025',
-        direction: 'income',
-      };
-
-      const comparison = compareOperations(expenseOp, incomeOp);
-
-      // Теперь мы не штрафуем за разное направление - важно содержание операции
-      // directionScore должен быть 0 (нет бонуса, но и нет штрафа)
-      expect(comparison.directionScore).toBe(0);
-      // Операции все еще могут требовать проверки из-за среднего общего балла
-      expect(comparison.similarity.score).toBeGreaterThanOrEqual(0);
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('acquiring_fee');
     });
 
-    it('должен находить похожие операции по ИНН', () => {
-      const op1: ParsedDocument = {
+    it('should return "other" if no tags found', () => {
+      const op: ParsedDocument = {
         date: new Date(),
-        amount: 1000,
-        payerInn: '1234567890',
-        purpose: 'Оплата услуг',
+        amount: 100,
+        purpose: 'Непонятная операция',
       };
-
-      const op2: ParsedDocument = {
-        date: new Date(),
-        amount: 2000,
-        payerInn: '1234567890',
-        purpose: 'Оплата товаров',
-      };
-
-      const comparison = compareOperations(op1, op2);
-
-      expect(comparison.innScore).toBe(100);
-      expect(comparison.similarity.matchReasons).toContain('ИНН');
-    });
-
-    it('должен учитывать контрагента при сравнении', () => {
-      const op1: ParsedDocument = {
-        date: new Date(),
-        amount: 1000,
-        receiver: 'ООО "Поставщик"',
-        purpose: 'Оплата по договору',
-      };
-
-      const op2: ParsedDocument = {
-        date: new Date(),
-        amount: 1500,
-        receiver: 'ООО "Поставщик"',
-        purpose: 'Оплата по договору',
-      };
-
-      const comparison = compareOperations(op1, op2);
-
-      expect(comparison.counterpartyScore).toBeGreaterThan(30);
-      expect(comparison.similarity.matchReasons).toContain('контрагент');
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('other');
     });
   });
 
   describe('findSimilarOperations', () => {
-    it('должен находить похожие операции из списка', () => {
-      const target: ParsedDocument = {
-        date: new Date('2025-10-31'),
-        amount: 1000,
-        purpose: 'Комиссия за операции по терминалам эквайринга',
-      };
+    it('should find operations with same primary tag', () => {
+      const target = {
+        id: '1',
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за проживание',
+      } as ParsedDocument & { id: string };
 
-      const operations: ParsedDocument[] = [
+      const all = [
         {
-          date: new Date('2025-10-31'),
-          amount: 1000,
-          purpose:
-            'Комиссия за операции по терминалам эквайринга от 15.11.2025',
+          id: '2',
+          date: new Date(),
+          amount: 200,
+          purpose: 'Оплата гостиницы', // travel_accommodation
         },
         {
-          date: new Date('2025-11-01'),
-          amount: 500,
-          purpose: 'Зачисление средств по терминалам',
+          id: '3',
+          date: new Date(),
+          amount: 300,
+          purpose: 'Зачисление средств', // acquiring_income
         },
-        {
-          date: new Date('2025-10-30'),
-          amount: 1000,
-          purpose:
-            'Комиссия за операции по терминалам эквайринга от 30.10.2025',
-        },
-      ];
+      ] as (ParsedDocument & { id: string })[];
 
-      const results = findSimilarOperations(target, operations, null, 40);
-
-      expect(results.length).toBeGreaterThan(0);
-      // Должны найти операции с "комиссия", но не с "зачисление"
-      const foundPurposes = results.map((r) => r.operation.purpose);
-      expect(foundPurposes.some((p) => p?.includes('Комиссия'))).toBe(true);
-      expect(foundPurposes.some((p) => p?.includes('Зачисление'))).toBe(false);
+      const similar = findSimilarOperations(target, all) as (ParsedDocument & {
+        id: string;
+      })[];
+      expect(similar.length).toBe(1);
+      expect(similar[0].id).toBe('2');
     });
 
-    it('должен исключать операции с разным направлением', () => {
-      const target: ParsedDocument = {
-        date: new Date('2025-10-31'),
-        amount: 50,
-        purpose: 'Комиссия за операции по терминалам эквайринга',
-        direction: 'expense',
+    it('should not find similar operations if target is "other"', () => {
+      const target = {
+        id: '1',
+        date: new Date(),
+        amount: 100,
+        purpose: 'Непонятное',
+      } as ParsedDocument & { id: string };
+
+      const all = [
+        {
+          id: '2',
+          date: new Date(),
+          amount: 200,
+          purpose: 'Тоже непонятное',
+        },
+      ] as (ParsedDocument & { id: string })[];
+
+      const similar = findSimilarOperations(target, all);
+      expect(similar.length).toBe(0);
+    });
+  });
+
+  describe('determineOperationDirection', () => {
+    it('should detect direction by tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Комиссия за операции по терминалам',
       };
+      const result = determineOperationDirection(op);
+      expect(result.direction).toBe('expense');
+    });
 
-      const operations: ParsedDocument[] = [
-        {
-          date: new Date('2025-10-31'),
-          amount: 50,
-          purpose: 'Комиссия за операции по терминалам эквайринга',
-          direction: 'expense',
-        },
-        {
-          date: new Date('2025-11-01'),
-          amount: 1000,
-          purpose: 'Зачисление средств по терминалам эквайринга',
-          direction: 'income',
-        },
-      ];
-
-      const results = findSimilarOperations(target, operations, null, 40);
-
-      // Должна найти только операцию с тем же направлением
-      expect(results.length).toBe(1);
-      expect(results[0].operation.direction).toBe('expense');
+    it('should detect direction by INN', () => {
+      const companyInn = '111';
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        payerInn: '111',
+        receiverInn: '222',
+      };
+      const result = determineOperationDirection(op, companyInn);
+      expect(result.direction).toBe('expense');
     });
   });
 });

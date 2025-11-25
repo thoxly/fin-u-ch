@@ -19,6 +19,22 @@ import sessionService from './services/session.service';
 import mappingRulesService from './services/mapping-rules.service';
 import operationImportService from './services/operation-import.service';
 import { BatchProcessor } from './utils/batch-processor';
+import { Prisma } from '@prisma/client';
+
+/**
+ * Transforms Prisma ImportedOperation with relations to match frontend format
+ */
+function transformImportedOperation(op: any): any {
+  const { article, counterparty, account, deal, department, ...rest } = op;
+  return {
+    ...rest,
+    matchedArticle: article,
+    matchedCounterparty: counterparty,
+    matchedAccount: account,
+    matchedDeal: deal,
+    matchedDepartment: department,
+  };
+}
 
 /**
  * TODO: Написать integration тесты для всех endpoints
@@ -62,10 +78,11 @@ export class ImportsService {
     });
 
     // Проверка дубликатов по хэшу (быстрая проверка)
-    const { duplicatesCount } = await this.checkDuplicatesByHash(
-      companyId,
-      documents
-    );
+    const { duplicatesCount } =
+      await duplicateDetectionService.checkDuplicatesByHash(
+        companyId,
+        documents
+      );
 
     // Создаем сессию импорта
     const importSession = await sessionService.createSession(
@@ -137,13 +154,15 @@ export class ImportsService {
         preview: filePreview.substring(0, 200),
       });
 
-      parsedFile = parseClientBankExchange(fileBuffer);
+      const parsedFile = parseClientBankExchange(fileBuffer);
 
       logger.info('File parsed successfully', {
         fileName,
         documentsCount: parsedFile.documents.length,
         companyAccountNumber: parsedFile.companyAccountNumber,
       });
+
+      return parsedFile;
     } catch (error: any) {
       // Логируем ошибку парсинга с деталями
       logger.error('File parsing failed', {
@@ -162,44 +181,29 @@ export class ImportsService {
         400
       );
     }
+  }
 
-    const documents = parsedFile.documents;
-    const companyAccountNumber = parsedFile.companyAccountNumber;
-
-    // Валидация количества операций (максимум 1000)
-    if (documents.length > 1000) {
-      throw new AppError('File contains more than 1000 operations', 400);
-    }
-
-    // Если документов нет, но ошибка не была выброшена парсером,
-    // значит файл корректный, но пустой
-    if (documents.length === 0) {
-      throw new AppError(
-        'File contains no valid operations. Please check that the file contains payment orders (Платежное поручение) with required fields (Дата, Сумма).',
-        400
-      );
-    }
-
-    // Получаем ИНН компании
+  /**
+   * Создает импортированные операции из документов
+   */
+  private async createImportedOperations(
+    sessionId: string,
+    companyId: string,
+    documents: ParsedDocument[],
+    companyInn: string | null,
+    companyAccountNumber?: string
+  ) {
+    // Получаем информацию о компании
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { inn: true },
     });
 
-    // Создаем сессию импорта
-    const session = await prisma.importSession.create({
-      data: {
-        companyId,
-        userId,
-        fileName,
-        status: 'draft',
-        importedCount: documents.length,
-      },
-    });
-
     // Применяем автосопоставление и создаем черновики операций
     // Используем батчинг для больших файлов (по 100 операций за раз)
-    const importedOperations = [];
+    const importedOperations: Prisma.ImportedOperationGetPayload<
+      Record<string, never>
+    >[] = [];
     const BATCH_SIZE = 100;
     const batches = [];
 
@@ -218,7 +222,7 @@ export class ImportsService {
               const matchingResult = await autoMatch(
                 companyId,
                 doc,
-                company?.inn || null,
+                company?.inn || companyInn || null,
                 companyAccountNumber
               );
 
@@ -232,7 +236,7 @@ export class ImportsService {
 
               // Создаем черновик операции
               const operationData = {
-                importSessionId: session.id,
+                importSessionId: sessionId,
                 companyId,
                 date: doc.date,
                 number: doc.number,
@@ -267,8 +271,7 @@ export class ImportsService {
             } catch (error: any) {
               // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
               logger.error('Failed to process document during import', {
-                fileName,
-                sessionId: session.id,
+                sessionId,
                 document: {
                   date: doc.date,
                   amount: doc.amount,
@@ -284,8 +287,7 @@ export class ImportsService {
       } catch (error: any) {
         // Логируем ошибку батча, но продолжаем обработку следующих батчей
         logger.error('Failed to process batch during import', {
-          fileName,
-          sessionId: session.id,
+          sessionId,
           batchSize: batch.length,
           error: error?.message || String(error),
           stack: error?.stack,
@@ -293,11 +295,7 @@ export class ImportsService {
       }
     }
 
-    return {
-      sessionId: session.id,
-      importedCount: importedOperations.length,
-      fileName: session.fileName,
-    };
+    return importedOperations;
   }
 
   /**
@@ -338,15 +336,14 @@ export class ImportsService {
       prisma.importedOperation.findMany({
         where,
         include: {
-          matchedArticle: { select: { id: true, name: true } },
-          matchedCounterparty: { select: { id: true, name: true } },
-          matchedAccount: { select: { id: true, name: true } },
-          matchedDeal: { select: { id: true, name: true } },
-          matchedDepartment: { select: { id: true, name: true } },
-        },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          account: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+        } as any,
         take: filters?.limit || 20,
         skip: filters?.offset || 0,
-        orderBy: { date: 'desc' },
       }),
       prisma.importedOperation.count({ where }),
     ]);
@@ -360,7 +357,7 @@ export class ImportsService {
     });
 
     return {
-      operations,
+      operations: operations.map(transformImportedOperation),
       total,
       confirmed: confirmedCount,
       unmatched: unmatchedCount,
@@ -436,12 +433,12 @@ export class ImportsService {
       where: { id },
       data: updateData,
       include: {
-        matchedArticle: { select: { id: true, name: true } },
-        matchedCounterparty: { select: { id: true, name: true } },
-        matchedAccount: { select: { id: true, name: true } },
-        matchedDeal: { select: { id: true, name: true } },
-        matchedDepartment: { select: { id: true, name: true } },
-      },
+        article: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
+        deal: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+      } as any,
     });
 
     // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
@@ -461,14 +458,14 @@ export class ImportsService {
           where: { id },
           data: { matchedBy: 'manual' },
           include: {
-            matchedArticle: { select: { id: true, name: true } },
-            matchedCounterparty: { select: { id: true, name: true } },
-            matchedAccount: { select: { id: true, name: true } },
-            matchedDeal: { select: { id: true, name: true } },
-            matchedDepartment: { select: { id: true, name: true } },
-          },
+            article: { select: { id: true, name: true } },
+            counterparty: { select: { id: true, name: true } },
+            account: { select: { id: true, name: true } },
+            deal: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+          } as any,
         });
-        return finalOperation;
+        return transformImportedOperation(finalOperation);
       }
     } else {
       // Если операция не полностью сопоставлена, сбрасываем matchedBy
@@ -477,18 +474,18 @@ export class ImportsService {
           where: { id },
           data: { matchedBy: null, matchedRuleId: null },
           include: {
-            matchedArticle: { select: { id: true, name: true } },
-            matchedCounterparty: { select: { id: true, name: true } },
-            matchedAccount: { select: { id: true, name: true } },
-            matchedDeal: { select: { id: true, name: true } },
-            matchedDepartment: { select: { id: true, name: true } },
-          },
+            article: { select: { id: true, name: true } },
+            counterparty: { select: { id: true, name: true } },
+            account: { select: { id: true, name: true } },
+            deal: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+          } as any,
         });
-        return finalOperation;
+        return transformImportedOperation(finalOperation);
       }
     }
 
-    return updatedOperation;
+    return transformImportedOperation(updatedOperation);
   }
 
   /**
@@ -830,8 +827,15 @@ export class ImportsService {
                 operationData.departmentId = op.matchedDepartmentId;
               }
 
-              // Создаем операцию через сервис
-              await operationsService.create(companyId, operationData);
+              // Создаем операцию через prisma напрямую
+              await tx.operation.create({
+                data: {
+                  ...operationData,
+                  companyId,
+                  isTemplate: false,
+                  isConfirmed: true,
+                },
+              });
 
               // Помечаем как обработанную
               await tx.importedOperation.update({
