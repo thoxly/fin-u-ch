@@ -66,6 +66,15 @@ export class PlanFactService {
         ? params.parentArticleId
         : null;
 
+    // Если указан parentArticleId и level === 'article', получаем данные родительской статьи
+    let parentArticle: { id: string; name: string } | null = null;
+    if (params.parentArticleId && params.level === 'article') {
+      parentArticle = await prisma.article.findFirst({
+        where: { id: params.parentArticleId, companyId },
+        select: { id: true, name: true },
+      });
+    }
+
     for (const planItem of planItems) {
       const expanded = plansService.expandPlan(
         planItem,
@@ -110,15 +119,6 @@ export class PlanFactService {
         }
         resultMap.get(rowKey)!.plan += amount;
       }
-    }
-
-    // Если указан parentArticleId и level === 'article', получаем данные родительской статьи
-    let parentArticle: { id: string; name: string } | null = null;
-    if (params.parentArticleId && params.level === 'article') {
-      parentArticle = await prisma.article.findFirst({
-        where: { id: params.parentArticleId, companyId },
-        select: { id: true, name: true },
-      });
     }
 
     // Get fact data (только реальные операции, не шаблоны)
