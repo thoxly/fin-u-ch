@@ -7,15 +7,14 @@ import { dirname } from 'path';
 // Determine project root: go up from apps/api/src to project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-// From apps/api/src/server.ts -> apps/api/src -> apps/api -> apps -> root
+
 const projectRoot = path.resolve(__dirname, '../../..');
 const apiRoot = path.resolve(__dirname, '../..');
 
-// Load .env - try root first, then fallback to apps/api
 const rootEnvPath = path.resolve(projectRoot, '.env');
 const apiEnvPath = path.resolve(apiRoot, '.env');
 dotenv.config({ path: rootEnvPath });
-// If DATABASE_URL is still not set, try loading from apps/api
+
 if (!process.env.DATABASE_URL) {
   dotenv.config({ path: apiEnvPath });
 }

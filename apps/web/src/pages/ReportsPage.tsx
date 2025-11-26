@@ -70,6 +70,7 @@ export const ReportsPage = () => {
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
   const [showArticleFilter, setShowArticleFilter] = useState(false);
   const [selectedParentArticleId] = useState<string | null>(null);
+  const [articleSearchQuery, setArticleSearchQuery] = useState<string>('');
   const planButtonRef = useRef<HTMLButtonElement>(null);
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
@@ -450,6 +451,41 @@ export const ReportsPage = () => {
               </div>
             </>
           )}
+
+          {/* Поле поиска статей */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="text"
+                value={articleSearchQuery}
+                onChange={(e) => setArticleSearchQuery(e.target.value)}
+                placeholder="Поиск статьи..."
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              {articleSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setArticleSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Очистить поиск"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </Card>
 
         {/* Контент отчетов */}
@@ -460,6 +496,7 @@ export const ReportsPage = () => {
           reportMode={reportMode}
           selectedBudget={selectedBudget}
           selectedParentArticleId={selectedParentArticleId}
+          articleSearchQuery={articleSearchQuery}
         />
       </div>
     </Layout>
@@ -474,6 +511,7 @@ const CashflowTab = ({
   reportMode,
   selectedBudget,
   selectedParentArticleId,
+  articleSearchQuery,
 }: {
   periodFrom: string;
   periodTo: string;
@@ -481,6 +519,7 @@ const CashflowTab = ({
   reportMode: ReportMode;
   selectedBudget: Budget | null;
   selectedParentArticleId: string | null;
+  articleSearchQuery: string;
 }) => {
   const { canRead } = usePermissions();
 
@@ -601,6 +640,7 @@ const CashflowTab = ({
       showPlan={showPlanColumns}
       periodFrom={periodFrom}
       periodTo={periodTo}
+      articleSearchQuery={articleSearchQuery}
     />
   );
 };

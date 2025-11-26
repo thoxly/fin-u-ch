@@ -283,6 +283,38 @@ export class ArticlesService {
   }
 
   /**
+   * Получает все ID родителей статьи до корня (рекурсивно)
+   * @param articleId - ID статьи
+   * @param companyId - ID компании
+   * @returns Массив ID всех родителей (от ближайшего к корню)
+   */
+  async getAncestorIds(
+    articleId: string,
+    companyId: string
+  ): Promise<string[]> {
+    const ancestors: string[] = [];
+
+    const collectParents = async (currentId: string) => {
+      const article = await prisma.article.findFirst({
+        where: {
+          id: currentId,
+          companyId,
+        },
+        select: { parentId: true },
+      });
+
+      if (article?.parentId) {
+        ancestors.push(article.parentId);
+        // Рекурсивно собираем родителей
+        await collectParents(article.parentId);
+      }
+    };
+
+    await collectParents(articleId);
+    return ancestors;
+  }
+
+  /**
    * Преобразует плоский список статей в дерево
    * @param articles - Плоский список статей
    * @returns Массив корневых статей с вложенными children

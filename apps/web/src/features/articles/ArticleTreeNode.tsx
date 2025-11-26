@@ -1,5 +1,4 @@
 import {
-  Folder,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -152,14 +151,14 @@ export const ArticleTreeNode = ({
               : 'bg-gradient-to-r from-purple-100 to-purple-200 dark:from-purple-900 dark:to-purple-800'
           )}
         >
-          {hasChildren ? (
-            <Folder size={16} className="text-blue-600 dark:text-blue-300" />
-          ) : (
-            <FileText
-              size={16}
-              className="text-purple-600 dark:text-purple-300"
-            />
-          )}
+          <FileText
+            size={16}
+            className={
+              hasChildren
+                ? 'text-blue-600 dark:text-blue-300'
+                : 'text-purple-600 dark:text-purple-300'
+            }
+          />
         </div>
 
         {/* Информация о статье */}
