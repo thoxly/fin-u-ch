@@ -1,6 +1,7 @@
 // apps/api/src/modules/integrations/integrations.service.ts
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
+import { encrypt, decrypt } from '../../utils/encryption';
 
 interface OzonIntegrationData {
   clientKey: string;
@@ -96,6 +97,9 @@ export class IntegrationsService {
         data.accountId
       );
 
+      // Шифруем apiKey перед сохранением
+      const encryptedApiKey = encrypt(data.apiKey);
+
       // Сохраняем или обновляем интеграцию
       const integration = await prisma.integration.upsert({
         where: {
@@ -106,7 +110,7 @@ export class IntegrationsService {
         },
         update: {
           clientKey: data.clientKey,
-          apiKey: data.apiKey,
+          apiKey: encryptedApiKey, // Сохраняем зашифрованный ключ
           paymentSchedule: data.paymentSchedule,
           articleId: data.articleId,
           accountId: data.accountId,
@@ -117,7 +121,7 @@ export class IntegrationsService {
           companyId,
           type: 'ozon',
           clientKey: data.clientKey,
-          apiKey: data.apiKey,
+          apiKey: encryptedApiKey, // Сохраняем зашифрованный ключ
           paymentSchedule: data.paymentSchedule,
           articleId: data.articleId,
           accountId: data.accountId,
@@ -133,7 +137,8 @@ export class IntegrationsService {
           connected: integration.isActive,
           data: {
             clientKey: integration.clientKey,
-            apiKey: integration.apiKey,
+            // НЕ возвращаем apiKey в ответе для безопасности
+            apiKey: '***', // Маскируем ключ
             paymentSchedule: integration.paymentSchedule as
               | 'next_week'
               | 'week_after',
@@ -192,7 +197,8 @@ export class IntegrationsService {
           connected: integration.isActive,
           data: {
             clientKey: integration.clientKey,
-            apiKey: integration.apiKey,
+            // НЕ возвращаем apiKey в ответе для безопасности
+            apiKey: '***', // Маскируем ключ
             paymentSchedule: integration.paymentSchedule as
               | 'next_week'
               | 'week_after',
@@ -235,7 +241,8 @@ export class IntegrationsService {
           connected: false,
           data: {
             clientKey: integration.clientKey,
-            apiKey: integration.apiKey,
+            // НЕ возвращаем apiKey в ответе для безопасности
+            apiKey: '***', // Маскируем ключ
             paymentSchedule: integration.paymentSchedule as
               | 'next_week'
               | 'week_after',

@@ -2,6 +2,7 @@
 import { ozonOperationService } from '../jobs/ozon.generate.operations';
 import { prisma } from '../config/prisma';
 import { env } from '../config/env';
+import { decrypt } from '../utils/encryption';
 
 interface DebugResult {
   success: boolean;
@@ -361,9 +362,11 @@ class OzonIntegrationDebugger {
       console.log(`    Запрос данных за: ${fromISO} - ${toISO}`);
 
       // Временно используем старый метод для прямого доступа
+      // Расшифровываем apiKey перед использованием
+      const decryptedApiKey = decrypt(integration.apiKey);
       const cashFlowData = await this.getCashFlowStatementDirect(
         integration.clientKey,
-        integration.apiKey,
+        decryptedApiKey,
         fromISO,
         toISO
       );

@@ -1,6 +1,9 @@
 // apps/api/src/modules/integrations/ozon/ozon-operation.service.ts
 import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
+import { retryWithBackoff } from '../../../utils/retry';
+import { hashObject } from '../../../utils/hash';
+import { decrypt } from '../../../utils/encryption';
 
 interface OzonCashFlowResponse {
   result: {
@@ -117,7 +120,7 @@ export class OzonOperationService {
   }
 
   /**
-   * Получает данные о денежных потоках из Ozon API
+   * Получает данные о денежных потоках из Ozon API с retry и backoff
    */
   async getCashFlowStatement(
     clientKey: string,
@@ -125,57 +128,81 @@ export class OzonOperationService {
     dateFrom: string,
     dateTo: string
   ): Promise<OzonCashFlowResponse> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    return retryWithBackoff(
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    try {
-      const response = await fetch(
-        'https://api-seller.ozon.ru/v1/finance/cash-flow-statement/list',
-        {
-          method: 'POST',
-          headers: {
-            'Client-Id': clientKey,
-            'Api-Key': apiKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            date: {
-              from: dateFrom,
-              to: dateTo,
-            },
-            with_details: true,
-            page: 1,
-            page_size: 100,
-          }),
-          signal: controller.signal,
+        try {
+          const response = await fetch(
+            'https://api-seller.ozon.ru/v1/finance/cash-flow-statement/list',
+            {
+              method: 'POST',
+              headers: {
+                'Client-Id': clientKey,
+                'Api-Key': apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                date: {
+                  from: dateFrom,
+                  to: dateTo,
+                },
+                with_details: true,
+                page: 1,
+                page_size: 100,
+              }),
+              signal: controller.signal,
+            }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            // Сохраняем статус код для retry логики
+            const error: any = new AppError(
+              `Ozon API error: ${response.status} ${response.statusText}`,
+              response.status
+            );
+            error.status = response.status;
+            error.statusCode = response.status;
+            throw error;
+          }
+
+          const data = (await response.json()) as OzonCashFlowResponse;
+          return data;
+        } catch (error: any) {
+          clearTimeout(timeoutId);
+
+          if (error.name === 'AbortError') {
+            const timeoutError: any = new AppError(
+              'Таймаут подключения к Ozon API',
+              408
+            );
+            timeoutError.status = 408;
+            timeoutError.statusCode = 408;
+            throw timeoutError;
+          } else if (error instanceof AppError) {
+            throw error;
+          }
+
+          const networkError: any = new AppError(
+            `Ошибка подключения к Ozon API: ${error.message}`,
+            500
+          );
+          networkError.status = 500;
+          networkError.statusCode = 500;
+          throw networkError;
         }
-      );
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new AppError(
-          `Ozon API error: ${response.status} ${response.statusText}`,
-          response.status
-        );
+      },
+      {
+        maxRetries: 5,
+        initialDelay: 1000,
+        maxDelay: 30000,
+        backoffMultiplier: 2,
+        retryableStatusCodes: [429, 500, 502, 503, 504],
       }
-
-      const data = (await response.json()) as OzonCashFlowResponse;
-      return data;
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-
-      if (error.name === 'AbortError') {
-        throw new AppError('Таймаут подключения к Ozon API', 408);
-      } else if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw new AppError(
-        `Ошибка подключения к Ozon API: ${error.message}`,
-        500
-      );
-    }
+    );
   }
 
   /**
@@ -343,28 +370,92 @@ export class OzonOperationService {
       console.log(`   Компания: ${integration.company.name}`);
       console.log(`   График выплат: ${integration.paymentSchedule}`);
 
+      const period = this.getQueryPeriod(
+        integration.paymentSchedule as 'next_week' | 'week_after'
+      );
+
+      // Создаем сессию импорта для отслеживания
+      let importSession = null;
+      const startTime = Date.now();
+
       try {
-        const period = this.getQueryPeriod(
-          integration.paymentSchedule as 'next_week' | 'week_after'
-        );
+        // Создаем сессию импорта
+        importSession = await prisma.importSession.create({
+          data: {
+            companyId: integration.companyId,
+            type: 'ozon',
+            integrationId: integration.id,
+            status: 'draft',
+            periodFrom: period.from,
+            periodTo: period.to,
+            importedCount: 0,
+            processedCount: 0,
+            skippedCount: 0,
+            retryCount: 0,
+          },
+        });
+
+        console.log(`📋 Создана сессия импорта: ${importSession.id}`);
+
         const created = await this.createOperationForIntegration(
           integration,
-          period
+          period,
+          importSession.id
         );
+
+        const duration = Date.now() - startTime;
+
         if (created) {
           results.created++;
           console.log(
             `   ✅ Операция успешно создана для интеграции ${integration.id}`
           );
+
+          // Обновляем сессию как успешную
+          await prisma.importSession.update({
+            where: { id: importSession.id },
+            data: {
+              status: 'success',
+              processedCount: 1,
+              importedCount: 1,
+              duration,
+            },
+          });
         } else {
           console.log(
             `   ⏭️  Операция не создана (сумма 0, payment >= 0 или дубликат)`
           );
+
+          // Обновляем сессию - операция пропущена
+          await prisma.importSession.update({
+            where: { id: importSession.id },
+            data: {
+              status: 'success',
+              skippedCount: 1,
+              importedCount: 1,
+              duration,
+            },
+          });
         }
       } catch (error: any) {
         const errorMsg = `Integration ${integration.id}: ${error.message}`;
         console.error(`   ❌ Ошибка: ${errorMsg}`);
         results.errors.push(errorMsg);
+
+        const duration = Date.now() - startTime;
+
+        // Обновляем сессию с ошибкой
+        if (importSession) {
+          await prisma.importSession.update({
+            where: { id: importSession.id },
+            data: {
+              status: 'error',
+              lastError: errorMsg,
+              retryCount: error.retryCount || 0,
+              duration,
+            },
+          });
+        }
       }
     }
 
@@ -383,7 +474,8 @@ export class OzonOperationService {
    */
   async createOperationForIntegration(
     integration: any,
-    period: { from: Date; to: Date }
+    period: { from: Date; to: Date },
+    importSessionId?: string
   ): Promise<boolean> {
     try {
       console.log(`🔄 Обрабатываем интеграцию: ${integration.id}`);
@@ -406,12 +498,49 @@ export class OzonOperationService {
 
       // Получаем данные из Ozon
       console.log(`🌐 Запрашиваем данные Ozon API...`);
+      // Расшифровываем apiKey перед использованием
+      const decryptedApiKey = decrypt(integration.apiKey);
       const cashFlowData = await this.getCashFlowStatement(
         integration.clientKey,
-        integration.apiKey,
+        decryptedApiKey,
         fromISO,
         toISO
       );
+
+      // Вычисляем хэш данных для идемпотентности
+      const dataHash = hashObject({
+        integrationId: integration.id,
+        periodFrom: fromISO,
+        periodTo: toISO,
+        cashFlows: cashFlowData.result.cash_flows,
+        details: cashFlowData.result.details,
+      });
+      console.log(`🔐 Хэш данных: ${dataHash.substring(0, 16)}...`);
+
+      // Проверяем, не был ли уже импортирован этот набор данных (по хэшу)
+      if (importSessionId) {
+        const existingSession = await prisma.importSession.findFirst({
+          where: {
+            integrationId: integration.id,
+            dataHash,
+            status: { in: ['success', 'processed'] },
+            id: { not: importSessionId },
+          },
+        });
+
+        if (existingSession) {
+          console.log(
+            `⏭️ Данные с таким же хэшем уже были импортированы в сессии ${existingSession.id}, пропускаем`
+          );
+          return false;
+        }
+
+        // Обновляем сессию с хэшем
+        await prisma.importSession.update({
+          where: { id: importSessionId },
+          data: { dataHash },
+        });
+      }
 
       // Получаем сумму выплаты
       const calculatedAmount = this.calculatePaymentAmount(cashFlowData);

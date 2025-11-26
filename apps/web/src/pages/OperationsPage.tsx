@@ -855,8 +855,6 @@ export const OperationsPage = () => {
               onIntegrationDisconnect={handleIntegrationDisconnect}
               isLoading={isLoadingOzonIntegration}
             />
-            <RecurringOperations onEdit={handleEdit} />
-            <MappingRules />
 
             {canUpdate('operations') && (
               <>

@@ -36,4 +36,5 @@ export const env = {
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || '',
+  ENCRYPTION_KEY: process.env.ENCRYPTION_KEY, // Ключ для шифрования чувствительных данных (32 байта в hex или строка)
 };

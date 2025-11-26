@@ -2,6 +2,7 @@
 // Прямой режим работы с БД и Ozon API (без использования API сервера)
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import { decrypt } from '../utils/encryption';
 
 interface OzonCashFlowResponse {
   result: {
@@ -326,9 +327,11 @@ export class OzonDirectService {
       logger.info(`   🔍 Шаг 3/7: Запрос данных из Ozon API...`);
       logger.info(`   🌐 Отправляем запрос к Ozon API...`);
       const apiStartTime = Date.now();
+      // Расшифровываем apiKey перед использованием
+      const decryptedApiKey = decrypt(integration.apiKey);
       const cashFlowData = await this.getCashFlowStatement(
         integration.clientKey,
-        integration.apiKey,
+        decryptedApiKey,
         fromISO,
         toISO
       );
