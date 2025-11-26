@@ -98,9 +98,14 @@ export class CashflowService {
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
-    // Находим все уникальные статьи, по которым есть операции
+    // Фильтруем операции по активности, если указана
+    const filteredOperations = params.activity
+      ? operations.filter((op) => op.article?.activity === params.activity)
+      : operations;
+
+    // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
     const articlesWithOperations = new Set<string>();
-    for (const op of operations) {
+    for (const op of filteredOperations) {
       if (op.article) {
         articlesWithOperations.add(op.article.id);
       }
@@ -144,12 +149,11 @@ export class CashflowService {
     // Создаем Map для быстрого доступа к статьям
     const articleDataMap = new Map(allArticles.map((a) => [a.id, a]));
 
-    // Агрегируем операции по статьям
+    // Агрегируем операции по статьям (используем уже отфильтрованные операции)
     const operationsByArticle = new Map<string, CashflowRow>();
 
-    for (const op of operations) {
+    for (const op of filteredOperations) {
       if (!op.article) continue;
-      if (params.activity && op.article.activity !== params.activity) continue;
 
       const articleId = op.article.id;
 
@@ -275,8 +279,23 @@ export class CashflowService {
     const byActivity: Map<string, ActivityGroup> = new Map();
 
     for (const rootArticle of sortedRootArticles) {
-      const activity = (articleDataMap.get(rootArticle.articleId)?.activity ||
+      const articleData = articleDataMap.get(rootArticle.articleId);
+      if (!articleData) continue;
+
+      const activity = (articleData.activity ||
         'unknown') as ActivityGroup['activity'];
+
+      // Если указан фильтр по активности, пропускаем статьи с другой активностью
+      // Но включаем их, если они являются родителями или потомками статей с нужной активностью
+      // (это уже учтено при фильтрации операций выше)
+      if (params.activity && articleData.activity !== params.activity) {
+        // Проверяем, есть ли у этой статьи операции (hasOperations)
+        // Если нет операций, значит это родительская/дочерняя статья, и мы её включаем
+        // Если есть операции, но активность не совпадает, пропускаем
+        if (rootArticle.hasOperations) {
+          continue;
+        }
+      }
 
       if (!byActivity.has(activity)) {
         byActivity.set(activity, {

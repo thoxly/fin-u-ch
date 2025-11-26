@@ -187,19 +187,14 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      // При фильтре по активности 'operating' должны возвращаться только статьи с этой активностью
+      // Поскольку операции фильтруются по активности, в allArticleIds будет только 'art-1'
       mockArticleFindMany.mockResolvedValue([
         {
           id: 'art-1',
           name: 'Sales',
           parentId: null,
           activity: 'operating',
-          type: 'income',
-        },
-        {
-          id: 'art-3',
-          name: 'Investment',
-          parentId: null,
-          activity: 'investing',
           type: 'income',
         },
       ]);
