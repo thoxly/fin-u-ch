@@ -25,6 +25,9 @@ jest.mock('../../../config/db', () => ({
     operation: {
       findMany: jest.fn(),
     },
+    article: {
+      findMany: jest.fn(),
+    },
   },
 }));
 
@@ -34,8 +37,20 @@ jest.mock('../utils/cache', () => ({
   generateCacheKey: jest.fn().mockReturnValue('test-cache-key'),
 }));
 
+jest.mock('../../catalogs/articles/articles.service', () => ({
+  __esModule: true,
+  default: {
+    getAncestorIds: jest.fn().mockResolvedValue([]),
+    getDescendantIds: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 import prisma from '../../../config/db';
+import articlesService from '../../catalogs/articles/articles.service';
 const mockOperationFindMany = prisma.operation.findMany as jest.Mock;
+const mockArticleFindMany = prisma.article.findMany as jest.Mock;
+const mockGetAncestorIds = articlesService.getAncestorIds as jest.Mock;
+const mockGetDescendantIds = articlesService.getDescendantIds as jest.Mock;
 
 describe('CashflowService', () => {
   let service: CashflowService;
@@ -43,6 +58,10 @@ describe('CashflowService', () => {
   beforeEach(() => {
     service = new CashflowService();
     jest.clearAllMocks();
+    // Моки по умолчанию для новых вызовов
+    mockGetAncestorIds.mockResolvedValue([]);
+    mockGetDescendantIds.mockResolvedValue([]);
+    mockArticleFindMany.mockResolvedValue([]);
   });
 
   describe('getCashflow', () => {
@@ -107,6 +126,23 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      // Мокируем статьи, которые будут возвращены из иерархии
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+        {
+          id: 'art-2',
+          name: 'Salary',
+          parentId: null,
+          activity: 'operating',
+          type: 'expense',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -151,6 +187,22 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+        {
+          id: 'art-3',
+          name: 'Investment',
+          parentId: null,
+          activity: 'investing',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -181,6 +233,15 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -244,6 +305,15 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
