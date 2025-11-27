@@ -90,6 +90,7 @@ export const OperationsPage = () => {
   const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
     useGetOzonIntegrationQuery();
   const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
+  const { showSuccess, showError } = useNotification();
 
   // Инициализируем интеграции с данными из API
   const [integrations, setIntegrations] = useState([
@@ -257,7 +258,6 @@ export const OperationsPage = () => {
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
-  const { showSuccess, showError } = useNotification();
 
   const { selectedIds, toggleSelectOne, toggleSelectAll, clearSelection } =
     useBulkSelection();
