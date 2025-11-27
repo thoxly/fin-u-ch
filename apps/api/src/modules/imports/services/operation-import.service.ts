@@ -529,25 +529,25 @@ export class OperationImportService {
             };
 
             if (isFullyMatched && matchingResult.matchedRuleId) {
-              updateData.matchedRule = {
+              updateData.mapping_rule = {
                 connect: { id: matchingResult.matchedRuleId },
               };
             } else {
-              updateData.matchedRule = { disconnect: true };
+              updateData.mapping_rule = { disconnect: true };
             }
 
             if (matchingResult.matchedArticleId) {
-              updateData.matchedArticle = {
+              updateData.article = {
                 connect: { id: matchingResult.matchedArticleId },
               };
             }
             if (matchingResult.matchedCounterpartyId) {
-              updateData.matchedCounterparty = {
+              updateData.counterparty = {
                 connect: { id: matchingResult.matchedCounterpartyId },
               };
             }
             if (matchingResult.matchedAccountId) {
-              updateData.matchedAccount = {
+              updateData.account = {
                 connect: { id: matchingResult.matchedAccountId },
               };
             }
