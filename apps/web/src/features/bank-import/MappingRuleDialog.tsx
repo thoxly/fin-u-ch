@@ -9,10 +9,10 @@ import {
   useGetImportedOperationsQuery,
 } from '../../store/api/importsApi';
 import {
-  useGetArticlesQuery,
   useGetCounterpartiesQuery,
   useGetAccountsQuery,
 } from '../../store/api/catalogsApi';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
 import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
@@ -51,9 +51,9 @@ export const MappingRuleDialog = ({
   >(rule?.sourceField || 'description');
   const [patternError, setPatternError] = useState<string>('');
 
-  const { data: articles = [], refetch: refetchArticles } = useGetArticlesQuery(
-    { isActive: true }
-  );
+  // Используем только листья (статьи без дочерних) для операций
+  const { leafArticles: articles = [], refetch: refetchArticles } =
+    useLeafArticles({ isActive: true });
   const { data: counterparties = [], refetch: refetchCounterparties } =
     useGetCounterpartiesQuery();
   const { data: accounts = [], refetch: refetchAccounts } =
@@ -255,8 +255,9 @@ export const MappingRuleDialog = ({
 
     // Обновляем списки и находим созданный элемент
     if (createModal.field === 'article') {
-      const { data: updatedArticles } = await refetchArticles();
-      const createdArticle = updatedArticles?.find((a) => a.id === createdId);
+      const result = await refetchArticles();
+      const updatedArticles = result.data || [];
+      const createdArticle = updatedArticles.find((a) => a.id === createdId);
       if (createdArticle) {
         setTargetId(createdId);
         setTargetName(createdArticle.name);

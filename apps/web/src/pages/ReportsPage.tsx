@@ -12,6 +12,7 @@ import {
 import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
 import { CashflowTable } from '../widgets/CashflowTable';
+import { useArticleTree } from '../shared/hooks/useArticleTree';
 import type { Budget, CashflowReport, BDDSReport } from '@fin-u-ch/shared';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
@@ -67,12 +68,19 @@ export const ReportsPage = () => {
   const [reportMode, setReportMode] = useState<ReportMode>('fact');
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
+  const [showArticleFilter, setShowArticleFilter] = useState(false);
+  const [selectedParentArticleId] = useState<string | null>(null);
+  const [articleSearchQuery, setArticleSearchQuery] = useState<string>('');
   const planButtonRef = useRef<HTMLButtonElement>(null);
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
+  const articleFilterRef = useRef<HTMLDivElement>(null);
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
+
+  // Загружаем дерево статей для фильтра
+  const { tree: articleTree = [] } = useArticleTree({ isActive: true });
 
   // Загружаем активные бюджеты (только если есть права на просмотр отчётов)
   const { data: budgets = [] } = useGetBudgetsQuery(
@@ -209,11 +217,19 @@ export const ReportsPage = () => {
       ) {
         setShowBudgetMenu(false);
       }
+      // Закрываем фильтр статей если клик вне
+      if (
+        showArticleFilter &&
+        articleFilterRef.current &&
+        !articleFilterRef.current.contains(target)
+      ) {
+        setShowArticleFilter(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showBudgetMenu]);
+  }, [showBudgetMenu, showArticleFilter]);
 
   // Если нет прав на просмотр, показываем сообщение
   if (!canRead('reports')) {
@@ -435,6 +451,41 @@ export const ReportsPage = () => {
               </div>
             </>
           )}
+
+          {/* Поле поиска статей */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="text"
+                value={articleSearchQuery}
+                onChange={(e) => setArticleSearchQuery(e.target.value)}
+                placeholder="Поиск статьи..."
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              {articleSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setArticleSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Очистить поиск"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </Card>
 
         {/* Контент отчетов */}
@@ -444,6 +495,8 @@ export const ReportsPage = () => {
           periodFormat={periodFilters.format}
           reportMode={reportMode}
           selectedBudget={selectedBudget}
+          selectedParentArticleId={selectedParentArticleId}
+          articleSearchQuery={articleSearchQuery}
         />
       </div>
     </Layout>
@@ -457,12 +510,16 @@ const CashflowTab = ({
   periodFormat: _periodFormat,
   reportMode,
   selectedBudget,
+  selectedParentArticleId,
+  articleSearchQuery,
 }: {
   periodFrom: string;
   periodTo: string;
   periodFormat: 'day' | 'week' | 'month' | 'quarter' | 'year';
   reportMode: ReportMode;
   selectedBudget: Budget | null;
+  selectedParentArticleId: string | null;
+  articleSearchQuery: string;
 }) => {
   const { canRead } = usePermissions();
 
@@ -474,6 +531,7 @@ const CashflowTab = ({
       ? {
           periodFrom,
           periodTo,
+          parentArticleId: selectedParentArticleId || undefined,
         }
       : skipToken
   );
@@ -489,6 +547,7 @@ const CashflowTab = ({
           periodFrom,
           periodTo,
           budgetId: selectedBudget!.id,
+          parentArticleId: selectedParentArticleId || undefined,
         }
       : skipToken
   );
@@ -581,6 +640,7 @@ const CashflowTab = ({
       showPlan={showPlanColumns}
       periodFrom={periodFrom}
       periodTo={periodTo}
+      articleSearchQuery={articleSearchQuery}
     />
   );
 };

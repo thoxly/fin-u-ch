@@ -5,8 +5,8 @@ import {
   CreateOperationSchema,
   UpdateOperationSchema,
   type CreateOperationInput,
-  type UpdateOperationInput,
 } from '@fin-u-ch/shared';
+import articlesService from '../catalogs/articles/articles.service';
 
 // Keep for backward compatibility with tests
 export type CreateOperationDTO = CreateOperationInput;
@@ -188,6 +188,20 @@ export class OperationsService {
       validatedData.targetAccountId,
     ]);
 
+    // Валидация: операции можно создавать только с листовыми статьями (не имеющими дочерних)
+    if (validatedData.articleId) {
+      const isLeaf = await articlesService.isLeafArticle(
+        validatedData.articleId,
+        companyId
+      );
+      if (!isLeaf) {
+        throw new AppError(
+          'Нельзя создать операцию с родительской статьей. Выберите дочернюю статью или статью без дочерних элементов.',
+          400
+        );
+      }
+    }
+
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
     if (validatedData.repeat && validatedData.repeat !== 'none') {
       return prisma.$transaction(async (tx) => {
@@ -203,7 +217,7 @@ export class OperationsService {
         });
 
         // Создаем первую дочернюю операцию на дату создания шаблона
-        const firstChild = await tx.operation.create({
+        await tx.operation.create({
           data: {
             companyId: template.companyId,
             type: template.type,
@@ -264,6 +278,20 @@ export class OperationsService {
         validatedData.sourceAccountId,
         validatedData.targetAccountId,
       ]);
+
+      // Валидация: операции можно обновлять только с листовыми статьями (не имеющими дочерних)
+      if (validatedData.articleId !== undefined) {
+        const isLeaf = await articlesService.isLeafArticle(
+          validatedData.articleId,
+          companyId
+        );
+        if (!isLeaf) {
+          throw new AppError(
+            'Нельзя использовать родительскую статью в операции. Выберите дочернюю статью или статью без дочерних элементов.',
+            400
+          );
+        }
+      }
 
       return prisma.operation.update({
         where: { id },

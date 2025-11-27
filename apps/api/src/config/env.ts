@@ -8,9 +8,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // From apps/api/src/config/env.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
 const projectRoot = path.resolve(__dirname, '../../..');
+const apiRoot = path.resolve(__dirname, '../..');
 
-// Load .env from monorepo root
-dotenv.config({ path: path.resolve(projectRoot, '.env') });
+// Load .env from monorepo root, fallback to apps/api
+const rootEnvPath = path.resolve(projectRoot, '.env');
+const apiEnvPath = path.resolve(apiRoot, '.env');
+dotenv.config({ path: rootEnvPath });
+// If DATABASE_URL is still not set, try loading from apps/api
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: apiEnvPath });
+}
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',

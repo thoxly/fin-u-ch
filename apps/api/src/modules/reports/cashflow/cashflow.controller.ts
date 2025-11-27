@@ -16,6 +16,7 @@ export class CashflowController {
         rounding: req.query.rounding
           ? parseInt(req.query.rounding as string, 10)
           : undefined,
+        parentArticleId: req.query.parentArticleId as string | undefined,
       };
 
       const result = await cashflowService.getCashflow(req.companyId!, params);

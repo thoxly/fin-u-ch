@@ -14,6 +14,7 @@ export class PlanFactController {
           : new Date(),
         level:
           (req.query.level as 'article' | 'department' | 'deal') || 'article',
+        parentArticleId: req.query.parentArticleId as string | undefined,
       };
 
       const result = await planfactService.getPlanFact(req.companyId!, params);

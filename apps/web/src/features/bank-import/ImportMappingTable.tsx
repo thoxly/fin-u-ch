@@ -36,14 +36,12 @@ import { findSimilarOperations } from './utils/findSimilarOperations';
 import { useUndoManager } from './hooks/useUndoManager';
 import { ApplySimilarPopover } from './ApplySimilarPopover';
 import { UndoToast } from '../../shared/ui/UndoToast';
-import {
-  useGetArticlesQuery,
-  useGetAccountsQuery,
-} from '../../store/api/catalogsApi';
+import { useGetAccountsQuery } from '../../store/api/catalogsApi';
 import { useGetCompanyQuery } from '../../store/api/companiesApi';
 import { formatDate } from '../../shared/lib/date';
 import { formatMoney } from '../../shared/lib/money';
 import { useNotification } from '../../shared/hooks/useNotification';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import type { ImportedOperation } from '@shared/types/imports';
 import { ImportMappingRow, AnchorRect } from './ImportMappingRow';
 import { SaveRulesCell } from './SaveRulesCell';
@@ -186,7 +184,8 @@ export const ImportMappingTable = ({
   // Lazy query for fetching ALL operations for similarity check
   const [getAllOperations] = useLazyGetImportedOperationsQuery();
 
-  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
+  // Используем только листья (статьи без дочерних) для операций
+  const { leafArticles: articles = [] } = useLeafArticles({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: company } = useGetCompanyQuery();
   const { data: totalImportedData } = useGetTotalImportedOperationsCountQuery();

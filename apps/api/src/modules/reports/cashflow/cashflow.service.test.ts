@@ -1,3 +1,21 @@
+// Mock env.ts before importing anything that uses it
+jest.mock('../../../config/env', () => ({
+  env: {
+    NODE_ENV: 'test',
+    PORT: 4000,
+    DATABASE_URL: 'postgresql://test',
+    REDIS_URL: 'redis://localhost:6379',
+    JWT_SECRET: 'test-secret',
+    JWT_ACCESS_EXPIRES_IN: '15m',
+    JWT_REFRESH_EXPIRES_IN: '7d',
+    FRONTEND_URL: 'http://localhost:3000',
+    SMTP_HOST: '',
+    SMTP_PORT: 465,
+    SMTP_USER: '',
+    SMTP_PASS: '',
+  },
+}));
+
 import { CashflowService } from './cashflow.service';
 
 // Mock the prisma import
@@ -5,6 +23,9 @@ jest.mock('../../../config/db', () => ({
   __esModule: true,
   default: {
     operation: {
+      findMany: jest.fn(),
+    },
+    article: {
       findMany: jest.fn(),
     },
   },
@@ -16,8 +37,20 @@ jest.mock('../utils/cache', () => ({
   generateCacheKey: jest.fn().mockReturnValue('test-cache-key'),
 }));
 
+jest.mock('../../catalogs/articles/articles.service', () => ({
+  __esModule: true,
+  default: {
+    getAncestorIds: jest.fn().mockResolvedValue([]),
+    getDescendantIds: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 import prisma from '../../../config/db';
+import articlesService from '../../catalogs/articles/articles.service';
 const mockOperationFindMany = prisma.operation.findMany as jest.Mock;
+const mockArticleFindMany = prisma.article.findMany as jest.Mock;
+const mockGetAncestorIds = articlesService.getAncestorIds as jest.Mock;
+const mockGetDescendantIds = articlesService.getDescendantIds as jest.Mock;
 
 describe('CashflowService', () => {
   let service: CashflowService;
@@ -25,6 +58,10 @@ describe('CashflowService', () => {
   beforeEach(() => {
     service = new CashflowService();
     jest.clearAllMocks();
+    // Моки по умолчанию для новых вызовов
+    mockGetAncestorIds.mockResolvedValue([]);
+    mockGetDescendantIds.mockResolvedValue([]);
+    mockArticleFindMany.mockResolvedValue([]);
   });
 
   describe('getCashflow', () => {
@@ -89,6 +126,23 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      // Мокируем статьи, которые будут возвращены из иерархии
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+        {
+          id: 'art-2',
+          name: 'Salary',
+          parentId: null,
+          activity: 'operating',
+          type: 'expense',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -133,6 +187,17 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      // При фильтре по активности 'operating' должны возвращаться только статьи с этой активностью
+      // Поскольку операции фильтруются по активности, в allArticleIds будет только 'art-1'
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -163,6 +228,15 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
@@ -226,6 +300,15 @@ describe('CashflowService', () => {
       ];
 
       mockOperationFindMany.mockResolvedValue(mockOperations);
+      mockArticleFindMany.mockResolvedValue([
+        {
+          id: 'art-1',
+          name: 'Sales',
+          parentId: null,
+          activity: 'operating',
+          type: 'income',
+        },
+      ]);
 
       const result = await service.getCashflow('company-id', {
         periodFrom: new Date('2025-01-01'),
