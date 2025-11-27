@@ -1,7 +1,16 @@
 -- AlterTable
--- Удаляем onboardingCompleted только если она существует (она уже была удалена в миграции 20251120000000)
-ALTER TABLE "users" DROP COLUMN IF EXISTS "onboardingCompleted";
-ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
+DO $$
+BEGIN
+  -- Drop onboardingCompleted if it exists
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='onboardingCompleted') THEN
+    ALTER TABLE "users" DROP COLUMN "onboardingCompleted";
+  END IF;
+  
+  -- Add isSuperAdmin if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='isSuperAdmin') THEN
+    ALTER TABLE "users" ADD COLUMN "isSuperAdmin" BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "roles" (

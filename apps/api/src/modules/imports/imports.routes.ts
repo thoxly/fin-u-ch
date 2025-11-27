@@ -78,6 +78,10 @@ router.post(
  *         schema:
  *           type: boolean
  *       - in: query
+ *         name: processed
+ *         schema:
+ *           type: boolean
+ *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
@@ -229,6 +233,20 @@ router.post('/sessions/:sessionId/import', importsController.importOperations);
 /**
  * @swagger
  * /api/imports/sessions/{sessionId}:
+ *   get:
+ *     summary: Get import session information
+ *     tags: [Imports]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Session information
  *   delete:
  *     summary: Delete import session
  *     tags: [Imports]
@@ -244,6 +262,7 @@ router.post('/sessions/:sessionId/import', importsController.importOperations);
  *       200:
  *         description: Session deleted
  */
+router.get('/sessions/:sessionId', importsController.getImportSession);
 router.delete('/sessions/:sessionId', importsController.deleteSession);
 
 /**
@@ -384,5 +403,29 @@ router.delete('/rules/:id', importsController.deleteMappingRule);
  *         description: List of import sessions
  */
 router.get('/sessions', importsController.getImportSessions);
+
+/**
+ * @swagger
+ * /api/imports/stats/total-imported:
+ *   get:
+ *     summary: Get total count of imported operations
+ *     tags: [Imports]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Total count of imported operations
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 count:
+ *                   type: integer
+ */
+router.get(
+  '/stats/total-imported',
+  importsController.getTotalImportedOperationsCount
+);
 
 export default router;

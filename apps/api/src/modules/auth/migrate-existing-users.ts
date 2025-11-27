@@ -260,7 +260,7 @@ export async function migrateExistingUsers(): Promise<void> {
       const usersWithoutRoles = await prisma.user.findMany({
         where: {
           companyId: company.id,
-          userRoles: {
+          user_roles: {
             none: {},
           },
         },

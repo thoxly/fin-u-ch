@@ -7,15 +7,33 @@ import {
   ParsedFile,
 } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
-import operationsService from '../operations/operations.service';
-import articlesService from '../catalogs/articles/articles.service';
-import counterpartiesService from '../catalogs/counterparties/counterparties.service';
+import {
+  ImportFilters,
+  UploadStatementResult,
+  ImportOperationsResult,
+  ApplyRulesResult,
+} from '@fin-u-ch/shared';
+import { invalidateReportCache } from '../reports/utils/cache';
+import duplicateDetectionService from './services/duplicate-detection.service';
+import sessionService from './services/session.service';
+import mappingRulesService from './services/mapping-rules.service';
+import operationImportService from './services/operation-import.service';
+import { BatchProcessor } from './utils/batch-processor';
+import { Prisma } from '@prisma/client';
 
-export interface ImportFilters {
-  confirmed?: boolean;
-  matched?: boolean;
-  limit?: number;
-  offset?: number;
+/**
+ * Transforms Prisma ImportedOperation with relations to match frontend format
+ */
+function transformImportedOperation(op: any): any {
+  const { article, counterparty, account, deal, department, ...rest } = op;
+  return {
+    ...rest,
+    matchedArticle: article,
+    matchedCounterparty: counterparty,
+    matchedAccount: account,
+    matchedDeal: deal,
+    matchedDepartment: department,
+  };
 }
 
 /**
@@ -40,7 +58,90 @@ export class ImportsService {
     }
 
     // Парсинг файла
-    let parsedFile: ParsedFile;
+    const parsedFile = await this.parseFile(fileName, fileBuffer);
+    const documents = parsedFile.documents;
+    const companyAccountNumber = parsedFile.companyAccountNumber;
+    const parseStats = parsedFile.stats;
+
+    // Валидация количества операций
+    if (documents.length > 5000) {
+      throw new AppError(
+        `File contains too many operations (${documents.length}). Maximum allowed is 5000.`,
+        400
+      );
+    }
+
+    // Получаем информацию о компании
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { inn: true },
+    });
+
+    // Проверка дубликатов по хэшу (быстрая проверка)
+    const { duplicatesCount } =
+      await duplicateDetectionService.checkDuplicatesByHash(
+        companyId,
+        documents
+      );
+
+    // Создаем сессию импорта
+    const importSession = await sessionService.createSession(
+      companyId,
+      userId,
+      fileName,
+      documents.length,
+      companyAccountNumber
+    );
+
+    logger.info('Import session created', {
+      sessionId: importSession.id,
+      fileName,
+      companyId,
+      documentsCount: documents.length,
+    });
+
+    // Создаем черновики операций батчами
+    const importedOperations = await this.createImportedOperations(
+      importSession.id,
+      companyId,
+      documents,
+      company?.inn || null,
+      companyAccountNumber
+    );
+
+    logger.info('Upload statement processing completed', {
+      sessionId: importSession.id,
+      fileName,
+      companyId,
+      importedCount: importedOperations.length,
+      duplicatesCount,
+    });
+
+    return {
+      sessionId: importSession.id,
+      importedCount: importedOperations.length,
+      duplicatesCount,
+      fileName: importSession.fileName,
+      companyAccountNumber,
+      parseStats: parseStats
+        ? {
+            documentsStarted: parseStats.documentsStarted,
+            documentsFound: parseStats.documentsFound,
+            documentsSkipped: parseStats.documentsSkipped,
+            documentsInvalid: parseStats.documentsInvalid,
+            documentTypesFound: parseStats.documentTypesFound,
+          }
+        : undefined,
+    };
+  }
+
+  /**
+   * Парсит файл выписки
+   */
+  private async parseFile(
+    fileName: string,
+    fileBuffer: Buffer
+  ): Promise<ParsedFile> {
     try {
       // Логируем начало парсинга
       const filePreview = fileBuffer
@@ -53,13 +154,15 @@ export class ImportsService {
         preview: filePreview.substring(0, 200),
       });
 
-      parsedFile = parseClientBankExchange(fileBuffer);
+      const parsedFile = parseClientBankExchange(fileBuffer);
 
       logger.info('File parsed successfully', {
         fileName,
         documentsCount: parsedFile.documents.length,
         companyAccountNumber: parsedFile.companyAccountNumber,
       });
+
+      return parsedFile;
     } catch (error: any) {
       // Логируем ошибку парсинга с деталями
       logger.error('File parsing failed', {
@@ -78,44 +181,29 @@ export class ImportsService {
         400
       );
     }
+  }
 
-    const documents = parsedFile.documents;
-    const companyAccountNumber = parsedFile.companyAccountNumber;
-
-    // Валидация количества операций (максимум 1000)
-    if (documents.length > 1000) {
-      throw new AppError('File contains more than 1000 operations', 400);
-    }
-
-    // Если документов нет, но ошибка не была выброшена парсером,
-    // значит файл корректный, но пустой
-    if (documents.length === 0) {
-      throw new AppError(
-        'File contains no valid operations. Please check that the file contains payment orders (Платежное поручение) with required fields (Дата, Сумма).',
-        400
-      );
-    }
-
-    // Получаем ИНН компании
+  /**
+   * Создает импортированные операции из документов
+   */
+  private async createImportedOperations(
+    sessionId: string,
+    companyId: string,
+    documents: ParsedDocument[],
+    companyInn: string | null,
+    companyAccountNumber?: string
+  ) {
+    // Получаем информацию о компании
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { inn: true },
     });
 
-    // Создаем сессию импорта
-    const session = await prisma.importSession.create({
-      data: {
-        companyId,
-        userId,
-        fileName,
-        status: 'draft',
-        importedCount: documents.length,
-      },
-    });
-
     // Применяем автосопоставление и создаем черновики операций
     // Используем батчинг для больших файлов (по 100 операций за раз)
-    const importedOperations = [];
+    const importedOperations: Prisma.ImportedOperationGetPayload<
+      Record<string, never>
+    >[] = [];
     const BATCH_SIZE = 100;
     const batches = [];
 
@@ -134,7 +222,7 @@ export class ImportsService {
               const matchingResult = await autoMatch(
                 companyId,
                 doc,
-                company?.inn || null,
+                company?.inn || companyInn || null,
                 companyAccountNumber
               );
 
@@ -148,7 +236,7 @@ export class ImportsService {
 
               // Создаем черновик операции
               const operationData = {
-                importSessionId: session.id,
+                importSessionId: sessionId,
                 companyId,
                 date: doc.date,
                 number: doc.number,
@@ -183,8 +271,7 @@ export class ImportsService {
             } catch (error: any) {
               // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
               logger.error('Failed to process document during import', {
-                fileName,
-                sessionId: session.id,
+                sessionId,
                 document: {
                   date: doc.date,
                   amount: doc.amount,
@@ -200,8 +287,7 @@ export class ImportsService {
       } catch (error: any) {
         // Логируем ошибку батча, но продолжаем обработку следующих батчей
         logger.error('Failed to process batch during import', {
-          fileName,
-          sessionId: session.id,
+          sessionId,
           batchSize: batch.length,
           error: error?.message || String(error),
           stack: error?.stack,
@@ -209,11 +295,7 @@ export class ImportsService {
       }
     }
 
-    return {
-      sessionId: session.id,
-      importedCount: importedOperations.length,
-      fileName: session.fileName,
-    };
+    return importedOperations;
   }
 
   /**
@@ -250,19 +332,22 @@ export class ImportsService {
       }
     }
 
+    if (filters?.processed !== undefined) {
+      where.processed = filters.processed;
+    }
+
     const [operations, total] = await Promise.all([
       prisma.importedOperation.findMany({
         where,
         include: {
-          matchedArticle: { select: { id: true, name: true } },
-          matchedCounterparty: { select: { id: true, name: true } },
-          matchedAccount: { select: { id: true, name: true } },
-          matchedDeal: { select: { id: true, name: true } },
-          matchedDepartment: { select: { id: true, name: true } },
-        },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          account: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+        } as any,
         take: filters?.limit || 20,
         skip: filters?.offset || 0,
-        orderBy: { date: 'desc' },
       }),
       prisma.importedOperation.count({ where }),
     ]);
@@ -276,7 +361,7 @@ export class ImportsService {
     });
 
     return {
-      operations,
+      operations: operations.map(transformImportedOperation),
       total,
       confirmed: confirmedCount,
       unmatched: unmatchedCount,
@@ -333,6 +418,9 @@ export class ImportsService {
 
     if (data.currency !== undefined) {
       updateData.currency = data.currency;
+    } else if (!operation.currency) {
+      // Если валюта не указана в обновлении и не установлена в операции, устанавливаем 'RUB' по умолчанию
+      updateData.currency = 'RUB';
     }
 
     if (data.repeat !== undefined) {
@@ -352,17 +440,17 @@ export class ImportsService {
       where: { id },
       data: updateData,
       include: {
-        matchedArticle: { select: { id: true, name: true } },
-        matchedCounterparty: { select: { id: true, name: true } },
-        matchedAccount: { select: { id: true, name: true } },
-        matchedDeal: { select: { id: true, name: true } },
-        matchedDepartment: { select: { id: true, name: true } },
-      },
+        article: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
+        account: { select: { id: true, name: true } },
+        deal: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+      } as any,
     });
 
-    // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
+    // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+    // Контрагент не обязателен, как в обычной форме
     const isFullyMatched = !!(
-      updatedOperation.matchedCounterpartyId &&
       updatedOperation.matchedArticleId &&
       updatedOperation.matchedAccountId &&
       updatedOperation.currency
@@ -377,14 +465,14 @@ export class ImportsService {
           where: { id },
           data: { matchedBy: 'manual' },
           include: {
-            matchedArticle: { select: { id: true, name: true } },
-            matchedCounterparty: { select: { id: true, name: true } },
-            matchedAccount: { select: { id: true, name: true } },
-            matchedDeal: { select: { id: true, name: true } },
-            matchedDepartment: { select: { id: true, name: true } },
-          },
+            article: { select: { id: true, name: true } },
+            counterparty: { select: { id: true, name: true } },
+            account: { select: { id: true, name: true } },
+            deal: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+          } as any,
         });
-        return finalOperation;
+        return transformImportedOperation(finalOperation);
       }
     } else {
       // Если операция не полностью сопоставлена, сбрасываем matchedBy
@@ -393,18 +481,18 @@ export class ImportsService {
           where: { id },
           data: { matchedBy: null, matchedRuleId: null },
           include: {
-            matchedArticle: { select: { id: true, name: true } },
-            matchedCounterparty: { select: { id: true, name: true } },
-            matchedAccount: { select: { id: true, name: true } },
-            matchedDeal: { select: { id: true, name: true } },
-            matchedDepartment: { select: { id: true, name: true } },
-          },
+            article: { select: { id: true, name: true } },
+            counterparty: { select: { id: true, name: true } },
+            account: { select: { id: true, name: true } },
+            deal: { select: { id: true, name: true } },
+            department: { select: { id: true, name: true } },
+          } as any,
         });
-        return finalOperation;
+        return transformImportedOperation(finalOperation);
       }
     }
 
-    return updatedOperation;
+    return transformImportedOperation(updatedOperation);
   }
 
   /**
@@ -520,9 +608,9 @@ export class ImportsService {
           company?.inn || null
         );
 
-        // Проверяем, что операция полностью сопоставлена (контрагент, статья, счет, валюта)
+        // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+        // Контрагент не обязателен, как в обычной форме
         const isFullyMatched = !!(
-          matchingResult.matchedCounterpartyId &&
           matchingResult.matchedArticleId &&
           matchingResult.matchedAccountId &&
           op.currency
@@ -572,6 +660,14 @@ export class ImportsService {
     operationIds?: string[],
     saveRulesForIds?: string[]
   ) {
+    logger.info('Starting import operations', {
+      sessionId,
+      companyId,
+      userId,
+      operationIds: operationIds?.length || 0,
+      saveRulesForIds: saveRulesForIds?.length || 0,
+    });
+
     // Проверяем, что сессия принадлежит компании
     const session = await prisma.importSession.findFirst({
       where: { id: sessionId, companyId },
@@ -596,14 +692,55 @@ export class ImportsService {
       where,
     });
 
+    logger.info('Operations found for import', {
+      sessionId,
+      companyId,
+      operationsCount: operations.length,
+      transferOperations: operations
+        .filter((op) => op.direction === 'transfer')
+        .map((op) => ({
+          id: op.id,
+          number: op.number,
+          payerAccount: op.payerAccount,
+          receiverAccount: op.receiverAccount,
+          direction: op.direction,
+        })),
+    });
+
     if (operations.length === 0) {
       throw new AppError('No operations to import', 400);
     }
 
     // Проверяем, что все операции полностью сопоставлены
     // Операция считается сопоставленной, если указаны: статья, счет и валюта
+    // Для переводов (transfer) статья и счет не обязательны, нужны только payerAccount и receiverAccount
+    // Валюта по умолчанию 'RUB', как на фронтенде
+    logger.info('Validating operations before import', {
+      sessionId,
+      companyId,
+      operationsCount: operations.length,
+      transferOperationsCount: operations.filter(
+        (op) => op.direction === 'transfer'
+      ).length,
+    });
+
     const unmatchedOperations: string[] = [];
     for (const op of operations) {
+      // Логируем данные операции для переводов
+      if (op.direction === 'transfer') {
+        logger.info('Validating transfer operation', {
+          operationId: op.id,
+          operationNumber: op.number,
+          direction: op.direction,
+          payerAccount: op.payerAccount,
+          receiverAccount: op.receiverAccount,
+          currency: op.currency,
+          date: op.date,
+          amount: op.amount,
+          description: op.description,
+        });
+      }
+
       if (!op.direction) {
         unmatchedOperations.push(
           `Операция ${op.number || op.id}: не указан тип операции`
@@ -611,28 +748,37 @@ export class ImportsService {
         continue;
       }
 
-      // Проверяем обязательные поля
-      if (!op.matchedArticleId) {
-        unmatchedOperations.push(
-          `Операция ${op.number || op.id}: не указана статья`
-        );
-      }
-      if (!op.matchedAccountId) {
-        unmatchedOperations.push(
-          `Операция ${op.number || op.id}: не указан счет`
-        );
-      }
+      // Валюта по умолчанию 'RUB', как на фронтенде (checkOperationMatched)
+      // Если валюта не указана в БД, она будет установлена в 'RUB' при создании операции
+      // Но проверяем, что валюта есть (может быть null в старых данных)
       if (!op.currency) {
-        unmatchedOperations.push(
-          `Операция ${op.number || op.id}: не указана валюта`
-        );
+        // Устанавливаем валюту по умолчанию для операции
+        op.currency = 'RUB';
       }
 
       if (op.direction === 'transfer') {
-        // Для переводов дополнительно нужны счета плательщика и получателя
+        // Для переводов нужны счета плательщика и получателя
         if (!op.payerAccount || !op.receiverAccount) {
+          logger.warn('Transfer operation missing account numbers', {
+            operationId: op.id,
+            operationNumber: op.number,
+            payerAccount: op.payerAccount,
+            receiverAccount: op.receiverAccount,
+          });
           unmatchedOperations.push(
             `Операция ${op.number || op.id}: для перевода нужны счета плательщика и получателя`
+          );
+        }
+      } else {
+        // Для income/expense нужны статья и счет
+        if (!op.matchedArticleId) {
+          unmatchedOperations.push(
+            `Операция ${op.number || op.id}: не указана статья`
+          );
+        }
+        if (!op.matchedAccountId) {
+          unmatchedOperations.push(
+            `Операция ${op.number || op.id}: не указан счет`
           );
         }
       }
@@ -647,6 +793,7 @@ export class ImportsService {
 
     let created = 0;
     let errors = 0;
+    const errorMessages: string[] = []; // Собираем детальные сообщения об ошибках
 
     // Используем батчинг для больших объемов (по 50 операций за раз)
     const BATCH_SIZE = 50;
@@ -663,6 +810,16 @@ export class ImportsService {
         await prisma.$transaction(async (tx) => {
           for (const op of batch) {
             try {
+              // Логируем начало обработки операции
+              logger.info('Processing operation for import', {
+                operationId: op.id,
+                operationNumber: op.number,
+                direction: op.direction,
+                date: op.date,
+                amount: op.amount,
+                companyId,
+              });
+
               // Проверяем обязательные поля
               if (!op.direction) {
                 throw new AppError(`Operation ${op.id} has no direction`, 400);
@@ -682,6 +839,12 @@ export class ImportsService {
                 op.direction === 'transfer' &&
                 (!op.payerAccount || !op.receiverAccount)
               ) {
+                logger.warn('Transfer operation missing account numbers', {
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  payerAccount: op.payerAccount,
+                  receiverAccount: op.receiverAccount,
+                });
                 throw new AppError(
                   `Operation ${op.id} is missing account information for transfer`,
                   400
@@ -699,9 +862,19 @@ export class ImportsService {
               };
 
               if (op.direction === 'transfer') {
+                // Логируем данные перевода
+                logger.info('Processing transfer operation', {
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  payerAccount: op.payerAccount,
+                  receiverAccount: op.receiverAccount,
+                  companyId,
+                });
+
                 // Для переводов нужно найти счета по номерам
-                const sourceAccount = op.payerAccount
-                  ? await prisma.account.findFirst({
+                // Если счет не найден по номеру, используем выбранный счет (matchedAccountId) как fallback
+                let sourceAccount = op.payerAccount
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.payerAccount,
@@ -710,8 +883,8 @@ export class ImportsService {
                     })
                   : null;
 
-                const targetAccount = op.receiverAccount
-                  ? await prisma.account.findFirst({
+                let targetAccount = op.receiverAccount
+                  ? await tx.account.findFirst({
                       where: {
                         companyId,
                         number: op.receiverAccount,
@@ -720,15 +893,137 @@ export class ImportsService {
                     })
                   : null;
 
+                // Если счет не найден по номеру, используем выбранный счет как fallback
+                // Но только для одного недостающего счета, чтобы избежать одинаковых счетов
+                const matchedAccount = op.matchedAccountId
+                  ? await tx.account.findFirst({
+                      where: {
+                        id: op.matchedAccountId,
+                        companyId,
+                        isActive: true,
+                      },
+                    })
+                  : null;
+
+                // Используем выбранный счет только если один счет найден, а другой нет
+                // и выбранный счет отличается от найденного
+                if (matchedAccount) {
+                  if (
+                    !sourceAccount &&
+                    targetAccount &&
+                    targetAccount.id !== matchedAccount.id
+                  ) {
+                    // sourceAccount не найден, targetAccount найден и отличается от выбранного
+                    sourceAccount = matchedAccount;
+                    logger.info(
+                      'Using matchedAccountId as fallback for source account',
+                      {
+                        operationId: op.id,
+                        operationNumber: op.number,
+                        matchedAccountId: op.matchedAccountId,
+                      }
+                    );
+                  } else if (
+                    !targetAccount &&
+                    sourceAccount &&
+                    sourceAccount.id !== matchedAccount.id
+                  ) {
+                    // targetAccount не найден, sourceAccount найден и отличается от выбранного
+                    targetAccount = matchedAccount;
+                    logger.info(
+                      'Using matchedAccountId as fallback for target account',
+                      {
+                        operationId: op.id,
+                        operationNumber: op.number,
+                        matchedAccountId: op.matchedAccountId,
+                      }
+                    );
+                  }
+                }
+
+                // Логируем результаты поиска счетов
+                logger.info('Account lookup results for transfer', {
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  payerAccount: op.payerAccount,
+                  receiverAccount: op.receiverAccount,
+                  matchedAccountId: op.matchedAccountId,
+                  sourceAccountFound: !!sourceAccount,
+                  sourceAccountId: sourceAccount?.id,
+                  targetAccountFound: !!targetAccount,
+                  targetAccountId: targetAccount?.id,
+                });
+
                 if (!sourceAccount || !targetAccount) {
+                  const missingAccounts: string[] = [];
+                  if (!sourceAccount) {
+                    if (op.payerAccount) {
+                      missingAccounts.push(
+                        `счет плательщика: ${op.payerAccount}`
+                      );
+                    } else {
+                      missingAccounts.push('счет плательщика не указан');
+                    }
+                  }
+                  if (!targetAccount) {
+                    if (op.receiverAccount) {
+                      missingAccounts.push(
+                        `счет получателя: ${op.receiverAccount}`
+                      );
+                    } else {
+                      missingAccounts.push('счет получателя не указан');
+                    }
+                  }
+
+                  // Логируем детали ошибки
+                  logger.error('Transfer operation: accounts not found', {
+                    operationId: op.id,
+                    operationNumber: op.number,
+                    payerAccount: op.payerAccount,
+                    receiverAccount: op.receiverAccount,
+                    matchedAccountId: op.matchedAccountId,
+                    sourceAccountFound: !!sourceAccount,
+                    targetAccountFound: !!targetAccount,
+                    missingAccounts,
+                    companyId,
+                  });
+
+                  // Формируем понятное сообщение об ошибке
+                  let errorMessage = `Операция ${op.number || op.id}: не найдены счета для перевода. `;
+                  if (missingAccounts.length > 0) {
+                    errorMessage += `Не найдены: ${missingAccounts.join(', ')}. `;
+                  }
+
+                  // Если оба счета не найдены, объясняем что нужно
+                  if (!sourceAccount && !targetAccount) {
+                    errorMessage +=
+                      'Для перевода нужны два разных счета. Добавьте счета с указанными номерами в справочник или убедитесь, что хотя бы один из счетов найден по номеру из выписки.';
+                  } else {
+                    errorMessage +=
+                      'Выберите счет в таблице (он будет использован для недостающего счета) или добавьте счет с указанным номером в справочник.';
+                  }
+
+                  throw new AppError(errorMessage, 400);
+                }
+
+                // Проверяем, что счета разные
+                if (sourceAccount.id === targetAccount.id) {
                   throw new AppError(
-                    `Cannot find accounts for transfer operation ${op.id}`,
+                    `Операция ${op.number || op.id}: счета плательщика и получателя не могут быть одинаковыми для перевода. Для перевода нужны два разных счета.`,
                     400
                   );
                 }
 
                 operationData.sourceAccountId = sourceAccount.id;
                 operationData.targetAccountId = targetAccount.id;
+
+                logger.info('Transfer operation data prepared', {
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  sourceAccountId: sourceAccount.id,
+                  targetAccountId: targetAccount.id,
+                  operationData,
+                });
               } else {
                 operationData.accountId = op.matchedAccountId;
                 operationData.articleId = op.matchedArticleId;
@@ -746,8 +1041,31 @@ export class ImportsService {
                 operationData.departmentId = op.matchedDepartmentId;
               }
 
-              // Создаем операцию через сервис
-              await operationsService.create(companyId, operationData);
+              // Логируем данные перед созданием операции
+              logger.info('Creating operation', {
+                operationId: op.id,
+                operationNumber: op.number,
+                direction: op.direction,
+                operationData,
+                companyId,
+              });
+
+              // Создаем операцию через prisma напрямую
+              const createdOperation = await tx.operation.create({
+                data: {
+                  ...operationData,
+                  companyId,
+                  isTemplate: false,
+                  isConfirmed: true,
+                },
+              });
+
+              logger.info('Operation created successfully', {
+                operationId: op.id,
+                operationNumber: op.number,
+                createdOperationId: createdOperation.id,
+                direction: op.direction,
+              });
 
               // Помечаем как обработанную
               await tx.importedOperation.update({
@@ -805,13 +1123,20 @@ export class ImportsService {
               created++;
             } catch (error: any) {
               errors++;
+              const errorMessage = error?.message || String(error);
+
+              // Сохраняем детальное сообщение об ошибке
+              errorMessages.push(
+                `Операция ${op.number || op.id}: ${errorMessage}`
+              );
+
               logger.error('Failed to import operation', {
                 sessionId,
                 companyId,
                 operationId: op.id,
                 operationNumber: op.number,
                 operationDate: op.date,
-                error: error?.message || String(error),
+                error: errorMessage,
                 stack: error?.stack,
               });
               // Продолжаем обработку остальных операций в батче
@@ -820,15 +1145,20 @@ export class ImportsService {
         });
       } catch (error: any) {
         // Логируем ошибку батча, но продолжаем обработку следующих батчей
+        const errorMessage = error?.message || String(error);
         logger.error('Failed to import batch', {
           sessionId,
           companyId,
           batchSize: batch.length,
-          error: error?.message || String(error),
+          error: errorMessage,
           stack: error?.stack,
         });
-        // Помечаем все операции в батче как ошибки
+
+        // Помечаем все операции в батче как ошибки и сохраняем сообщение
         errors += batch.length;
+        for (const op of batch) {
+          errorMessages.push(`Операция ${op.number || op.id}: ${errorMessage}`);
+        }
       }
     }
 
@@ -851,6 +1181,7 @@ export class ImportsService {
       created,
       errors,
       sessionId,
+      errorMessages: errorMessages.length > 0 ? errorMessages : undefined,
     };
   }
 
@@ -977,6 +1308,29 @@ export class ImportsService {
   }
 
   /**
+   * Получает информацию о сессии импорта
+   */
+  async getImportSession(sessionId: string, companyId: string) {
+    const session = await sessionService.getSession(sessionId, companyId);
+
+    // Получаем количество обработанных операций
+    const processedCount = await prisma.importedOperation.count({
+      where: { importSessionId: sessionId, companyId },
+    });
+
+    return {
+      id: session.id,
+      fileName: session.fileName,
+      status: session.status,
+      importedCount: session.importedCount,
+      processedCount,
+      confirmedCount: session.confirmedCount,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+    };
+  }
+
+  /**
    * Получает историю импортов
    */
   async getImportSessions(
@@ -1000,6 +1354,18 @@ export class ImportsService {
     ]);
 
     return { sessions, total };
+  }
+
+  /**
+   * Получает общее количество импортированных операций (processed) для компании
+   */
+  async getTotalImportedOperationsCount(companyId: string): Promise<number> {
+    return prisma.importedOperation.count({
+      where: {
+        companyId,
+        processed: true,
+      },
+    });
   }
 }
 
