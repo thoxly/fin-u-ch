@@ -25,7 +25,16 @@ interface Integration {
 
 interface IntegrationsDropdownProps {
   integrations: Integration[];
-  onIntegrationUpdate: (integrationId: string, data: any) => void;
+  onIntegrationUpdate: (
+    integrationId: string,
+    data: {
+      clientKey: string;
+      apiKey: string;
+      paymentSchedule: 'next_week' | 'week_after';
+      articleId: string;
+      accountId: string;
+    }
+  ) => void;
   onIntegrationDisconnect: (integrationId: string) => void;
   isLoading?: boolean;
 }

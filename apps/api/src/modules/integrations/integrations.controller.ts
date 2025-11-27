@@ -4,6 +4,7 @@ import { TenantRequest } from '../../middlewares/tenant';
 import integrationsService from './integrations.service';
 import ozonOperationService from './ozon/ozon-operation.service';
 import prisma from '../../config/db';
+import { AppError } from '../../middlewares/error';
 
 export class IntegrationsController {
   async saveOzonIntegration(
@@ -12,9 +13,41 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      const { clientKey, apiKey, paymentSchedule, articleId, accountId } =
+        req.body;
+
+      // Валидация обязательных полей
+      if (!clientKey || typeof clientKey !== 'string') {
+        throw new AppError('clientKey обязателен и должен быть строкой', 400);
+      }
+      if (!apiKey || typeof apiKey !== 'string') {
+        throw new AppError('apiKey обязателен и должен быть строкой', 400);
+      }
+      if (
+        !paymentSchedule ||
+        !['next_week', 'week_after'].includes(paymentSchedule)
+      ) {
+        throw new AppError(
+          'paymentSchedule должен быть "next_week" или "week_after"',
+          400
+        );
+      }
+      if (!articleId || typeof articleId !== 'string') {
+        throw new AppError('articleId обязателен и должен быть строкой', 400);
+      }
+      if (!accountId || typeof accountId !== 'string') {
+        throw new AppError('accountId обязателен и должен быть строкой', 400);
+      }
+
       const result = await integrationsService.saveOzonIntegration(
         req.companyId!,
-        req.body
+        {
+          clientKey,
+          apiKey,
+          paymentSchedule,
+          articleId,
+          accountId,
+        }
       );
       res.json(result);
     } catch (error) {
@@ -75,11 +108,13 @@ export class IntegrationsController {
             'Операция не создана (возможно, сумма 0 или операция уже существует)',
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Ошибка при ручном тестировании интеграции:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Ошибка при тестировании интеграции';
       res.status(500).json({
         success: false,
-        error: error.message || 'Ошибка при тестировании интеграции',
+        error: errorMessage,
       });
     }
   }
@@ -152,10 +187,12 @@ export class IntegrationsController {
           ? 'Тестовая операция успешно создана'
           : 'Операция не создана (возможно, сумма 0 или операция уже существует)',
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Ошибка при тестировании интеграции';
       res.status(500).json({
         success: false,
-        error: error.message || 'Ошибка при тестировании интеграции',
+        error: errorMessage,
       });
     }
   }
@@ -228,11 +265,13 @@ export class IntegrationsController {
           },
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Ошибка при получении операций Ozon:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Ошибка при получении операций';
       res.status(500).json({
         success: false,
-        error: error.message || 'Ошибка при получении операций',
+        error: errorMessage,
       });
     }
   }
@@ -302,10 +341,14 @@ export class IntegrationsController {
           },
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Ошибка при получении статуса интеграции';
       res.status(500).json({
         success: false,
-        error: error.message || 'Ошибка при получении статуса интеграции',
+        error: errorMessage,
       });
     }
   }
@@ -338,10 +381,14 @@ export class IntegrationsController {
         success: true,
         data: operations,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Ошибка при получении истории операций';
       res.status(500).json({
         success: false,
-        error: error.message || 'Ошибка при получении истории операций',
+        error: errorMessage,
       });
     }
   }

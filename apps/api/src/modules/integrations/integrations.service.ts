@@ -60,15 +60,20 @@ export class IntegrationsService {
       }
 
       return response.status === 200;
-    } catch (error: any) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
       console.error('Ozon API validation error:', error);
 
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         throw new AppError('Таймаут подключения к Ozon API', 408);
       } else if (error instanceof AppError) {
         throw error;
-      } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      } else if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED')
+      ) {
         throw new AppError('Не удалось подключиться к Ozon API', 503);
       }
 
@@ -137,7 +142,7 @@ export class IntegrationsService {
           },
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof AppError) {
         return {
           success: false,

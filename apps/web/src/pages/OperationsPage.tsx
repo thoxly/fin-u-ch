@@ -93,13 +93,27 @@ export const OperationsPage = () => {
   const { showSuccess, showError } = useNotification();
 
   // Инициализируем интеграции с данными из API
-  const [integrations, setIntegrations] = useState([
+  const [integrations, setIntegrations] = useState<
+    Array<{
+      id: string;
+      name: string;
+      icon: typeof OzonIcon;
+      connected: boolean;
+      data?: {
+        clientKey?: string;
+        apiKey?: string;
+        paymentSchedule?: 'next_week' | 'week_after';
+        articleId?: string;
+        accountId?: string;
+      };
+    }>
+  >([
     {
       id: 'ozon',
       name: 'Ozon',
       icon: OzonIcon,
       connected: false,
-      data: undefined as any,
+      data: undefined,
     },
   ]);
 
@@ -265,7 +279,16 @@ export const OperationsPage = () => {
   const isMobile = useIsMobile();
   const { canCreate, canUpdate } = usePermissions();
 
-  const handleIntegrationUpdate = (integrationId: string, data: any) => {
+  const handleIntegrationUpdate = (
+    integrationId: string,
+    data: {
+      clientKey: string;
+      apiKey: string;
+      paymentSchedule: 'next_week' | 'week_after';
+      articleId: string;
+      accountId: string;
+    }
+  ) => {
     setIntegrations((prev) =>
       prev.map((integration) =>
         integration.id === integrationId
