@@ -23,6 +23,9 @@ jest.mock('../../config/db', () => ({
     account: {
       findMany: jest.fn(),
     },
+    article: {
+      count: jest.fn(),
+    },
     operation: {
       create: jest.fn(),
       update: jest.fn(),
@@ -176,6 +179,8 @@ describe('OperationsService', () => {
       (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
         { id: 'account-1' },
       ]);
+      // Mock article validation - article is leaf (no children)
+      (mockedPrisma.article.count as jest.Mock).mockResolvedValue(0);
       (mockedPrisma.operation.create as jest.Mock).mockResolvedValue({
         ...incomeOperation,
         id: 'op-1',

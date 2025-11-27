@@ -84,7 +84,8 @@ export async function generateRecurringOperations(
         // Создаем новую операцию-копию в транзакции для атомарности
         await prisma.$transaction(async (tx) => {
           // Дополнительная проверка на существование операции в транзакции
-          const existingInTx = await tx.operation.findFirst({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const existingInTx = await (tx as any).operation.findFirst({
             where: {
               recurrenceParentId: template.id,
               operationDate: today,
@@ -98,7 +99,8 @@ export async function generateRecurringOperations(
             return;
           }
 
-          await tx.operation.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (tx as any).operation.create({
             data: {
               companyId: template.companyId,
               type: template.type,

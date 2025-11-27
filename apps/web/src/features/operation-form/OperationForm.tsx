@@ -2,20 +2,16 @@ import { FormEvent, useEffect, useState } from 'react';
 import { OperationFormFields } from './OperationFormFields';
 import { OperationFormActions } from './OperationFormActions';
 import {
-  useGetArticlesQuery,
   useGetAccountsQuery,
   useGetCounterpartiesQuery,
   useGetDealsQuery,
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import type { Operation } from '@fin-u-ch/shared';
 import { OperationType, Periodicity } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '../../constants/notificationMessages';
-import {
-  formatAmountInput,
-  parseAmountInputToNumber,
-} from '../../shared/lib/numberInput';
+import { formatAmountInput } from '../../shared/lib/numberInput';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { useOperationValidation } from './useOperationValidation';
 import { useFilteredDeals } from './useFilteredDeals';
@@ -90,7 +86,8 @@ export const OperationForm = ({
       validateOperation,
     });
 
-  const { data: articles = [] } = useGetArticlesQuery();
+  // Используем только листья (статьи без дочерних) для операций
+  const { leafArticles: articles = [] } = useLeafArticles();
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
@@ -98,12 +95,10 @@ export const OperationForm = ({
 
   const filteredDeals = useFilteredDeals(counterpartyId, deals);
 
-  const { showSuccess, showError } = useNotification();
   const { canCreate, canUpdate } = usePermissions();
 
   // Определяем, можем ли редактировать форму
   const isEditing = operation?.id && !isCopy;
-  const canEdit = isEditing ? canUpdate('operations') : canCreate('operations');
   // Состояние для модалок создания
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;

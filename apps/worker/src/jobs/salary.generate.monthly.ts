@@ -1,12 +1,6 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 
-// Type helper for Prisma transaction client
-type TransactionClient = Omit<
-  typeof prisma,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
-
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
   companyId?: string; // Optional: generate for specific company only
@@ -83,9 +77,10 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx: TransactionClient) => {
+        await prisma.$transaction(async (tx) => {
           // 1. ФОТ (начисление зарплаты)
-          await tx.operation.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
@@ -101,7 +96,8 @@ export async function generateSalaryOperations(
           });
 
           // 2. Взносы (страховые взносы)
-          await tx.operation.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
@@ -117,7 +113,8 @@ export async function generateSalaryOperations(
           });
 
           // 3. НДФЛ
-          await tx.operation.create({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',

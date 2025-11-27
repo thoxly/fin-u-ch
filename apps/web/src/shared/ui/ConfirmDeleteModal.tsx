@@ -29,8 +29,13 @@ export const ConfirmDeleteModal = ({
   description,
 }: ConfirmDeleteModalProps) => {
   const handleConfirm = async () => {
-    await onConfirm();
-    onClose();
+    try {
+      await onConfirm();
+      onClose();
+    } catch (error) {
+      // При ошибке не закрываем модальное окно, чтобы пользователь мог увидеть ошибку
+      console.error('Error in confirm action:', error);
+    }
   };
 
   const variantStyles = {

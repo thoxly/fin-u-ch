@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import type {
   CashflowReport,
   BDDSReport,
@@ -7,6 +7,8 @@ import type {
 import { formatNumber } from '../../shared/lib/money';
 import { ExportMenu } from '../../shared/ui/ExportMenu';
 import { type ExportRow } from '../../shared/lib/exportData';
+import { useArticleTree } from '../../shared/hooks/useArticleTree';
+import { findArticleInTree, flattenTree } from '../../shared/lib/articleTree';
 
 interface CashflowTableProps {
   data: CashflowReport | BDDSReport;
@@ -15,6 +17,7 @@ interface CashflowTableProps {
   periodFrom: string;
   periodTo: string;
   title?: string;
+  articleSearchQuery?: string;
 }
 
 interface ExpandedSections {
@@ -45,10 +48,161 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   periodFrom,
   periodTo,
   title,
+  articleSearchQuery = '',
 }) => {
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>(
     {}
   );
+  const [expandedArticles, setExpandedArticles] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Загружаем дерево статей для определения родительских связей
+  const { tree: articleTree } = useArticleTree({ isActive: true });
+
+  // Создаем плоский список статей с Map для быстрого поиска
+  const articleMap = useMemo(() => {
+    const flatArticles = flattenTree(articleTree);
+    const map = new Map<
+      string,
+      { id: string; name: string; parentId?: string | null }
+    >();
+    flatArticles.forEach((article) => {
+      map.set(article.id, {
+        id: article.id,
+        name: article.name,
+        parentId: article.parentId,
+      });
+    });
+    return map;
+  }, [articleTree]);
+
+  // Находим статьи, соответствующие поисковому запросу
+  const matchedArticleIds = useMemo(() => {
+    if (!articleSearchQuery.trim()) {
+      return new Set<string>();
+    }
+
+    const query = articleSearchQuery.toLowerCase().trim();
+    const matched = new Set<string>();
+
+    // Ищем в данных отчета
+    const activitiesToSearch = data.activities || [];
+    for (const activity of activitiesToSearch) {
+      // Ищем в группах доходов
+      for (const group of activity.incomeGroups || []) {
+        if (group.articleName.toLowerCase().includes(query)) {
+          matched.add(group.articleId);
+        }
+      }
+      // Ищем в группах расходов
+      for (const group of activity.expenseGroups || []) {
+        if (group.articleName.toLowerCase().includes(query)) {
+          matched.add(group.articleId);
+        }
+      }
+    }
+
+    // Также ищем в плановых данных
+    if (planData?.activities) {
+      for (const activity of planData.activities) {
+        for (const group of activity.incomeGroups || []) {
+          if (group.articleName.toLowerCase().includes(query)) {
+            matched.add(group.articleId);
+          }
+        }
+        for (const group of activity.expenseGroups || []) {
+          if (group.articleName.toLowerCase().includes(query)) {
+            matched.add(group.articleId);
+          }
+        }
+      }
+    }
+
+    return matched;
+  }, [articleSearchQuery, data.activities, planData]);
+
+  // Определяем, какие активности нужно развернуть
+  // Если найдена дочерняя статья, разворачиваем активность, чтобы она была видна
+  const activitiesToExpand = useMemo(() => {
+    if (matchedArticleIds.size === 0) {
+      return new Set<string>();
+    }
+
+    const activities = new Set<string>();
+    const activitiesToSearch = data.activities || [];
+
+    for (const activity of activitiesToSearch) {
+      // Проверяем доходы
+      for (const group of activity.incomeGroups || []) {
+        if (matchedArticleIds.has(group.articleId)) {
+          activities.add(activity.activity);
+        }
+      }
+      // Проверяем расходы
+      for (const group of activity.expenseGroups || []) {
+        if (matchedArticleIds.has(group.articleId)) {
+          activities.add(activity.activity);
+        }
+      }
+    }
+
+    // Также проверяем плановые данные
+    if (planData?.activities) {
+      for (const activity of planData.activities) {
+        for (const group of activity.incomeGroups || []) {
+          if (matchedArticleIds.has(group.articleId)) {
+            activities.add(activity.activity);
+          }
+        }
+        for (const group of activity.expenseGroups || []) {
+          if (matchedArticleIds.has(group.articleId)) {
+            activities.add(activity.activity);
+          }
+        }
+      }
+    }
+
+    return activities;
+  }, [matchedArticleIds, data.activities, planData]);
+
+  // Автоматически разворачиваем активности с найденными статьями
+  useEffect(() => {
+    if (activitiesToExpand.size > 0) {
+      setExpandedSections((prev) => {
+        const updated = { ...prev };
+        activitiesToExpand.forEach((activity) => {
+          updated[activity] = true;
+        });
+        return updated;
+      });
+    }
+  }, [activitiesToExpand]);
+
+  // Автоматически разворачиваем родительские статьи для найденных дочерних статей
+  useEffect(() => {
+    if (matchedArticleIds.size > 0) {
+      setExpandedArticles((prev) => {
+        const newSet = new Set(prev);
+
+        // Для каждой найденной статьи находим всех её родителей и разворачиваем их
+        matchedArticleIds.forEach((articleId) => {
+          const article = articleMap.get(articleId);
+          if (article?.parentId) {
+            // Находим всех родителей рекурсивно
+            let currentParentId = article.parentId;
+            while (currentParentId) {
+              newSet.add(currentParentId);
+              const parentArticle = articleMap.get(currentParentId);
+              currentParentId = parentArticle?.parentId || null;
+            }
+          }
+        });
+
+        return newSet;
+      });
+    }
+  }, [matchedArticleIds, articleMap]);
 
   const hasFactData = data.activities.length > 0;
 
@@ -57,6 +211,18 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       ...prev,
       [activity]: !prev[activity],
     }));
+  };
+
+  const toggleArticle = (articleId: string) => {
+    setExpandedArticles((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(articleId)) {
+        newSet.delete(articleId);
+      } else {
+        newSet.add(articleId);
+      }
+      return newSet;
+    });
   };
 
   const allMonths = useMemo(() => {
@@ -368,6 +534,181 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return colors[activity] || '#6B7280';
   };
 
+  // Рекурсивная функция для рендеринга статьи и её дочерних статей
+  const renderArticleRow = (
+    group: (typeof data.activities)[0]['incomeGroups'][0],
+    activity: string,
+    type: 'income' | 'expense',
+    depth: number = 0,
+    planGroupMap?: Map<string, (typeof data.activities)[0]['incomeGroups'][0]>
+  ): React.ReactNode[] => {
+    const planGroup =
+      planGroupMap?.get(group.articleId) || (!hasFactData ? group : undefined);
+    const articleName = planGroup?.articleName || group.articleName;
+    const isMatched = matchedArticleIds.has(group.articleId);
+    const hasChildren = group.children && group.children.length > 0;
+    const isExpanded = expandedArticles.has(group.articleId);
+    const paddingLeft = 10 + depth * 20; // Отступ для вложенности
+
+    const rows: React.ReactNode[] = [];
+
+    // Рендерим саму статью
+    rows.push(
+      <tr
+        key={`${activity}-${type}-${group.articleId}`}
+        className={`bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100 ${
+          isMatched
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700'
+            : ''
+        }`}
+      >
+        <td
+          className={`px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)] ${
+            isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20 font-semibold' : ''
+          } ${hasChildren ? 'cursor-pointer' : ''}`}
+          style={{
+            width: `${columnWidths.article}px`,
+            paddingLeft: `${paddingLeft}px`,
+          }}
+          onClick={
+            hasChildren ? () => toggleArticle(group.articleId) : undefined
+          }
+        >
+          <div className="flex items-center gap-2">
+            {hasChildren && (
+              <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
+                {isExpanded ? '▾' : '▸'}
+              </span>
+            )}
+            {!hasChildren && depth > 0 && (
+              <span className="text-gray-400 dark:text-gray-600 w-4">•</span>
+            )}
+            <span
+              className={
+                group.hasOperations ? 'font-semibold' : 'font-normal opacity-75'
+              }
+            >
+              {articleName}
+            </span>
+          </div>
+        </td>
+        {allMonths.map((month) => {
+          const factAmount = hasFactData
+            ? group.months.find((m) => m.month === month)?.amount || 0
+            : 0;
+          const planAmount = getPlanAmount(group.articleId, month);
+
+          if (showPlan) {
+            return (
+              <React.Fragment
+                key={`${activity}-${type}-${group.articleId}-${month}`}
+              >
+                <td
+                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
+                    isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                  }`}
+                  style={{
+                    minWidth: `${subColumnWidth}px`,
+                  }}
+                >
+                  {planAmount !== 0 && type === 'income' && (
+                    <span className="text-green-600 dark:text-green-400 mr-1">
+                      ▲
+                    </span>
+                  )}
+                  {planAmount !== 0 && type === 'expense' && (
+                    <span className="text-red-600 dark:text-red-400 mr-1">
+                      ▼
+                    </span>
+                  )}
+                  {formatNumber(planAmount)}
+                </td>
+                <td
+                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
+                    isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+                  }`}
+                  style={{
+                    minWidth: `${subColumnWidth}px`,
+                  }}
+                >
+                  {factAmount !== 0 && type === 'income' && (
+                    <span className="text-green-600 dark:text-green-400 mr-1">
+                      ▲
+                    </span>
+                  )}
+                  {factAmount !== 0 && type === 'expense' && (
+                    <span className="text-red-600 dark:text-red-400 mr-1">
+                      ▼
+                    </span>
+                  )}
+                  {formatNumber(factAmount)}
+                </td>
+              </React.Fragment>
+            );
+          }
+
+          return (
+            <td
+              key={`${activity}-${type}-${group.articleId}-${month}`}
+              className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
+                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+              }`}
+              style={{
+                minWidth: `${columnWidths.month}px`,
+              }}
+            >
+              {factAmount !== 0 && type === 'income' && (
+                <span className="text-green-600 dark:text-green-400 mr-1">
+                  ▲
+                </span>
+              )}
+              {factAmount !== 0 && type === 'expense' && (
+                <span className="text-red-600 dark:text-red-400 mr-1">▼</span>
+              )}
+              {formatNumber(factAmount)}
+            </td>
+          );
+        })}
+        <td
+          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums ${
+            isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+          }`}
+          style={{
+            minWidth: `${columnWidths.total}px`,
+          }}
+        >
+          {(() => {
+            const total = hasFactData ? group.total : planGroup?.total || 0;
+            return (
+              <>
+                {total !== 0 && type === 'income' && (
+                  <span className="text-green-600 dark:text-green-400 mr-1">
+                    ▲
+                  </span>
+                )}
+                {total !== 0 && type === 'expense' && (
+                  <span className="text-red-600 dark:text-red-400 mr-1">▼</span>
+                )}
+                {formatNumber(total)}
+              </>
+            );
+          })()}
+        </td>
+      </tr>
+    );
+
+    // Рекурсивно рендерим дочерние статьи, если статья развернута
+    if (hasChildren && isExpanded && group.children) {
+      for (const child of group.children) {
+        rows.push(
+          ...renderArticleRow(child, activity, type, depth + 1, planGroupMap)
+        );
+      }
+    }
+
+    return rows;
+  };
+
   const renderMonthlyCells = (
     params: {
       month: string;
@@ -583,113 +924,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : incomePlanGroups;
 
                         return incomeGroupsToRender
-                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            const planGroup =
-                              incomePlanMap.get(group.articleId) ||
-                              (!hasFactData ? group : undefined);
-                            const articleName =
-                              planGroup?.articleName || group.articleName;
-
-                            return (
-                              <tr
-                                key={`${activity.activity}-income-${group.articleId}`}
-                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
-                              >
-                                <td
-                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
-                                  style={{ width: `${columnWidths.article}px` }}
-                                >
-                                  {articleName}
-                                </td>
-                                {allMonths.map((month) => {
-                                  const factAmount = hasFactData
-                                    ? group.months.find(
-                                        (m) => m.month === month
-                                      )?.amount || 0
-                                    : 0;
-                                  const planAmount = getPlanAmount(
-                                    group.articleId,
-                                    month
-                                  );
-
-                                  if (showPlan) {
-                                    return (
-                                      <React.Fragment
-                                        key={`${activity.activity}-income-${group.articleId}-${month}`}
-                                      >
-                                        <td
-                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                          style={{
-                                            minWidth: `${subColumnWidth}px`,
-                                          }}
-                                        >
-                                          {planAmount !== 0 && (
-                                            <span className="text-green-600 dark:text-green-400 mr-1">
-                                              ▲
-                                            </span>
-                                          )}
-                                          {formatNumber(planAmount)}
-                                        </td>
-                                        <td
-                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                          style={{
-                                            minWidth: `${subColumnWidth}px`,
-                                          }}
-                                        >
-                                          {factAmount !== 0 && (
-                                            <span className="text-green-600 dark:text-green-400 mr-1">
-                                              ▲
-                                            </span>
-                                          )}
-                                          {formatNumber(factAmount)}
-                                        </td>
-                                      </React.Fragment>
-                                    );
-                                  }
-
-                                  return (
-                                    <td
-                                      key={`${activity.activity}-income-${group.articleId}-${month}`}
-                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                      style={{
-                                        minWidth: `${columnWidths.month}px`,
-                                      }}
-                                    >
-                                      {factAmount !== 0 && (
-                                        <span className="text-green-600 dark:text-green-400 mr-1">
-                                          ▲
-                                        </span>
-                                      )}
-                                      {formatNumber(factAmount)}
-                                    </td>
-                                  );
-                                })}
-                                <td
-                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
-                                  style={{
-                                    minWidth: `${columnWidths.total}px`,
-                                  }}
-                                >
-                                  {(() => {
-                                    const total = hasFactData
-                                      ? group.total
-                                      : planGroup?.total || 0;
-                                    return (
-                                      <>
-                                        {total !== 0 && (
-                                          <span className="text-green-600 dark:text-green-400 mr-1">
-                                            ▲
-                                          </span>
-                                        )}
-                                        {formatNumber(total)}
-                                      </>
-                                    );
-                                  })()}
-                                </td>
-                              </tr>
+                            return renderArticleRow(
+                              group,
+                              activity.activity,
+                              'income',
+                              0,
+                              incomePlanMap
                             );
-                          });
+                          })
+                          .flat();
                       })()}
 
                       {(() => {
@@ -706,113 +950,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : expensePlanGroups;
 
                         return expenseGroupsToRender
-                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            const planGroup =
-                              expensePlanMap.get(group.articleId) ||
-                              (!hasFactData ? group : undefined);
-                            const articleName =
-                              planGroup?.articleName || group.articleName;
-
-                            return (
-                              <tr
-                                key={`${activity.activity}-expense-${group.articleId}`}
-                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
-                              >
-                                <td
-                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
-                                  style={{ width: `${columnWidths.article}px` }}
-                                >
-                                  {articleName}
-                                </td>
-                                {allMonths.map((month) => {
-                                  const factAmount = hasFactData
-                                    ? group.months.find(
-                                        (m) => m.month === month
-                                      )?.amount || 0
-                                    : 0;
-                                  const planAmount = getPlanAmount(
-                                    group.articleId,
-                                    month
-                                  );
-
-                                  if (showPlan) {
-                                    return (
-                                      <React.Fragment
-                                        key={`${activity.activity}-expense-${group.articleId}-${month}`}
-                                      >
-                                        <td
-                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                          style={{
-                                            minWidth: `${subColumnWidth}px`,
-                                          }}
-                                        >
-                                          {planAmount !== 0 && (
-                                            <span className="text-red-600 dark:text-red-400 mr-1">
-                                              ▼
-                                            </span>
-                                          )}
-                                          {formatNumber(planAmount)}
-                                        </td>
-                                        <td
-                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                          style={{
-                                            minWidth: `${subColumnWidth}px`,
-                                          }}
-                                        >
-                                          {factAmount !== 0 && (
-                                            <span className="text-red-600 dark:text-red-400 mr-1">
-                                              ▼
-                                            </span>
-                                          )}
-                                          {formatNumber(factAmount)}
-                                        </td>
-                                      </React.Fragment>
-                                    );
-                                  }
-
-                                  return (
-                                    <td
-                                      key={`${activity.activity}-expense-${group.articleId}-${month}`}
-                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
-                                      style={{
-                                        minWidth: `${columnWidths.month}px`,
-                                      }}
-                                    >
-                                      {factAmount !== 0 && (
-                                        <span className="text-red-600 dark:text-red-400 mr-1">
-                                          ▼
-                                        </span>
-                                      )}
-                                      {formatNumber(factAmount)}
-                                    </td>
-                                  );
-                                })}
-                                <td
-                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
-                                  style={{
-                                    minWidth: `${columnWidths.total}px`,
-                                  }}
-                                >
-                                  {(() => {
-                                    const total = hasFactData
-                                      ? group.total
-                                      : planGroup?.total || 0;
-                                    return (
-                                      <>
-                                        {total !== 0 && (
-                                          <span className="text-red-600 dark:text-red-400 mr-1">
-                                            ▼
-                                          </span>
-                                        )}
-                                        {formatNumber(total)}
-                                      </>
-                                    );
-                                  })()}
-                                </td>
-                              </tr>
+                            return renderArticleRow(
+                              group,
+                              activity.activity,
+                              'expense',
+                              0,
+                              expensePlanMap
                             );
-                          });
+                          })
+                          .flat();
                       })()}
                     </>
                   )}
