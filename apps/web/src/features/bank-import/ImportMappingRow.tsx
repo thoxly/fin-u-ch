@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo, useEffect } from 'react';
 import {
   useGetCounterpartiesQuery,
   useGetArticlesQuery,
@@ -10,6 +10,15 @@ import { useUpdateImportedOperationMutation } from '../../store/api/importsApi';
 import { Select } from '../../shared/ui/Select';
 import { useNotification } from '../../shared/hooks/useNotification';
 import type { ImportedOperation } from '@shared/types/imports';
+
+export interface AnchorRect {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  width: number;
+  height: number;
+}
 
 interface ImportMappingRowProps {
   operation: ImportedOperation;
@@ -31,19 +40,69 @@ interface ImportMappingRowProps {
       | 'deal'
       | 'department'
       | 'currency',
-    operation: ImportedOperation
+    operation: ImportedOperation,
+    anchorRect?: AnchorRect | null
   ) => void;
+  onFieldUpdate?: (
+    operation: ImportedOperation,
+    field:
+      | 'counterparty'
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'currency'
+      | 'direction',
+    value: string,
+    updateData: Record<string, unknown>,
+    anchorRect?: AnchorRect | null
+  ) => Promise<boolean>; // Возвращает true если показан popover, false если нет
   disabled?: boolean;
+  isModalOpen?: boolean; // Флаг открытия модалки создания
 }
 
-export const ImportMappingRow = ({
+// Проверяем, является ли поле обязательным
+const isRequiredField = (field: string): boolean => {
+  return ['direction', 'article', 'account', 'currency'].includes(field);
+};
+
+// Проверяем, заполнено ли обязательное поле
+const isFieldFilled = (
+  operation: ImportedOperation,
+  field: string
+): boolean => {
+  switch (field) {
+    case 'direction':
+      return !!operation.direction;
+    case 'article':
+      return !!operation.matchedArticleId;
+    case 'account':
+      return !!operation.matchedAccountId;
+    case 'currency':
+      return !!operation.currency;
+    default:
+      return true;
+  }
+};
+
+const ImportMappingRowComponent = ({
   operation,
   field,
   sessionId: _sessionId,
   onOpenCreateModal,
+  onFieldUpdate,
   disabled = false,
+  isModalOpen = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [lastClickRect, setLastClickRect] = useState<AnchorRect | null>(null);
+
+  // Закрываем селектор при открытии модалки создания
+  useEffect(() => {
+    if (isModalOpen) {
+      setIsEditing(false);
+    }
+  }, [isModalOpen]);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
@@ -52,7 +111,7 @@ export const ImportMappingRow = ({
   const { data: departments = [] } = useGetDepartmentsQuery();
 
   const [updateOperation] = useUpdateImportedOperationMutation();
-  const { showSuccess, showError } = useNotification();
+  const { showError } = useNotification();
 
   const getCurrentValue = () => {
     switch (field) {
@@ -103,7 +162,7 @@ export const ImportMappingRow = ({
   const getDirectionLabel = (direction: string | null | undefined) => {
     const labels: Record<string, string> = {
       income: 'Поступление',
-      expense: 'Расход',
+      expense: 'Списание',
       transfer: 'Перевод',
     };
     return direction ? labels[direction] || direction : 'Не определено';
@@ -127,21 +186,18 @@ export const ImportMappingRow = ({
     switch (field) {
       case 'counterparty':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name }))
         );
         break;
       case 'article':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...articles.map((a) => ({ value: a.id, label: a.name }))
         );
         break;
       case 'account':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...accounts
             .filter((a) => a.isActive)
@@ -150,21 +206,18 @@ export const ImportMappingRow = ({
         break;
       case 'deal':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...deals.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'department':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: '', label: 'Не выбрано' },
           ...departments.map((d) => ({ value: d.id, label: d.name }))
         );
         break;
       case 'currency':
         baseOptions.push(
-          { value: '__create__', label: '+ Добавить новый' },
           { value: 'RUB', label: 'RUB' },
           { value: 'USD', label: 'USD' },
           { value: 'EUR', label: 'EUR' }
@@ -185,7 +238,7 @@ export const ImportMappingRow = ({
         baseOptions.push(
           { value: '', label: 'Не определено' },
           { value: 'income', label: 'Поступление' },
-          { value: 'expense', label: 'Расход' },
+          { value: 'expense', label: 'Списание' },
           { value: 'transfer', label: 'Перевод' }
         );
         break;
@@ -193,23 +246,21 @@ export const ImportMappingRow = ({
     return baseOptions;
   };
 
-  const handleChange = async (value: string) => {
-    // Если выбрана опция создания, открываем offcanvas
-    if (value === '__create__') {
-      if (
-        field === 'counterparty' ||
-        field === 'article' ||
-        field === 'account' ||
-        field === 'deal' ||
-        field === 'department' ||
-        field === 'currency'
-      ) {
-        onOpenCreateModal(field, operation);
-        setIsEditing(false);
-      }
-      return;
+  const handleCreateNew = () => {
+    if (
+      field === 'counterparty' ||
+      field === 'article' ||
+      field === 'account' ||
+      field === 'deal' ||
+      field === 'department' ||
+      field === 'currency'
+    ) {
+      // Передаем сохраненную позицию элемента для показа popover после создания
+      onOpenCreateModal(field, operation, lastClickRect);
     }
+  };
 
+  const handleChange = async (value: string) => {
     try {
       const updateData: {
         matchedCounterpartyId?: string | null;
@@ -219,7 +270,7 @@ export const ImportMappingRow = ({
         matchedDepartmentId?: string | null;
         currency?: string;
         repeat?: string;
-        direction?: string | null;
+        direction?: 'income' | 'expense' | 'transfer' | null;
       } = {};
 
       if (field === 'counterparty') {
@@ -246,28 +297,56 @@ export const ImportMappingRow = ({
       } else if (field === 'repeat') {
         updateData.repeat = value;
       } else if (field === 'direction') {
-        updateData.direction = value || null;
+        updateData.direction =
+          (value as 'income' | 'expense' | 'transfer') || null;
       }
 
+      setIsEditing(false);
+
+      // СНАЧАЛА обновляем текущую операцию
       await updateOperation({
         id: operation.id,
         data: updateData,
       }).unwrap();
 
-      setIsEditing(false);
-      showSuccess('Обновлено');
+      // ЗАТЕМ проверяем похожие операции и показываем popover (только для значимых полей)
+      if (
+        field !== 'repeat' &&
+        onFieldUpdate &&
+        lastClickRect &&
+        (field === 'counterparty' ||
+          field === 'article' ||
+          field === 'account' ||
+          field === 'deal' ||
+          field === 'department' ||
+          field === 'currency' ||
+          field === 'direction')
+      ) {
+        // Проверяем наличие похожих операций
+        // Результат игнорируем, так как операция уже обновлена
+        await onFieldUpdate(operation, field, value, updateData, lastClickRect);
+      }
     } catch (error) {
       showError('Ошибка при обновлении');
     }
   };
 
   if (isEditing && !disabled) {
+    const canCreate =
+      field === 'counterparty' ||
+      field === 'article' ||
+      field === 'account' ||
+      field === 'deal' ||
+      field === 'department' ||
+      field === 'currency';
+
     return (
       <div className="relative w-full">
         <Select
           value={getCurrentValue()}
           onChange={handleChange}
           options={getOptions()}
+          onCreateNew={canCreate ? handleCreateNew : undefined}
           className="w-full"
         />
       </div>
@@ -293,7 +372,20 @@ export const ImportMappingRow = ({
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:opacity-80'
         }`}
-        onClick={() => !disabled && setIsEditing(true)}
+        onClick={(e) => {
+          if (!disabled) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setLastClickRect({
+              top: rect.top,
+              bottom: rect.bottom,
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
+            });
+            setIsEditing(true);
+          }
+        }}
         title={
           disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
@@ -303,12 +395,13 @@ export const ImportMappingRow = ({
     );
   }
 
-  // Для account показываем номер счета серым текстом
+  // Для account показываем номер счета серым текстом (только если счет выбран)
   if (field === 'account') {
-    const accountNumber =
-      operation.direction === 'expense'
-        ? operation.payerAccount
-        : operation.receiverAccount;
+    // Показываем номер только выбранного счета из справочника
+    const selectedAccount = accounts.find(
+      (acc) => acc.id === operation.matchedAccountId
+    );
+    const selectedAccountNumber = selectedAccount?.number;
 
     return (
       <div
@@ -317,15 +410,28 @@ export const ImportMappingRow = ({
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
         }`}
-        onClick={() => !disabled && setIsEditing(true)}
+        onClick={(e) => {
+          if (!disabled) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            setLastClickRect({
+              top: rect.top,
+              bottom: rect.bottom,
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
+            });
+            setIsEditing(true);
+          }
+        }}
         title={
           disabled ? 'Операция распределена' : 'Нажмите для редактирования'
         }
       >
         <div className="truncate">{getDisplayValue()}</div>
-        {accountNumber && (
+        {selectedAccountNumber && (
           <div className="text-gray-500 dark:text-gray-400 mt-1 text-xs">
-            {accountNumber}
+            {selectedAccountNumber}
           </div>
         )}
       </div>
@@ -339,10 +445,98 @@ export const ImportMappingRow = ({
           ? 'opacity-60 cursor-not-allowed'
           : 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800'
       }`}
-      onClick={() => !disabled && setIsEditing(true)}
+      onClick={(e) => {
+        if (!disabled) {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setLastClickRect({
+            top: rect.top,
+            bottom: rect.bottom,
+            left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height,
+          });
+          setIsEditing(true);
+        }
+      }}
       title={disabled ? 'Операция распределена' : 'Нажмите для редактирования'}
     >
       {getDisplayValue()}
     </div>
   );
 };
+
+// Мемоизируем компонент для избежания лишних ререндеров
+// Компонент обновляется только если изменились его пропсы
+export const ImportMappingRow = memo(
+  ImportMappingRowComponent,
+  (prevProps, nextProps) => {
+    // Возвращаем true если props НЕ изменились (пропускаем ререндер)
+    return (
+      prevProps.operation.id === nextProps.operation.id &&
+      prevProps.field === nextProps.field &&
+      prevProps.disabled === nextProps.disabled &&
+      prevProps.isModalOpen === nextProps.isModalOpen &&
+      // Сравниваем только те поля операции которые используются в компоненте
+      JSON.stringify(
+        getRelevantOperationFields(prevProps.operation, prevProps.field)
+      ) ===
+        JSON.stringify(
+          getRelevantOperationFields(nextProps.operation, nextProps.field)
+        )
+    );
+  }
+);
+
+// Вспомогательная функция для получения релевантных полей операции для данного field
+function getRelevantOperationFields(
+  operation: ImportedOperation,
+  field: string
+) {
+  const base = {
+    id: operation.id,
+    processed: operation.processed,
+  };
+
+  switch (field) {
+    case 'counterparty':
+      return {
+        ...base,
+        matchedCounterpartyId: operation.matchedCounterpartyId,
+        matchedCounterparty: operation.matchedCounterparty,
+      };
+    case 'article':
+      return {
+        ...base,
+        matchedArticleId: operation.matchedArticleId,
+        matchedArticle: operation.matchedArticle,
+        direction: operation.direction,
+      };
+    case 'account':
+      return {
+        ...base,
+        matchedAccountId: operation.matchedAccountId,
+        matchedAccount: operation.matchedAccount,
+      };
+    case 'deal':
+      return {
+        ...base,
+        matchedDealId: operation.matchedDealId,
+        matchedDeal: operation.matchedDeal,
+      };
+    case 'department':
+      return {
+        ...base,
+        matchedDepartmentId: operation.matchedDepartmentId,
+        matchedDepartment: operation.matchedDepartment,
+      };
+    case 'currency':
+      return { ...base, currency: operation.currency };
+    case 'direction':
+      return { ...base, direction: operation.direction };
+    case 'repeat':
+      return { ...base, repeat: operation.repeat };
+    default:
+      return base;
+  }
+}

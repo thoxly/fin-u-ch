@@ -13,7 +13,7 @@ export interface CreateArticleDTO {
 }
 
 export interface ArticleFilters {
-  type?: 'income' | 'expense';
+  type?: 'income' | 'expense' | 'transfer';
   activity?: 'operating' | 'investing' | 'financing';
   isActive?: boolean;
 }
@@ -65,8 +65,8 @@ export class ArticlesService {
   async create(companyId: string, data: CreateArticleDTO) {
     validateRequired({ name: data.name, type: data.type });
 
-    if (!['income', 'expense'].includes(data.type)) {
-      throw new AppError('Type must be income or expense', 400);
+    if (!['income', 'expense', 'transfer'].includes(data.type)) {
+      throw new AppError('Type must be income, expense, or transfer', 400);
     }
 
     return prisma.article.create({

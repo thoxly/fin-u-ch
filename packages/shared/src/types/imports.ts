@@ -8,12 +8,15 @@ export interface ParsedDocument {
   amount: number;
   payer?: string;
   payerInn?: string;
+  payerKpp?: string;
   payerAccount?: string;
   receiver?: string;
   receiverInn?: string;
+  receiverKpp?: string;
   receiverAccount?: string;
   purpose?: string;
   hash?: string;
+  direction?: 'income' | 'expense' | 'transfer' | null;
 }
 
 export interface ImportSession {
@@ -58,6 +61,7 @@ export interface ImportedOperation {
   confirmed: boolean;
   processed: boolean;
   draft: boolean;
+  lockedFields?: string | null; // JSON array of field names that are locked from bulk updates
   createdAt: Date;
   updatedAt: Date;
   matchedArticle?: { id: string; name: string } | null;
@@ -89,6 +93,7 @@ export interface ImportedOperationsResponse {
   confirmed: number;
   unmatched: number;
   duplicates: number;
+  companyAccountNumber?: string;
 }
 
 export interface ImportSessionsResponse {
@@ -120,6 +125,7 @@ export interface ImportFilters {
   confirmed?: boolean;
   matched?: boolean;
   duplicate?: boolean;
+  processed?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -132,6 +138,7 @@ export interface UploadStatementResult {
   importedCount: number;
   duplicatesCount: number;
   fileName: string;
+  companyAccountNumber?: string;
   parseStats?: {
     documentsStarted: number;
     documentsFound: number;
@@ -149,6 +156,7 @@ export interface ImportOperationsResult {
   created: number;
   errors: number;
   sessionId: string;
+  errorMessages?: string[];
 }
 
 /**

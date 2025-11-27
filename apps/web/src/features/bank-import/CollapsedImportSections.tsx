@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, FileCheck, X, Maximize2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useGetImportedOperationsQuery } from '../../store/api/importsApi';
 
 const STORAGE_KEY = 'bankImportModal_state';
 const EXPIRY_HOURS = 24;
@@ -11,7 +12,6 @@ interface StoredState {
   timestamp: number;
   collapsedHistory: boolean;
   collapsedMapping: boolean;
-  activeTab: 'upload' | 'history';
   viewingSessionId: string | null;
 }
 
@@ -38,7 +38,6 @@ export const CollapsedImportSections = () => {
 
           setState(parsedState);
         } catch (error) {
-          console.error('Failed to load collapsed state:', error);
           localStorage.removeItem(STORAGE_KEY);
           setState(null);
         }
@@ -85,7 +84,6 @@ export const CollapsedImportSections = () => {
         collapsedHistory: type === 'history' ? false : state.collapsedHistory,
         collapsedMapping: type === 'mapping' ? false : state.collapsedMapping,
         minimized: false,
-        activeTab: type === 'history' ? 'history' : 'upload',
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedState));
       setState(updatedState);
@@ -95,10 +93,6 @@ export const CollapsedImportSections = () => {
 
     // Сохраняем флаг для открытия модального окна
     sessionStorage.setItem('openImportModal', 'true');
-    sessionStorage.setItem(
-      'importModalTab',
-      type === 'history' ? 'history' : 'upload'
-    );
 
     // Если мы уже на странице операций, просто обновляем страницу
     if (location.pathname === '/operations') {
@@ -138,6 +132,25 @@ export const CollapsedImportSections = () => {
     }
   };
 
+  // Приоритет отображения: маппинг > история
+  // Показываем только ОДНО окошко
+  const shouldShowMapping =
+    state?.collapsedMapping && (state?.sessionId || state?.viewingSessionId);
+
+  // Получаем total количество операций для текущей сессии
+  // Хук должен быть вызван до любых ранних возвратов
+  const sessionIdForQuery = state?.sessionId || state?.viewingSessionId;
+  const { data: operationsData } = useGetImportedOperationsQuery(
+    {
+      sessionId: sessionIdForQuery || '',
+      limit: 1,
+      offset: 0,
+    },
+    {
+      skip: !sessionIdForQuery || !shouldShowMapping || !state,
+    }
+  );
+
   // Отображаем компонент, если есть свернутые секции
   if (!state) {
     return null;
@@ -151,6 +164,8 @@ export const CollapsedImportSections = () => {
   if (!hasCollapsedSections) {
     return null;
   }
+
+  const shouldShowHistory = state.collapsedHistory && !shouldShowMapping;
 
   return (
     <div className="fixed bottom-6 right-6 z-40 space-y-3 flex flex-col items-end">
@@ -200,6 +215,12 @@ export const CollapsedImportSections = () => {
                 />
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                   Импортированные операции
+                  {operationsData?.total !== undefined &&
+                    operationsData.total > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-gray-600 dark:text-gray-400">
+                        ({operationsData.total})
+                      </span>
+                    )}
                 </h3>
               </div>
               <div className="flex items-center gap-1">

@@ -14,7 +14,7 @@ export const catalogsApi = apiSlice.injectEndpoints({
     getArticles: builder.query<
       Article[],
       {
-        type?: 'income' | 'expense';
+        type?: 'income' | 'expense' | 'transfer';
         activity?: 'operating' | 'investing' | 'financing';
         isActive?: boolean;
       } | void

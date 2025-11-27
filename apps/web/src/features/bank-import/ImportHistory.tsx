@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Trash2, Eye, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -7,6 +7,7 @@ import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
 import {
   useGetImportSessionsQuery,
   useDeleteSessionMutation,
+  useGetImportedOperationsQuery,
 } from '../../store/api/importsApi';
 import { formatDate } from '../../shared/lib/date';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -22,21 +23,22 @@ interface ImportHistoryProps {
   onCollapseChange?: (collapsed: boolean) => void;
   onViewSession?: (sessionId: string) => void;
   viewingSessionId?: string | null;
+  hideHeader?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: 'Черновик',
-  confirmed: 'Подтверждено',
-  processed: 'Обработано',
-  canceled: 'Отменено',
+  draft: 'В работе',
+  confirmed: 'В работе',
+  processed: 'Завершено',
+  canceled: 'В работе',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+  draft: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   processed:
     'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  canceled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+  canceled: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
 };
 
 export const ImportHistory = ({
@@ -46,6 +48,7 @@ export const ImportHistory = ({
   onCollapseChange,
   onViewSession,
   viewingSessionId: propViewingSessionId,
+  hideHeader = false,
 }: ImportHistoryProps) => {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -64,17 +67,46 @@ export const ImportHistory = ({
 
   const limit = 20;
 
+  // Получаем total количество операций для текущей сессии
+  const { data: operationsData } = useGetImportedOperationsQuery(
+    {
+      sessionId: viewingSessionId || '',
+      limit: 1,
+      offset: 0,
+    },
+    {
+      skip: !viewingSessionId,
+    }
+  );
+
+  // Преобразуем фильтр для API: "in_progress" не передаем, фильтруем на клиенте
+  const apiStatusFilter =
+    statusFilter === 'in_progress' ? undefined : statusFilter || undefined;
+
   const { data, isLoading, refetch } = useGetImportSessionsQuery({
-    status: statusFilter || undefined,
-    limit,
-    offset: page * limit,
+    status: apiStatusFilter,
+    limit: 1000, // Получаем больше данных для клиентской фильтрации
+    offset: 0,
   });
 
   const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
   const { showSuccess, showError } = useNotification();
 
-  const sessions = data?.sessions || [];
-  const total = data?.total || 0;
+  // Фильтруем на клиенте для "В работе"
+  const allSessions = data?.sessions || [];
+  const filteredSessions = useMemo(() => {
+    if (statusFilter === 'in_progress') {
+      return allSessions.filter((s) => s.status !== 'processed');
+    }
+    if (statusFilter === 'processed') {
+      return allSessions.filter((s) => s.status === 'processed');
+    }
+    return allSessions;
+  }, [allSessions, statusFilter]);
+
+  // Применяем пагинацию к отфильтрованным результатам
+  const sessions = filteredSessions.slice(page * limit, (page + 1) * limit);
+  const total = filteredSessions.length;
 
   const handleView = (sessionId: string) => {
     if (onViewSession) {
@@ -142,26 +174,6 @@ export const ImportHistory = ({
       width: '130px',
     },
     {
-      key: 'counts',
-      header: 'Операции',
-      render: (session: ImportSession) => (
-        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
-          <div>
-            Всего: <span className="font-medium">{session.importedCount}</span>
-          </div>
-          <div>
-            Подтверждено:{' '}
-            <span className="font-medium">{session.confirmedCount}</span>
-          </div>
-          <div>
-            Обработано:{' '}
-            <span className="font-medium">{session.processedCount}</span>
-          </div>
-        </div>
-      ),
-      width: '150px',
-    },
-    {
       key: 'actions',
       header: 'Действия',
       render: (session: ImportSession) => (
@@ -201,7 +213,15 @@ export const ImportHistory = ({
     return (
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Импортированные операции</h2>
+          <h2 className="text-xl font-semibold">
+            Импортированные операции
+            {operationsData?.total !== undefined &&
+              operationsData.total > 0 && (
+                <span className="ml-2 text-base font-normal text-gray-600 dark:text-gray-400">
+                  ({operationsData.total})
+                </span>
+              )}
+          </h2>
           <Button onClick={handleCloseView} variant="secondary" size="sm">
             Назад к истории
           </Button>
@@ -250,26 +270,28 @@ export const ImportHistory = ({
   }
 
   return (
-    <div className="p-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">История импортов</h2>
-          {onCollapseChange && (
-            <button
-              onClick={() => onCollapseChange(true)}
-              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Свернуть"
-            >
-              <ChevronDown size={20} />
-            </button>
+    <div className={`${hideHeader ? '' : 'p-6'} space-y-4`}>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">История импортов</h2>
+            {onCollapseChange && (
+              <button
+                onClick={() => onCollapseChange(true)}
+                className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Свернуть"
+              >
+                <ChevronDown size={20} />
+              </button>
+            )}
+          </div>
+          {onClose && (
+            <Button onClick={onClose} variant="secondary" size="sm">
+              Закрыть
+            </Button>
           )}
         </div>
-        {onClose && (
-          <Button onClick={onClose} variant="secondary" size="sm">
-            Закрыть
-          </Button>
-        )}
-      </div>
+      )}
 
       <div className="flex items-center gap-4 mb-4">
         <Select
@@ -280,10 +302,8 @@ export const ImportHistory = ({
           }}
           options={[
             { value: '', label: 'Все статусы' },
-            { value: 'draft', label: 'Черновик' },
-            { value: 'confirmed', label: 'Подтверждено' },
-            { value: 'processed', label: 'Обработано' },
-            { value: 'canceled', label: 'Отменено' },
+            { value: 'in_progress', label: 'В работе' },
+            { value: 'processed', label: 'Завершено' },
           ]}
           placeholder="Фильтр по статусу"
           className="w-48"
