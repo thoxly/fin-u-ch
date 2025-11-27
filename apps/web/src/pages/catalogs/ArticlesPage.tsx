@@ -49,12 +49,16 @@ export const ArticlesPage = () => {
   });
 
   // Фильтры
-  const [typeFilter, setTypeFilter] = useState<'income' | 'expense' | ''>('');
+  const [typeFilter, setTypeFilter] = useState<
+    'income' | 'expense' | 'transfer' | ''
+  >('');
   const [activityFilter, setActivityFilter] = useState<
     'operating' | 'investing' | 'financing' | ''
   >('');
   const filters = {
-    ...(typeFilter && { type: typeFilter as 'income' | 'expense' }),
+    ...(typeFilter && {
+      type: typeFilter as 'income' | 'expense' | 'transfer',
+    }),
     ...(activityFilter && {
       activity: activityFilter as 'operating' | 'investing' | 'financing',
     }),
@@ -408,12 +412,15 @@ export const ArticlesPage = () => {
                       label="Тип"
                       value={typeFilter}
                       onChange={(value) =>
-                        setTypeFilter(value as 'income' | 'expense' | '')
+                        setTypeFilter(
+                          value as 'income' | 'expense' | 'transfer' | ''
+                        )
                       }
                       options={[
                         { value: '', label: 'Все типы' },
                         { value: 'income', label: 'Поступления' },
                         { value: 'expense', label: 'Списания' },
+                        { value: 'transfer', label: 'Перевод' },
                       ]}
                       placeholder="Выберите тип"
                       fullWidth={false}

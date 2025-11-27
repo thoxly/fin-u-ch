@@ -2,6 +2,7 @@ import prisma from '../../../config/db';
 import { compareTwoStrings } from 'string-similarity';
 import { ParsedDocument } from '../parsers/clientBankExchange.parser';
 import logger from '../../../config/logger';
+import { determineOperationDirection } from '@fin-u-ch/shared';
 
 export interface MatchingResult {
   matchedArticleId?: string;
@@ -13,61 +14,47 @@ export interface MatchingResult {
 }
 
 /**
- * Определяет направление операции на основе ИНН компании
+ * Определяет направление операции на основе ИНН компании, номеров счетов и текста назначения платежа
+ * Использует улучшенный алгоритм из shared пакета
  */
 export async function determineDirection(
   payerInn: string | null | undefined,
   receiverInn: string | null | undefined,
-  companyInn: string | null | undefined
+  companyInn: string | null | undefined,
+  purpose?: string | null | undefined,
+  payerAccount?: string | null | undefined,
+  receiverAccount?: string | null | undefined,
+  companyAccountNumbers?: string[] | null
 ): Promise<'income' | 'expense' | 'transfer' | null> {
-  // Если ИНН компании не указан, возвращаем null (требует ручного выбора)
-  if (!companyInn) {
-    logger.debug('determineDirection: Company INN not set', {
+  // Создаем объект операции для анализа
+  const operation: ParsedDocument = {
+    date: new Date(),
+    amount: 0,
+    payerInn: payerInn || undefined,
+    receiverInn: receiverInn || undefined,
+    payerAccount: payerAccount || undefined,
+    receiverAccount: receiverAccount || undefined,
+    purpose: purpose || undefined,
+  };
+
+  // Используем улучшенный алгоритм определения направления
+  const result = determineOperationDirection(
+    operation,
+    companyInn,
+    companyAccountNumbers
+  );
+
+  if (result.direction) {
+    logger.debug('determineDirection: Direction detected', {
+      direction: result.direction,
+      confidence: result.confidence,
+      reasons: result.reasons,
       payerInn,
       receiverInn,
+      payerAccount,
+      receiverAccount,
     });
-    return null;
-  }
-
-  // Нормализуем ИНН (убираем пробелы)
-  const normalizedCompanyInn = companyInn.replace(/\s/g, '').trim();
-  const normalizedPayerInn = payerInn?.replace(/\s/g, '').trim() || null;
-  const normalizedReceiverInn = receiverInn?.replace(/\s/g, '').trim() || null;
-
-  // Если плательщик и получатель - одна и та же компания
-  if (
-    normalizedPayerInn &&
-    normalizedReceiverInn &&
-    normalizedPayerInn === normalizedCompanyInn &&
-    normalizedReceiverInn === normalizedCompanyInn
-  ) {
-    logger.debug(
-      'determineDirection: Transfer detected (same company as payer and receiver)'
-    );
-    return 'transfer';
-  }
-
-  // Если плательщик - наша компания (и получатель - не наша компания)
-  if (
-    normalizedPayerInn &&
-    normalizedPayerInn === normalizedCompanyInn &&
-    normalizedReceiverInn !== normalizedCompanyInn
-  ) {
-    logger.debug('determineDirection: Expense detected (company is payer)', {
-      payerInn: normalizedPayerInn,
-      companyInn: normalizedCompanyInn,
-      receiverInn: normalizedReceiverInn,
-    });
-    return 'expense';
-  }
-
-  // Если получатель - наша компания (и плательщик - не наша компания)
-  if (
-    normalizedReceiverInn &&
-    normalizedReceiverInn === normalizedCompanyInn &&
-    normalizedPayerInn !== normalizedCompanyInn
-  ) {
-    return 'income';
+    return result.direction;
   }
 
   // Не удалось определить
@@ -402,6 +389,67 @@ export async function matchArticle(
 
   // 2. Сопоставление по ключевым словам (предустановленные правила)
   const keywordRules: Array<{ keywords: string[]; articleNames: string[] }> = [
+    // Специфичные правила для зарплаты (проверяем раньше налогов, чтобы "Без налога" не перехватывало)
+    {
+      keywords: [
+        'зарплата',
+        'отпускные',
+        'аванс',
+        'премия',
+        'заработная плата',
+        'зарплата (аванс)',
+        'зарплата за',
+      ],
+      articleNames: ['Зарплата', 'Выплаты персоналу', 'ФОТ'],
+    },
+    // Аренда (проверяем раньше выручки, чтобы "оплата счета за аренду" не попадала в выручку)
+    {
+      keywords: [
+        'аренда',
+        'за аренду',
+        'аренда нежилых помещений',
+        'нежилых помещений',
+        'аренда помещений',
+        'помещений',
+        'аренда офиса',
+        'аренда недвижимости',
+        'оренда',
+      ],
+      articleNames: [
+        'Аренда офиса',
+        'Аренда помещений',
+        'Оренда недвижимости',
+        'Аренда',
+      ],
+    },
+    // Выручка (проверяем раньше общих правил, но после более специфичных)
+    {
+      keywords: [
+        'оплата по счету',
+        'оплата счета',
+        'счет №',
+        'выручка',
+        'поступление от клиента',
+        'оплата покупателя',
+        'доход',
+        'продажа',
+        'разработка по',
+        'разработка программного обеспечения',
+        'за разработку',
+        'за разработку по',
+        'услуги по разработке',
+        'оказание услуг',
+        'оказание услуг по',
+      ],
+      articleNames: [
+        'Выручка от продаж',
+        'Доход от реализации',
+        'Поступления от клиентов',
+        'Выручка',
+      ],
+    },
+    // Налоги (общее правило, проверяем после специфичных)
+    // ВАЖНО: Исключаем упоминания НДС в составе оплаты услуг/товаров
     {
       keywords: [
         'налог',
@@ -559,7 +607,92 @@ export async function matchArticle(
     );
 
     if (hasKeyword) {
-      // Ищем статью по любому из возможных названий
+      // Специальная проверка для правила налогов: исключаем упоминания НДС в составе оплаты
+      // Например: "оплата за услуги, В том числе НДС 20%" - это не налоговый платеж
+      if (
+        keywordRule.keywords.includes('ндс') &&
+        keywordRule.articleNames.includes('Налоги')
+      ) {
+        // Паттерны, которые указывают на НДС в составе оплаты, а не на налоговый платеж
+        const vatInPaymentPatterns = [
+          /в\s+том\s+числе\s+ндс/i, // "В том числе НДС"
+          /в\s*т\.?\s*ч\.?\s*[^\w]*ндс/i, // "В т.ч. НДС", "В т.ч НДС", "В тч НДС", "В т.ч.НДС", "Вт.ч.НДС"
+          /т\.?\s*ч\.?\s*[^\w]*ндс/i, // "т.ч. НДС", "т.ч НДС", "тч НДС", "т.ч.НДС"
+          /включая\s+ндс/i, // "включая НДС"
+          /ндс\s*\(?\s*\d+\s*%?\s*\)?/i, // "НДС 20%", "НДС(20%)", "НДС (20%)"
+          /ндс\s*-\s*\d+/i, // "НДС - 2400.00"
+          /ндс\s+\d+\.\d+/i, // "НДС 2400.00"
+          /ндс\s+\d+-\d+/i, // "НДС 593103-20"
+          /в\s+сумме\s+ндс/i, // "в сумме НДС"
+          /с\s+ндс/i, // "с НДС"
+          /оплат[аы]\s+.*\s+ндс/i, // "оплата ... НДС"
+          /за\s+.*\s+ндс/i, // "за ... НДС"
+          /по\s+счету.*ндс/i, // "по счету ... НДС"
+          /реестр.*ндс/i, // "реестр ... НДС"
+          /договор.*ндс/i, // "договор ... НДС"
+          /ндс\s+не\s+облагается/i, // "НДС не облагается"
+        ];
+
+        // Если найдено упоминание НДС в контексте оплаты, пропускаем это правило
+        if (vatInPaymentPatterns.some((pattern) => pattern.test(purpose))) {
+          continue;
+        }
+
+        // Нормализуем purpose для проверок
+        const purposeLower = purpose?.toLowerCase() || '';
+
+        // Специальная проверка: если в тексте есть "т.ч." (в любом виде) и "НДС",
+        // то это почти наверняка НДС в составе оплаты, а не налоговый платеж
+        const hasTchPattern = /т\.?\s*ч\.?/i.test(purpose);
+        if (hasTchPattern && purposeLower.includes('ндс')) {
+          continue;
+        }
+
+        // Дополнительная проверка: если в описании есть слова, указывающие на оплату услуг/товаров,
+        // и при этом упоминается НДС, то это не налоговый платеж
+        const paymentContextKeywords = [
+          'оплата за',
+          'оплата по счету',
+          'за товар',
+          'за услуги',
+          'за работы',
+          'за поставку',
+          'за доставку',
+          'реестр на оплату',
+          'реестр',
+          'по договору',
+          'договор',
+          'счет',
+          'сумма',
+        ];
+
+        const hasPaymentContext = paymentContextKeywords.some((keyword) =>
+          purposeLower.includes(keyword)
+        );
+
+        // Если есть контекст оплаты и упоминание НДС, но нет явных признаков налогового платежа
+        if (hasPaymentContext && purposeLower.includes('ндс')) {
+          const taxPaymentKeywords = [
+            'уплата ндс',
+            'перечисление ндс',
+            'налог ндс',
+            'ндс к уплате',
+            'ндс в бюджет',
+            'возмещение ндс',
+          ];
+
+          const isTaxPayment = taxPaymentKeywords.some((keyword) =>
+            purposeLower.includes(keyword)
+          );
+
+          // Если нет явных признаков налогового платежа, пропускаем правило
+          if (!isTaxPayment) {
+            continue;
+          }
+        }
+      }
+
+      // Ищем статью по любому из возможных названий (используем предзагруженные статьи)
       for (const articleName of keywordRule.articleNames) {
         const article = await prisma.article.findFirst({
           where: {
@@ -655,11 +788,28 @@ export async function autoMatch(
   companyInn: string | null | undefined,
   companyAccountNumber?: string
 ): Promise<MatchingResult> {
+  // Получаем список номеров счетов компании для определения направления операции
+  const companyAccounts = await prisma.account.findMany({
+    where: {
+      companyId,
+      isActive: true,
+      number: { not: null },
+    },
+    select: { number: true },
+  });
+  const companyAccountNumbers = companyAccounts
+    .map((acc) => acc.number)
+    .filter((num): num is string => !!num);
+
   // 1. Определяем направление
   const direction = await determineDirection(
     operation.payerInn,
     operation.receiverInn,
-    companyInn
+    companyInn,
+    operation.purpose,
+    operation.payerAccount,
+    operation.receiverAccount,
+    companyAccountNumbers
   );
 
   // 2. Сопоставляем контрагента

@@ -169,7 +169,7 @@ describe('ArticlesService', () => {
         AppError
       );
       await expect(articlesService.create(companyId, data)).rejects.toThrow(
-        'Type must be income or expense'
+        'Type must be income, expense, or transfer'
       );
     });
   });

@@ -37,6 +37,9 @@ export class ImportsController {
       const matched = req.query.matched
         ? req.query.matched === 'true'
         : undefined;
+      const processed = req.query.processed
+        ? req.query.processed === 'true'
+        : undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
       const offset = req.query.offset
         ? parseInt(req.query.offset as string)
@@ -48,6 +51,7 @@ export class ImportsController {
         {
           confirmed,
           matched,
+          processed,
           limit,
           offset,
         }
@@ -130,6 +134,24 @@ export class ImportsController {
         req.userId!,
         operationIds,
         saveRulesForIds
+      );
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getImportSession(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const { sessionId } = req.params;
+      const result = await importsService.getImportSession(
+        sessionId,
+        req.companyId!
       );
 
       res.json(result);
@@ -242,6 +264,21 @@ export class ImportsController {
       });
 
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTotalImportedOperationsCount(
+    req: TenantRequest,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      const count = await importsService.getTotalImportedOperationsCount(
+        req.companyId!
+      );
+      res.json({ count });
     } catch (error) {
       next(error);
     }

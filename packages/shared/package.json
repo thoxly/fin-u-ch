@@ -9,6 +9,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./lib/operationHash": {
+      "import": "./dist/lib/operationHash.js",
+      "require": "./dist/lib/operationHash.js",
+      "types": "./dist/lib/operationHash.d.ts"
     }
   },
   "scripts": {

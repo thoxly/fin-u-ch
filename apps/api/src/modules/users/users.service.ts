@@ -15,6 +15,26 @@ import {
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
 
+// Типы для работы с пользователями и компаниями
+// Используются для правильной типизации результатов Prisma запросов с include
+type CompanySelect = {
+  id: string;
+  name: string;
+  currencyBase: string;
+  inn?: string | null;
+};
+
+type UserWithCompany<T = CompanySelect> = {
+  id: string;
+  email: string;
+  companyId: string;
+  isActive: boolean;
+  createdAt: Date;
+  firstName: string | null;
+  lastName: string | null;
+  company: T | null;
+};
+
 // Вспомогательная функция для обработки ошибок нарушения уникального ограничения Prisma
 function handleUniqueConstraintError(
   error: unknown,
@@ -205,8 +225,20 @@ export class UsersService {
     }
 
     return {
-      ...user,
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      companyId: user.companyId,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
       companyName: user.company.name,
+      company: {
+        id: user.company.id,
+        name: user.company.name,
+        currencyBase: user.company.currencyBase,
+        inn: user.company.inn,
+      },
     };
   }
 
@@ -480,69 +512,100 @@ export class UsersService {
     }
 
     // Обновляем пользователя в транзакции с проверкой companyId для предотвращения утечки данных
-    const updatedUser = await prisma.$transaction(async (tx) => {
-      // Используем updateMany для безопасной фильтрации по companyId
-      const updateResult = await tx.user.updateMany({
-        where: {
-          id: userId,
-          companyId: companyId,
-        },
-        data: {
-          ...(data.firstName !== undefined && { firstName: data.firstName }),
-          ...(data.lastName !== undefined && { lastName: data.lastName }),
-        },
-      });
+    // Полагаемся на уникальное ограничение базы данных для предотвращения race condition.
+    try {
+      const updatedUser = await prisma.$transaction(async (tx) => {
+        // Проверяем, что пользователь принадлежит к этой компании перед обновлением
+        const userCheckInTx = await tx.user.findFirst({
+          where: {
+            id: userId,
+            companyId: companyId,
+          },
+          select: { id: true },
+        });
 
-      if (updateResult.count === 0) {
-        throw new AppError('User not found or access denied', 404);
-      }
+        if (!userCheckInTx) {
+          throw new AppError('User not found or access denied', 404);
+        }
 
-      // Получаем обновленного пользователя
-      const updatedUser = await tx.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          companyId: true,
-          isActive: true,
-          isSuperAdmin: true,
-          company: {
-            select: {
-              id: true,
-              name: true,
-              currencyBase: true,
+        // Используем updateMany для безопасной фильтрации по companyId
+        const updateResult = await tx.user.updateMany({
+          where: {
+            id: userId,
+            companyId: companyId,
+          },
+          data,
+        });
+
+        if (updateResult.count === 0) {
+          throw new AppError('User not found or access denied', 404);
+        }
+
+        // Получаем обновленного пользователя
+        const updatedUser = await tx.user.findUniqueOrThrow({
+          where: { id: userId },
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+                currencyBase: true,
+                inn: true,
+              } as Prisma.CompanySelect,
             },
           },
-        },
+        });
+
+        // Типизируем результат с учетом включенных связей
+        const userWithCompany =
+          updatedUser as unknown as UserWithCompany<CompanySelect>;
+
+        if (!userWithCompany.company) {
+          throw new AppError('Company not found for user', 500);
+        }
+
+        return {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: userWithCompany.firstName,
+          lastName: userWithCompany.lastName,
+          companyId: updatedUser.companyId,
+          isActive: updatedUser.isActive,
+          company: userWithCompany.company,
+        };
       });
 
-      return updatedUser;
-    });
+      // Типизируем результат с учетом включенных связей
+      const resultWithCompany =
+        updatedUser as unknown as UserWithCompany<CompanySelect>;
 
-    return {
-      ...updatedUser,
-      companyName: updatedUser.company.name,
-    };
-  }
+      // Проверяем наличие company (должна быть, так как проверяли внутри транзакции)
+      if (!resultWithCompany.company) {
+        throw new AppError('Company not found for user', 500);
+      }
 
-  async getPreferences(userId: string, companyId: string) {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: userId,
-        companyId: companyId,
-      },
-      select: {
-        preferences: true,
-      },
-    });
-
-    if (!user) {
-      throw new AppError('User not found or access denied', 404);
+      return {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: resultWithCompany.firstName,
+        lastName: resultWithCompany.lastName,
+        companyId: updatedUser.companyId,
+        isActive: updatedUser.isActive,
+        companyName: resultWithCompany.company.name,
+        company: {
+          id: resultWithCompany.company.id,
+          name: resultWithCompany.company.name,
+          currencyBase: resultWithCompany.company.currencyBase,
+          inn: resultWithCompany.company.inn,
+        },
+      };
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      handleUniqueConstraintError(error, 'email', 'Email already in use');
+      throw error; // Re-throw after handling
     }
-
-    return (user.preferences as Record<string, unknown>) || {};
   }
 
   async updatePreferences(
@@ -573,6 +636,24 @@ export class UsersService {
     });
 
     return (updatedUser.preferences as Record<string, unknown>) || {};
+  }
+
+  async getPreferences(userId: string, companyId: string) {
+    const user = await prisma.user.findFirst({
+      where: {
+        id: userId,
+        companyId: companyId,
+      },
+      select: {
+        preferences: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found or access denied', 404);
+    }
+
+    return (user.preferences as Record<string, unknown>) || {};
   }
 
   async changePassword(

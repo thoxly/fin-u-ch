@@ -7,12 +7,22 @@ import type {
   ImportOperationsRequest,
 } from '@shared/types/imports';
 import type { RootState } from '../store';
-import type { PatchCollection } from '@reduxjs/toolkit';
+// PatchCollection is not exported from @reduxjs/toolkit, using ReturnType instead
 
 interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
+  expectedCount?: number; // Ожидаемое количество операций
+  duplicatesCount?: number;
   fileName: string;
+  companyAccountNumber?: string;
+  parseStats?: {
+    documentsStarted: number;
+    documentsFound: number;
+    documentsSkipped: number;
+    documentsInvalid: number;
+    documentTypesFound: string[];
+  };
 }
 
 interface BulkUpdateRequest {
@@ -33,6 +43,7 @@ interface ImportOperationsResponse {
   created: number;
   errors: number;
   sessionId: string;
+  errorMessages?: string[];
 }
 
 interface DeleteSessionResponse {
@@ -56,6 +67,7 @@ export const importsApi = apiSlice.injectEndpoints({
         sessionId: string;
         confirmed?: boolean;
         matched?: boolean;
+        processed?: boolean;
         limit?: number;
         offset?: number;
       }
@@ -93,6 +105,25 @@ export const importsApi = apiSlice.injectEndpoints({
         { id, data },
         { dispatch, queryFulfilled, getState }
       ) {
+        // Функция для проверки, сопоставлена ли операция
+        const _checkOperationMatched = (op: ImportedOperation): boolean => {
+          if (!op.direction) return false;
+
+          const currency = op.currency || 'RUB';
+          const hasRequiredFields = !!(
+            op.matchedArticleId &&
+            op.matchedAccountId &&
+            currency
+          );
+
+          if (op.direction === 'transfer') {
+            return (
+              hasRequiredFields && !!(op.payerAccount && op.receiverAccount)
+            );
+          }
+          return hasRequiredFields;
+        };
+
         // Optimistic update - обновляем кеш локально без перезапроса
         // Находим все активные запросы getImportedOperations и обновляем их
         const state = getState() as RootState;
@@ -124,7 +155,8 @@ export const importsApi = apiSlice.injectEndpoints({
         }
 
         // Обновляем каждый найденный запрос
-        const patchResults: PatchCollection[] = [];
+        const patchResults: Array<{ patches: unknown[]; undo: () => void }> =
+          [];
         cacheKeys.forEach((args) => {
           const patchResult = dispatch(
             importsApi.util.updateQueryData(
@@ -163,6 +195,12 @@ export const importsApi = apiSlice.injectEndpoints({
                     if (data.direction !== undefined) {
                       operation.direction = data.direction;
                     }
+
+                    // НЕ пересчитываем счетчики здесь!
+                    // draft.operations содержит только текущую страницу (20 операций),
+                    // а счетчики должны быть по ВСЕМ операциям сессии.
+                    // Счетчики приходят с бэкенда в изначальном ответе и остаются валидными.
+
                     // matchedBy будет обновлен из ответа сервера после успешного запроса
                   }
                 }
@@ -208,6 +246,11 @@ export const importsApi = apiSlice.injectEndpoints({
                       operation.matchedBy = updatedOperation.matchedBy ?? null;
                       operation.matchedRuleId =
                         updatedOperation.matchedRuleId ?? null;
+
+                      // НЕ пересчитываем счетчики!
+                      // Они актуальны из изначального ответа бэкенда.
+                      // При одиночном обновлении операции счетчики не сильно меняются,
+                      // а при массовом - будет вызван invalidatesTags.
                     }
                   }
                 }
@@ -219,7 +262,7 @@ export const importsApi = apiSlice.injectEndpoints({
           patchResults.forEach((patchResult) => patchResult.undo());
         }
       },
-      // Не инвалидируем теги, чтобы не вызывать перезапрос всего списка
+      // НЕ инвалидируем теги - используем оптимистичные обновления выше
       // invalidatesTags: ['Import'],
     }),
 
@@ -242,6 +285,7 @@ export const importsApi = apiSlice.injectEndpoints({
       query: ({ sessionId }) => ({
         url: `/imports/sessions/${sessionId}/apply-rules`,
         method: 'POST',
+        body: data,
       }),
       invalidatesTags: ['Import'],
     }),
@@ -281,7 +325,7 @@ export const importsApi = apiSlice.injectEndpoints({
     >({
       query: (params) => ({
         url: '/imports/rules',
-        params,
+        params: params || {},
       }),
       providesTags: ['MappingRule'],
     }),
@@ -328,6 +372,25 @@ export const importsApi = apiSlice.injectEndpoints({
       invalidatesTags: ['MappingRule'],
     }),
 
+    getImportSession: builder.query<
+      {
+        id: string;
+        fileName: string;
+        status: string;
+        importedCount: number;
+        processedCount: number;
+        confirmedCount: number;
+        createdAt: Date;
+        updatedAt: Date;
+      },
+      { sessionId: string }
+    >({
+      query: ({ sessionId }) => ({
+        url: `/imports/sessions/${sessionId}`,
+      }),
+      providesTags: ['Import'],
+    }),
+
     getImportSessions: builder.query<
       ImportSessionsResponse,
       {
@@ -338,7 +401,14 @@ export const importsApi = apiSlice.injectEndpoints({
     >({
       query: (params) => ({
         url: '/imports/sessions',
-        params,
+        params: params || {},
+      }),
+      providesTags: ['Import'],
+    }),
+
+    getTotalImportedOperationsCount: builder.query<{ count: number }, void>({
+      query: () => ({
+        url: '/imports/stats/total-imported',
       }),
       providesTags: ['Import'],
     }),
@@ -348,6 +418,7 @@ export const importsApi = apiSlice.injectEndpoints({
 export const {
   useUploadStatementMutation,
   useGetImportedOperationsQuery,
+  useLazyGetImportedOperationsQuery,
   useUpdateImportedOperationMutation,
   useBulkUpdateImportedOperationsMutation,
   useApplyRulesMutation,
@@ -357,5 +428,7 @@ export const {
   useCreateMappingRuleMutation,
   useUpdateMappingRuleMutation,
   useDeleteMappingRuleMutation,
+  useGetImportSessionQuery,
   useGetImportSessionsQuery,
+  useGetTotalImportedOperationsCountQuery,
 } = importsApi;

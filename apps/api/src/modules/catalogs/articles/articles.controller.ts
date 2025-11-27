@@ -7,13 +7,13 @@ export class ArticlesController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const filters: {
-        type?: 'income' | 'expense';
+        type?: 'income' | 'expense' | 'transfer';
         activity?: 'operating' | 'investing' | 'financing';
         isActive?: boolean;
       } = {};
 
       if (req.query.type) {
-        filters.type = req.query.type as 'income' | 'expense';
+        filters.type = req.query.type as 'income' | 'expense' | 'transfer';
       }
 
       if (req.query.activity) {
