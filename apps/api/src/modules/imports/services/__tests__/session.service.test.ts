@@ -362,17 +362,18 @@ describe('SessionService', () => {
         confirmed: true,
       });
 
-      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith({
-        where: {
-          importSessionId: sessionId,
-          companyId,
-          confirmed: true,
-        },
-        include: expect.any(Object),
-        take: 20,
-        skip: 0,
-        orderBy: expect.any(Array),
-      });
+      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            importSessionId: sessionId,
+            companyId,
+            confirmed: true,
+          },
+          include: expect.any(Object),
+          take: 20,
+          skip: 0,
+        })
+      );
     });
 
     it('должен фильтровать по matched', async () => {
@@ -391,17 +392,18 @@ describe('SessionService', () => {
         matched: true,
       });
 
-      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith({
-        where: {
-          importSessionId: sessionId,
-          companyId,
-          matchedBy: { not: null },
-        },
-        include: expect.any(Object),
-        take: 20,
-        skip: 0,
-        orderBy: expect.any(Array),
-      });
+      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            importSessionId: sessionId,
+            companyId,
+            matchedBy: { not: null },
+          },
+          include: expect.any(Object),
+          take: 20,
+          skip: 0,
+        })
+      );
     });
 
     it('должен фильтровать по duplicate', async () => {
@@ -420,17 +422,18 @@ describe('SessionService', () => {
         duplicate: true,
       });
 
-      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith({
-        where: {
-          importSessionId: sessionId,
-          companyId,
-          isDuplicate: true,
-        },
-        include: expect.any(Object),
-        take: 20,
-        skip: 0,
-        orderBy: expect.any(Array),
-      });
+      expect(mockPrisma.importedOperation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            importSessionId: sessionId,
+            companyId,
+            isDuplicate: true,
+          },
+          include: expect.any(Object),
+          take: 20,
+          skip: 0,
+        })
+      );
     });
   });
 

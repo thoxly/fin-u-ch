@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { X, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 
 interface UndoToastProps {
   message: string;
@@ -61,29 +61,14 @@ export const UndoToast = ({
     return null;
   }
 
-  // Вычисляем стили позиционирования
-  const getPositionStyles = () => {
-    if (anchorPosition) {
-      // Позиционируем рядом с элементом, где пользователь кликнул
-      return {
-        position: 'fixed' as const,
-        top: `${anchorPosition.top + 10}px`,
-        left: `${anchorPosition.left}px`,
-        zIndex: 50,
-      };
-    }
-    // Дефолтная позиция - правый нижний угол
-    return {
-      position: 'fixed' as const,
-      bottom: '1rem',
-      right: '1rem',
-      zIndex: 50,
-    };
-  };
-
   return (
     <div
-      style={getPositionStyles()}
+      style={{
+        position: 'fixed',
+        bottom: '1rem',
+        right: '1rem',
+        zIndex: 50,
+      }}
       className={`transition-all duration-300 ${
         isVisible && !isClosing
           ? 'translate-y-0 opacity-100'
@@ -103,23 +88,14 @@ export const UndoToast = ({
         <div className="p-4 flex items-center justify-between gap-3">
           <div className="flex-1 text-sm">{message}</div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleUndo}
-              className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm font-medium transition-colors"
-            >
-              <RotateCcw size={14} />
-              Отменить
-            </button>
-
-            <button
-              onClick={handleClose}
-              className="p-1.5 hover:bg-gray-700 rounded-md transition-colors"
-              aria-label="Закрыть"
-            >
-              <X size={16} />
-            </button>
-          </div>
+          <button
+            onClick={handleUndo}
+            className="flex items-center gap-1 px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white rounded-md text-sm font-medium transition-colors"
+            aria-label="Отменить"
+          >
+            <RotateCcw size={14} />
+            Отменить
+          </button>
         </div>
       </div>
     </div>

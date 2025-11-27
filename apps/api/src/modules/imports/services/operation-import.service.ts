@@ -102,21 +102,8 @@ export class OperationImportService {
       }
     );
 
-    // Обновляем счетчики сессии
-    const processedCount = await prisma.importedOperation.count({
-      where: { importSessionId: sessionId, companyId, processed: true },
-    });
-
-    await prisma.importSession.update({
-      where: { id: sessionId, companyId },
-      data: {
-        processedCount,
-        status:
-          processedCount === session.importedCount
-            ? IMPORT_SESSION_STATUS.PROCESSED
-            : IMPORT_SESSION_STATUS.CONFIRMED,
-      },
-    });
+    // Обновляем счетчики сессии (включая статус)
+    await sessionService.updateSessionCounters(sessionId, companyId);
 
     // Инвалидируем кэш отчетов после успешного импорта операций
     if (created > 0) {
@@ -147,17 +134,7 @@ export class OperationImportService {
         continue;
       }
 
-      // Проверяем обязательные поля
-      if (!op.matchedArticleId) {
-        unmatchedOperations.push(
-          `Операция ${op.number || op.id}: не указана статья`
-        );
-      }
-      if (!op.matchedAccountId) {
-        unmatchedOperations.push(
-          `Операция ${op.number || op.id}: не указан счет`
-        );
-      }
+      // Валюта обязательна для всех операций
       if (!op.currency) {
         unmatchedOperations.push(
           `Операция ${op.number || op.id}: не указана валюта`
@@ -165,9 +142,22 @@ export class OperationImportService {
       }
 
       if (op.direction === 'transfer') {
+        // Для переводов нужны счета плательщика и получателя
         if (!op.payerAccount || !op.receiverAccount) {
           unmatchedOperations.push(
             `Операция ${op.number || op.id}: для перевода нужны счета плательщика и получателя`
+          );
+        }
+      } else {
+        // Для income/expense нужны статья и счет
+        if (!op.matchedArticleId) {
+          unmatchedOperations.push(
+            `Операция ${op.number || op.id}: не указана статья`
+          );
+        }
+        if (!op.matchedAccountId) {
+          unmatchedOperations.push(
+            `Операция ${op.number || op.id}: не указан счет`
           );
         }
       }
@@ -406,8 +396,15 @@ export class OperationImportService {
         : null;
 
       if (!sourceAccount || !targetAccount) {
+        const missingAccounts: string[] = [];
+        if (!sourceAccount && op.payerAccount) {
+          missingAccounts.push(`счет плательщика: ${op.payerAccount}`);
+        }
+        if (!targetAccount && op.receiverAccount) {
+          missingAccounts.push(`счет получателя: ${op.receiverAccount}`);
+        }
         throw new AppError(
-          `Cannot find accounts for transfer operation ${op.id}. Source: ${op.payerAccount}, Target: ${op.receiverAccount}`,
+          `Операция ${op.number || op.id}: не найдены счета для перевода. ${missingAccounts.length > 0 ? `Не найдены: ${missingAccounts.join(', ')}` : 'Счета не указаны'}`,
           400
         );
       }
@@ -514,9 +511,9 @@ export class OperationImportService {
               company?.inn || null
             );
 
-            // Проверяем полное сопоставление
+            // Проверяем полное сопоставление (статья, счет, валюта)
+            // Контрагент не обязателен, как в обычной форме
             const isFullyMatched = !!(
-              matchingResult.matchedCounterpartyId &&
               matchingResult.matchedArticleId &&
               matchingResult.matchedAccountId &&
               op.currency

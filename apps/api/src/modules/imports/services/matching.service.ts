@@ -14,14 +14,17 @@ export interface MatchingResult {
 }
 
 /**
- * Определяет направление операции на основе ИНН компании и текста назначения платежа
+ * Определяет направление операции на основе ИНН компании, номеров счетов и текста назначения платежа
  * Использует улучшенный алгоритм из shared пакета
  */
 export async function determineDirection(
   payerInn: string | null | undefined,
   receiverInn: string | null | undefined,
   companyInn: string | null | undefined,
-  purpose?: string | null | undefined
+  purpose?: string | null | undefined,
+  payerAccount?: string | null | undefined,
+  receiverAccount?: string | null | undefined,
+  companyAccountNumbers?: string[] | null
 ): Promise<'income' | 'expense' | 'transfer' | null> {
   // Создаем объект операции для анализа
   const operation: ParsedDocument = {
@@ -29,11 +32,17 @@ export async function determineDirection(
     amount: 0,
     payerInn: payerInn || undefined,
     receiverInn: receiverInn || undefined,
+    payerAccount: payerAccount || undefined,
+    receiverAccount: receiverAccount || undefined,
     purpose: purpose || undefined,
   };
 
   // Используем улучшенный алгоритм определения направления
-  const result = determineOperationDirection(operation, companyInn);
+  const result = determineOperationDirection(
+    operation,
+    companyInn,
+    companyAccountNumbers
+  );
 
   if (result.direction) {
     logger.debug('determineDirection: Direction detected', {
@@ -42,58 +51,10 @@ export async function determineDirection(
       reasons: result.reasons,
       payerInn,
       receiverInn,
+      payerAccount,
+      receiverAccount,
     });
     return result.direction;
-  }
-
-  // Fallback к старой логике, если новый алгоритм не определил
-  if (!companyInn) {
-    logger.debug('determineDirection: Company INN not set', {
-      payerInn,
-      receiverInn,
-    });
-    return null;
-  }
-
-  // Нормализуем ИНН (убираем пробелы)
-  const normalizedCompanyInn = companyInn.replace(/\s/g, '').trim();
-  const normalizedPayerInn = payerInn?.replace(/\s/g, '').trim() || null;
-  const normalizedReceiverInn = receiverInn?.replace(/\s/g, '').trim() || null;
-
-  // Если плательщик и получатель - одна и та же компания
-  if (
-    normalizedPayerInn &&
-    normalizedReceiverInn &&
-    normalizedPayerInn === normalizedCompanyInn &&
-    normalizedReceiverInn === normalizedCompanyInn
-  ) {
-    logger.debug(
-      'determineDirection: Transfer detected (same company as payer and receiver)'
-    );
-    return 'transfer';
-  }
-
-  // Если плательщик - наша компания (и получатель - не наша компания)
-  if (
-    normalizedPayerInn &&
-    normalizedPayerInn === normalizedCompanyInn &&
-    normalizedReceiverInn !== normalizedCompanyInn
-  ) {
-    logger.debug('determineDirection: Expense detected (company is payer)', {
-      payerInn: normalizedPayerInn,
-      companyInn: normalizedCompanyInn,
-      receiverInn: normalizedReceiverInn,
-    });
-    return 'expense';
-  }
-
-  // Если получатель - наша компания (и плательщик - не наша компания)
-  if (
-    normalizedReceiverInn &&
-    normalizedReceiverInn === normalizedCompanyInn &&
-    normalizedPayerInn !== normalizedCompanyInn
-  ) {
-    return 'income';
   }
 
   // Не удалось определить
@@ -827,12 +788,28 @@ export async function autoMatch(
   companyInn: string | null | undefined,
   companyAccountNumber?: string
 ): Promise<MatchingResult> {
+  // Получаем список номеров счетов компании для определения направления операции
+  const companyAccounts = await prisma.account.findMany({
+    where: {
+      companyId,
+      isActive: true,
+      number: { not: null },
+    },
+    select: { number: true },
+  });
+  const companyAccountNumbers = companyAccounts
+    .map((acc) => acc.number)
+    .filter((num): num is string => !!num);
+
   // 1. Определяем направление
   const direction = await determineDirection(
     operation.payerInn,
     operation.receiverInn,
     companyInn,
-    operation.purpose
+    operation.purpose,
+    operation.payerAccount,
+    operation.receiverAccount,
+    companyAccountNumbers
   );
 
   // 2. Сопоставляем контрагента

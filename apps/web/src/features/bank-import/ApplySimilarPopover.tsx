@@ -36,6 +36,112 @@ const getFieldLabel = (field: string): string => {
   return labels[field] || field;
 };
 
+/**
+ * Переводит тег операции на русский язык
+ */
+const translateTag = (tag: string): string => {
+  const tagTranslations: Record<string, string> = {
+    salary: 'Зарплата',
+    payroll_taxes: 'Налоги с ФОТ',
+    hr_expenses: 'HR расходы',
+    employee_training: 'Обучение сотрудников',
+    employee_medical_checks: 'Медосмотры',
+    employee_uniform: 'Спецодежда',
+    travel_accommodation: 'Проживание в командировках',
+    travel_transport: 'Транспорт в командировках',
+    travel_daily_allowance: 'Суточные',
+    taxes_general: 'Налоги',
+    fines_penalties: 'Штрафы и пени',
+    government_fees: 'Госпошлины',
+    rent_office: 'Аренда офиса',
+    rent_warehouse: 'Аренда склада',
+    rent_equipment: 'Аренда оборудования',
+    utilities_power: 'Электроэнергия',
+    utilities_water: 'Водоснабжение',
+    utilities_heating: 'Отопление',
+    utilities_gas: 'Газоснабжение',
+    telecom_internet: 'Интернет',
+    telecom_mobile: 'Мобильная связь',
+    raw_materials: 'Сырье',
+    components: 'Комплектующие',
+    spare_parts: 'Запчасти',
+    goods_purchase: 'Товары',
+    packaging: 'Упаковка',
+    office_supplies: 'Канцелярия',
+    furniture: 'Мебель',
+    cleaning_supplies: 'Хозтовары',
+    equipment_purchase: 'Оборудование',
+    maintenance_service: 'Техобслуживание',
+    repair: 'Ремонт',
+    construction_materials: 'Стройматериалы',
+    construction_services: 'Строительные работы',
+    special_equipment_services: 'Спецтехника',
+    movers_transport: 'Грузчики',
+    logistics_delivery: 'Доставка',
+    courier_services: 'Курьерские услуги',
+    freight_transport: 'Грузоперевозки',
+    fuel: 'ГСМ',
+    tolls_parking: 'Парковка и платные дороги',
+    it_software: 'ПО',
+    it_hardware: 'IT оборудование',
+    it_hosting: 'Хостинг',
+    it_domains: 'Домены',
+    it_support: 'IT поддержка',
+    it_dev_services: 'Разработка',
+    acquiring_fee: 'Комиссия эквайринга',
+    acquiring_income: 'Эквайринг (доход)',
+    banking_fees: 'Банковские комиссии',
+    loan_payments: 'Кредиты',
+    insurance: 'Страхование',
+    legal_services: 'Юридические услуги',
+    accounting_services: 'Бухгалтерские услуги',
+    audit_services: 'Аудит',
+    marketing_ads: 'Реклама',
+    marketing_ppc: 'Контекстная реклама',
+    marketing_smm: 'SMM',
+    marketplace_fee: 'Комиссия маркетплейса',
+    marketplace_payment: 'Выплаты с маркетплейса',
+    consulting: 'Консалтинг',
+    design_services: 'Дизайн',
+    photo_video_services: 'Фото/видео услуги',
+    medical_services: 'Медицинские услуги',
+    lab_services: 'Лабораторные услуги',
+    beauty_supplies: 'Косметология',
+    horeca_food: 'Продукты (HoReCa)',
+    horeca_inventory: 'Инвентарь (HoReCa)',
+    horeca_delivery: 'Доставка (HoReCa)',
+    waste_disposal: 'Вывоз мусора',
+    security_services: 'Охранные услуги',
+    cleaning_services: 'Уборка',
+    printing_services: 'Печать',
+    research_services: 'Исследования',
+    charity: 'Благотворительность',
+    government_services: 'Госуслуги',
+    customs: 'Таможня',
+    warehouse_services: 'Складские услуги',
+    mortgage_lease: 'Лизинг',
+    advertising_production: 'Производство рекламы',
+    subscription_services: 'Подписки',
+    office_cleaning: 'Уборка офиса',
+    hr_benefits: 'Соцпакет',
+    internal_transfer: 'Внутренний перевод',
+    cash_withdrawal: 'Снятие наличных',
+    cash_deposit: 'Внесение наличных',
+    currency_exchange: 'Обмен валют',
+    depreciation: 'Амортизация',
+    inventory_services: 'Инвентаризация',
+    printing_materials: 'Расходники для печати',
+    event_services: 'Мероприятия',
+    catering: 'Кейтеринг',
+    hr_outstaff: 'Аутстаффинг',
+    pr_services: 'PR услуги',
+    merchandising: 'Мерчендайзинг',
+    education_services: 'Образовательные услуги',
+    other: 'Другое',
+  };
+  return tagTranslations[tag] || tag;
+};
+
 export const ApplySimilarPopover = ({
   isOpen,
   onClose: _onClose,
@@ -52,6 +158,9 @@ export const ApplySimilarPopover = ({
   const itemsPerLoad = 10; // Загружаем по 10 операций при нажатии "Загрузить еще"
   const [positionStyle, setPositionStyle] = useState<React.CSSProperties>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set()); // Отслеживание выбранных операций
+  const [expandedOperations, setExpandedOperations] = useState<Set<string>>(
+    new Set()
+  ); // Отслеживание развернутых операций
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,6 +194,7 @@ export const ApplySimilarPopover = ({
     if (isOpen) {
       setDisplayedCount(5);
       setShowPreview(false); // Также сбрасываем превью
+      setExpandedOperations(new Set()); // Сбрасываем развернутые операции
       // По умолчанию все операции выбраны
       const allIds = new Set(
         similarOperations
@@ -94,6 +204,19 @@ export const ApplySimilarPopover = ({
       setSelectedIds(allIds);
     }
   }, [isOpen, similarOperations]);
+
+  // Функция для переключения развернутого состояния операции
+  const toggleOperationExpanded = (operationId: string) => {
+    setExpandedOperations((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(operationId)) {
+        newSet.delete(operationId);
+      } else {
+        newSet.add(operationId);
+      }
+      return newSet;
+    });
+  };
 
   // Функция для переключения выбора операции
   const toggleOperationSelection = (operationId: string) => {
@@ -126,12 +249,19 @@ export const ApplySimilarPopover = ({
 
   // Умное позиционирование popover
   useEffect(() => {
-    if (!isOpen || !popoverRef.current) return;
+    if (!isOpen) return;
+
+    let rafId = 0;
+    let resizeObserver: ResizeObserver | null = null;
 
     const updatePosition = () => {
-      if (!popoverRef.current) return;
+      const element = popoverRef.current;
+      if (!element) {
+        rafId = requestAnimationFrame(updatePosition);
+        return;
+      }
 
-      const popoverRect = popoverRef.current.getBoundingClientRect();
+      const popoverRect = element.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
 
@@ -216,27 +346,49 @@ export const ApplySimilarPopover = ({
         top: `${top}px`,
         left: `${left}px`,
       });
+
+      console.log('[ApplySimilarPopover] позиция поповера', {
+        anchorPosition,
+        computedTop: top,
+        computedLeft: left,
+        popoverWidth,
+        popoverHeight,
+        viewportWidth,
+        viewportHeight,
+      });
     };
 
-    // Небольшая задержка, чтобы popover успел отрендериться
-    const timeoutId = setTimeout(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(updatePosition);
-      });
-    }, 10); // Даем время DOM обновиться
+    const scheduleUpdate = () => {
+      rafId = requestAnimationFrame(updatePosition);
+    };
 
-    // ResizeObserver для автоматического пересчета при изменении размера
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(updatePosition);
+    scheduleUpdate();
+
+    const handleScroll = () => scheduleUpdate();
+    const handleResize = () => scheduleUpdate();
+
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
+
+    const observeResize = () => {
+      const element = popoverRef.current;
+      if (!element || resizeObserver) return;
+      resizeObserver = new ResizeObserver(() => scheduleUpdate());
+      resizeObserver.observe(element);
+    };
+
+    rafId = requestAnimationFrame(() => {
+      observeResize();
+      updatePosition();
     });
 
-    if (popoverRef.current) {
-      resizeObserver.observe(popoverRef.current);
-    }
-
     return () => {
-      clearTimeout(timeoutId);
-      resizeObserver.disconnect();
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      resizeObserver?.disconnect();
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
     };
   }, [isOpen, anchorPosition, showPreview, displayedCount]);
 
@@ -291,7 +443,7 @@ export const ApplySimilarPopover = ({
                   // Собираем уникальные причины совпадения из всех операций
                   const allReasons = new Set<string>();
                   similarOperations.forEach((item) => {
-                    item.comparison.similarity.matchReasons.forEach((reason) =>
+                    item.comparison.matchReasons.forEach((reason) =>
                       allReasons.add(reason)
                     );
                   });
@@ -306,7 +458,12 @@ export const ApplySimilarPopover = ({
                       </span>
                     ))
                   ) : (
-                    <span>описание, контрагент или ИНН</span>
+                    <span>
+                      тег:{' '}
+                      {translateTag(
+                        similarOperations[0]?.comparison.primaryTag || 'other'
+                      )}
+                    </span>
                   );
                 })()}
               </div>
@@ -360,9 +517,9 @@ export const ApplySimilarPopover = ({
                       const isSelected = op.id ? selectedIds.has(op.id) : false;
                       const directionLabel =
                         op.direction === 'income'
-                          ? 'Приход'
+                          ? 'Поступление'
                           : op.direction === 'expense'
-                            ? 'Расход'
+                            ? 'Списание'
                             : op.direction === 'transfer'
                               ? 'Перевод'
                               : '—';
@@ -373,11 +530,11 @@ export const ApplySimilarPopover = ({
                             ? 'text-red-600 dark:text-red-400'
                             : 'text-gray-600 dark:text-gray-400';
 
-                      // Обрезаем описание для компактности
-                      const shortDescription =
-                        op.description && op.description.length > 60
-                          ? op.description.substring(0, 60) + '...'
-                          : op.description || '—';
+                      const isExpanded = op.id
+                        ? expandedOperations.has(op.id)
+                        : false;
+                      const hasLongDescription =
+                        op.description && op.description.length > 60;
 
                       return (
                         <div
@@ -388,20 +545,38 @@ export const ApplySimilarPopover = ({
                               : 'border-gray-200 dark:border-gray-700'
                           }`}
                         >
-                          <label className="flex items-start gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() =>
-                                op.id && toggleOperationSelection(op.id)
+                          <div className="flex items-start gap-2">
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (op.id) {
+                                  toggleOperationSelection(op.id);
+                                }
+                              }}
+                              className="mt-0.5 flex-shrink-0"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() =>
+                                  op.id && toggleOperationSelection(op.id)
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 dark:border-gray-600 dark:focus:ring-primary-600 cursor-pointer"
+                              />
+                            </div>
+                            <div
+                              className="flex-1 min-w-0 cursor-pointer"
+                              onClick={() =>
+                                op.id && toggleOperationExpanded(op.id)
                               }
-                              className="mt-0.5 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 dark:border-gray-600 dark:focus:ring-primary-600 cursor-pointer flex-shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
+                            >
                               <div className="flex items-start justify-between gap-2 mb-1">
                                 <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                                    {shortDescription}
+                                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                                    {isExpanded || !hasLongDescription
+                                      ? op.description || '—'
+                                      : `${op.description.substring(0, 60)}...`}
                                   </div>
                                   <div className="flex items-center gap-2 mt-1 text-gray-600 dark:text-gray-400">
                                     <span>{formatDate(op.date)}</span>
@@ -415,22 +590,49 @@ export const ApplySimilarPopover = ({
                                       )}
                                     </span>
                                   </div>
+                                  {/* Плательщик и получатель */}
+                                  <div className="mt-2 space-y-1">
+                                    {op.payer && (
+                                      <div className="text-xs">
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          Плательщик:{' '}
+                                        </span>
+                                        <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                          {op.payer}
+                                        </span>
+                                        {op.payerInn && (
+                                          <span className="text-gray-500 dark:text-gray-400 ml-1">
+                                            (ИНН: {op.payerInn})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                    {op.receiver && (
+                                      <div className="text-xs">
+                                        <span className="text-gray-500 dark:text-gray-400">
+                                          Получатель:{' '}
+                                        </span>
+                                        <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                          {op.receiver}
+                                        </span>
+                                        {op.receiverInn && (
+                                          <span className="text-gray-500 dark:text-gray-400 ml-1">
+                                            (ИНН: {op.receiverInn})
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="flex-shrink-0 text-right">
-                                  {/* <div className="text-blue-600 dark:text-blue-400 font-medium">
-                                    {Math.round(comparison.similarity.score)}%
-                                  </div> */}
-                                  {comparison.similarity.requiresReview && (
-                                    <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                                      ⚠ Проверка
-                                    </div>
-                                  )}
+                                  <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                    {translateTag(comparison.primaryTag)}
+                                  </div>
                                 </div>
                               </div>
-                              {comparison.similarity.matchReasons.length >
-                                0 && (
+                              {comparison.matchReasons.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
-                                  {comparison.similarity.matchReasons.map(
+                                  {comparison.matchReasons.map(
                                     (reason, reasonIdx) => (
                                       <span
                                         key={reasonIdx}
@@ -442,8 +644,23 @@ export const ApplySimilarPopover = ({
                                   )}
                                 </div>
                               )}
+                              {hasLongDescription && (
+                                <div className="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
+                                  {isExpanded ? (
+                                    <span className="flex items-center gap-1">
+                                      <ChevronUp size={12} />
+                                      Свернуть
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1">
+                                      <ChevronDown size={12} />
+                                      Развернуть
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          </label>
+                          </div>
                         </div>
                       );
                     })}

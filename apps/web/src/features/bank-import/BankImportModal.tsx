@@ -216,6 +216,9 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         }
 
         showSuccess(message);
+
+        // Сбрасываем прогресс через небольшую задержку
+        setTimeout(() => setUploadProgress(null), 2000);
       } catch (error: unknown) {
         // RTK Query возвращает ошибку в формате { error: { status, data } }
         // где data это ответ сервера { status: 'error', message: '...' }
@@ -611,8 +614,8 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                     >
                       <p>
                         {!company?.inn
-                          ? 'Укажите ИНН компании в настройках — так система сама будет определять, это приход или расход денег. Без ИНН придётся выбирать вручную для каждой операции.'
-                          : 'Система смотрит на ваш ИНН в платёжке и сама понимает, это приход или расход.'}
+                          ? 'Укажите ИНН компании в настройках — так система сама будет определять, это поступление или списание денег. Без ИНН придётся выбирать вручную для каждой операции.'
+                          : 'Система смотрит на ваш ИНН в платёжке и сама понимает, это поступление или списание.'}
                       </p>
                       <p>
                         <strong>Как это работает:</strong>
@@ -624,7 +627,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                           </span>
                           <span>
                             Ваш ИНН в поле <strong>"Плательщик"</strong> → это{' '}
-                            <strong>расход</strong> (деньги ушли)
+                            <strong>списание</strong> (деньги ушли)
                           </span>
                         </li>
                         <li className="flex items-start gap-2">
@@ -633,7 +636,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                           </span>
                           <span>
                             Ваш ИНН в поле <strong>"Получатель"</strong> → это{' '}
-                            <strong>приход</strong> (деньги пришли)
+                            <strong>поступление</strong> (деньги пришли)
                           </span>
                         </li>
                       </ul>

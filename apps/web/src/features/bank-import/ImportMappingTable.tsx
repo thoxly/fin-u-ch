@@ -17,6 +17,8 @@ import {
   ChevronUp,
   ArrowUp,
   ArrowDown,
+  Loader2,
+  CheckCircle,
 } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -24,9 +26,11 @@ import { Select } from '../../shared/ui/Select';
 import { OffCanvas } from '../../shared/ui/OffCanvas';
 import {
   useGetImportedOperationsQuery,
+  useLazyGetImportedOperationsQuery,
   useBulkUpdateImportedOperationsMutation,
   useImportOperationsMutation,
   useUpdateImportedOperationMutation,
+  useGetTotalImportedOperationsCountQuery,
 } from '../../store/api/importsApi';
 import { findSimilarOperations } from './utils/findSimilarOperations';
 import { useUndoManager } from './hooks/useUndoManager';
@@ -41,7 +45,7 @@ import { formatDate } from '../../shared/lib/date';
 import { formatMoney } from '../../shared/lib/money';
 import { useNotification } from '../../shared/hooks/useNotification';
 import type { ImportedOperation } from '@shared/types/imports';
-import { ImportMappingRow } from './ImportMappingRow';
+import { ImportMappingRow, AnchorRect } from './ImportMappingRow';
 import { SaveRulesCell } from './SaveRulesCell';
 import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
 import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
@@ -91,6 +95,9 @@ export const ImportMappingTable = ({
   const [duplicateFilter, setDuplicateFilter] = useState<boolean | undefined>(
     undefined
   );
+  const [processedFilter, setProcessedFilter] = useState<boolean | undefined>(
+    undefined
+  );
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [operationsToSaveRules, setOperationsToSaveRules] = useState<
@@ -101,6 +108,13 @@ export const ImportMappingTable = ({
   const [recentlyUpdatedIds, setRecentlyUpdatedIds] = useState<Set<string>>(
     new Set()
   );
+
+  // Состояние для импорта (loading, success)
+  const [importStatus, setImportStatus] = useState<
+    'idle' | 'loading' | 'success'
+  >('idle');
+
+  const navigate = useNavigate();
 
   // Состояние для модалки создания
   const [createModal, setCreateModal] = useState<{
@@ -114,10 +128,12 @@ export const ImportMappingTable = ({
       | 'currency'
       | null;
     operation: ImportedOperation | null;
+    anchorRect: AnchorRect | null;
   }>({
     isOpen: false,
     field: null,
     operation: null,
+    anchorRect: null,
   });
 
   // Состояние для попо вера применения к похожим операциям
@@ -154,16 +170,26 @@ export const ImportMappingTable = ({
 
   const limit = 20;
 
+  // Сбрасываем страницу при изменении фильтров
+  useEffect(() => {
+    setPage(0);
+  }, [matchedFilter, duplicateFilter, processedFilter]);
+
   const { data, refetch } = useGetImportedOperationsQuery({
     sessionId,
     limit,
     offset: page * limit,
     matched: matchedFilter,
+    processed: processedFilter,
   });
+
+  // Lazy query for fetching ALL operations for similarity check
+  const [getAllOperations] = useLazyGetImportedOperationsQuery();
 
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: company } = useGetCompanyQuery();
+  const { data: totalImportedData } = useGetTotalImportedOperationsCountQuery();
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bulkUpdate] = useBulkUpdateImportedOperationsMutation();
@@ -241,7 +267,6 @@ export const ImportMappingTable = ({
     isUndoAvailable,
     undoDescription,
     undoAnchorPosition,
-    registerChange,
     registerBulkChange,
     undo,
     cancelUndo,
@@ -388,8 +413,8 @@ export const ImportMappingTable = ({
           break;
         case 'direction': {
           const directionLabels: Record<string, string> = {
-            income: 'Доход',
-            expense: 'Расход',
+            income: 'Поступление',
+            expense: 'Списание',
             transfer: 'Перевод',
           };
           const aLabel = directionLabels[a.direction || ''] || '';
@@ -418,12 +443,14 @@ export const ImportMappingTable = ({
         | 'deal'
         | 'department'
         | 'currency',
-      operation: ImportedOperation
+      operation: ImportedOperation,
+      anchorRect?: AnchorRect | null
     ) => {
       setCreateModal({
         isOpen: true,
         field,
         operation,
+        anchorRect: anchorRect || null,
       });
     },
     []
@@ -435,6 +462,7 @@ export const ImportMappingTable = ({
       isOpen: false,
       field: null,
       operation: null,
+      anchorRect: null,
     });
   }, []);
 
@@ -478,13 +506,49 @@ export const ImportMappingTable = ({
           updateData.currency = createdId;
         }
 
+        // Обновляем операцию
         await updateImportedOperation({
           id: createModal.operation.id,
           data: updateData,
         }).unwrap();
 
+        // Сохраняем данные для проверки похожих операций
+        const operation = createModal.operation;
+        const field = createModal.field;
+        const anchorRect = createModal.anchorRect;
+        const value = createdId;
+
         showSuccess('Элемент создан и выбран');
         handleCloseModal();
+
+        // После успешного создания и обновления проверяем похожие операции
+        // Используем небольшую задержку, чтобы UI успел обновиться
+        setTimeout(async () => {
+          // Создаем обновленную операцию с новыми данными
+          // RTK Query автоматически обновит кэш, но для проверки похожих используем обновленные данные
+          const updatedOperation = {
+            ...operation,
+            ...updateData,
+          } as ImportedOperation;
+
+          // Проверяем похожие операции только если поле поддерживает эту функцию
+          if (
+            field === 'counterparty' ||
+            field === 'article' ||
+            field === 'account' ||
+            field === 'deal' ||
+            field === 'department' ||
+            field === 'currency'
+          ) {
+            await handleFieldUpdate(
+              updatedOperation,
+              field,
+              value,
+              updateData,
+              anchorRect
+            );
+          }
+        }, 150);
       } catch (error) {
         showError('Ошибка при выборе созданного элемента');
       }
@@ -504,9 +568,14 @@ export const ImportMappingTable = ({
       | 'direction',
     value: string,
     updateData: Record<string, unknown>,
-    event: React.MouseEvent
+    anchorRect?: AnchorRect | null
   ) => {
     try {
+      // Не показываем popover для уже распределенных операций
+      if (operation.processed) {
+        return false;
+      }
+
       // Определяем обязательные поля
       const requiredFields = ['direction', 'article', 'account', 'currency'];
       const isRequiredField = requiredFields.includes(field);
@@ -541,16 +610,15 @@ export const ImportMappingTable = ({
       }
 
       // Получаем ВСЕ операции сессии для поиска похожих
-      // Используем refetch с большим лимитом для получения всех операций
-      const response = await refetch();
-      const allOperations = response.data?.operations || data?.operations || [];
-
-      console.log('🔍 Поиск похожих операций для:', {
-        operationId: operation.id,
-        description: operation.description,
-        field,
-        totalOperations: allOperations.length,
+      // Используем lazy query с большим лимитом для получения всех операций (до 10000)
+      const response = await getAllOperations({
+        sessionId,
+        limit: 10000, // Запрашиваем большое количество для охвата всех операций
+        matched: matchedFilter, // Применяем текущий фильтр, если он установлен
       });
+
+      // Если запрос вернул ошибку или нет данных, используем текущие данные (fallback)
+      const allOperations = response.data?.operations || data?.operations || [];
 
       // Находим похожие операции (передаем поле для проверки lockedFields)
       const similar = findSimilarOperations(
@@ -561,32 +629,41 @@ export const ImportMappingTable = ({
         field // поле для проверки блокировки
       );
 
-      console.log(
-        '✅ Найдено похожих операций:',
-        similar.length,
-        similar.map((s: unknown) => ({
-          id:
-            'operation' in (s as object)
-              ? (s as { operation: { id: string } }).operation.id
-              : (s as { id: string }).id,
-          description:
-            'operation' in (s as object)
-              ? (s as { operation: { description: string } }).operation
-                  .description
-              : (s as { description: string }).description,
-          score:
-            'comparison' in (s as object)
-              ? (s as { comparison: { similarity: { score: number } } })
-                  .comparison.similarity.score
-              : 'N/A',
-        }))
-      );
+      // Минимальный лог для отслеживания вызова
+      console.log('[ImportMappingTable] Поиск похожих операций вызван', {
+        operationId: operation.id,
+        field,
+        totalOperations: allOperations.length,
+        found: similar.length,
+      });
 
       // Если есть похожие операции, показываем popover ПОСЛЕ обновления текущей операции
       if (similar.length > 0) {
         // Получаем позицию элемента для показа popover
-        const target = event.currentTarget as HTMLElement;
-        const rect = target.getBoundingClientRect();
+        const rect = anchorRect
+          ? {
+              ...anchorRect,
+              bottom: anchorRect.top + anchorRect.height,
+              right: anchorRect.left + anchorRect.width,
+            }
+          : {
+              top: window.innerHeight / 2 - 20,
+              bottom: window.innerHeight / 2 + 20,
+              left: window.innerWidth / 2 - 50,
+              right: window.innerWidth / 2 + 50,
+              width: 100,
+              height: 40,
+            };
+
+        console.log(
+          '[ImportMappingTable] Отображаем popover похожих операций',
+          {
+            operationId: operation.id,
+            field,
+            anchorRect: rect,
+            similarCount: similar.length,
+          }
+        );
 
         setSimilarPopover({
           isOpen: true,
@@ -595,7 +672,7 @@ export const ImportMappingTable = ({
           operation: updatedOperation as ImportedOperation, // Используем обновленную операцию
           similarOperations: similar,
           anchorPosition: {
-            top: rect.bottom,
+            top: rect.bottom + 8,
             left: rect.left,
             right: rect.right,
           },
@@ -840,6 +917,9 @@ export const ImportMappingTable = ({
       ? isAllMatched
       : selectedOperations.every(checkOperationMatched);
 
+  // Проверяем, все ли операции сопоставлены (используем unmatchedCount из API)
+  const areAllOperationsMatched = unmatchedCount === 0;
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       // Выбираем только необработанные операции
@@ -909,6 +989,7 @@ export const ImportMappingTable = ({
 
   const handleImport = async () => {
     try {
+      setImportStatus('loading');
       const operationIds = selectedIds.length > 0 ? selectedIds : undefined;
       const saveRulesForIds = Array.from(operationsToSaveRules).filter(
         (id) => !operationIds || operationIds.includes(id)
@@ -922,21 +1003,111 @@ export const ImportMappingTable = ({
             saveRulesForIds.length > 0 ? saveRulesForIds : undefined,
         },
       }).unwrap();
-      showSuccess(
-        `Импортировано операций: ${result.created}. Ошибок: ${result.errors}`
-      );
+
       // refetch нужен здесь, т.к. меняется статус processed
       refetch();
+
       if (result.errors === 0) {
-        if (onImportSuccess) {
-          onImportSuccess();
+        setImportStatus('success');
+        showSuccess(
+          `Импортировано операций: ${result.created}. Ошибок: ${result.errors}`
+        );
+
+        // Переход на страницу операций через 1.5 секунды после успешного импорта
+        setTimeout(() => {
+          // Закрываем модальное окно перед навигацией
+          onImportSuccess?.();
+          navigate('/operations');
+        }, 1500);
+      } else {
+        setImportStatus('idle');
+
+        // Формируем детальное сообщение об ошибке
+        let errorMessage = '';
+        if (result.errorMessages && result.errorMessages.length > 0) {
+          // Показываем детальные сообщения об ошибках
+          // Ограничиваем количество сообщений для читаемости
+          const maxMessages = 5;
+          const messagesToShow = result.errorMessages.slice(0, maxMessages);
+          const details = messagesToShow.join('\n');
+          const moreCount = result.errorMessages.length - maxMessages;
+
+          let detailsText = details;
+          if (moreCount > 0) {
+            detailsText += `\n... и еще ${moreCount} ошибок`;
+          }
+
+          errorMessage =
+            result.created > 0
+              ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}.\n\nДетали:\n${detailsText}`
+              : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}.\n\nДетали:\n${detailsText}`;
         } else {
-          // Fallback: просто закрываем текущий экран
-          onClose();
+          // Если детальных сообщений нет, показываем общее
+          errorMessage =
+            result.created > 0
+              ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}. Проверьте логи или попробуйте импортировать операции по одной.`
+              : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}. Проверьте, что все операции полностью сопоставлены.`;
         }
+
+        showError(errorMessage);
       }
     } catch (error) {
-      showError('Ошибка при импорте операций');
+      setImportStatus('idle');
+
+      // Извлекаем детальное сообщение об ошибке
+      let errorMessage = 'Ошибка при импорте операций';
+
+      if (error && typeof error === 'object') {
+        // RTK Query возвращает ошибку в формате { data: { message: '...' } } или { error: { data: { message: '...' } } }
+        if ('data' in error) {
+          const errorData = (error as { data?: unknown }).data;
+
+          if (errorData && typeof errorData === 'object') {
+            // Проверяем разные варианты структуры ошибки
+            if (
+              'message' in errorData &&
+              typeof errorData.message === 'string'
+            ) {
+              errorMessage = errorData.message;
+            } else if (
+              'error' in errorData &&
+              typeof errorData.error === 'string'
+            ) {
+              errorMessage = errorData.error;
+            } else if (
+              'data' in errorData &&
+              typeof errorData.data === 'object' &&
+              errorData.data !== null &&
+              'message' in errorData.data &&
+              typeof errorData.data.message === 'string'
+            ) {
+              errorMessage = (errorData.data as { message: string }).message;
+            }
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          }
+        } else if ('error' in error) {
+          const nestedError = (
+            error as { error?: { data?: { message?: string } } }
+          ).error;
+          if (nestedError?.data?.message) {
+            errorMessage = nestedError.data.message;
+          }
+        } else if (
+          'message' in error &&
+          typeof (error as { message: unknown }).message === 'string'
+        ) {
+          errorMessage = (error as { message: string }).message;
+        }
+      }
+
+      console.error('Import error details:', {
+        error,
+        status: (error as { status?: unknown })?.status,
+        data: (error as { data?: unknown })?.data,
+      });
+
+      showError(errorMessage);
     }
   };
 
@@ -1074,7 +1245,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1098,7 +1268,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1128,7 +1297,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1158,7 +1326,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1182,7 +1349,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1206,7 +1372,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1236,7 +1401,6 @@ export const ImportMappingTable = ({
           sessionId={sessionId}
           onOpenCreateModal={handleOpenCreateModal}
           onFieldUpdate={handleFieldUpdate}
-          onRegisterChange={registerChange}
           disabled={op.processed}
           isModalOpen={createModal.isOpen}
         />
@@ -1300,7 +1464,14 @@ export const ImportMappingTable = ({
               size={20}
               className="text-primary-600 dark:text-primary-400"
             />
-            <h3 className="text-lg font-semibold">Импортированные операции</h3>
+            <h3 className="text-lg font-semibold">
+              Импортированные операции
+              {total > 0 && (
+                <span className="ml-2 text-sm font-normal text-gray-600 dark:text-gray-400">
+                  ({total})
+                </span>
+              )}
+            </h3>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1348,6 +1519,11 @@ export const ImportMappingTable = ({
           <span className="text-gray-600 dark:text-gray-400">
             Всего: {total}
           </span>
+          {totalImportedData?.count !== undefined && (
+            <span className="text-gray-600 dark:text-gray-400">
+              Записано в Операции: {totalImportedData.count}
+            </span>
+          )}
           <span className="text-yellow-600 dark:text-yellow-400">
             Несопоставлено: {unmatchedCount}
           </span>
@@ -1370,11 +1546,23 @@ export const ImportMappingTable = ({
             ]}
             className="w-40"
           />
+          <Select
+            value={processedFilter === undefined ? '' : String(processedFilter)}
+            onChange={(value) =>
+              setProcessedFilter(value === '' ? undefined : value === 'true')
+            }
+            options={[
+              { value: '', label: 'Все операции' },
+              { value: 'true', label: 'Записанные' },
+              { value: 'false', label: 'Незаписанные' },
+            ]}
+            className="w-48"
+          />
         </div>
       </div>
 
       {/* Таблица */}
-      <div className="border rounded-lg overflow-hidden">
+      <div className="rounded-lg overflow-hidden">
         <Table
           columns={columns}
           data={operations}
@@ -1451,16 +1639,24 @@ export const ImportMappingTable = ({
                   Функция должна экспортировать все правила маппинга в JSON формате */}
         <Button
           onClick={handleImport}
-          disabled={isImporting || total === 0 || !isSelectedMatched}
+          disabled={
+            isImporting ||
+            total === 0 ||
+            (selectedIds.length === 0
+              ? !areAllOperationsMatched
+              : !isSelectedMatched)
+          }
           className="btn-primary"
           title={
-            !isSelectedMatched
+            selectedIds.length === 0 && !areAllOperationsMatched
               ? 'Не все операции сопоставлены. Убедитесь, что у всех операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
-              : undefined
+              : selectedIds.length > 0 && !isSelectedMatched
+                ? 'Не все выбранные операции сопоставлены. Убедитесь, что у всех выбранных операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
+                : undefined
           }
         >
           <Download size={16} className="mr-2" />
-          Импортировать{' '}
+          Записать в Операции{' '}
           {selectedIds.length > 0
             ? `выбранные (${selectedIds.length})`
             : 'все операции'}
@@ -1579,6 +1775,49 @@ export const ImportMappingTable = ({
         onClose={cancelUndo}
         anchorPosition={undoAnchorPosition}
       />
+
+      {/* Модальное окно состояния импорта */}
+      {(importStatus === 'loading' || importStatus === 'success') && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col items-center gap-4">
+              {importStatus === 'loading' && (
+                <>
+                  <Loader2
+                    className="animate-spin text-primary-600 dark:text-primary-400"
+                    size={48}
+                  />
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Импорт операций...
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Пожалуйста, подождите. Импорт операций может занять
+                      некоторое время.
+                    </p>
+                  </div>
+                </>
+              )}
+              {importStatus === 'success' && (
+                <>
+                  <CheckCircle
+                    className="text-green-600 dark:text-green-400"
+                    size={48}
+                  />
+                  <div className="text-center space-y-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Импорт завершен успешно!
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Перенаправление на страницу операций...
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

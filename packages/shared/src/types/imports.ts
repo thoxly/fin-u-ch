@@ -125,6 +125,7 @@ export interface ImportFilters {
   confirmed?: boolean;
   matched?: boolean;
   duplicate?: boolean;
+  processed?: boolean;
   limit?: number;
   offset?: number;
 }
@@ -155,6 +156,7 @@ export interface ImportOperationsResult {
   created: number;
   errors: number;
   sessionId: string;
+  errorMessages?: string[];
 }
 
 /**

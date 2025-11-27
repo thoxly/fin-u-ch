@@ -11,6 +11,15 @@ import { Select } from '../../shared/ui/Select';
 import { useNotification } from '../../shared/hooks/useNotification';
 import type { ImportedOperation } from '@shared/types/imports';
 
+export interface AnchorRect {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+  width: number;
+  height: number;
+}
+
 interface ImportMappingRowProps {
   operation: ImportedOperation;
   field:
@@ -31,7 +40,8 @@ interface ImportMappingRowProps {
       | 'deal'
       | 'department'
       | 'currency',
-    operation: ImportedOperation
+    operation: ImportedOperation,
+    anchorRect?: AnchorRect | null
   ) => void;
   onFieldUpdate?: (
     operation: ImportedOperation,
@@ -45,14 +55,8 @@ interface ImportMappingRowProps {
       | 'direction',
     value: string,
     updateData: Record<string, unknown>,
-    event: React.MouseEvent
+    anchorRect?: AnchorRect | null
   ) => Promise<boolean>; // Возвращает true если показан popover, false если нет
-  onRegisterChange?: (
-    operationId: string,
-    previousState: Record<string, unknown>,
-    description: string,
-    anchorPosition?: { top: number; left: number }
-  ) => void;
   disabled?: boolean;
   isModalOpen?: boolean; // Флаг открытия модалки создания
 }
@@ -87,15 +91,11 @@ const ImportMappingRowComponent = ({
   sessionId: _sessionId,
   onOpenCreateModal,
   onFieldUpdate,
-  onRegisterChange,
   disabled = false,
   isModalOpen = false,
 }: ImportMappingRowProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [lastClickPosition, setLastClickPosition] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
+  const [lastClickRect, setLastClickRect] = useState<AnchorRect | null>(null);
 
   // Закрываем селектор при открытии модалки создания
   useEffect(() => {
@@ -162,7 +162,7 @@ const ImportMappingRowComponent = ({
   const getDirectionLabel = (direction: string | null | undefined) => {
     const labels: Record<string, string> = {
       income: 'Поступление',
-      expense: 'Расход',
+      expense: 'Списание',
       transfer: 'Перевод',
     };
     return direction ? labels[direction] || direction : 'Не определено';
@@ -238,7 +238,7 @@ const ImportMappingRowComponent = ({
         baseOptions.push(
           { value: '', label: 'Не определено' },
           { value: 'income', label: 'Поступление' },
-          { value: 'expense', label: 'Расход' },
+          { value: 'expense', label: 'Списание' },
           { value: 'transfer', label: 'Перевод' }
         );
         break;
@@ -255,7 +255,8 @@ const ImportMappingRowComponent = ({
       field === 'department' ||
       field === 'currency'
     ) {
-      onOpenCreateModal(field, operation);
+      // Передаем сохраненную позицию элемента для показа popover после создания
+      onOpenCreateModal(field, operation, lastClickRect);
     }
   };
 
@@ -302,50 +303,6 @@ const ImportMappingRowComponent = ({
 
       setIsEditing(false);
 
-      // Регистрируем изменение для возможности отмены (если есть callback)
-      if (onRegisterChange) {
-        // Сохраняем предыдущее состояние
-        const previousState: Record<string, unknown> = {};
-        if (field === 'counterparty') {
-          previousState.matchedCounterpartyId = operation.matchedCounterpartyId;
-        } else if (field === 'article') {
-          previousState.matchedArticleId = operation.matchedArticleId;
-          previousState.direction = operation.direction;
-        } else if (field === 'account') {
-          previousState.matchedAccountId = operation.matchedAccountId;
-        } else if (field === 'deal') {
-          previousState.matchedDealId = operation.matchedDealId;
-        } else if (field === 'department') {
-          previousState.matchedDepartmentId = operation.matchedDepartmentId;
-        } else if (field === 'currency') {
-          previousState.currency = operation.currency;
-        } else if (field === 'repeat') {
-          previousState.repeat = operation.repeat;
-        } else if (field === 'direction') {
-          previousState.direction = operation.direction;
-        }
-
-        // Формируем описание изменения
-        const fieldNames: Record<string, string> = {
-          counterparty: 'Контрагент',
-          article: 'Статья',
-          account: 'Счет',
-          deal: 'Сделка',
-          department: 'Подразделение',
-          currency: 'Валюта',
-          repeat: 'Повтор',
-          direction: 'Тип операции',
-        };
-        const description = `Изменено: ${fieldNames[field] || field}`;
-
-        onRegisterChange(
-          operation.id,
-          previousState,
-          description,
-          lastClickPosition || undefined
-        );
-      }
-
       // СНАЧАЛА обновляем текущую операцию
       await updateOperation({
         id: operation.id,
@@ -356,7 +313,7 @@ const ImportMappingRowComponent = ({
       if (
         field !== 'repeat' &&
         onFieldUpdate &&
-        lastClickPosition &&
+        lastClickRect &&
         (field === 'counterparty' ||
           field === 'article' ||
           field === 'account' ||
@@ -365,27 +322,9 @@ const ImportMappingRowComponent = ({
           field === 'currency' ||
           field === 'direction')
       ) {
-        // Создаем синтетическое событие с сохраненной позицией
-        const syntheticEvent = {
-          currentTarget: {
-            getBoundingClientRect: () => ({
-              top: lastClickPosition.top - 40, // Примерная высота элемента
-              bottom: lastClickPosition.top,
-              left: lastClickPosition.left,
-              right: lastClickPosition.left + 100, // Примерная ширина
-            }),
-          },
-        } as React.MouseEvent;
-
         // Проверяем наличие похожих операций
         // Результат игнорируем, так как операция уже обновлена
-        await onFieldUpdate(
-          operation,
-          field,
-          value,
-          updateData,
-          syntheticEvent
-        );
+        await onFieldUpdate(operation, field, value, updateData, lastClickRect);
       }
     } catch (error) {
       showError('Ошибка при обновлении');
@@ -436,9 +375,13 @@ const ImportMappingRowComponent = ({
         onClick={(e) => {
           if (!disabled) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setLastClickPosition({
+            setLastClickRect({
               top: rect.top,
+              bottom: rect.bottom,
               left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
             });
             setIsEditing(true);
           }
@@ -470,9 +413,13 @@ const ImportMappingRowComponent = ({
         onClick={(e) => {
           if (!disabled) {
             const rect = e.currentTarget.getBoundingClientRect();
-            setLastClickPosition({
+            setLastClickRect({
               top: rect.top,
+              bottom: rect.bottom,
               left: rect.left,
+              right: rect.right,
+              width: rect.width,
+              height: rect.height,
             });
             setIsEditing(true);
           }
@@ -501,9 +448,13 @@ const ImportMappingRowComponent = ({
       onClick={(e) => {
         if (!disabled) {
           const rect = e.currentTarget.getBoundingClientRect();
-          setLastClickPosition({
+          setLastClickRect({
             top: rect.top,
+            bottom: rect.bottom,
             left: rect.left,
+            right: rect.right,
+            width: rect.width,
+            height: rect.height,
           });
           setIsEditing(true);
         }

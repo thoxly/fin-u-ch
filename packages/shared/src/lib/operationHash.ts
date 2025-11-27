@@ -118,30 +118,23 @@ export function createOperationHash(doc: ParsedDocument): string {
     );
   }
 
-  // Use dynamic import or direct require based on environment
+  // Use the imported crypto module directly
   try {
-    // In Node.js environment (including Jest), we can use crypto directly
+    // In Node.js environment, use the imported crypto module
     if (
       typeof process !== 'undefined' &&
       process.versions &&
       process.versions.node
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const crypto = require('crypto');
+      // Use the imported crypto module directly
       return crypto.createHash('sha256').update(data).digest('hex');
     }
 
-    // Fallback for other environments
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const getRequire = new Function(
-      'moduleName',
-      'return require(moduleName);'
-    );
-    const crypto = getRequire('crypto');
+    // Fallback: try to use the imported crypto module anyway
     return crypto.createHash('sha256').update(data).digest('hex');
   } catch (error) {
     throw new Error(
-      `Failed to load crypto module: ${error instanceof Error ? error.message : 'unknown error'}`
+      `Failed to create hash: ${error instanceof Error ? error.message : 'unknown error'}`
     );
   }
 }

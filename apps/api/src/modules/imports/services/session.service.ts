@@ -20,11 +20,11 @@ function transformImportedOperation(op: any): any {
   const { article, counterparty, account, deal, department, ...rest } = op;
   return {
     ...rest,
-    matchedArticle: article,
-    matchedCounterparty: counterparty,
-    matchedAccount: account,
-    matchedDeal: deal,
-    matchedDepartment: department,
+    matchedArticle: article ?? null,
+    matchedCounterparty: counterparty ?? null,
+    matchedAccount: account ?? null,
+    matchedDeal: deal ?? null,
+    matchedDepartment: department ?? null,
   };
 }
 
@@ -222,6 +222,10 @@ export class SessionService {
       where.isDuplicate = filters.duplicate;
     }
 
+    if (filters?.processed !== undefined) {
+      where.processed = filters.processed;
+    }
+
     const [operations, total] = await Promise.all([
       prisma.importedOperation.findMany({
         where,
@@ -326,35 +330,30 @@ export class SessionService {
       updateData.article = data.matchedArticleId
         ? { connect: { id: data.matchedArticleId } }
         : { disconnect: true };
-      updateData.matchedArticleId = data.matchedArticleId;
     }
 
     if (data.matchedCounterpartyId !== undefined) {
       updateData.counterparty = data.matchedCounterpartyId
         ? { connect: { id: data.matchedCounterpartyId } }
         : { disconnect: true };
-      updateData.matchedCounterpartyId = data.matchedCounterpartyId;
     }
 
     if (data.matchedAccountId !== undefined) {
       updateData.account = data.matchedAccountId
         ? { connect: { id: data.matchedAccountId } }
         : { disconnect: true };
-      updateData.matchedAccountId = data.matchedAccountId;
     }
 
     if (data.matchedDealId !== undefined) {
       updateData.deal = data.matchedDealId
         ? { connect: { id: data.matchedDealId } }
         : { disconnect: true };
-      updateData.matchedDealId = data.matchedDealId;
     }
 
     if (data.matchedDepartmentId !== undefined) {
       updateData.department = data.matchedDepartmentId
         ? { connect: { id: data.matchedDepartmentId } }
         : { disconnect: true };
-      updateData.matchedDepartmentId = data.matchedDepartmentId;
     }
 
     if (data.currency !== undefined) {
@@ -386,9 +385,9 @@ export class SessionService {
       },
     });
 
-    // Проверяем, что операция полностью сопоставлена
+    // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+    // Контрагент не обязателен, как в обычной форме
     const isFullyMatched = !!(
-      updatedOperation.matchedCounterpartyId &&
       updatedOperation.matchedArticleId &&
       updatedOperation.matchedAccountId &&
       updatedOperation.currency
@@ -398,7 +397,7 @@ export class SessionService {
 
     // Обновляем matchedBy
     if (isFullyMatched && !updatedOperation.matchedBy) {
-      finalOperation = await prisma.importedOperation.update({
+      finalOperation = (await prisma.importedOperation.update({
         where: { id, companyId },
         data: { matchedBy: 'manual' },
         include: {
@@ -408,9 +407,9 @@ export class SessionService {
           deal: { select: { id: true, name: true } },
           department: { select: { id: true, name: true } },
         } as any,
-      });
+      })) as unknown as typeof updatedOperation;
     } else if (!isFullyMatched && updatedOperation.matchedBy) {
-      finalOperation = await prisma.importedOperation.update({
+      finalOperation = (await prisma.importedOperation.update({
         where: { id, companyId },
         data: {
           matchedBy: null,
@@ -423,7 +422,7 @@ export class SessionService {
           deal: { select: { id: true, name: true } },
           department: { select: { id: true, name: true } },
         } as any,
-      });
+      })) as unknown as typeof updatedOperation;
     }
 
     // Обновляем счетчики сессии
@@ -519,7 +518,6 @@ export class SessionService {
         updateData.article = data.matchedArticleId
           ? { connect: { id: data.matchedArticleId } }
           : { disconnect: true };
-        updateData.matchedArticleId = data.matchedArticleId;
         updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
       }
 
@@ -530,7 +528,6 @@ export class SessionService {
         updateData.counterparty = data.matchedCounterpartyId
           ? { connect: { id: data.matchedCounterpartyId } }
           : { disconnect: true };
-        updateData.matchedCounterpartyId = data.matchedCounterpartyId;
         if (!updateData.matchedBy) {
           updateData.matchedBy = data.matchedCounterpartyId ? 'manual' : null;
         }
@@ -543,7 +540,6 @@ export class SessionService {
         updateData.account = data.matchedAccountId
           ? { connect: { id: data.matchedAccountId } }
           : { disconnect: true };
-        updateData.matchedAccountId = data.matchedAccountId;
       }
 
       if (
@@ -553,7 +549,6 @@ export class SessionService {
         updateData.deal = data.matchedDealId
           ? { connect: { id: data.matchedDealId } }
           : { disconnect: true };
-        updateData.matchedDealId = data.matchedDealId;
       }
 
       if (
@@ -563,7 +558,6 @@ export class SessionService {
         updateData.department = data.matchedDepartmentId
           ? { connect: { id: data.matchedDepartmentId } }
           : { disconnect: true };
-        updateData.matchedDepartmentId = data.matchedDepartmentId;
       }
 
       if (data.currency !== undefined && !lockedFields.includes('currency')) {
@@ -586,6 +580,11 @@ export class SessionService {
         });
         updated++;
       }
+    }
+
+    // Обновляем счетчики сессии после массового обновления
+    if (updated > 0) {
+      await this.updateSessionCounters(sessionId, companyId);
     }
 
     return { updated };

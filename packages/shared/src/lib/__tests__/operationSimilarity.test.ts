@@ -15,6 +15,15 @@ describe('operationSimilarity', () => {
       expect(normalized).not.toContain('01.01.2025');
       expect(normalized).not.toContain('ндс');
     });
+
+    it('should strip "в том числе НДС" fragments with amounts', () => {
+      const text =
+        'Оплата за товар. В том числе НДС 20 % - 44430.00 рублей. Без НДС';
+      const normalized = normalizeText(text);
+      expect(normalized).not.toContain('в том числе');
+      expect(normalized).not.toContain('20 %');
+      expect(normalized).not.toContain('44430.00');
+    });
   });
 
   describe('extractTags', () => {
@@ -28,14 +37,94 @@ describe('operationSimilarity', () => {
       expect(tags[0]).toBe('travel_accommodation');
     });
 
+    it('should extract movers_transport tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Услуги грузчиков',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('movers_transport');
+    });
+
+    it('should extract equipment_purchase tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за оборудование',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('equipment_purchase');
+    });
+
+    it('should extract goods_purchase tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за товар',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('goods_purchase');
+    });
+
+    it('should extract acquiring_income tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Зачисление средств по терминалам эквайринга',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('acquiring_income');
+    });
+
     it('should extract acquiring_fee tag', () => {
       const op: ParsedDocument = {
         date: new Date(),
         amount: 100,
-        purpose: 'Комиссия за операции по терминалам',
+        purpose: 'Комиссия за операции по терминалам эквайринга',
       };
       const tags = extractTags(op);
       expect(tags[0]).toBe('acquiring_fee');
+    });
+
+    it('should extract fuel tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за ГСМ',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('fuel');
+    });
+
+    it('should extract repair tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за ремонт',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('repair');
+    });
+
+    it('should extract internal_transfer tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Перевод собственных средств',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('internal_transfer');
+    });
+
+    it('should extract cash_withdrawal tag', () => {
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Снятие наличных',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('cash_withdrawal');
     });
 
     it('should return "other" if no tags found', () => {
@@ -46,6 +135,17 @@ describe('operationSimilarity', () => {
       };
       const tags = extractTags(op);
       expect(tags[0]).toBe('other');
+    });
+
+    it('should return first matching tag as primary', () => {
+      // travel_accommodation должен быть первым в словаре
+      const op: ParsedDocument = {
+        date: new Date(),
+        amount: 100,
+        purpose: 'Оплата за проживание и товар',
+      };
+      const tags = extractTags(op);
+      expect(tags[0]).toBe('travel_accommodation');
     });
   });
 
@@ -80,7 +180,7 @@ describe('operationSimilarity', () => {
       expect(similar[0].id).toBe('2');
     });
 
-    it('should not find similar operations if target is "other"', () => {
+    it('should leverage text similarity if target tag is "other"', () => {
       const target = {
         id: '1',
         date: new Date(),
@@ -98,7 +198,7 @@ describe('operationSimilarity', () => {
       ] as (ParsedDocument & { id: string })[];
 
       const similar = findSimilarOperations(target, all);
-      expect(similar.length).toBe(0);
+      expect(similar.length).toBe(1);
     });
   });
 

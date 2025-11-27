@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, FileCheck, X, Maximize2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useGetImportedOperationsQuery } from '../../store/api/importsApi';
 
 const STORAGE_KEY = 'bankImportModal_state';
 const EXPIRY_HOURS = 24;
@@ -131,6 +132,25 @@ export const CollapsedImportSections = () => {
     }
   };
 
+  // Приоритет отображения: маппинг > история
+  // Показываем только ОДНО окошко
+  const shouldShowMapping =
+    state?.collapsedMapping && (state?.sessionId || state?.viewingSessionId);
+
+  // Получаем total количество операций для текущей сессии
+  // Хук должен быть вызван до любых ранних возвратов
+  const sessionIdForQuery = state?.sessionId || state?.viewingSessionId;
+  const { data: operationsData } = useGetImportedOperationsQuery(
+    {
+      sessionId: sessionIdForQuery || '',
+      limit: 1,
+      offset: 0,
+    },
+    {
+      skip: !sessionIdForQuery || !shouldShowMapping || !state,
+    }
+  );
+
   // Отображаем компонент, если есть свернутые секции
   if (!state) {
     return null;
@@ -145,10 +165,6 @@ export const CollapsedImportSections = () => {
     return null;
   }
 
-  // Приоритет отображения: маппинг > история
-  // Показываем только ОДНО окошко
-  const shouldShowMapping =
-    state.collapsedMapping && (state.sessionId || state.viewingSessionId);
   const shouldShowHistory = state.collapsedHistory && !shouldShowMapping;
 
   return (
@@ -199,6 +215,12 @@ export const CollapsedImportSections = () => {
                 />
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                   Импортированные операции
+                  {operationsData?.total !== undefined &&
+                    operationsData.total > 0 && (
+                      <span className="ml-1.5 text-xs font-normal text-gray-600 dark:text-gray-400">
+                        ({operationsData.total})
+                      </span>
+                    )}
                 </h3>
               </div>
               <div className="flex items-center gap-1">

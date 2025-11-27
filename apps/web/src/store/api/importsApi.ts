@@ -12,6 +12,7 @@ import type { RootState } from '../store';
 interface UploadStatementResponse {
   sessionId: string;
   importedCount: number;
+  expectedCount?: number; // Ожидаемое количество операций
   duplicatesCount?: number;
   fileName: string;
   companyAccountNumber?: string;
@@ -42,6 +43,7 @@ interface ImportOperationsResponse {
   created: number;
   errors: number;
   sessionId: string;
+  errorMessages?: string[];
 }
 
 interface DeleteSessionResponse {
@@ -65,6 +67,7 @@ export const importsApi = apiSlice.injectEndpoints({
         sessionId: string;
         confirmed?: boolean;
         matched?: boolean;
+        processed?: boolean;
         limit?: number;
         offset?: number;
       }
@@ -101,7 +104,7 @@ export const importsApi = apiSlice.injectEndpoints({
       async onQueryStarted(
         { id, data },
         { dispatch, queryFulfilled, getState }
-      ): Promise<void> {
+      ) {
         // Функция для проверки, сопоставлена ли операция
         const _checkOperationMatched = (op: ImportedOperation): boolean => {
           if (!op.direction) return false;
@@ -282,6 +285,7 @@ export const importsApi = apiSlice.injectEndpoints({
       query: ({ sessionId }) => ({
         url: `/imports/sessions/${sessionId}/apply-rules`,
         method: 'POST',
+        body: data,
       }),
       invalidatesTags: ['Import'],
     }),
@@ -368,6 +372,25 @@ export const importsApi = apiSlice.injectEndpoints({
       invalidatesTags: ['MappingRule'],
     }),
 
+    getImportSession: builder.query<
+      {
+        id: string;
+        fileName: string;
+        status: string;
+        importedCount: number;
+        processedCount: number;
+        confirmedCount: number;
+        createdAt: Date;
+        updatedAt: Date;
+      },
+      { sessionId: string }
+    >({
+      query: ({ sessionId }) => ({
+        url: `/imports/sessions/${sessionId}`,
+      }),
+      providesTags: ['Import'],
+    }),
+
     getImportSessions: builder.query<
       ImportSessionsResponse,
       {
@@ -382,12 +405,20 @@ export const importsApi = apiSlice.injectEndpoints({
       }),
       providesTags: ['Import'],
     }),
+
+    getTotalImportedOperationsCount: builder.query<{ count: number }, void>({
+      query: () => ({
+        url: '/imports/stats/total-imported',
+      }),
+      providesTags: ['Import'],
+    }),
   }),
 });
 
 export const {
   useUploadStatementMutation,
   useGetImportedOperationsQuery,
+  useLazyGetImportedOperationsQuery,
   useUpdateImportedOperationMutation,
   useBulkUpdateImportedOperationsMutation,
   useApplyRulesMutation,
@@ -397,5 +428,7 @@ export const {
   useCreateMappingRuleMutation,
   useUpdateMappingRuleMutation,
   useDeleteMappingRuleMutation,
+  useGetImportSessionQuery,
   useGetImportSessionsQuery,
+  useGetTotalImportedOperationsCountQuery,
 } = importsApi;

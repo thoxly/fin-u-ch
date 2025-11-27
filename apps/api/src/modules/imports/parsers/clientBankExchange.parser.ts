@@ -308,7 +308,6 @@ function decodeFile(content: Buffer | string): string {
     // UTF-8 BOM
     bufferToCheck = content.slice(3);
     text = bufferToCheck.toString('utf8');
-    logger.info('Parser: File encoding = UTF-8 with BOM');
     // eslint-disable-next-line no-control-regex
     return text.replace(/[\uFEFF\u200B-\u200D\u2060\u0000]/g, '');
   }
@@ -327,7 +326,6 @@ function decodeFile(content: Buffer | string): string {
     const hasCyrillic = /[а-яёА-ЯЁ]/.test(fullUtf8Text.substring(0, 500));
 
     if (hasHeader && hasCyrillic) {
-      logger.info('Parser: File encoding = UTF-8');
       text = fullUtf8Text;
       // eslint-disable-next-line no-control-regex
       return text.trim().replace(/[\uFEFF\u200B-\u200D\u2060\u0000]/g, '');
@@ -341,7 +339,6 @@ function decodeFile(content: Buffer | string): string {
     const hasHeader = text.substring(0, 500).includes('1CClientBankExchange');
 
     if (hasCyrillic && hasHeader) {
-      logger.info('Parser: File encoding = Windows-1251 ✅');
       // eslint-disable-next-line no-control-regex
       text = text.trim().replace(/[\uFEFF\u200B-\u200D\u2060\u0000]/g, '');
       return text;
@@ -349,19 +346,13 @@ function decodeFile(content: Buffer | string): string {
 
     // Если есть заголовок, но нет кириллицы - всё равно используем win1251
     if (hasHeader) {
-      logger.info('Parser: File encoding = Windows-1251 (forced)');
       // eslint-disable-next-line no-control-regex
       text = text.trim().replace(/[\uFEFF\u200B-\u200D\u2060\u0000]/g, '');
       return text;
     }
   } catch (error) {
-    logger.warn('Parser: Failed to decode as win1251', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    // Продолжаем с fallback
   }
-
-  // Последний fallback - UTF-8
-  logger.warn('Parser: Using UTF-8 as last fallback');
   text = bufferToCheck.toString('utf8');
   // eslint-disable-next-line no-control-regex
   return text.trim().replace(/[\uFEFF\u200B-\u200D\u2060\u0000]/g, '');
@@ -451,19 +442,6 @@ function splitIntoSections(text: string): {
     }
   }
 
-  logger.info('Parser: Sections split completed', {
-    sectionStartCount,
-    sectionEndCount,
-    documentSectionsCount: documentSections.length,
-    headerLinesCount: headerLines.length,
-  });
-
-  if (documentSections.length > 0) {
-    logger.debug('Parser: First section preview', {
-      firstSectionPreview: documentSections[0].substring(0, 500),
-    });
-  }
-
   return { documentSections, headerLines };
 }
 
@@ -498,10 +476,18 @@ function parseKeyValuePairs(lines: string[]): {
 
   const flushCurrent = () => {
     if (currentKey && currentValue.length > 0) {
-      result[currentKey] = currentValue.join(' ').trim();
+      const value = currentValue.join(' ').trim();
+
+      // Сохраняем значение только если оно не пустое
+      if (value.length > 0) {
+        result[currentKey] = value;
+      }
     } else if (currentRawKey && currentValue.length > 0) {
       // Сохраняем неопознанные поля
-      rawFields[currentRawKey] = currentValue.join(' ').trim();
+      const value = currentValue.join(' ').trim();
+      if (value.length > 0) {
+        rawFields[currentRawKey] = value;
+      }
     }
   };
 
@@ -527,6 +513,7 @@ function parseKeyValuePairs(lines: string[]): {
       }
 
       const normalizedKey = normalizeKey(rawKey);
+
       if (normalizedKey) {
         currentKey = normalizedKey;
         currentRawKey = null;
@@ -545,14 +532,6 @@ function parseKeyValuePairs(lines: string[]): {
 
   flushCurrent();
 
-  // Логируем неопознанные поля для отладки
-  if (Object.keys(rawFields).length > 0) {
-    logger.debug('Parser: Found unrecognized fields', {
-      rawFields,
-      recognizedFields: result,
-    });
-  }
-
   return { fields: result, rawFields };
 }
 
@@ -561,46 +540,32 @@ function parseKeyValuePairs(lines: string[]): {
  * Приоритет: ДатаСписано -> ДатаПоступило -> Дата
  * Логика: для списаний используем ДатаСписано, для поступлений - ДатаПоступило
  */
-function getDocumentDate(
-  fields: Record<string, string>,
-  sectionIndex?: number
-): Date | null {
-  const logForFirst = sectionIndex === 0;
-
-  if (logForFirst) {
-    logger.info('Parser: getDocumentDate called for FIRST doc', {
-      fieldsKeys: Object.keys(fields),
-      hasDate: !!fields.date,
-      hasDateWrittenOff: !!fields.dateWrittenOff,
-      hasDateReceived: !!fields.dateReceived,
-    });
-  }
-
+function getDocumentDate(fields: Record<string, string>): Date | null {
   // Пытаемся извлечь дату по приоритету
   // Если есть ДатаСписано - это расход
-  if (fields.dateWrittenOff) {
+  if (fields.dateWrittenOff && fields.dateWrittenOff.trim().length > 0) {
     try {
-      return parseDate(fields.dateWrittenOff);
+      return parseDate(fields.dateWrittenOff.trim());
     } catch (e) {
-      // Ignore date parsing errors
+      // Продолжаем поиск в других полях
     }
   }
 
   // Если есть ДатаПоступило - это приход
-  if (fields.dateReceived) {
+  if (fields.dateReceived && fields.dateReceived.trim().length > 0) {
     try {
-      return parseDate(fields.dateReceived);
+      return parseDate(fields.dateReceived.trim());
     } catch (e) {
-      // Ignore date parsing errors
+      // Продолжаем поиск в других полях
     }
   }
 
   // Если есть просто Дата, берем её
-  if (fields.date) {
+  if (fields.date && fields.date.trim().length > 0) {
     try {
-      return parseDate(fields.date);
+      return parseDate(fields.date.trim());
     } catch (e) {
-      // Ignore date parsing errors
+      // Не удалось распарсить
     }
   }
 
@@ -612,45 +577,14 @@ function getDocumentDate(
  * Универсальная логика: все варианты сумм (СуммаДокументаПоступило, СуммаДокументаСписано и т.д.)
  * должны быть нормализованы в единое поле amount
  */
-function getDocumentAmount(
-  fields: Record<string, string>,
-  sectionIndex?: number
-): number | null {
-  const logForFirst = sectionIndex === 0;
-
-  if (logForFirst) {
-    logger.info('Parser: getDocumentAmount called for FIRST doc', {
-      fieldsKeys: Object.keys(fields),
-      hasAmountField: !!fields.amount,
-      amountValue: fields.amount,
-    });
-  }
-
+function getDocumentAmount(fields: Record<string, string>): number | null {
   // После нормализации все варианты сумм должны быть в поле 'amount'
-  if (fields.amount) {
+  if (fields.amount && fields.amount.trim().length > 0) {
     try {
-      const parsedAmount = parseAmount(fields.amount);
-      if (logForFirst) {
-        logger.info('Parser: ✅ Successfully parsed amount', {
-          rawValue: fields.amount,
-          parsedAmount,
-        });
-      }
-      return parsedAmount;
+      return parseAmount(fields.amount.trim());
     } catch (error) {
-      if (logForFirst) {
-        logger.warn('Parser: ❌ Failed to parse amount', {
-          value: fields.amount,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      // Не удалось распарсить
     }
-  }
-
-  if (logForFirst) {
-    logger.warn('Parser: ❌ No valid amount found', {
-      fieldsKeys: Object.keys(fields),
-    });
   }
 
   return null;
@@ -661,63 +595,29 @@ function getDocumentAmount(
  * Использует мягкую валидацию - пустые или некорректные поля не ломают документ
  */
 function parseDocumentSection(
-  sectionText: string,
-  sectionIndex: number
+  sectionText: string
 ): Partial<ParsedDocument> | null {
   const lines = sectionText.split('\n');
-  if (lines.length === 0) return null;
-
-  // Логируем сырую секцию для ПЕРВОГО документа
-  if (sectionIndex === 0) {
-    logger.info('Parser: Raw section text for FIRST document', {
-      sectionIndex: 0,
-      rawSectionPreview: sectionText.substring(0, 1000),
-      linesCount: lines.length,
-    });
+  if (lines.length === 0) {
+    return null;
   }
 
   // Первая строка - заголовок секции, остальные - данные
   const dataLines = lines.slice(1);
-  const { fields, rawFields } = parseKeyValuePairs(dataLines);
-
-  // Логируем только ПЕРВЫЙ документ
-  if (sectionIndex === 0) {
-    logger.info(`Parser: Parsed fields for FIRST document`, {
-      sectionIndex: 0,
-      fieldsKeys: Object.keys(fields),
-      rawKeys: Object.keys(rawFields),
-      fieldsCount: Object.keys(fields).length,
-      hasDate: !!fields.date,
-      hasDateWrittenOff: !!fields.dateWrittenOff,
-      hasDateReceived: !!fields.dateReceived,
-      hasAmount: !!fields.amount,
-    });
-  }
+  const { fields } = parseKeyValuePairs(dataLines);
 
   const doc: Partial<ParsedDocument> = {};
 
   // Извлекаем дату с fallback
-  const date = getDocumentDate(fields, sectionIndex);
+  const date = getDocumentDate(fields);
   if (date) {
     doc.date = date;
-  } else if (sectionIndex === 0) {
-    logger.error('Parser: Failed to extract date for FIRST doc', {
-      fieldsKeys: Object.keys(fields),
-      dateValue: fields.date,
-      dateWrittenOffValue: fields.dateWrittenOff,
-      dateReceivedValue: fields.dateReceived,
-    });
   }
 
   // Извлекаем сумму с fallback
-  const amount = getDocumentAmount(fields, sectionIndex);
+  const amount = getDocumentAmount(fields);
   if (amount !== null) {
     doc.amount = amount;
-  } else if (sectionIndex === 0) {
-    logger.error('Parser: Failed to extract amount for FIRST doc', {
-      fieldsKeys: Object.keys(fields),
-      amountValue: fields.amount,
-    });
   }
 
   // Остальные поля - необязательные, заполняем если есть
@@ -830,10 +730,6 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
   let documentsInvalid = 0;
   let documentsSkipped = 0;
 
-  logger.info('Parser: Starting document parsing', {
-    totalSections: documentSections.length,
-  });
-
   for (let i = 0; i < documentSections.length; i++) {
     try {
       const sectionText = documentSections[i];
@@ -870,29 +766,14 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
       }
 
       // Парсим документ
-      const doc = parseDocumentSection(sectionText, i);
+      const doc = parseDocumentSection(sectionText);
       if (!doc) {
         documentsInvalid++;
-        if (documentsInvalid <= 2) {
-          logger.warn('Parser: Failed to parse document section', {
-            index: i,
-            docType,
-            sectionPreview: sectionText.substring(0, 300),
-          });
-        }
         continue;
       }
 
       // Валидируем обязательные поля
       const isValid = validateDocument(doc);
-      if (i === 0) {
-        logger.info('Parser: Validation result for FIRST doc', {
-          isValid,
-          hasDate: !!doc.date,
-          hasAmount: doc.amount !== undefined,
-          docType,
-        });
-      }
 
       if (!isValid) {
         documentsInvalid++;
@@ -901,15 +782,50 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
           const lines = sectionText.split('\n');
           const dataLines = lines.slice(1);
           const { fields, rawFields } = parseKeyValuePairs(dataLines);
+
+          // Детальная информация о полях date и amount
+          const dateFields = Object.fromEntries(
+            Object.entries(fields).filter(
+              ([k]) =>
+                k.toLowerCase().includes('date') ||
+                k.toLowerCase().includes('дата')
+            )
+          );
+          const amountFields = Object.fromEntries(
+            Object.entries(fields).filter(
+              ([k]) =>
+                k.toLowerCase().includes('amount') ||
+                k.toLowerCase().includes('сумма')
+            )
+          );
+
           logger.error('Parser: Invalid document - missing required fields', {
             index: i,
             docType,
             hasDate: !!doc.date,
             hasAmount: doc.amount !== undefined,
+            docDate: doc.date,
+            docAmount: doc.amount,
             rawFields: Object.keys(rawFields), // Логируем неопознанные ключи
             recognizedFields: Object.keys(fields), // Логируем опознанные ключи
             dateField: fields.date,
+            dateFieldType: typeof fields.date,
+            dateFieldLength: fields.date?.length,
+            dateWrittenOffField: fields.dateWrittenOff,
+            dateReceivedField: fields.dateReceived,
             amountField: fields.amount,
+            amountFieldType: typeof fields.amount,
+            amountFieldLength: fields.amount?.length,
+            allDateFields: dateFields,
+            allAmountFields: amountFields,
+            allFields: Object.fromEntries(
+              Object.entries(fields).map(([k, v]) => [
+                k,
+                typeof v === 'string' && v.length > 100
+                  ? v.substring(0, 100) + '...'
+                  : v,
+              ])
+            ),
             sectionContent: sectionText.substring(0, 500), // Log the content to see what's wrong
           });
         }
@@ -917,51 +833,12 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
       }
 
       // Добавляем хэш
-      try {
-        doc.hash = createOperationHash(doc);
-        documents.push(doc);
-
-        if (i === 0) {
-          logger.info('Parser: ✅ FIRST document added successfully!', {
-            hash: doc.hash,
-            docType,
-          });
-        }
-      } catch (hashError) {
-        if (i === 0) {
-          logger.error('Parser: ❌ Failed to add FIRST document', {
-            error:
-              hashError instanceof Error
-                ? hashError.message
-                : String(hashError),
-            stack: hashError instanceof Error ? hashError.stack : undefined,
-          });
-        }
-        throw hashError;
-      }
+      doc.hash = createOperationHash(doc);
+      documents.push(doc);
     } catch (error) {
-      if (i === 0 || documentsInvalid <= 2) {
-        logger.error('Parser: ❌ Exception in document processing', {
-          index: i,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-      }
       documentsInvalid++;
     }
   }
-
-  // Логируем итоговую статистику
-  logger.info('Parser: Document parsing completed', {
-    totalSections: documentSections.length,
-    documentsFound: documents.length,
-    documentsSkipped,
-    documentsInvalid,
-    documentTypesFound,
-    skippedDocumentTypes: Array.from(skippedDocumentTypesMap.entries()).map(
-      ([type, count]) => ({ type, count })
-    ),
-  });
 
   // 6. Проверка результата
   if (documents.length === 0) {
@@ -1126,11 +1003,10 @@ function parseAmount(amountStr: string): number {
     throw new AppError(`Invalid amount format: ${amountStr}`, 400);
   }
 
-  // Сумма может быть отрицательной в некоторых выписках (например, списания)
-  // Но обычно в 1С выписках сумма документа положительная, а направление определяется типом
-  // Тем не менее, для надежности разрешаем только не нулевые значения
-  if (amount === 0) {
-    throw new AppError(`Amount cannot be zero: ${amountStr}`, 400);
+  // Сумма должна быть положительной
+  // В 1С выписках сумма документа положительная, а направление определяется типом документа
+  if (amount <= 0) {
+    throw new AppError(`Amount must be positive: ${amountStr}`, 400);
   }
 
   return amount;
