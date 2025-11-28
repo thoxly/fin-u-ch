@@ -50,7 +50,9 @@ export function encrypt(text: string): string {
   const salt = crypto.randomBytes(SALT_LENGTH);
 
   // Генерируем ключ из пароля и соли
-  const derivedKey = crypto.scryptSync(key.toString('hex'), salt, KEY_LENGTH);
+  // Используем исходный ключ (Buffer) для генерации derived key
+  const keyString = key instanceof Buffer ? key.toString('hex') : key;
+  const derivedKey = crypto.scryptSync(keyString, salt, KEY_LENGTH);
 
   const cipher = crypto.createCipheriv(ALGORITHM, derivedKey, iv);
 
@@ -78,8 +80,19 @@ export function decrypt(encryptedText: string): string {
     const parts = encryptedText.split(':');
 
     if (parts.length !== 4) {
-      // Если формат неверный, возможно это незашифрованное значение (для обратной совместимости)
-      console.warn('⚠️  Попытка расшифровать незашифрованное значение');
+      // Если формат неверный, это может быть:
+      // 1. Незашифрованное значение (для обратной совместимости со старыми данными)
+      // 2. Неправильно зашифрованное значение
+      // Проверяем длину: если очень длинное (> 100 символов), вероятно это зашифрованное значение с ошибкой
+      if (encryptedText.length > 100) {
+        throw new Error(
+          `Неверный формат зашифрованного значения (ожидается формат "iv:salt:tag:encrypted" с 4 частями через ":")`
+        );
+      }
+      // Если короткое, возможно это незашифрованное значение (для обратной совместимости)
+      console.warn(
+        '⚠️  Попытка расшифровать незашифрованное значение (для обратной совместимости)'
+      );
       return encryptedText;
     }
 
@@ -90,7 +103,9 @@ export function decrypt(encryptedText: string): string {
     const tag = Buffer.from(tagBase64, 'base64');
 
     // Генерируем ключ из пароля и соли
-    const derivedKey = crypto.scryptSync(key.toString('hex'), salt, KEY_LENGTH);
+    // Используем исходный ключ (Buffer) для генерации derived key
+    const keyString = key instanceof Buffer ? key.toString('hex') : key;
+    const derivedKey = crypto.scryptSync(keyString, salt, KEY_LENGTH);
 
     const decipher = crypto.createDecipheriv(ALGORITHM, derivedKey, iv);
     decipher.setAuthTag(tag);
@@ -101,8 +116,8 @@ export function decrypt(encryptedText: string): string {
     return decrypted;
   } catch (error: any) {
     console.error('Ошибка при расшифровке:', error.message);
-    // Если не удалось расшифровать, возможно это незашифрованное значение
-    // (для обратной совместимости со старыми данными)
-    return encryptedText;
+    // Если не удалось расшифровать, выбрасываем ошибку
+    // Это предотвратит использование зашифрованной строки как API ключа
+    throw new Error(`Не удалось расшифровать значение: ${error.message}`);
   }
 }

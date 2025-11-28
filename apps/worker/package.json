@@ -16,6 +16,7 @@
     "debug-ozon": "tsx src/scripts/debug-ozon-integration.ts"
   },
   "dependencies": {
+    "@fin-u-ch/shared": "workspace:*",
     "@prisma/client": "^5.22.0",
     "node-cron": "^3.0.3",
     "dotenv": "^16.4.7",

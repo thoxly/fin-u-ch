@@ -24,10 +24,36 @@ export const authenticate = (
     const token = authHeader.substring(7);
 
     // Проверяем, является ли это WORKER_API_KEY
-    if (env.WORKER_API_KEY && token === env.WORKER_API_KEY) {
-      // Это запрос от worker - пропускаем без проверки JWT
-      req.isWorker = true;
-      return next();
+    // Используем process.env напрямую, чтобы получить актуальное значение
+    const workerApiKey = process.env.WORKER_API_KEY || env.WORKER_API_KEY;
+
+    if (workerApiKey) {
+      if (token === workerApiKey) {
+        // Это запрос от worker - пропускаем без проверки JWT
+        req.isWorker = true;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Auth] ✅ Worker request authenticated');
+        }
+        return next();
+      } else {
+        // Логируем для отладки (только в dev режиме)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Auth] WORKER_API_KEY mismatch:', {
+            receivedLength: token.length,
+            expectedLength: workerApiKey.length,
+            receivedStart: token.substring(0, 10),
+            expectedStart: workerApiKey.substring(0, 10),
+          });
+        }
+      }
+    } else {
+      // Всегда логируем, если ключ не настроен (критично для работы worker)
+      console.warn('[Auth] ⚠️  WORKER_API_KEY not configured in API');
+      console.warn('[Auth] env.WORKER_API_KEY:', env.WORKER_API_KEY);
+      console.warn(
+        '[Auth] process.env.WORKER_API_KEY:',
+        process.env.WORKER_API_KEY
+      );
     }
 
     // Обычная JWT аутентификация для пользователей

@@ -4,83 +4,18 @@ import { AppError } from '../../../middlewares/error';
 import { retryWithBackoff } from '../../../utils/retry';
 import { hashObject } from '../../../utils/hash';
 import { decrypt } from '../../../utils/encryption';
+import logger from '../../../config/logger';
+import {
+  getOzonQueryPeriod,
+  calculateOzonPaymentDates,
+  calculateOzonPaymentAmount,
+  type OzonCashFlowResponse,
+} from '@fin-u-ch/shared';
 
-interface OzonCashFlowResponse {
-  result: {
-    cash_flows: Array<{
-      commission_amount: number;
-      currency_code: string;
-      item_delivery_and_return_amount: number;
-      orders_amount: number;
-      period: {
-        begin: string;
-        end: string;
-        id: number;
-      };
-      returns_amount: number;
-      services_amount: number;
-    }>;
-    details?: Array<{
-      period: {
-        begin: string;
-        end: string;
-        id: number;
-      };
-      payments: Array<{
-        payment: number;
-        currency_code: string;
-      }>;
-      begin_balance_amount: number;
-      delivery: {
-        total: number;
-        amount: number;
-        delivery_services: {
-          total: number;
-          items: Array<{
-            name: string;
-            price: number;
-          }>;
-        };
-      };
-      return: {
-        total: number;
-        amount: number;
-        return_services: {
-          total: number;
-          items: Array<{
-            name: string;
-            price: number;
-          }>;
-        };
-      };
-      loan: number;
-      invoice_transfer: number;
-      rfbs: {
-        total: number;
-        transfer_delivery: number;
-        transfer_delivery_return: number;
-        compensation_delivery_return: number;
-        partial_compensation: number;
-        partial_compensation_return: number;
-      };
-      services: {
-        total: number;
-        items: Array<{
-          name: string;
-          price: number;
-        }>;
-      };
-      others: {
-        total: number;
-        items: Array<{
-          name: string;
-          price: number;
-        }>;
-      };
-      end_balance_amount: number;
-    }>;
-  };
-  page_count: number;
+// Расширенный интерфейс для внутреннего использования (с дополнительными полями для логирования)
+// Используем базовый интерфейс из shared, но добавляем дополнительные поля, которые могут быть в ответе Ozon API
+interface OzonCashFlowResponseExtended extends OzonCashFlowResponse {
+  page_count?: number;
 }
 
 export class OzonOperationService {
@@ -113,7 +48,11 @@ export class OzonOperationService {
       },
       include: {
         company: true,
-        article: true,
+        article: {
+          include: {
+            counterparty: true, // Включаем контрагента из статьи
+          },
+        },
         account: true,
       },
     });
@@ -127,20 +66,24 @@ export class OzonOperationService {
     apiKey: string,
     dateFrom: string,
     dateTo: string
-  ): Promise<OzonCashFlowResponse> {
+  ): Promise<OzonCashFlowResponseExtended> {
     return retryWithBackoff(
       async () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         try {
+          // Обрезаем пробелы в ключах (как в валидации и как должно быть)
+          const trimmedClientKey = clientKey.trim();
+          const trimmedApiKey = apiKey.trim();
+
           const response = await fetch(
             'https://api-seller.ozon.ru/v1/finance/cash-flow-statement/list',
             {
               method: 'POST',
               headers: {
-                'Client-Id': clientKey,
-                'Api-Key': apiKey,
+                'Client-Id': trimmedClientKey,
+                'Api-Key': trimmedApiKey,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
@@ -159,17 +102,41 @@ export class OzonOperationService {
           clearTimeout(timeoutId);
 
           if (!response.ok) {
-            // Сохраняем статус код для retry логики
-            const error: any = new AppError(
-              `Ozon API error: ${response.status} ${response.statusText}`,
-              response.status
+            // Получаем тело ответа для диагностики (как в worker)
+            const errorText = await response.text();
+            let errorBody: any;
+            try {
+              errorBody = JSON.parse(errorText);
+            } catch {
+              errorBody = errorText;
+            }
+
+            logger.error(
+              ` Ozon API error ${response.status} ${response.statusText}:`,
+              errorBody
             );
+            logger.error(` Request details:`, {
+              url: 'https://api-seller.ozon.ru/v1/finance/cash-flow-statement/list',
+              clientKey: trimmedClientKey
+                ? `${trimmedClientKey.substring(0, 8)}...`
+                : 'missing',
+              apiKey: trimmedApiKey
+                ? `${trimmedApiKey.substring(0, 8)}...`
+                : 'missing',
+              apiKeyLength: trimmedApiKey?.length || 0,
+              dateFrom,
+              dateTo,
+            });
+
+            // Сохраняем статус код для retry логики
+            const errorMessage = `Ozon API error: ${response.status} ${response.statusText}${errorBody?.message ? ` - ${errorBody.message}` : ''}${typeof errorBody === 'string' ? ` - ${errorBody}` : ''}`;
+            const error: any = new AppError(errorMessage, response.status);
             error.status = response.status;
             error.statusCode = response.status;
             throw error;
           }
 
-          const data = (await response.json()) as OzonCashFlowResponse;
+          const data = (await response.json()) as OzonCashFlowResponseExtended;
           return data;
         } catch (error: any) {
           clearTimeout(timeoutId);
@@ -206,37 +173,34 @@ export class OzonOperationService {
   }
 
   /**
-   * Рассчитывает сумму выплаты
+   * Рассчитывает сумму выплаты (использует общую функцию из shared)
    */
-  calculatePaymentAmount(cashFlowData: OzonCashFlowResponse): number {
+  calculatePaymentAmount(cashFlowData: OzonCashFlowResponseExtended): number {
     if (!cashFlowData.result.cash_flows.length) {
-      console.log('❌ Нет данных cash_flows в ответе Ozon API');
+      logger.warn(' Нет данных cash_flows в ответе Ozon API');
       return 0;
     }
 
-    // Смотрим на поле payment в details
+    const calculatedAmount = calculateOzonPaymentAmount(cashFlowData);
+
+    // Логируем источник суммы для диагностики
     const details = cashFlowData.result.details;
     if (details && details.length > 0) {
       const payments = details[0]?.payments;
       if (payments && payments.length > 0) {
         const payment = payments[0];
-        console.log(
-          `💰 Прямая сумма выплаты из Ozon: ${payment.payment} ${payment.currency_code}`
+        logger.info(
+          ` Прямая сумма выплаты из Ozon: ${payment.payment} ${payment.currency_code}`
         );
-        return payment.payment || 0;
+      } else {
+        logger.warn(`  Поле payment не найдено, используем расчетную сумму`);
+        logger.info(` Расчетная сумма: ${calculatedAmount}`);
       }
+    } else {
+      logger.warn(`  Поле payment не найдено, используем расчетную сумму`);
+      logger.info(` Расчетная сумма: ${calculatedAmount}`);
     }
 
-    // Fallback логика
-    console.log(`⚠️  Поле payment не найдено, используем расчетную сумму`);
-    const cashFlow = cashFlowData.result.cash_flows[0];
-    const calculatedAmount =
-      cashFlow.orders_amount +
-      cashFlow.services_amount -
-      cashFlow.commission_amount -
-      Math.abs(cashFlow.returns_amount);
-
-    console.log(`🧮 Расчетная сумма: ${calculatedAmount}`);
     return calculatedAmount;
   }
 
@@ -255,26 +219,13 @@ export class OzonOperationService {
   }
 
   /**
-   * Получает период за прошлую неделю
+   * Получает период для запроса данных
    */
-  getLastWeekPeriod(): { from: Date; to: Date } {
-    const now = new Date();
-    const lastSunday = new Date(now);
-    // Находим воскресенье прошлой недели
-    if (now.getDay() === 0) {
-      // Если сегодня воскресенье, то прошлое воскресенье - это 7 дней назад
-      lastSunday.setDate(now.getDate() - 7);
-    } else {
-      // Иначе находим воскресенье текущей недели и отнимаем 7 дней
-      lastSunday.setDate(now.getDate() - now.getDay() - 7);
-    }
-    lastSunday.setHours(23, 59, 59, 999);
-
-    const lastMonday = new Date(lastSunday);
-    lastMonday.setDate(lastSunday.getDate() - 6);
-    lastMonday.setHours(0, 0, 0, 0);
-
-    return { from: lastMonday, to: lastSunday };
+  getQueryPeriod(paymentSchedule: 'next_week' | 'week_after'): {
+    from: Date;
+    to: Date;
+  } {
+    return getOzonQueryPeriod(paymentSchedule);
   }
 
   /**
@@ -284,57 +235,7 @@ export class OzonOperationService {
     periodEndDate: Date,
     paymentSchedule: 'next_week' | 'week_after'
   ): { calculationDate: Date; paymentDate: Date } {
-    const periodEnd = new Date(periodEndDate);
-
-    if (paymentSchedule === 'next_week') {
-      const calculationDate = new Date(periodEnd);
-      calculationDate.setDate(
-        periodEnd.getDate() + ((8 - periodEnd.getDay()) % 7) || 7
-      );
-      const paymentDate = new Date(calculationDate);
-      paymentDate.setDate(calculationDate.getDate() + 2);
-      return { calculationDate, paymentDate };
-    } else {
-      const calculationDate = new Date(periodEnd);
-      calculationDate.setDate(
-        periodEnd.getDate() + ((8 - periodEnd.getDay()) % 7) || 7 + 7
-      );
-      const paymentDate = new Date(calculationDate);
-      paymentDate.setDate(calculationDate.getDate() + 2);
-      return { calculationDate, paymentDate };
-    }
-  }
-
-  /**
-   * Получает период для запроса данных
-   */
-  getQueryPeriod(paymentSchedule: 'next_week' | 'week_after'): {
-    from: Date;
-    to: Date;
-  } {
-    const now = new Date();
-
-    if (paymentSchedule === 'next_week') {
-      // Для "next_week" - текущая неделя (понедельник - воскресенье текущей недели)
-      const to = new Date(now);
-      // now.getDate() - now.getDay() дает воскресенье текущей недели
-      // Если сегодня воскресенье (getDay() = 0), то это и есть воскресенье текущей недели
-      if (now.getDay() === 0) {
-        to.setDate(now.getDate());
-      } else {
-        to.setDate(now.getDate() - now.getDay());
-      }
-      to.setHours(23, 59, 59, 999);
-
-      const from = new Date(to);
-      from.setDate(to.getDate() - 6); // Понедельник текущей недели
-      from.setHours(0, 0, 0, 0);
-
-      return { from, to };
-    } else {
-      // Для "week_after" - прошлая неделя (понедельник - воскресенье прошлой недели)
-      return this.getLastWeekPeriod();
-    }
+    return calculateOzonPaymentDates(periodEndDate, paymentSchedule);
   }
 
   /**
@@ -351,24 +252,18 @@ export class OzonOperationService {
       errors: [] as string[],
     };
 
-    console.log(`🔍 Найдено активных интеграций Ozon: ${integrations.length}`);
-
     if (integrations.length === 0) {
-      console.log('ℹ️  Активных интеграций не найдено, операций не создано');
+      logger.info('  Активных интеграций не найдено, операций не создано');
       return results;
     }
 
-    console.log('═══════════════════════════════════════════════════════');
-    console.log('🔄 Начинаем обработку интеграций...');
-    console.log('═══════════════════════════════════════════════════════');
-
     for (let i = 0; i < integrations.length; i++) {
       const integration = integrations[i];
-      console.log(
+      logger.info(
         `\n[${i + 1}/${integrations.length}] Обработка интеграции: ${integration.id}`
       );
-      console.log(`   Компания: ${integration.company.name}`);
-      console.log(`   График выплат: ${integration.paymentSchedule}`);
+      logger.info(`   Компания: ${integration.company.name}`);
+      logger.info(`   График выплат: ${integration.paymentSchedule}`);
 
       const period = this.getQueryPeriod(
         integration.paymentSchedule as 'next_week' | 'week_after'
@@ -395,7 +290,7 @@ export class OzonOperationService {
           },
         });
 
-        console.log(`📋 Создана сессия импорта: ${importSession.id}`);
+        logger.info(`Создана сессия импорта: ${importSession.id}`);
 
         const created = await this.createOperationForIntegration(
           integration,
@@ -407,8 +302,8 @@ export class OzonOperationService {
 
         if (created) {
           results.created++;
-          console.log(
-            `   ✅ Операция успешно создана для интеграции ${integration.id}`
+          logger.info(
+            `   Операция успешно создана для интеграции ${integration.id}`
           );
 
           // Обновляем сессию как успешную
@@ -422,8 +317,8 @@ export class OzonOperationService {
             },
           });
         } else {
-          console.log(
-            `   ⏭️  Операция не создана (сумма 0, payment >= 0 или дубликат)`
+          logger.info(
+            `    Операция не создана (сумма 0, payment >= 0 или дубликат)`
           );
 
           // Обновляем сессию - операция пропущена
@@ -439,7 +334,7 @@ export class OzonOperationService {
         }
       } catch (error: any) {
         const errorMsg = `Integration ${integration.id}: ${error.message}`;
-        console.error(`   ❌ Ошибка: ${errorMsg}`);
+        logger.error(`   Ошибка: ${errorMsg}`);
         results.errors.push(errorMsg);
 
         const duration = Date.now() - startTime;
@@ -458,13 +353,8 @@ export class OzonOperationService {
         }
       }
     }
-
-    console.log('\n═══════════════════════════════════════════════════════');
-    console.log('📊 ИТОГИ ОБРАБОТКИ ИНТЕГРАЦИЙ');
-    console.log('═══════════════════════════════════════════════════════');
-    console.log(`✅ Успешно создано операций: ${results.created}`);
-    console.log(`❌ Ошибок: ${results.errors.length}`);
-    console.log('═══════════════════════════════════════════════════════\n');
+    logger.info(`Успешно создано операций: ${results.created}`);
+    logger.info(`Ошибок: ${results.errors.length}`);
 
     return results;
   }
@@ -478,15 +368,15 @@ export class OzonOperationService {
     importSessionId?: string
   ): Promise<boolean> {
     try {
-      console.log(`🔄 Обрабатываем интеграцию: ${integration.id}`);
-      console.log(
-        `📅 Период запроса: ${period.from.toLocaleDateString('ru-RU')} - ${period.to.toLocaleDateString('ru-RU')}`
+      logger.info(
+        `Период запроса: ${period.from.toLocaleDateString('ru-RU')} - ${period.to.toLocaleDateString('ru-RU')}`
       );
 
       // Проверяем данные интеграции
-      console.log(`📋 Данные интеграции:`, {
+      logger.info(`Данные интеграции:`, {
         articleId: integration.articleId,
         articleName: integration.article?.name || 'N/A',
+        articleCounterpartyId: integration.article?.counterpartyId || 'N/A',
         accountId: integration.accountId,
         accountName: integration.account?.name || 'N/A',
         companyId: integration.companyId,
@@ -497,15 +387,130 @@ export class OzonOperationService {
       const toISO = period.to.toISOString();
 
       // Получаем данные из Ozon
-      console.log(`🌐 Запрашиваем данные Ozon API...`);
       // Расшифровываем apiKey перед использованием
-      const decryptedApiKey = decrypt(integration.apiKey);
+      let decryptedApiKey: string;
+      try {
+        // Логируем исходное значение для диагностики (первые символы)
+        const originalApiKeyPreview = integration.apiKey
+          ? `${integration.apiKey.substring(0, 20)}...`
+          : 'missing';
+        logger.debug(
+          `   Исходный apiKey (первые 20 символов): ${originalApiKeyPreview}`
+        );
+        logger.debug(
+          `   Длина исходного apiKey: ${integration.apiKey?.length || 0}`
+        );
+
+        decryptedApiKey = decrypt(integration.apiKey);
+
+        // КРИТИЧЕСКАЯ ПРОВЕРКА: расшифрованное значение не должно быть равно исходному
+        if (decryptedApiKey === integration.apiKey) {
+          logger.error(
+            `   КРИТИЧЕСКОЕ: Расшифрованное значение равно исходному!`
+          );
+          logger.error(`   Это означает, что расшифровка не удалась`);
+          logger.error(`   apiKey был зашифрован другим ENCRYPTION_KEY`);
+          logger.error(
+            `   Пересоздайте интеграцию через форму, введя apiKey заново`
+          );
+          throw new AppError(
+            'Не удалось расшифровать apiKey (расшифрованное значение равно исходному). Пересоздайте интеграцию через форму.',
+            400
+          );
+        }
+
+        // Проверяем, что расшифрованное значение выглядит как валидный API ключ
+        // Зашифрованное значение имеет формат "iv:salt:tag:encrypted" (4 части через :)
+        // Реальный API ключ не содержит двоеточий и имеет другую длину
+        const isEncryptedFormat = decryptedApiKey.split(':').length === 4;
+        if (isEncryptedFormat) {
+          logger.error(
+            `   Не удалось расшифровать apiKey (вернуто зашифрованное значение)`
+          );
+          logger.error(
+            `   Расшифрованное значение имеет формат зашифрованного: ${decryptedApiKey.substring(0, 50)}...`
+          );
+          logger.error(`   apiKey был зашифрован другим ENCRYPTION_KEY`);
+          logger.error(
+            `   Пересоздайте интеграцию через форму, введя apiKey заново`
+          );
+          throw new AppError(
+            'Не удалось расшифровать apiKey (вернуто зашифрованное значение). Пересоздайте интеграцию через форму.',
+            400
+          );
+        }
+
+        // Проверяем, что расшифрованное значение выглядит как валидный API ключ
+        // Ozon API ключи обычно имеют длину 32-64 символа и содержат буквы и цифры
+        if (
+          !decryptedApiKey ||
+          decryptedApiKey.length < 10 ||
+          decryptedApiKey.length > 200
+        ) {
+          logger.error(
+            `   Расшифрованный apiKey выглядит некорректно (длина: ${decryptedApiKey.length})`
+          );
+          logger.error(
+            `   Пересоздайте интеграцию через форму, введя apiKey заново`
+          );
+          throw new AppError(
+            'Расшифрованный apiKey выглядит некорректно. Пересоздайте интеграцию через форму.',
+            400
+          );
+        }
+
+        // Дополнительная проверка: apiKey не должен содержать base64-подобные паттерны
+        // (зашифрованные значения содержат base64 строки)
+        const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+        if (
+          decryptedApiKey.length > 50 &&
+          base64Pattern.test(decryptedApiKey) &&
+          decryptedApiKey.includes('=')
+        ) {
+          logger.warn(
+            `   Предупреждение: apiKey выглядит как base64 строка, возможно это зашифрованное значение`
+          );
+        }
+
+        logger.info(
+          `apiKey успешно расшифрован (длина: ${decryptedApiKey.length})`
+        );
+        logger.debug(
+          `   Первые 8 символов расшифрованного apiKey: ${decryptedApiKey.substring(0, 8)}...`
+        );
+      } catch (error: any) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+        // Если это ошибка от decrypt, оборачиваем её в AppError
+        throw new AppError(
+          `Ошибка расшифровки apiKey: ${error.message}. Пересоздайте интеграцию через форму.`,
+          400
+        );
+      }
+
+      // Обрезаем пробелы в ключах перед отправкой (как в валидации)
+      const trimmedClientKey = integration.clientKey.trim();
+      const trimmedApiKey = decryptedApiKey.trim();
+
+      logger.debug(`   Параметры запроса:`, {
+        clientKey: `${trimmedClientKey.substring(0, 8)}...`,
+        apiKeyLength: trimmedApiKey.length,
+        dateFrom: fromISO,
+        dateTo: toISO,
+      });
+
       const cashFlowData = await this.getCashFlowStatement(
-        integration.clientKey,
-        decryptedApiKey,
+        trimmedClientKey,
+        trimmedApiKey,
         fromISO,
         toISO
       );
+
+      logger.info(` Получено данных от Ozon API:`, {
+        cash_flows_count: cashFlowData.result.cash_flows?.length || 0,
+        details_count: cashFlowData.result.details?.length || 0,
+      });
 
       // Вычисляем хэш данных для идемпотентности
       const dataHash = hashObject({
@@ -515,7 +520,7 @@ export class OzonOperationService {
         cashFlows: cashFlowData.result.cash_flows,
         details: cashFlowData.result.details,
       });
-      console.log(`🔐 Хэш данных: ${dataHash.substring(0, 16)}...`);
+      logger.debug(` Хэш данных: ${dataHash.substring(0, 16)}...`);
 
       // Проверяем, не был ли уже импортирован этот набор данных (по хэшу)
       if (importSessionId) {
@@ -529,8 +534,8 @@ export class OzonOperationService {
         });
 
         if (existingSession) {
-          console.log(
-            `⏭️ Данные с таким же хэшем уже были импортированы в сессии ${existingSession.id}, пропускаем`
+          logger.info(
+            `Данные с таким же хэшем уже были импортированы в сессии ${existingSession.id}, пропускаем`
           );
           return false;
         }
@@ -544,18 +549,43 @@ export class OzonOperationService {
 
       // Получаем сумму выплаты
       const calculatedAmount = this.calculatePaymentAmount(cashFlowData);
-      console.log(`💰 Рассчитанная сумма выплаты: ${calculatedAmount}`);
+      logger.info(
+        `Рассчитанная сумма выплаты: ${calculatedAmount.toLocaleString('ru-RU')} RUB`
+      );
+
+      // Логируем детали расчета для диагностики
+      if (
+        cashFlowData.result.details &&
+        cashFlowData.result.details.length > 0
+      ) {
+        const payment = cashFlowData.result.details[0]?.payments?.[0]?.payment;
+        logger.debug(
+          `   Payment из details: ${payment ? payment.toLocaleString('ru-RU') + ' RUB' : 'не найден'}`
+        );
+      }
+      if (
+        cashFlowData.result.cash_flows &&
+        cashFlowData.result.cash_flows.length > 0
+      ) {
+        const cf = cashFlowData.result.cash_flows[0];
+        logger.debug(`   Cash flow данные:`, {
+          orders_amount: cf.orders_amount?.toLocaleString('ru-RU') || 0,
+          services_amount: cf.services_amount?.toLocaleString('ru-RU') || 0,
+          commission_amount: cf.commission_amount?.toLocaleString('ru-RU') || 0,
+          returns_amount: cf.returns_amount?.toLocaleString('ru-RU') || 0,
+        });
+      }
 
       // Если сумма 0, нет необходимости создавать операцию
       if (calculatedAmount === 0) {
-        console.log(`⏭️ Сумма 0, пропускаем создание операции`);
+        logger.info(`Сумма 0, пропускаем создание операции`);
         return false;
       }
 
       // Проверяем, что payment < 0 для создания операции
       if (calculatedAmount >= 0) {
-        console.log(
-          `⏭️ Payment ${calculatedAmount} >= 0, пропускаем создание операции (создаем только при payment < 0)`
+        logger.info(
+          `Payment ${calculatedAmount.toLocaleString('ru-RU')} >= 0, пропускаем создание операции (создаем только при payment < 0)`
         );
         return false;
       }
@@ -564,40 +594,73 @@ export class OzonOperationService {
       const operationAmount = this.getOperationAmount(calculatedAmount);
       const operationType = this.getOperationType(calculatedAmount);
 
-      console.log(
-        `📊 Создаем операцию: ${operationType} на сумму ${operationAmount}`
+      logger.info(
+        `Создаем операцию: ${operationType} на сумму ${operationAmount}`
       );
 
-      // Проверяем, не была ли уже создана операция за этот период
+      // Генерируем описание для проверки дубликатов
+      const formatDate = (date: Date) => date.toLocaleDateString('ru-RU');
+      const operationDescription = this.generateOperationDescription(
+        period.from,
+        period.to,
+        operationAmount,
+        operationType,
+        integration.paymentSchedule as 'next_week' | 'week_after'
+      );
+
+      // Улучшенная проверка дубликатов:
+      // 1. По описанию (содержит "Ozon" и период)
+      // 2. По параметрам операции (companyId, articleId, accountId)
+      // 3. По дате операции (расширенный диапазон для учета даты выплаты)
+
       const existingOperation = await prisma.operation.findFirst({
         where: {
           companyId: integration.companyId,
           articleId: integration.articleId,
           accountId: integration.accountId,
-          operationDate: {
-            gte: period.from,
-            lte: period.to,
-          },
           description: {
-            contains: `Ozon выплата`,
+            contains: `Ozon`,
           },
+          // Проверяем операции с похожим описанием (содержит период)
+          OR: [
+            {
+              description: {
+                contains: formatDate(period.from),
+              },
+            },
+            {
+              description: {
+                contains: formatDate(period.to),
+              },
+            },
+            // Также проверяем по дате операции (может быть вне периода запроса)
+            {
+              operationDate: {
+                gte: new Date(period.from.getTime() - 7 * 24 * 60 * 60 * 1000), // За неделю до периода
+                lte: new Date(period.to.getTime() + 14 * 24 * 60 * 60 * 1000), // До 2 недель после периода
+              },
+            },
+          ],
         },
       });
 
       if (existingOperation) {
-        console.log(
-          `⏭️ Операция за этот период уже существует: ${existingOperation.id}`
-        );
+        logger.info(`Похожая операция уже существует: ${existingOperation.id}`);
+        logger.debug(`   Детали существующей операции:`, {
+          id: existingOperation.id,
+          date: existingOperation.operationDate,
+          amount: existingOperation.amount,
+          description: existingOperation.description?.substring(0, 100),
+        });
         return false;
       }
+
+      logger.debug(`Дубликатов не найдено, продолжаем создание операции`);
 
       // Рассчитываем даты выплаты
       const paymentDates = this.calculatePaymentDates(
         period.to,
         integration.paymentSchedule as 'next_week' | 'week_after'
-      );
-      console.log(
-        `📆 Дата выплаты: ${paymentDates.paymentDate.toLocaleDateString('ru-RU')}`
       );
 
       // Получаем валюту
@@ -614,6 +677,9 @@ export class OzonOperationService {
         throw new AppError('Account ID is missing in integration', 400);
       }
 
+      // Получаем counterpartyId из статьи, если он есть
+      const counterpartyId = integration.article?.counterpartyId || null;
+
       // Создаем операцию - явно указываем все поля
       const operationData = {
         type: operationType,
@@ -622,23 +688,20 @@ export class OzonOperationService {
         currency,
         articleId: integration.articleId, // Явно указываем articleId
         accountId: integration.accountId, // Явно указываем accountId
-        description: this.generateOperationDescription(
-          period.from,
-          period.to,
-          operationAmount,
-          operationType,
-          integration.paymentSchedule as 'next_week' | 'week_after'
-        ),
+        counterpartyId: counterpartyId, // Передаем counterpartyId из статьи
+        description: operationDescription, // Используем уже сгенерированное описание
         isConfirmed: true,
       };
 
-      console.log(`🔄 Создаем операцию:`, {
+      logger.info(`Создаем операцию:`, {
         type: operationData.type,
         amount: operationData.amount,
         currency: operationData.currency,
         date: operationData.operationDate.toLocaleDateString('ru-RU'),
         articleId: operationData.articleId,
         article: integration.article?.name || 'N/A',
+        counterpartyId: operationData.counterpartyId,
+        counterparty: integration.article?.counterparty?.name || 'N/A',
         accountId: operationData.accountId,
         account: integration.account?.name || 'N/A',
       });
@@ -652,6 +715,7 @@ export class OzonOperationService {
           currency: operationData.currency,
           articleId: operationData.articleId, // Явно указываем articleId
           accountId: operationData.accountId, // Явно указываем accountId
+          counterpartyId: operationData.counterpartyId, // Передаем counterpartyId из статьи
           description: operationData.description,
           isConfirmed: operationData.isConfirmed,
           companyId: integration.companyId,
@@ -659,41 +723,22 @@ export class OzonOperationService {
         include: {
           article: true,
           account: true,
+          counterparty: true, // Включаем контрагента для проверки
         },
       });
 
-      console.log(`✅ Операция успешно создана: ${createdOperation.id}`);
-      console.log(`   📋 Детали созданной операции:`);
-      console.log(`      - ID: ${createdOperation.id}`);
-      console.log(`      - Тип: ${createdOperation.type}`);
-      console.log(
-        `      - Сумма: ${createdOperation.amount} ${createdOperation.currency}`
-      );
-      console.log(
-        `      - Дата: ${createdOperation.operationDate.toLocaleDateString('ru-RU')}`
-      );
-      console.log(
-        `      - Статья ID: ${createdOperation.articleId || 'ОТСУТСТВУЕТ!'}`
-      );
-      console.log(`      - Статья: ${createdOperation.article?.name || 'N/A'}`);
-      console.log(
-        `      - Счет ID: ${createdOperation.accountId || 'ОТСУТСТВУЕТ!'}`
-      );
-      console.log(`      - Счет: ${createdOperation.account?.name || 'N/A'}`);
-      console.log(
-        `      - Описание: ${createdOperation.description?.substring(0, 60)}...`
-      );
+      logger.info(`Операция успешно создана: ${createdOperation.id}`);
 
       if (!createdOperation.articleId) {
-        console.error(`   ❌ ВНИМАНИЕ: articleId не сохранился в операции!`);
+        logger.error(`   ВНИМАНИЕ: articleId не сохранился в операции!`);
       } else {
-        console.log(`   ✅ Операция создана корректно со всеми полями`);
+        logger.debug(`   Операция создана корректно со всеми полями`);
       }
 
       return true;
     } catch (error: any) {
-      console.error(
-        `❌ Ошибка при создании операции для интеграции ${integration.id}:`,
+      logger.error(
+        ` Ошибка при создании операции для интеграции ${integration.id}:`,
         error
       );
       throw new AppError(
@@ -722,21 +767,6 @@ export class OzonOperationService {
     const typeText = operationType === 'income' ? 'доход' : 'расход';
 
     return `Ozon ${typeText} (${scheduleText}) за период ${formatDate(periodFrom)} - ${formatDate(periodTo)}. Сумма: ${amount.toLocaleString('ru-RU')} RUB`;
-  }
-
-  /**
-   * Тестовый метод для создания операции вручную
-   */
-  async createTestOperation(integrationId: string): Promise<boolean> {
-    const integration = await this.getIntegrationById(integrationId);
-    if (!integration) {
-      throw new AppError('Integration not found or not active', 404);
-    }
-
-    const period = this.getQueryPeriod(
-      integration.paymentSchedule as 'next_week' | 'week_after'
-    );
-    return this.createOperationForIntegration(integration, period);
   }
 }
 

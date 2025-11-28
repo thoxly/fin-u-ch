@@ -23,5 +23,7 @@ export * from './constants/config';
 export * from './lib/currencies';
 export * from './lib/period';
 export * from './lib/date';
-// NOTE: operationHash is Node.js-only, import directly from './lib/operationHash' if needed in backend
 export * from './lib/operationSimilarity';
+export * from './lib/ozon-periods';
+export * from './lib/ozon-calculations';
+// NOTE: operationHash is Node.js-only, import directly from './lib/operationHash' if needed in backend

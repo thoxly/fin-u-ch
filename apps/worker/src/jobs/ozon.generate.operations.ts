@@ -1,6 +1,7 @@
 // apps/worker/src/jobs/ozon.generate.operations.ts
 import { logger } from '../config/logger';
 import { env } from '../config/env';
+import { getOzonQueryPeriod } from '@fin-u-ch/shared';
 
 interface OzonOperationsGenerationParams {
   testIntegrationId?: string;
@@ -52,7 +53,7 @@ export class OzonOperationService {
       }
 
       const url = `${this.apiUrl}/api/integrations${endpoint}`;
-      logger.debug(`🔗 Making API call to: ${url}`);
+      logger.debug(` Making API call to: ${url}`);
 
       const response = await fetch(url, {
         method,
@@ -117,75 +118,26 @@ export class OzonOperationService {
   /**
    * Создает операцию для конкретной интеграции
    */
-  async createOperationForIntegration(
-    integrationId: string
-  ): Promise<boolean | number> {
-    logger.info(
-      `Calling API to generate Ozon operation for integration ${integrationId}`
-    );
-
-    try {
-      const result = await this.callApi('/ozon/generate-operation', 'POST', {
-        integrationId,
-      });
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to generate operation');
-      }
-
-      logger.info(`Operation generation result: ${result.created}`);
-      return result.created || false;
-    } catch (error: any) {
-      logger.error(
-        `Failed to generate operation for integration ${integrationId}:`,
-        error
-      );
-      throw error;
-    }
-  }
 
   /**
-   * Тестовый метод для создания операции вручную
-   */
-  async createTestOperation(integrationId: string): Promise<boolean> {
-    logger.info(
-      `Calling API to test Ozon operation generation for integration ${integrationId}`
-    );
-
-    try {
-      // Используем существующий test endpoint
-      const result = await this.callApi(`/ozon/${integrationId}/test`, 'POST');
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to test operation generation');
-      }
-
-      logger.info(`Test operation result: ${result.operationCreated}`);
-      return result.operationCreated || false;
-    } catch (error: any) {
-      logger.error(
-        `Failed to test operation generation for integration ${integrationId}:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Получает статус операций
+   * Получает статус операций (только для direct mode)
    */
   async getOperationsStatus() {
-    logger.info('Getting Ozon operations status');
+    logger.info('Getting Ozon operations status (direct mode)');
 
     try {
-      const result = await this.callApi('/ozon/operations-status', 'GET');
+      // Используем direct mode для получения статуса
+      const { ozonDirectService } = await import('./ozon.direct.service');
+      const integrations = await ozonDirectService.getActiveIntegrations();
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to get operations status');
-      }
-
-      logger.info('Successfully retrieved operations status');
-      return result.data;
+      return {
+        activeIntegrations: integrations.length,
+        integrations: integrations.map((i) => ({
+          id: i.id,
+          companyId: i.companyId,
+          paymentSchedule: i.paymentSchedule,
+        })),
+      };
     } catch (error: any) {
       logger.error('Failed to get operations status:', error);
       throw error;
@@ -196,6 +148,12 @@ export class OzonOperationService {
    * Проверяет доступность API
    */
   async healthCheck(): Promise<boolean> {
+    // Если WORKER_API_KEY не настроен, пропускаем проверку
+    if (!env.WORKER_API_KEY) {
+      logger.warn('WORKER_API_KEY не настроен, пропускаем health check');
+      return false;
+    }
+
     try {
       logger.info('Performing API health check');
 
@@ -221,7 +179,7 @@ export const ozonOperationService = new OzonOperationService();
 export async function generateOzonOperations(
   params: OzonOperationsGenerationParams = {}
 ): Promise<{ created: number; errors: string[] }> {
-  logger.info('🔄 Запуск генерации операций Ozon...');
+  logger.info(' Запуск генерации операций Ozon...');
 
   try {
     logger.info('🏥 Проверка доступности API...');
@@ -231,14 +189,12 @@ export async function generateOzonOperations(
       const isHealthy = await ozonOperationService.healthCheck();
       if (isHealthy) {
         useApiMode = true;
-        logger.info('✅ API доступен, используем API режим');
+        logger.info(' API доступен, используем API режим');
       } else {
-        logger.warn(
-          '⚠️  API недоступен, переключаемся на прямой режим (direct)'
-        );
+        logger.warn('  API недоступен, переключаемся на прямой режим (direct)');
       }
     } catch (apiError: any) {
-      logger.warn(`⚠️  Ошибка проверки API: ${apiError.message}`);
+      logger.warn(`  Ошибка проверки API: ${apiError.message}`);
       logger.warn(
         '💡 Переключаемся на прямой режим (direct) - работа напрямую с БД и Ozon API'
       );
@@ -248,54 +204,62 @@ export async function generateOzonOperations(
 
     if (params.testIntegrationId) {
       logger.info(
-        `🧪 Тестовый режим для интеграции: ${params.testIntegrationId}`
+        ` Тестовый режим для интеграции: ${params.testIntegrationId}`
+      );
+      logger.warn(
+        '  Тестовый режим работает только в direct mode (напрямую с БД и Ozon API)'
       );
 
-      if (useApiMode) {
-        const created = await ozonOperationService.createTestOperation(
-          params.testIntegrationId
+      // Используем direct mode для тестирования
+      const { ozonDirectService } = await import('./ozon.direct.service');
+      const integration = await ozonDirectService.getActiveIntegrations();
+      const testIntegration = integration.find(
+        (i) => i.id === params.testIntegrationId
+      );
+
+      if (!testIntegration) {
+        throw new Error(
+          `Integration ${params.testIntegrationId} not found or not active`
         );
-        result = {
-          created: created ? 1 : 0,
-          errors: [],
-        };
-      } else {
-        logger.warn(
-          '⚠️  Тестовый режим в direct mode пока не реализован, используем API режим'
-        );
-        const created = await ozonOperationService.createTestOperation(
-          params.testIntegrationId
-        );
-        result = {
-          created: created ? 1 : 0,
-          errors: [],
-        };
       }
+
+      const period = getOzonQueryPeriod(
+        testIntegration.paymentSchedule as 'next_week' | 'week_after'
+      );
+      const created = await ozonDirectService.createOperationForIntegration(
+        testIntegration,
+        period
+      );
+
+      result = {
+        created: created ? 1 : 0,
+        errors: [],
+      };
       logger.info(
-        `✅ Тестовая операция ${result.created > 0 ? 'создана' : 'не создана'}`
+        ` Тестовая операция ${result.created > 0 ? 'создана' : 'не создана'}`
       );
     } else {
       if (useApiMode) {
         logger.info(
-          '📋 Продукционный режим - обработка всех активных интеграций через API'
+          ' Продукционный режим - обработка всех активных интеграций через API'
         );
         result =
           await ozonOperationService.createOperationsForAllIntegrations();
       } else {
         logger.info(
-          '📋 Продукционный режим - обработка всех активных интеграций (прямой режим)'
+          ' Продукционный режим - обработка всех активных интеграций (прямой режим)'
         );
         const { ozonDirectService } = await import('./ozon.direct.service');
         result = await ozonDirectService.createOperationsForAllIntegrations();
       }
       logger.info(
-        `📊 Обработка завершена: ${result.created} создано, ${result.errors.length} ошибок`
+        ` Обработка завершена: ${result.created} создано, ${result.errors.length} ошибок`
       );
     }
 
     return result;
   } catch (error) {
-    logger.error('❌ Ошибка при генерации операций Ozon:', error);
+    logger.error(' Ошибка при генерации операций Ozon:', error);
     throw error;
   }
 }
@@ -321,7 +285,7 @@ export function shouldRunOzonTaskToday(): boolean {
     'суббота',
   ];
   logger.info(
-    `📅 Сегодня ${weekdayNames[today]} (день недели: ${today}), запускать задачу: ${shouldRun ? 'ДА' : 'НЕТ'}`
+    ` Сегодня ${weekdayNames[today]} (день недели: ${today}), запускать задачу: ${shouldRun ? 'ДА' : 'НЕТ'}`
   );
   return shouldRun;
 }

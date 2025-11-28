@@ -30,9 +30,7 @@ class OzonIntegrationDebugger {
   }
 
   async run(): Promise<DebugResult> {
-    console.log(
-      `🔍 Детальная отладка Ozon интеграции: ${this.integrationId}\n`
-    );
+    console.log(` Детальная отладка Ozon интеграции: ${this.integrationId}\n`);
 
     try {
       const today = new Date().getDay();
@@ -46,15 +44,13 @@ class OzonIntegrationDebugger {
         'суббота',
       ];
       if (today !== 3) {
-        console.log(
-          `⚠️  ВНИМАНИЕ: Сегодня ${weekdayNames[today]}, а не среда.`
-        );
+        console.log(`  ВНИМАНИЕ: Сегодня ${weekdayNames[today]}, а не среда.`);
         console.log(
           `   В production интеграция работает только по средам, но для отладки продолжаем...`
         );
       } else {
         console.log(
-          `✅ Сегодня ${weekdayNames[today]} - подходящий день для работы интеграции`
+          ` Сегодня ${weekdayNames[today]} - подходящий день для работы интеграции`
         );
       }
 
@@ -141,7 +137,7 @@ class OzonIntegrationDebugger {
   }
 
   private async runDirectMode(): Promise<void> {
-    console.log('\n2. 🔧 Работаем напрямую (прямой доступ к БД и Ozon API)...');
+    console.log('\n2.  Работаем напрямую (прямой доступ к БД и Ozon API)...');
 
     await this.checkIntegrationDirect();
     await this.checkExistingOperationsDirect();
@@ -171,7 +167,7 @@ class OzonIntegrationDebugger {
   // === API MODE METHODS ===
 
   private async testApiHealth(): Promise<void> {
-    console.log('   🏥 Проверяем доступность API...');
+    console.log('    Проверяем доступность API...');
 
     try {
       const isHealthy = await ozonOperationService.healthCheck();
@@ -189,15 +185,32 @@ class OzonIntegrationDebugger {
   }
 
   private async testOzonApi(): Promise<void> {
-    console.log('   Тестируем Ozon API через наш API...');
+    console.log('   Тестируем Ozon API напрямую (direct mode)...');
 
     try {
-      const operationCreated = await ozonOperationService.createTestOperation(
-        this.integrationId
+      // Используем direct mode для тестирования
+      const { ozonDirectService } = await import('../jobs/ozon.direct.service');
+      const integrations = await ozonDirectService.getActiveIntegrations();
+      const integration = integrations.find((i) => i.id === this.integrationId);
+
+      if (!integration) {
+        throw new Error(
+          `Integration ${this.integrationId} not found or not active`
+        );
+      }
+
+      const { getOzonQueryPeriod } = await import('@fin-u-ch/shared');
+      const period = getOzonQueryPeriod(
+        integration.paymentSchedule as 'next_week' | 'week_after'
       );
+      const operationCreated =
+        await ozonDirectService.createOperationForIntegration(
+          integration,
+          period
+        );
 
       if (operationCreated) {
-        console.log('   Тестовая операция успешно создана через API');
+        console.log('   Тестовая операция успешно создана (direct mode)');
         this.result.amount = 1;
       } else {
         console.log(
@@ -206,23 +219,39 @@ class OzonIntegrationDebugger {
         this.result.errors.push('Операция не создана (сумма 0 или дубликат)');
       }
     } catch (apiError: any) {
-      const errorMsg = `Ошибка при тестировании через API: ${apiError.message}`;
+      const errorMsg = `Ошибка при тестировании: ${apiError.message}`;
       this.result.errors.push(errorMsg);
       console.log(`   ${errorMsg}`);
     }
   }
 
   private async createOperationViaApi(): Promise<void> {
-    console.log('   🚀 Создаем операцию через API...');
+    console.log('    Создаем операцию напрямую (direct mode)...');
 
     try {
+      // Используем direct mode
+      const { ozonDirectService } = await import('../jobs/ozon.direct.service');
+      const integrations = await ozonDirectService.getActiveIntegrations();
+      const integration = integrations.find((i) => i.id === this.integrationId);
+
+      if (!integration) {
+        throw new Error(
+          `Integration ${this.integrationId} not found or not active`
+        );
+      }
+
+      const { getOzonQueryPeriod } = await import('@fin-u-ch/shared');
+      const period = getOzonQueryPeriod(
+        integration.paymentSchedule as 'next_week' | 'week_after'
+      );
       const operationCreated =
-        await ozonOperationService.createOperationForIntegration(
-          this.integrationId
+        await ozonDirectService.createOperationForIntegration(
+          integration,
+          period
         );
 
       if (operationCreated) {
-        console.log('   Операция успешно создана через API');
+        console.log('   Операция успешно создана (direct mode)');
         this.result.operation = { id: 'created-via-api', created: true };
       } else {
         console.log(
@@ -273,7 +302,7 @@ class OzonIntegrationDebugger {
 
     if (!integration.articleId) {
       this.result.errors.push('articleId отсутствует в интеграции');
-      console.log('   ❌ ОШИБКА: articleId отсутствует в интеграции!');
+      console.log('    ОШИБКА: articleId отсутствует в интеграции!');
     }
 
     if (!integration.isActive) {
@@ -363,7 +392,57 @@ class OzonIntegrationDebugger {
 
       // Временно используем старый метод для прямого доступа
       // Расшифровываем apiKey перед использованием
-      const decryptedApiKey = decrypt(integration.apiKey);
+      // Расшифровываем apiKey перед использованием
+      let decryptedApiKey: string;
+      try {
+        decryptedApiKey = decrypt(integration.apiKey);
+
+        // Проверяем, что расшифрованное значение выглядит как валидный API ключ
+        // Зашифрованное значение имеет формат "iv:salt:tag:encrypted" (4 части через :)
+        // Реальный API ключ не содержит двоеточий и имеет другую длину
+        const isEncryptedFormat = decryptedApiKey.split(':').length === 4;
+        if (isEncryptedFormat) {
+          console.error(
+            ' Не удалось расшифровать apiKey (вернуто зашифрованное значение)'
+          );
+          console.error(' apiKey был зашифрован другим ENCRYPTION_KEY');
+          console.error(
+            ' Пересоздайте интеграцию через форму, введя apiKey заново'
+          );
+          throw new Error(
+            'Не удалось расшифровать apiKey. Пересоздайте интеграцию через форму.'
+          );
+        }
+
+        // Проверяем, что расшифрованное значение выглядит как валидный API ключ
+        if (
+          !decryptedApiKey ||
+          decryptedApiKey.length < 10 ||
+          decryptedApiKey.length > 200
+        ) {
+          console.error(
+            ` Расшифрованный apiKey выглядит некорректно (длина: ${decryptedApiKey.length})`
+          );
+          console.error(
+            ' Пересоздайте интеграцию через форму, введя apiKey заново'
+          );
+          throw new Error(
+            'Расшифрованный apiKey выглядит некорректно. Пересоздайте интеграцию через форму.'
+          );
+        }
+
+        console.log(
+          ` apiKey успешно расшифрован (длина: ${decryptedApiKey.length})`
+        );
+      } catch (error: any) {
+        console.error(` Ошибка при расшифровке apiKey: ${error.message}`);
+        console.error(' apiKey был зашифрован другим ENCRYPTION_KEY');
+        console.error(
+          ' Пересоздайте интеграцию через форму, введя apiKey заново'
+        );
+        throw error;
+      }
+
       const cashFlowData = await this.getCashFlowStatementDirect(
         integration.clientKey,
         decryptedApiKey,

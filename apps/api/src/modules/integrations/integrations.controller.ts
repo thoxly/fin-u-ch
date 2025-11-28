@@ -3,8 +3,12 @@ import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
 import integrationsService from './integrations.service';
 import ozonOperationService from './ozon/ozon-operation.service';
+<<<<<<< HEAD
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
+=======
+import logger from '../../config/logger';
+>>>>>>> 9502a4d (refactor(ozon): вынести общую логику в shared и улучшить проверку дубликатов)
 
 export class IntegrationsController {
   async saveOzonIntegration(
@@ -55,6 +59,7 @@ export class IntegrationsController {
     }
   }
 
+<<<<<<< HEAD
   async testOzonIntegrationManual(
     req: TenantRequest,
     res: Response,
@@ -121,14 +126,32 @@ export class IntegrationsController {
     }
   }
 
+=======
+>>>>>>> 9502a4d (refactor(ozon): вынести общую логику в shared и улучшить проверку дубликатов)
   async getOzonIntegration(
     req: TenantRequest,
     res: Response,
     next: NextFunction
   ) {
     try {
+      // Для worker запросов возвращаем пустой ответ (health check)
+      if (req.isWorker) {
+        return res.json({
+          success: true,
+          data: null,
+          message: 'Worker health check',
+        });
+      }
+
+      if (!req.companyId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Company ID is required',
+        });
+      }
+
       const result = await integrationsService.getOzonIntegration(
-        req.companyId!
+        req.companyId
       );
       res.json(result);
     } catch (error) {
@@ -142,8 +165,23 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      // Для worker запросов возвращаем ошибку (worker не должен отключать интеграции)
+      if (req.isWorker) {
+        return res.status(403).json({
+          success: false,
+          error: 'Worker requests cannot disconnect integrations',
+        });
+      }
+
+      if (!req.companyId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Company ID is required',
+        });
+      }
+
       const result = await integrationsService.disconnectOzonIntegration(
-        req.companyId!
+        req.companyId
       );
       res.json(result);
     } catch (error) {
@@ -151,6 +189,7 @@ export class IntegrationsController {
     }
   }
 
+<<<<<<< HEAD
   async testOzonIntegration(
     req: TenantRequest,
     res: Response,
@@ -399,6 +438,8 @@ export class IntegrationsController {
     }
   }
 
+=======
+>>>>>>> 9502a4d (refactor(ozon): вынести общую логику в shared и улучшить проверку дубликатов)
   /**
    * Генерация операций Ozon для всех интеграций (для worker)
    */
@@ -408,7 +449,7 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
-      console.log('🔄 API: Generating Ozon operations for all integrations');
+      logger.info('🔄 API: Generating Ozon operations for all integrations');
 
       const result =
         await ozonOperationService.createOperationsForAllIntegrations();
@@ -421,89 +462,6 @@ export class IntegrationsController {
     } catch (error) {
       next(error);
     }
-  }
-
-  /**
-   * Генерация операции Ozon для конкретной интеграции
-   */
-  async generateOzonOperationForIntegration(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const { integrationId } = req.body;
-
-      if (!integrationId) {
-        return res.status(400).json({
-          success: false,
-          error: 'integrationId is required',
-        });
-      }
-
-      console.log(
-        `🔄 API: Generating Ozon operation for integration ${integrationId}`
-      );
-
-      // Проверяем что интеграция принадлежит компании
-      const integration = await integrationsService.getOzonIntegration(
-        req.companyId!
-      );
-      if (
-        !integration.success ||
-        !integration.data ||
-        integration.data.id !== integrationId
-      ) {
-        return res.status(404).json({
-          success: false,
-          error: 'Integration not found',
-        });
-      }
-
-      const created =
-        await ozonOperationService.createTestOperation(integrationId);
-
-      res.json({
-        success: true,
-        created,
-        integrationId,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  /**
-   * Получение статуса генерации операций
-   */
-  async getOzonOperationsStatus(
-    req: TenantRequest,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      const integrations = await ozonOperationService.getActiveIntegrations();
-      console.log('Защёл');
-
-      res.json({
-        success: true,
-        data: {
-          totalIntegrations: integrations.length,
-          lastRun: new Date().toISOString(),
-          nextScheduledRun: this.getNextScheduledRun(),
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  private getNextScheduledRun(): string {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(now.getDate() + 1);
-    tomorrow.setHours(9, 0, 0, 0);
-    return tomorrow.toISOString();
   }
 }
 
