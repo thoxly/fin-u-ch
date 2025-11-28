@@ -1,9 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `onboardingCompleted` on the `users` table. All the data in the column will be lost.
-
-*/
 -- AlterTable
 DO $$
 BEGIN

@@ -1,6 +1,7 @@
 import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
 import { validateRequired } from '../../../utils/validation';
+import { Prisma } from '@prisma/client';
 
 export interface CreateArticleDTO {
   name: string;
@@ -394,7 +395,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      } as any,
+      } satisfies Prisma.ArticleInclude,
       orderBy: { name: 'asc' },
     });
   }
@@ -406,7 +407,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      } as any,
+      } satisfies Prisma.ArticleInclude,
     });
 
     if (!article) {
@@ -439,7 +440,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      } as any,
+      } satisfies Prisma.ArticleInclude,
     });
   }
 
@@ -474,7 +475,7 @@ export class ArticlesService {
         parent: { select: { id: true, name: true } },
         children: { select: { id: true, name: true } },
         counterparty: { select: { id: true, name: true } },
-      } as any,
+      } satisfies Prisma.ArticleInclude,
     });
   }
 

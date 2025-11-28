@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 
@@ -40,6 +41,14 @@ import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
+
+import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
+import { OzonIcon } from '../features/integrations/OzonIcon';
+import {
+  useDisconnectOzonIntegrationMutation,
+  useGetOzonIntegrationQuery,
+} from '../store/api/integrationsApi';
+
 import { usePermissions } from '../shared/hooks/usePermissions';
 
 export const OperationsPage = () => {
@@ -76,6 +85,64 @@ export const OperationsPage = () => {
   );
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // Загружаем данные интеграции Ozon
+  const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
+    useGetOzonIntegrationQuery();
+  const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
+  const { showSuccess, showError } = useNotification();
+
+  // Инициализируем интеграции с данными из API
+  const [integrations, setIntegrations] = useState<
+    Array<{
+      id: string;
+      name: string;
+      icon: typeof OzonIcon;
+      connected: boolean;
+      data?: {
+        clientKey?: string;
+        apiKey?: string;
+        paymentSchedule?: 'next_week' | 'week_after';
+        articleId?: string;
+        accountId?: string;
+      };
+    }>
+  >([
+    {
+      id: 'ozon',
+      name: 'Ozon',
+      icon: OzonIcon,
+      connected: false,
+      data: undefined,
+    },
+  ]);
+
+  const handleIntegrationDisconnect = async (integrationId: string) => {
+    if (integrationId === 'ozon') {
+      try {
+        const result = await disconnectOzonIntegration().unwrap();
+        if (result.success) {
+          setIntegrations((prev) =>
+            prev.map((integration) =>
+              integration.id === 'ozon'
+                ? {
+                    ...integration,
+                    connected: false,
+                    data: undefined,
+                  }
+                : integration
+            )
+          );
+          showSuccess('Интеграция Ozon успешно отключена');
+        } else {
+          showError(result.error || 'Ошибка при отключении интеграции');
+        }
+      } catch (error) {
+        console.error('Failed to disconnect Ozon integration:', error);
+        showError('Ошибка при отключении интеграции');
+      }
+    }
+  };
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -117,6 +184,23 @@ export const OperationsPage = () => {
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: company } = useGetCompanyQuery();
+
+  // Обновляем состояние интеграций при загрузке данных
+  useEffect(() => {
+    if (ozonIntegrationData?.success && ozonIntegrationData.data) {
+      setIntegrations((prev) =>
+        prev.map((integration) =>
+          integration.id === 'ozon'
+            ? {
+                ...integration,
+                connected: ozonIntegrationData.data!.connected,
+                data: ozonIntegrationData.data!.data,
+              }
+            : integration
+        )
+      );
+    }
+  }, [ozonIntegrationData]);
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -188,7 +272,6 @@ export const OperationsPage = () => {
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
-  const { showSuccess, showError } = useNotification();
 
   const { selectedIds, toggleSelectOne, toggleSelectAll, clearSelection } =
     useBulkSelection();
@@ -196,7 +279,38 @@ export const OperationsPage = () => {
   const isMobile = useIsMobile();
   const { canCreate, canUpdate } = usePermissions();
 
+  const handleIntegrationUpdate = (
+    integrationId: string,
+    data: {
+      clientKey: string;
+      apiKey: string;
+      paymentSchedule: 'next_week' | 'week_after';
+      articleId: string;
+      accountId: string;
+    }
+  ) => {
+    setIntegrations((prev) =>
+      prev.map((integration) =>
+        integration.id === integrationId
+          ? {
+              ...integration,
+              connected: true,
+              data: {
+                ...data,
+                articleId: data.articleId,
+                accountId: data.accountId,
+              },
+            }
+          : integration
+      )
+    );
+    showSuccess('Интеграция успешно подключена');
+  };
+
+  // Extract data reloading logic to avoid duplication
+
   // Функция для ручной перезагрузки данных (после мутаций)
+
   const reloadOperationsData = useCallback(async () => {
     clearSelection();
     await refetch();
@@ -735,12 +849,22 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+            <IntegrationsDropdown
+              integrations={integrations}
+              onIntegrationUpdate={handleIntegrationUpdate}
+              onIntegrationDisconnect={handleIntegrationDisconnect}
+              isLoading={isLoadingOzonIntegration}
+            />
+            <RecurringOperations onEdit={handleEdit} />
+            <MappingRules />
+
             {canUpdate('operations') && (
               <>
                 <RecurringOperations onEdit={handleEdit} />
                 <MappingRules />
               </>
             )}
+
             <ExportMenu
               filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
               buildRows={buildExportRows}

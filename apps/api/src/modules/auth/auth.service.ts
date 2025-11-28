@@ -12,7 +12,6 @@ import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
 import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
-import { Prisma } from '@prisma/client';
 
 export interface RegisterDTO {
   email: string;
@@ -203,7 +202,7 @@ export class AuthService {
         // Не блокируем регистрацию, если письмо не отправилось
       }
 
-      console.log('[AuthService.register] Регистрация успешна', {
+      logger.info('[AuthService.register] Регистрация успешна', {
         userId: result.user.id,
         email: result.user.email,
       });

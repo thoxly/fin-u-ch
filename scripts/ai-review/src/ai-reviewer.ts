@@ -39,6 +39,118 @@ export class AiReviewer {
   }
 
   /**
+   * Truncate tool results to prevent context overflow.
+   * Different tools have different size limits based on their typical output sizes.
+   */
+  private truncateToolResult(toolName: string, result: unknown): unknown {
+    const resultStr =
+      typeof result === 'string' ? result : JSON.stringify(result);
+    const originalSize = resultStr.length;
+
+    // Define size limits per tool type (in characters)
+    // These limits are conservative to leave room for other messages and completion tokens
+    const limits: Record<string, number> = {
+      search: 50000, // Search results can be huge, keep first 50k chars
+      read_file: 80000, // Large files, keep first 80k chars
+      read_file_range: 80000, // Range reads, same limit
+      list_files: 20000, // File listings, usually smaller
+    };
+
+    const limit = limits[toolName] || 50000; // Default limit
+
+    if (originalSize <= limit) {
+      return result; // No truncation needed
+    }
+
+    console.warn(
+      `  ⚠ Truncating ${toolName} result from ${originalSize} to ${limit} chars to prevent context overflow`
+    );
+
+    // For all results, convert to string, truncate, and try to parse back
+    // This ensures we maintain the original structure as much as possible
+    if (typeof result === 'string') {
+      // For string results, truncate and add a note
+      return (
+        result.substring(0, limit - 100) + // Leave room for truncation note
+        `\n\n[Result truncated: ${originalSize} chars total, showing first ${limit - 100} chars]`
+      );
+    } else {
+      // For structured results (objects/arrays), try to truncate intelligently
+      try {
+        const parsed = JSON.parse(resultStr);
+        if (Array.isArray(parsed)) {
+          // For arrays, keep items until we approach the limit
+          const truncated: any[] = [];
+          let currentSize = 2; // Account for '[' and ']'
+          const truncationNoteSize = 150; // Approximate size of truncation note
+
+          for (const item of parsed) {
+            const itemStr = JSON.stringify(item);
+            const itemSize = itemStr.length + (truncated.length > 0 ? 2 : 0); // +2 for ', '
+            if (currentSize + itemSize + truncationNoteSize > limit) {
+              break;
+            }
+            truncated.push(item);
+            currentSize += itemSize;
+          }
+
+          if (truncated.length < parsed.length) {
+            // Add truncation info as a final array element (as a special marker object)
+            truncated.push({
+              _truncated: true,
+              _originalCount: parsed.length,
+              _showingCount: truncated.length,
+              _note: `Result truncated: ${parsed.length} items total, showing first ${truncated.length} items`,
+            });
+          }
+          return truncated;
+        } else {
+          // For objects, truncate the JSON string representation
+          // Try to keep it valid JSON by finding a good break point
+          const truncated = resultStr.substring(0, limit - 100);
+          // Try to find the last complete key-value pair
+          const lastBrace = truncated.lastIndexOf('}');
+          if (lastBrace > limit - 500) {
+            // If we're close to a closing brace, use that
+            const partial = truncated.substring(0, lastBrace + 1);
+            try {
+              const parsed = JSON.parse(partial);
+              return {
+                ...parsed,
+                _truncated: true,
+                _note: `Result truncated from ${originalSize} to ${partial.length} chars`,
+              };
+            } catch {
+              // Fall through to error case
+            }
+          }
+          // If we can't parse it nicely, return an error object
+          return {
+            error: 'Result too large',
+            truncated_preview: resultStr.substring(
+              0,
+              Math.min(limit - 200, 10000)
+            ),
+            original_size: originalSize,
+            note: `Result truncated from ${originalSize} to ${limit} chars. Original result was too large to include fully.`,
+          };
+        }
+      } catch {
+        // If parsing fails, return truncated string with note
+        return {
+          error: 'Result too large and could not be parsed',
+          truncated_preview: resultStr.substring(
+            0,
+            Math.min(limit - 200, 10000)
+          ),
+          original_size: originalSize,
+          note: `Result truncated from ${originalSize} to ${limit} chars`,
+        };
+      }
+    }
+  }
+
+  /**
    * Retry wrapper for API calls with exponential backoff
    */
   private async retryApiCall<T>(
@@ -187,15 +299,22 @@ export class AiReviewer {
 
             const result = await this.callTool(name, parsedArgs);
 
+            // Truncate result to prevent context overflow
+            const truncatedResult = this.truncateToolResult(name, result);
+
             // Логируем размер результата (для понимания сколько данных получили)
-            const resultSize =
+            const originalSize =
               typeof result === 'string'
                 ? result.length
                 : JSON.stringify(result).length;
+            const truncatedSize =
+              typeof truncatedResult === 'string'
+                ? truncatedResult.length
+                : JSON.stringify(truncatedResult).length;
             const resultPreview =
-              resultSize > 200
-                ? `[${resultSize} chars]`
-                : JSON.stringify(result).substring(0, 200);
+              truncatedSize > 200
+                ? `[${truncatedSize} chars${originalSize !== truncatedSize ? ` (truncated from ${originalSize})` : ''}]`
+                : JSON.stringify(truncatedResult).substring(0, 200);
             console.log(`    ← ${resultPreview}`);
 
             messages.push({
@@ -207,7 +326,7 @@ export class AiReviewer {
             messages.push({
               role: 'tool',
               tool_call_id: toolCall.id,
-              content: JSON.stringify(result),
+              content: JSON.stringify(truncatedResult),
             } as any);
           }
 
@@ -436,14 +555,21 @@ IMPORTANT:
 
           const result = await this.callTool(name, parsedArgs);
 
-          const resultSize =
+          // Truncate result to prevent context overflow
+          const truncatedResult = this.truncateToolResult(name, result);
+
+          const originalSize =
             typeof result === 'string'
               ? result.length
               : JSON.stringify(result).length;
+          const truncatedSize =
+            typeof truncatedResult === 'string'
+              ? truncatedResult.length
+              : JSON.stringify(truncatedResult).length;
           const resultPreview =
-            resultSize > 200
-              ? `[${resultSize} chars]`
-              : JSON.stringify(result).substring(0, 200);
+            truncatedSize > 200
+              ? `[${truncatedSize} chars${originalSize !== truncatedSize ? ` (truncated from ${originalSize})` : ''}]`
+              : JSON.stringify(truncatedResult).substring(0, 200);
           console.log(`    ← verifier result: ${resultPreview}`);
 
           messages.push({
@@ -455,7 +581,7 @@ IMPORTANT:
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(result),
+            content: JSON.stringify(truncatedResult),
           } as any);
         }
 

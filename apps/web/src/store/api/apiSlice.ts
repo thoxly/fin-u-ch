@@ -130,6 +130,7 @@ export const apiSlice = createApi({
     'AuditLog',
     'Import',
     'MappingRule',
+    'Integration',
   ],
   endpoints: () => ({}),
 });

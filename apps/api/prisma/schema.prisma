@@ -24,6 +24,7 @@ model Account {
   sourceAccountOperations Operation[]         @relation("operations_sourceAccountIdToaccounts")
   targetAccountOperations Operation[]         @relation("operations_targetAccountIdToaccounts")
   planItems               PlanItem[]
+  integrations            Integration[]
 
   @@index([companyId])
   @@map("accounts")
@@ -49,6 +50,7 @@ model Article {
   importedOperations ImportedOperation[]
   operations         Operation[]
   planItems          PlanItem[]
+  integrations       Integration[]
 
   @@index([companyId])
   @@index([companyId, parentId])
@@ -109,6 +111,7 @@ model Company {
   departments         Department[]
   import_sessions     ImportSession[]
   imported_operations ImportedOperation[]
+  integrations       Integration[]
   mapping_rules       MappingRule[]
   operations          Operation[]
   plan_items          PlanItem[]
@@ -446,4 +449,29 @@ model User {
 
   @@index([companyId])
   @@map("users")
+}
+
+model Integration {
+  id              String   @id @default(cuid())
+  companyId       String
+  type            String // 'ozon', 'yandex', etc.
+  clientKey       String
+  apiKey          String
+  paymentSchedule String // 'next_week', 'week_after'
+  articleId       String
+  accountId       String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations с обратными связями
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [articleId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([companyId, type])
+  @@index([companyId])
+  @@index([articleId])
+  @@index([accountId])
+  @@map("integrations")
 }
