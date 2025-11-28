@@ -111,7 +111,9 @@ export class IntegrationsController {
     } catch (error: unknown) {
       console.error('❌ Ошибка при ручном тестировании интеграции:', error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Ошибка при тестировании интеграции';
+        error instanceof Error
+          ? error.message
+          : 'Ошибка при тестировании интеграции';
       res.status(500).json({
         success: false,
         error: errorMessage,
@@ -189,7 +191,9 @@ export class IntegrationsController {
       });
     } catch (error: unknown) {
       const errorMessage =
-        error instanceof Error ? error.message : 'Ошибка при тестировании интеграции';
+        error instanceof Error
+          ? error.message
+          : 'Ошибка при тестировании интеграции';
       res.status(500).json({
         success: false,
         error: errorMessage,
@@ -268,7 +272,9 @@ export class IntegrationsController {
     } catch (error: unknown) {
       console.error('Ошибка при получении операций Ozon:', error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Ошибка при получении операций';
+        error instanceof Error
+          ? error.message
+          : 'Ошибка при получении операций';
       res.status(500).json({
         success: false,
         error: errorMessage,
