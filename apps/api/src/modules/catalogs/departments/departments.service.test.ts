@@ -30,6 +30,7 @@ jest.mock('../../../utils/validation', () => ({
   validateRequired: jest.fn(),
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockedPrisma = prisma as any;
 
 describe('DepartmentsService', () => {

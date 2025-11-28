@@ -7,12 +7,7 @@ import {
   ParsedFile,
 } from './parsers/clientBankExchange.parser';
 import { autoMatch } from './services/matching.service';
-import {
-  ImportFilters,
-  UploadStatementResult,
-  ImportOperationsResult,
-  ApplyRulesResult,
-} from '@fin-u-ch/shared';
+import { ImportFilters } from '@fin-u-ch/shared';
 import { invalidateReportCache } from '../reports/utils/cache';
 import duplicateDetectionService from './services/duplicate-detection.service';
 import sessionService from './services/session.service';
