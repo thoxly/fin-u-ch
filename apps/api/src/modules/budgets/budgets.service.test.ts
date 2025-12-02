@@ -55,13 +55,13 @@ describe('BudgetsService', () => {
           id: '1',
           name: 'Budget 2024',
           status: 'active',
-          _count: { plan_items: 5 },
+          _count: { planItems: 5 },
         },
         {
           id: '2',
           name: 'Budget 2025',
           status: 'active',
-          _count: { plan_items: 3 },
+          _count: { planItems: 3 },
         },
       ];
       (prisma.budget.findMany as jest.Mock).mockResolvedValue(mockBudgets);
@@ -86,7 +86,7 @@ describe('BudgetsService', () => {
           id: '1',
           name: 'Budget 2024',
           status: 'active',
-          _count: { plan_items: 5 },
+          _count: { planItems: 5 },
         },
       ];
       (prisma.budget.findMany as jest.Mock).mockResolvedValue(mockBudgets);

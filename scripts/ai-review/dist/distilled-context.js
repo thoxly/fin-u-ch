@@ -119,8 +119,40 @@ export async function getDistilledContext() {
     const client = new OpenAI({
         apiKey: CONFIG.deepseek.apiKey,
         baseURL: 'https://api.deepseek.com/v1',
+        timeout: 300000, // 5 minutes timeout
+        maxRetries: 3,
     });
-    const completion = await client.chat.completions.create({
+    // Retry wrapper for API calls with exponential backoff
+    const retryApiCall = async (fn, maxRetries = 3, baseDelay = 1000) => {
+        let lastError = null;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                return await fn();
+            }
+            catch (error) {
+                lastError = error;
+                // Check if it's a retryable error
+                const isRetryable = error?.code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+                    error?.message?.includes('Premature close') ||
+                    error?.message?.includes('ECONNRESET') ||
+                    error?.message?.includes('ETIMEDOUT') ||
+                    error?.status === 429 || // Rate limit
+                    error?.status === 500 || // Server error
+                    error?.status === 502 || // Bad gateway
+                    error?.status === 503 || // Service unavailable
+                    error?.status === 504; // Gateway timeout
+                if (!isRetryable || attempt === maxRetries - 1) {
+                    throw error;
+                }
+                // Exponential backoff: 1s, 2s, 4s
+                const delay = baseDelay * Math.pow(2, attempt);
+                console.warn(`  ⚠ API call failed (attempt ${attempt + 1}/${maxRetries}): ${error?.message || error}. Retrying in ${delay}ms...`);
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        throw lastError || new Error('API call failed after retries');
+    };
+    const completion = await retryApiCall(() => client.chat.completions.create({
         model: CONFIG.deepseek.model,
         max_tokens: 4000,
         messages: [
@@ -133,7 +165,7 @@ export async function getDistilledContext() {
                 content: rawContext,
             },
         ],
-    });
+    }));
     const distilled = completion.choices[0]?.message?.content?.trim() ||
         'Project context distillation failed or returned empty.';
     // Save to both caches
