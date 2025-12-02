@@ -115,7 +115,7 @@ export class BudgetsService {
       },
     });
 
-    if (budget && budget._count.planItems > 0) {
+    if (budget && (budget as any)._count?.planItems > 0) {
       throw new AppError(
         'Cannot delete budget with plan items. Archive it instead or delete plan items first.',
         400
