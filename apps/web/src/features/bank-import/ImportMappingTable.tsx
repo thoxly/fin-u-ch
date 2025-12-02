@@ -112,6 +112,12 @@ export const ImportMappingTable = ({
     'idle' | 'loading' | 'success'
   >('idle');
 
+  // Состояние для отображения подсказок
+  const [showImportedStats, setShowImportedStats] = useState(false);
+  const [showUnmatchedStats, setShowUnmatchedStats] = useState(false);
+  const [showStatusInfo, setShowStatusInfo] = useState(false);
+  const [showRulesInfo, setShowRulesInfo] = useState(false);
+
   const navigate = useNavigate();
 
   // Состояние для модалки создания
@@ -1161,7 +1167,16 @@ export const ImportMappingTable = ({
         </button>
       ),
       render: (op: ImportedOperation) => (
-        <div className="truncate" title={op.description}>
+        <div
+          className="text-xs leading-tight line-clamp-2"
+          title={op.description}
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
           {op.description}
         </div>
       ),
@@ -1251,29 +1266,6 @@ export const ImportMappingTable = ({
       width: '120px',
     },
     {
-      key: 'counterparty',
-      header: (
-        <button
-          onClick={() => handleSort('counterparty')}
-          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
-        >
-          Контрагент <SortIcon field="counterparty" />
-        </button>
-      ),
-      render: (op: ImportedOperation) => (
-        <ImportMappingRow
-          operation={op}
-          field="counterparty"
-          sessionId={sessionId}
-          onOpenCreateModal={handleOpenCreateModal}
-          onFieldUpdate={handleFieldUpdate}
-          disabled={op.processed}
-          isModalOpen={createModal.isOpen}
-        />
-      ),
-      width: '180px',
-    },
-    {
       key: 'article',
       header: (
         <button
@@ -1332,6 +1324,58 @@ export const ImportMappingTable = ({
       width: '150px',
     },
     {
+      key: 'currency',
+      header: (
+        <button
+          onClick={() => handleSort('currency')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Валюта
+            <span className="text-red-500" title="Обязательное поле">
+              *
+            </span>
+          </span>
+          <SortIcon field="currency" />
+        </button>
+      ),
+      render: (op: ImportedOperation) => (
+        <ImportMappingRow
+          operation={op}
+          field="currency"
+          sessionId={sessionId}
+          onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          disabled={op.processed}
+          isModalOpen={createModal.isOpen}
+        />
+      ),
+      width: '100px',
+    },
+    {
+      key: 'counterparty',
+      header: (
+        <button
+          onClick={() => handleSort('counterparty')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Контрагент <SortIcon field="counterparty" />
+        </button>
+      ),
+      render: (op: ImportedOperation) => (
+        <ImportMappingRow
+          operation={op}
+          field="counterparty"
+          sessionId={sessionId}
+          onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          disabled={op.processed}
+          isModalOpen={createModal.isOpen}
+        />
+      ),
+      width: '180px',
+    },
+    {
       key: 'deal',
       header: (
         <button
@@ -1378,37 +1422,41 @@ export const ImportMappingTable = ({
       width: '150px',
     },
     {
-      key: 'currency',
-      header: (
-        <button
-          onClick={() => handleSort('currency')}
-          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
-        >
-          <span className="flex items-center gap-1">
-            Валюта
-            <span className="text-red-500" title="Обязательное поле">
-              *
-            </span>
-          </span>
-          <SortIcon field="currency" />
-        </button>
-      ),
-      render: (op: ImportedOperation) => (
-        <ImportMappingRow
-          operation={op}
-          field="currency"
-          sessionId={sessionId}
-          onOpenCreateModal={handleOpenCreateModal}
-          onFieldUpdate={handleFieldUpdate}
-          disabled={op.processed}
-          isModalOpen={createModal.isOpen}
-        />
-      ),
-      width: '100px',
-    },
-    {
       key: 'rules',
-      header: 'Правила',
+      header: (
+        <div className="relative group">
+          <button
+            onClick={() => setShowRulesInfo(!showRulesInfo)}
+            onMouseEnter={() => setShowRulesInfo(true)}
+            onMouseLeave={() => setShowRulesInfo(false)}
+            className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors underline decoration-dotted decoration-primary-400/50 hover:decoration-primary-500"
+          >
+            Правила
+          </button>
+          {showRulesInfo && (
+            <div
+              className="absolute top-full right-0 mt-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-300 max-w-xs transition-all duration-200 opacity-100 transform translate-y-0"
+              style={{ maxWidth: 'min(320px, calc(100vw - 2rem))' }}
+            >
+              <div className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Правила маппинга
+              </div>
+              <div className="space-y-2 text-gray-600 dark:text-gray-400">
+                <div>
+                  Отметьте операции, для которых нужно сохранить правила
+                  автоматического сопоставления. При следующем импорте эти
+                  правила будут автоматически применяться к похожим операциям.
+                </div>
+                <div className="text-gray-500 dark:text-gray-500 text-[10px] mt-2">
+                  Правила сохраняются на основе заполненных полей: контрагент,
+                  статья, счет, сделка, подразделение.
+                </div>
+              </div>
+              <div className="absolute -top-1 right-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 rotate-45"></div>
+            </div>
+          )}
+        </div>
+      ),
       render: (op: ImportedOperation) => (
         <SaveRulesCell
           operation={op}
@@ -1421,13 +1469,67 @@ export const ImportMappingTable = ({
     },
     {
       key: 'status',
-      header: 'Статус',
+      header: (
+        <div className="relative group">
+          <button
+            onClick={() => setShowStatusInfo(!showStatusInfo)}
+            onMouseEnter={() => setShowStatusInfo(true)}
+            onMouseLeave={() => setShowStatusInfo(false)}
+            className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors underline decoration-dotted decoration-primary-400/50 hover:decoration-primary-500"
+          >
+            Статус
+          </button>
+          {showStatusInfo && (
+            <div
+              className="absolute top-full right-0 mt-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-300 max-w-xs transition-all duration-200 opacity-100 transform translate-y-0"
+              style={{ maxWidth: 'min(320px, calc(100vw - 2rem))' }}
+            >
+              <div className="font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                Статус операции
+              </div>
+              <div className="space-y-2 text-gray-600 dark:text-gray-400">
+                <div className="flex items-start gap-2">
+                  <Check
+                    size={14}
+                    className="text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0"
+                  />
+                  <div>
+                    <span className="font-medium">Сопоставлено</span> — операция
+                    автоматически сопоставлена с данными из системы
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <AlertCircle
+                    size={14}
+                    className="text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0"
+                  />
+                  <div>
+                    <span className="font-medium">Не сопоставлено</span> —
+                    операция требует заполнения обязательных полей
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <FileCheck
+                    size={14}
+                    className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0"
+                  />
+                  <div>
+                    <span className="font-medium">Подтверждено</span> — операция
+                    подтверждена пользователем
+                  </div>
+                </div>
+              </div>
+              <div className="absolute -top-1 right-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 rotate-45"></div>
+            </div>
+          )}
+        </div>
+      ),
       render: (op: ImportedOperation) => (
         <div className="flex items-center gap-2">
           {op.matchedBy && (
             <span
               className="text-green-600 dark:text-green-400"
-              title="Автосопоставлено"
+              title="Сопоставлено"
             >
               <Check size={16} />
             </span>
@@ -1435,7 +1537,7 @@ export const ImportMappingTable = ({
           {!op.matchedBy && (
             <span
               className="text-yellow-600 dark:text-yellow-400"
-              title="Требует внимания"
+              title="Не сопоставлено"
             >
               <AlertCircle size={16} />
             </span>
@@ -1494,21 +1596,33 @@ export const ImportMappingTable = ({
 
   return (
     <div className="space-y-4">
-      {/* Кнопки управления */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          {onCollapseChange && (
-            <button
-              onClick={() => onCollapseChange(true)}
-              className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-              title="Свернуть"
-            >
-              <ChevronDown size={20} />
-            </button>
-          )}
-          <Button onClick={onClose} variant="secondary" size="sm">
-            Закрыть
-          </Button>
+      {/* Заголовок и инструкция */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Импортированные операции
+          </h2>
+          <div className="flex items-center gap-2">
+            {onCollapseChange && (
+              <button
+                onClick={() => onCollapseChange(true)}
+                className="text-gray-500 hover:text-primary-600 dark:hover:text-primary-400 p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="Свернуть"
+              >
+                <ChevronDown size={20} />
+              </button>
+            )}
+            <Button onClick={onClose} variant="secondary" size="sm">
+              Закрыть
+            </Button>
+          </div>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm text-gray-700 dark:text-gray-300">
+          <ul className="list-disc list-inside space-y-1">
+            <li>Проверьте автоматически заполненные поля</li>
+            <li>Заполните обязательные поля (отмечены •)</li>
+            <li>Отметьте операции и нажмите «Записать»</li>
+          </ul>
         </div>
       </div>
 
@@ -1519,18 +1633,57 @@ export const ImportMappingTable = ({
             Всего: {total}
           </span>
           {totalImportedData?.count !== undefined && (
-            <span className="text-gray-600 dark:text-gray-400">
-              Записано в Операции: {totalImportedData.count}
-            </span>
+            <div className="relative group">
+              <button
+                onClick={() => setShowImportedStats(!showImportedStats)}
+                onMouseEnter={() => setShowImportedStats(true)}
+                onMouseLeave={() => setShowImportedStats(false)}
+                className="text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer underline decoration-dotted decoration-primary-400/50 hover:decoration-primary-500"
+              >
+                Записано в Операции: {totalImportedData.count}
+              </button>
+              {showImportedStats && (
+                <div
+                  className="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-300 max-w-xs transition-all duration-200 opacity-100 transform translate-y-0"
+                  style={{ maxWidth: 'min(320px, calc(100vw - 2rem))' }}
+                >
+                  <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                    Записано в Операции
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-400">
+                    Количество операций, которые были успешно импортированы и
+                    записаны в систему
+                  </div>
+                  <div className="absolute -top-1 left-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 rotate-45"></div>
+                </div>
+              )}
+            </div>
           )}
-          <span className="text-yellow-600 dark:text-yellow-400">
-            Несопоставлено: {unmatchedCount}
-          </span>
-          {!isAllMatched && (
-            <span className="text-red-600 dark:text-red-400">
-              Не все операции сопоставлены
-            </span>
-          )}
+          <div className="relative group">
+            <button
+              onClick={() => setShowUnmatchedStats(!showUnmatchedStats)}
+              onMouseEnter={() => setShowUnmatchedStats(true)}
+              onMouseLeave={() => setShowUnmatchedStats(false)}
+              className="text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 transition-colors cursor-pointer underline decoration-dotted decoration-yellow-400/50 hover:decoration-yellow-500"
+            >
+              Несопоставлено: {unmatchedCount}
+            </button>
+            {showUnmatchedStats && (
+              <div
+                className="absolute top-full left-0 mt-2 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 text-xs text-gray-700 dark:text-gray-300 max-w-xs transition-all duration-200 opacity-100 transform translate-y-0"
+                style={{ maxWidth: 'min(320px, calc(100vw - 2rem))' }}
+              >
+                <div className="font-semibold text-gray-900 dark:text-gray-100 mb-1">
+                  Несопоставлено
+                </div>
+                <div className="text-gray-600 dark:text-gray-400">
+                  Количество операций, которые еще не имеют всех обязательных
+                  полей заполненными
+                </div>
+                <div className="absolute -top-1 left-4 w-2 h-2 bg-white dark:bg-gray-800 border-l border-t border-gray-200 dark:border-gray-700 rotate-45"></div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Select
@@ -1655,10 +1808,8 @@ export const ImportMappingTable = ({
           }
         >
           <Download size={16} className="mr-2" />
-          Записать в Операции{' '}
-          {selectedIds.length > 0
-            ? `выбранные (${selectedIds.length})`
-            : 'все операции'}
+          Записать
+          {selectedIds.length > 0 && ` (${selectedIds.length})`}
         </Button>
       </div>
 

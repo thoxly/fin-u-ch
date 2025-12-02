@@ -46,10 +46,10 @@ export class RolesService {
         include: {
           _count: {
             select: {
-              userRoles: true,
+              user_roles: true,
             },
           },
-          permissions: {
+          role_permissions: {
             select: {
               entity: true,
               action: true,
@@ -67,7 +67,7 @@ export class RolesService {
           id: r.id,
           name: r.name,
           category: r.category,
-          usersCount: r._count?.userRoles || 0,
+          usersCount: r._count?.user_roles || 0,
         })),
       });
 
@@ -100,7 +100,7 @@ export class RolesService {
         deletedAt: null,
       },
       include: {
-        permissions: {
+        role_permissions: {
           select: {
             id: true,
             entity: true,
@@ -110,7 +110,7 @@ export class RolesService {
         },
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -129,8 +129,8 @@ export class RolesService {
       companyId,
       name: role.name,
       isSystem: role.isSystem,
-      permissionsCount: role.permissions.length,
-      usersCount: role._count.userRoles,
+      permissionsCount: role.role_permissions.length,
+      usersCount: role._count.user_roles,
     });
 
     return role;
@@ -183,10 +183,10 @@ export class RolesService {
         isActive: true,
       },
       include: {
-        permissions: true,
+        role_permissions: true,
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -266,10 +266,10 @@ export class RolesService {
         ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
       include: {
-        permissions: true,
+        role_permissions: true,
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -603,7 +603,7 @@ export class RolesService {
       include: {
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
