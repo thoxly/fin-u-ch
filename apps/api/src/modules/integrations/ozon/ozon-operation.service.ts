@@ -1,6 +1,7 @@
 // apps/api/src/modules/integrations/ozon/ozon-operation.service.ts
 import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
+import logger from '../../../config/logger';
 
 interface OzonCashFlowResponse {
   result: {
@@ -125,8 +126,15 @@ export class OzonOperationService {
     dateFrom: string,
     dateTo: string
   ): Promise<OzonCashFlowResponse> {
+    logger.debug('Fetching cash flow statement from Ozon API', {
+      dateFrom,
+      dateTo,
+      clientKey: clientKey.substring(0, 8) + '...', // Частично скрываем ключ
+    });
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const startTime = Date.now();
 
     try {
       const response = await fetch(
@@ -152,8 +160,16 @@ export class OzonOperationService {
       );
 
       clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
 
       if (!response.ok) {
+        logger.error('Ozon API error', {
+          status: response.status,
+          statusText: response.statusText,
+          dateFrom,
+          dateTo,
+          duration: `${duration}ms`,
+        });
         throw new AppError(
           `Ozon API error: ${response.status} ${response.statusText}`,
           response.status
@@ -161,15 +177,44 @@ export class OzonOperationService {
       }
 
       const data = (await response.json()) as OzonCashFlowResponse;
+
+      logger.info('Cash flow statement fetched from Ozon API successfully', {
+        dateFrom,
+        dateTo,
+        duration: `${duration}ms`,
+        cashFlowsCount: data.result?.cash_flows?.length || 0,
+      });
+
       return data;
     } catch (error: any) {
       clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
 
       if (error.name === 'AbortError') {
+        logger.error('Ozon API timeout', {
+          dateFrom,
+          dateTo,
+          duration: `${duration}ms`,
+        });
         throw new AppError('Таймаут подключения к Ozon API', 408);
       } else if (error instanceof AppError) {
+        logger.error('Ozon API error', {
+          dateFrom,
+          dateTo,
+          error: error.message,
+          statusCode: error.statusCode,
+          duration: `${duration}ms`,
+        });
         throw error;
       }
+
+      logger.error('Ozon API connection error', {
+        dateFrom,
+        dateTo,
+        error: error.message,
+        duration: `${duration}ms`,
+        stack: error.stack,
+      });
 
       throw new AppError(
         `Ошибка подключения к Ozon API: ${error.message}`,
@@ -183,7 +228,7 @@ export class OzonOperationService {
    */
   calculatePaymentAmount(cashFlowData: OzonCashFlowResponse): number {
     if (!cashFlowData.result.cash_flows.length) {
-      console.log('❌ Нет данных cash_flows в ответе Ozon API');
+      logger.warn('No cash_flows data in Ozon API response');
       return 0;
     }
 
@@ -193,15 +238,16 @@ export class OzonOperationService {
       const payments = details[0]?.payments;
       if (payments && payments.length > 0) {
         const payment = payments[0];
-        console.log(
-          `💰 Прямая сумма выплаты из Ozon: ${payment.payment} ${payment.currency_code}`
-        );
+        logger.debug('Payment amount from Ozon API', {
+          payment: payment.payment,
+          currency: payment.currency_code,
+        });
         return payment.payment || 0;
       }
     }
 
     // Fallback логика
-    console.log(`⚠️  Поле payment не найдено, используем расчетную сумму`);
+    logger.debug('Payment field not found, using calculated amount');
     const cashFlow = cashFlowData.result.cash_flows[0];
     const calculatedAmount =
       cashFlow.orders_amount +
@@ -209,7 +255,14 @@ export class OzonOperationService {
       cashFlow.commission_amount -
       Math.abs(cashFlow.returns_amount);
 
-    console.log(`🧮 Расчетная сумма: ${calculatedAmount}`);
+    logger.debug('Calculated payment amount', {
+      calculatedAmount,
+      ordersAmount: cashFlow.orders_amount,
+      servicesAmount: cashFlow.services_amount,
+      commissionAmount: cashFlow.commission_amount,
+      returnsAmount: cashFlow.returns_amount,
+    });
+
     return calculatedAmount;
   }
 

@@ -209,7 +209,7 @@ export const RolesTab = () => {
       setIsRoleModalOpen(false);
       resetForm();
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -219,7 +219,23 @@ export const RolesTab = () => {
         typeof error.data.message === 'string'
           ? error.data.message
           : 'Ошибка при сохранении роли';
-      showError(errorMessage);
+
+      // Очищаем системную информацию из сообщения
+      const sanitizedMessage =
+        typeof rawErrorMessage === 'string'
+          ? rawErrorMessage
+              .replace(/Операция\s+[\w-]+:\s*/gi, '')
+              .replace(/^[^:]+:\s*/i, '')
+              .trim()
+          : 'Ошибка при сохранении роли';
+
+      showError(
+        sanitizedMessage &&
+          sanitizedMessage.length > 5 &&
+          !sanitizedMessage.match(/^[A-Z_]+$/)
+          ? sanitizedMessage
+          : 'Ошибка при сохранении роли'
+      );
     }
   };
 
@@ -233,7 +249,7 @@ export const RolesTab = () => {
       await deleteRole(role.id).unwrap();
       showSuccess('Роль успешно удалена');
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -243,7 +259,23 @@ export const RolesTab = () => {
         typeof error.data.message === 'string'
           ? error.data.message
           : 'Ошибка при удалении роли';
-      showError(errorMessage);
+
+      // Очищаем системную информацию из сообщения
+      const sanitizedMessage =
+        typeof rawErrorMessage === 'string'
+          ? rawErrorMessage
+              .replace(/Операция\s+[\w-]+:\s*/gi, '')
+              .replace(/^[^:]+:\s*/i, '')
+              .trim()
+          : 'Ошибка при удалении роли';
+
+      showError(
+        sanitizedMessage &&
+          sanitizedMessage.length > 5 &&
+          !sanitizedMessage.match(/^[A-Z_]+$/)
+          ? sanitizedMessage
+          : 'Ошибка при удалении роли'
+      );
     }
   };
 
@@ -279,7 +311,7 @@ export const RolesTab = () => {
       setSelectedRole(null);
       setPermissions({});
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -289,7 +321,23 @@ export const RolesTab = () => {
         typeof error.data.message === 'string'
           ? error.data.message
           : 'Ошибка при обновлении прав';
-      showError(errorMessage);
+
+      // Очищаем системную информацию из сообщения
+      const sanitizedMessage =
+        typeof rawErrorMessage === 'string'
+          ? rawErrorMessage
+              .replace(/Операция\s+[\w-]+:\s*/gi, '')
+              .replace(/^[^:]+:\s*/i, '')
+              .trim()
+          : 'Ошибка при обновлении прав';
+
+      showError(
+        sanitizedMessage &&
+          sanitizedMessage.length > 5 &&
+          !sanitizedMessage.match(/^[A-Z_]+$/)
+          ? sanitizedMessage
+          : 'Ошибка при обновлении прав'
+      );
     }
   };
 
@@ -474,24 +522,15 @@ export const RolesTab = () => {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex justify-end">
-        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+        <ProtectedAction entity="users" action="manage_roles">
           <Button
-            onClick={() => navigate('/admin')}
-            variant="outline"
+            onClick={handleCreateRole}
+            icon={<Plus size={20} />}
             className="w-full sm:w-auto"
           >
-            Назад
+            Создать роль
           </Button>
-          <ProtectedAction entity="users" action="manage_roles">
-            <Button
-              onClick={handleCreateRole}
-              icon={<Plus size={20} />}
-              className="w-full sm:w-auto"
-            >
-              Создать роль
-            </Button>
-          </ProtectedAction>
-        </div>
+        </ProtectedAction>
       </div>
 
       {/* Фильтры */}

@@ -5,6 +5,7 @@ import integrationsService from './integrations.service';
 import ozonOperationService from './ozon/ozon-operation.service';
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
+import logger from '../../config/logger';
 
 export class IntegrationsController {
   async saveOzonIntegration(
@@ -13,6 +14,17 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      logger.info('Save Ozon integration request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        hasClientKey: !!req.body.clientKey,
+        hasApiKey: !!req.body.apiKey,
+        paymentSchedule: req.body.paymentSchedule,
+        articleId: req.body.articleId,
+        accountId: req.body.accountId,
+        ip: req.ip,
+      });
+
       const { clientKey, apiKey, paymentSchedule, articleId, accountId } =
         req.body;
 
@@ -49,8 +61,21 @@ export class IntegrationsController {
           accountId,
         }
       );
+
+      logger.info('Ozon integration saved successfully', {
+        integrationId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to save Ozon integration', {
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
@@ -75,14 +100,23 @@ export class IntegrationsController {
         });
       }
 
-      console.log('🧪 Начинаем ручное тестирование интеграции Ozon...');
+      logger.info('Manual Ozon integration test started', {
+        integrationId,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
 
       // Создаем тестовую операцию
       const result =
         await ozonOperationService.createTestOperation(integrationId);
 
       if (result) {
-        console.log('✅ Тестовая операция успешно создана');
+        logger.info('Test operation created successfully', {
+          integrationId,
+          companyId: req.companyId,
+          userId: req.userId,
+        });
 
         // Получаем последнюю созданную операцию
         const lastOperation = await integrationsService.getLastOzonOperation(
@@ -98,9 +132,11 @@ export class IntegrationsController {
           message: 'Тестовая операция успешно создана',
         });
       } else {
-        console.log(
-          'ℹ️ Операция не создана (возможно, сумма 0 или операция уже существует)'
-        );
+        logger.info('Test operation not created (amount 0 or already exists)', {
+          integrationId,
+          companyId: req.companyId,
+          userId: req.userId,
+        });
         res.json({
           success: true,
           operationCreated: false,
@@ -109,7 +145,13 @@ export class IntegrationsController {
         });
       }
     } catch (error: unknown) {
-      console.error('❌ Ошибка при ручном тестировании интеграции:', error);
+      logger.error('Manual Ozon integration test failed', {
+        integrationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -127,11 +169,28 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      logger.debug('Get Ozon integration request', {
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       const result = await integrationsService.getOzonIntegration(
         req.companyId!
       );
+
+      logger.debug('Ozon integration retrieved', {
+        companyId: req.companyId,
+        hasIntegration: result.success,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get Ozon integration', {
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
@@ -142,11 +201,29 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      logger.info('Disconnect Ozon integration request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       const result = await integrationsService.disconnectOzonIntegration(
         req.companyId!
       );
+
+      logger.info('Ozon integration disconnected successfully', {
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to disconnect Ozon integration', {
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
@@ -270,7 +347,12 @@ export class IntegrationsController {
         },
       });
     } catch (error: unknown) {
-      console.error('Ошибка при получении операций Ozon:', error);
+      logger.error('Failed to get Ozon operations', {
+        companyId: req.companyId,
+        userId: req.userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -408,10 +490,20 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
-      console.log('🔄 API: Generating Ozon operations for all integrations');
+      logger.info('Generating Ozon operations for all integrations', {
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
 
       const result =
         await ozonOperationService.createOperationsForAllIntegrations();
+
+      logger.info('Ozon operations generation completed', {
+        companyId: req.companyId,
+        userId: req.userId,
+        ...result,
+      });
 
       res.json({
         success: true,
@@ -441,9 +533,12 @@ export class IntegrationsController {
         });
       }
 
-      console.log(
-        `🔄 API: Generating Ozon operation for integration ${integrationId}`
-      );
+      logger.info('Generating Ozon operation for integration', {
+        integrationId,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
 
       // Проверяем что интеграция принадлежит компании
       const integration = await integrationsService.getOzonIntegration(
@@ -482,8 +577,17 @@ export class IntegrationsController {
     next: NextFunction
   ) {
     try {
+      logger.debug('Get Ozon operations status request', {
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       const integrations = await ozonOperationService.getActiveIntegrations();
-      console.log('Защёл');
+
+      logger.debug('Ozon operations status retrieved', {
+        companyId: req.companyId,
+        totalIntegrations: integrations.length,
+      });
 
       res.json({
         success: true,

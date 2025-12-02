@@ -1,6 +1,7 @@
 import prisma from '../../../config/db';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import { createIntervals, PeriodFormat, Interval } from '@fin-u-ch/shared';
+import logger from '../../../config/logger';
 
 export interface DashboardParams {
   periodFrom: Date;
@@ -118,12 +119,36 @@ export class DashboardService {
     companyId: string,
     params: DashboardParams
   ): Promise<DashboardResponse> {
+    const startTime = Date.now();
     const cacheKey = generateCacheKey(companyId, 'dashboard', params);
+
+    logger.debug('Dashboard generation started', {
+      companyId,
+      params: {
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        mode: params.mode,
+        periodFormat: params.periodFormat,
+      },
+    });
+
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as DashboardResponse;
+    if (cached) {
+      logger.debug('Dashboard retrieved from cache', {
+        companyId,
+        cacheKey,
+      });
+      return cached as DashboardResponse;
+    }
 
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
+
+    logger.debug('Fetching operations for dashboard', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+    });
 
     // Получаем все операции за период (только реальные, не шаблоны)
     const operations = await prisma.operation.findMany({
@@ -239,6 +264,16 @@ export class DashboardService {
     };
 
     await cacheReport(cacheKey, result);
+
+    const duration = Date.now() - startTime;
+    logger.info('Dashboard generated successfully', {
+      companyId,
+      duration: `${duration}ms`,
+      operationsCount: operations.length,
+      accountsCount: accounts.length,
+      intervalsCount: incomeExpenseSeries.length,
+    });
+
     return result;
   }
 
@@ -249,16 +284,40 @@ export class DashboardService {
     companyId: string,
     params: DashboardParams
   ): Promise<CumulativeCashFlowResponse> {
+    const startTime = Date.now();
     const cacheKey = generateCacheKey(
       companyId,
       'cumulative-cash-flow',
       params
     );
+
+    logger.debug('Cumulative cashflow generation started', {
+      companyId,
+      params: {
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        mode: params.mode,
+        periodFormat: params.periodFormat,
+      },
+    });
+
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as CumulativeCashFlowResponse;
+    if (cached) {
+      logger.debug('Cumulative cashflow retrieved from cache', {
+        companyId,
+        cacheKey,
+      });
+      return cached as CumulativeCashFlowResponse;
+    }
 
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
+
+    logger.debug('Fetching operations for cumulative cashflow', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+    });
 
     // Получаем все операции за период (только реальные, не шаблоны)
     const operations = await prisma.operation.findMany({
@@ -359,6 +418,15 @@ export class DashboardService {
     };
 
     await cacheReport(cacheKey, result);
+
+    const duration = Date.now() - startTime;
+    logger.info('Cumulative cashflow generated successfully', {
+      companyId,
+      duration: `${duration}ms`,
+      operationsCount: operations.length,
+      intervalsCount: cumulativeSeries.length,
+    });
+
     return result;
   }
 

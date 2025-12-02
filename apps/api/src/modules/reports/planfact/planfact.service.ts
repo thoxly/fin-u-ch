@@ -3,6 +3,7 @@ import { getMonthKey } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
 import articlesService from '../../catalogs/articles/articles.service';
+import logger from '../../../config/logger';
 
 export interface PlanFactParams {
   periodFrom: Date;
@@ -25,9 +26,27 @@ export class PlanFactService {
     companyId: string,
     params: PlanFactParams
   ): Promise<PlanFactRow[]> {
+    const startTime = Date.now();
     const cacheKey = generateCacheKey(companyId, 'planfact', params);
+
+    logger.debug('PlanFact report generation started', {
+      companyId,
+      params: {
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        level: params.level,
+        parentArticleId: params.parentArticleId,
+      },
+    });
+
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as PlanFactRow[];
+    if (cached) {
+      logger.debug('PlanFact report retrieved from cache', {
+        companyId,
+        cacheKey,
+      });
+      return cached as PlanFactRow[];
+    }
 
     const resultMap = new Map<string, PlanFactRow>();
 
@@ -190,6 +209,17 @@ export class PlanFactService {
     );
 
     await cacheReport(cacheKey, result);
+
+    const duration = Date.now() - startTime;
+    logger.info('PlanFact report generated successfully', {
+      companyId,
+      duration: `${duration}ms`,
+      level: params.level,
+      planItemsCount: planItems.length,
+      operationsCount: operations.length,
+      resultRowsCount: result.length,
+    });
+
     return result;
   }
 }

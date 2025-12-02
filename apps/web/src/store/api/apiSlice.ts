@@ -32,9 +32,23 @@ const baseQueryWithReauth: BaseQueryFn<
   // Обработка ошибки 403 (Доступ запрещён)
   if (result.error && result.error.status === 403) {
     const dispatch = api.dispatch as AppDispatch;
-    const errorMessage =
+    const rawMessage =
       (result.error.data as { message?: string })?.message ||
       'У вас нет прав для выполнения этого действия';
+
+    // Очищаем системную информацию из сообщения
+    const sanitizedMessage = rawMessage
+      .replace(/Операция\s+[\w-]+:\s*/gi, '')
+      .replace(/^[^:]+:\s*/i, '')
+      .trim();
+
+    // Используем очищенное сообщение или дефолтное
+    const errorMessage =
+      sanitizedMessage &&
+      sanitizedMessage.length > 5 &&
+      !sanitizedMessage.match(/^[A-Z_]+$/)
+        ? sanitizedMessage
+        : 'У вас нет прав для выполнения этого действия';
 
     dispatch(
       showNotification({

@@ -187,7 +187,7 @@ export const UsersPage = () => {
         setInviteRoleId('');
       }
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -196,8 +196,22 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при приглашении пользователя';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при приглашении пользователя';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при приглашении пользователя'
+      );
     }
   };
 
@@ -241,7 +255,7 @@ export const UsersPage = () => {
       setIsEditModalOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -250,8 +264,22 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при обновлении пользователя';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при обновлении пользователя';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при обновлении пользователя'
+      );
     }
   };
 
@@ -270,7 +298,7 @@ export const UsersPage = () => {
       }).unwrap();
       showSuccess('Роль успешно назначена');
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -279,8 +307,22 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при назначении роли';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при назначении роли';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при назначении роли'
+      );
     }
   };
 
@@ -297,7 +339,7 @@ export const UsersPage = () => {
         }).unwrap();
         showSuccess('Роль успешно снята');
       } catch (error) {
-        const errorMessage =
+        const rawErrorMessage =
           error &&
           typeof error === 'object' &&
           'data' in error &&
@@ -306,8 +348,22 @@ export const UsersPage = () => {
           'message' in error.data &&
           typeof error.data.message === 'string'
             ? error.data.message
-            : 'Ошибка при снятии роли';
-        showError(errorMessage);
+            : undefined;
+
+        const errorMessage = rawErrorMessage
+          ? rawErrorMessage
+              .replace(/Операция\s+[\w-]+:\s*/gi, '')
+              .replace(/^[^:]+:\s*/i, '')
+              .trim()
+          : 'Ошибка при снятии роли';
+
+        showError(
+          errorMessage &&
+            errorMessage.length > 5 &&
+            !errorMessage.match(/^[A-Z_]+$/)
+            ? errorMessage
+            : 'Ошибка при снятии роли'
+        );
       }
     }
   };
@@ -332,7 +388,7 @@ export const UsersPage = () => {
       showSuccess('Пользователь успешно удалён');
       setDeleteModal({ isOpen: false, user: null });
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -341,8 +397,22 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при удалении пользователя';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при удалении пользователя';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при удалении пользователя'
+      );
       setDeleteModal({ isOpen: false, user: null });
     }
   };

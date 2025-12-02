@@ -788,6 +788,13 @@ export const ImportMappingTable = ({
           new Set([similarPopover.operation.id, ...operationIds])
         );
         setTimeout(() => setRecentlyUpdatedIds(new Set()), 3000);
+
+        // Показываем уведомление о количестве обновленных операций
+        const fieldName =
+          fieldNames[similarPopover.field] || similarPopover.field;
+        showSuccess(
+          `Обновлено ${operationIds.length + 1} операций: ${fieldName}`
+        );
       } else {
         // Если не выбраны похожие операции, просто подсвечиваем текущую
         setRecentlyUpdatedIds(new Set([similarPopover.operation.id]));
@@ -815,22 +822,37 @@ export const ImportMappingTable = ({
         data?: { message?: string };
         message?: string;
       };
-      const errorMessage =
+      const rawErrorMessage =
         errorData?.data?.message ||
         errorData?.message ||
         'Ошибка при применении к похожим операциям';
 
+      // Очищаем системную информацию
+      const errorMessage = rawErrorMessage
+        .replace(/Операция\s+[\w-]+:\s*/gi, '')
+        .replace(/^[^:]+:\s*/i, '')
+        .trim();
+
       if (
-        errorMessage.includes('already processed') ||
-        errorMessage.includes('not found')
+        errorMessage.toLowerCase().includes('already processed') ||
+        errorMessage.toLowerCase().includes('not found') ||
+        rawErrorMessage.toLowerCase().includes('already processed') ||
+        rawErrorMessage.toLowerCase().includes('not found')
       ) {
         showError(
           'Некоторые операции уже обработаны или удалены. Обновите страницу.'
         );
         // Автоматически обновляем список после небольшой задержки (здесь refetch нужен)
         setTimeout(() => refetch(), 1000);
-      } else {
+      } else if (
+        errorMessage &&
+        errorMessage.length > 5 &&
+        !errorMessage.match(/^[A-Z_]+$/)
+      ) {
+        // Показываем только если сообщение содержит полезную информацию
         showError(errorMessage);
+      } else {
+        showError('Ошибка при применении к похожим операциям');
       }
     }
   };
@@ -1021,30 +1043,42 @@ export const ImportMappingTable = ({
       } else {
         setImportStatus('idle');
 
-        // Формируем детальное сообщение об ошибке
+        // Формируем сообщение об ошибке для пользователя
         let errorMessage = '';
         if (result.errorMessages && result.errorMessages.length > 0) {
-          // Показываем детальные сообщения об ошибках
-          // Ограничиваем количество сообщений для читаемости
-          const maxMessages = 5;
-          const messagesToShow = result.errorMessages.slice(0, maxMessages);
-          const details = messagesToShow.join('\n');
-          const moreCount = result.errorMessages.length - maxMessages;
+          // Очищаем системную информацию из сообщений
+          const sanitizedMessages = result.errorMessages
+            .map((msg) => {
+              // Удаляем ID операций и технические детали
+              return msg.replace(/Операция\s+[\w-]+:\s*/gi, '').trim();
+            })
+            .filter((msg) => msg.length > 0)
+            .slice(0, 3); // Показываем только первые 3 уникальных сообщения
 
-          let detailsText = details;
-          if (moreCount > 0) {
-            detailsText += `\n... и еще ${moreCount} ошибок`;
+          if (sanitizedMessages.length > 0) {
+            const moreCount =
+              result.errorMessages.length - sanitizedMessages.length;
+            let detailsText = sanitizedMessages.join('. ');
+            if (moreCount > 0) {
+              detailsText += `. И еще ${moreCount} ошибок`;
+            }
+
+            errorMessage =
+              result.created > 0
+                ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}. ${detailsText}`
+                : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}. ${detailsText}`;
+          } else {
+            // Если после очистки не осталось сообщений, показываем общее
+            errorMessage =
+              result.created > 0
+                ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}. Проверьте, что все операции полностью сопоставлены.`
+                : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}. Проверьте, что все операции полностью сопоставлены.`;
           }
-
-          errorMessage =
-            result.created > 0
-              ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}.\n\nДетали:\n${detailsText}`
-              : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}.\n\nДетали:\n${detailsText}`;
         } else {
           // Если детальных сообщений нет, показываем общее
           errorMessage =
             result.created > 0
-              ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}. Проверьте логи или попробуйте импортировать операции по одной.`
+              ? `Импортировано операций: ${result.created}. Ошибок: ${result.errors}. Проверьте, что все операции полностью сопоставлены.`
               : `Ошибка импорта: не удалось импортировать операции. Ошибок: ${result.errors}. Проверьте, что все операции полностью сопоставлены.`;
         }
 
@@ -1053,7 +1087,7 @@ export const ImportMappingTable = ({
     } catch (error) {
       setImportStatus('idle');
 
-      // Извлекаем детальное сообщение об ошибке
+      // Извлекаем сообщение об ошибке и очищаем от системной информации
       let errorMessage = 'Ошибка при импорте операций';
 
       if (error && typeof error === 'object') {
@@ -1106,7 +1140,24 @@ export const ImportMappingTable = ({
         data: (error as { data?: unknown })?.data,
       });
 
-      showError(errorMessage);
+      // Очищаем системную информацию из сообщения
+      const sanitizedMessage = errorMessage
+        .replace(/Операция\s+[\w-]+:\s*/gi, '')
+        .replace(/^[^:]+:\s*/i, '')
+        .trim();
+
+      // Показываем только если сообщение содержит полезную информацию для пользователя
+      if (
+        sanitizedMessage &&
+        sanitizedMessage.length > 5 &&
+        !sanitizedMessage.match(/^[A-Z_]+$/)
+      ) {
+        showError(sanitizedMessage);
+      } else {
+        showError(
+          'Ошибка при импорте операций. Проверьте, что все операции полностью сопоставлены.'
+        );
+      }
     }
   };
 

@@ -19,6 +19,7 @@ import {
 } from '../store/api/budgetsApi';
 import { formatDate } from '../shared/lib/date';
 import type { Budget } from '@fin-u-ch/shared';
+import { useNotification } from '../shared/hooks/useNotification';
 
 export const BudgetsPage = () => {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ export const BudgetsPage = () => {
   const [createBudget, { isLoading: isCreating }] = useCreateBudgetMutation();
   const [updateBudget] = useUpdateBudgetMutation();
   const [deleteBudget] = useDeleteBudgetMutation();
+  const { showSuccess, showError } = useNotification();
 
   const handleCreate = () => {
     setFormData({ name: '', startDate: '', endDate: '' });
@@ -56,19 +58,77 @@ export const BudgetsPage = () => {
         startDate: formData.startDate,
         endDate: formData.endDate || undefined,
       }).unwrap();
+      showSuccess('Бюджет успешно создан');
       setIsFormOpen(false);
       setFormData({ name: '', startDate: '', endDate: '' });
     } catch (error) {
-      console.error('Failed to create budget:', error);
+      const rawErrorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при создании бюджета';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при создании бюджета'
+      );
     }
   };
 
   const handleArchive = async (budget: Budget) => {
     const newStatus = budget.status === 'active' ? 'archived' : 'active';
-    await updateBudget({
-      id: budget.id,
-      data: { status: newStatus },
-    });
+    try {
+      await updateBudget({
+        id: budget.id,
+        data: { status: newStatus },
+      }).unwrap();
+      showSuccess(
+        newStatus === 'archived'
+          ? 'Бюджет успешно архивирован'
+          : 'Бюджет успешно восстановлен'
+      );
+    } catch (error) {
+      const rawErrorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при изменении статуса бюджета';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при изменении статуса бюджета'
+      );
+    }
   };
 
   const [deleteModal, setDeleteModal] = useState<{
@@ -87,10 +147,33 @@ export const BudgetsPage = () => {
     if (!deleteModal.id) return;
     try {
       await deleteBudget(deleteModal.id).unwrap();
+      showSuccess('Бюджет успешно удален');
       setDeleteModal({ isOpen: false, id: null });
     } catch (error) {
-      alert(
-        'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
+      const rawErrorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
       );
       setDeleteModal({ isOpen: false, id: null });
     }

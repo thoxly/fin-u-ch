@@ -7,6 +7,7 @@ import {
   type CreateOperationInput,
 } from '@fin-u-ch/shared';
 import articlesService from '../catalogs/articles/articles.service';
+import logger from '../../config/logger';
 
 // Keep for backward compatibility with tests
 export type CreateOperationDTO = CreateOperationInput;
@@ -171,11 +172,22 @@ export class OperationsService {
   }
 
   async create(companyId: string, data: CreateOperationDTO) {
+    logger.debug('Creating operation', {
+      companyId,
+      operationType: data.type,
+      amount: data.amount,
+      hasRepeat: !!data.repeat && data.repeat !== 'none',
+    });
+
     // Validate using Zod schema
     const validationResult = CreateOperationSchema.safeParse(data);
 
     if (!validationResult.success) {
       const errorMessage = formatZodErrors(validationResult.error);
+      logger.warn('Operation validation failed', {
+        companyId,
+        error: errorMessage,
+      });
       throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
     }
 
@@ -195,6 +207,10 @@ export class OperationsService {
         companyId
       );
       if (!isLeaf) {
+        logger.warn('Attempt to create operation with non-leaf article', {
+          companyId,
+          articleId: validatedData.articleId,
+        });
         throw new AppError(
           'Нельзя создать операцию с родительской статьей. Выберите дочернюю статью или статью без дочерних элементов.',
           400
@@ -204,6 +220,11 @@ export class OperationsService {
 
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
     if (validatedData.repeat && validatedData.repeat !== 'none') {
+      logger.debug('Creating recurring operation template', {
+        companyId,
+        repeat: validatedData.repeat,
+      });
+
       return prisma.$transaction(async (tx) => {
         // Создаем шаблон (isTemplate: true)
         const template = await tx.operation.create({
@@ -240,18 +261,33 @@ export class OperationsService {
           },
         });
 
+        logger.info('Recurring operation template created successfully', {
+          companyId,
+          templateId: template.id,
+          repeat: validatedData.repeat,
+        });
+
         return template;
       });
     }
 
     // Обычная операция (не повторяющаяся)
-    return prisma.operation.create({
+    const operation = await prisma.operation.create({
       data: {
         ...validatedData,
         companyId,
         isTemplate: false,
       },
     });
+
+    logger.info('Operation created successfully', {
+      companyId,
+      operationId: operation.id,
+      operationType: operation.type,
+      amount: operation.amount,
+    });
+
+    return operation;
   }
 
   async update(
@@ -259,6 +295,12 @@ export class OperationsService {
     companyId: string,
     data: Partial<CreateOperationInput>
   ) {
+    logger.debug('Updating operation', {
+      companyId,
+      operationId: id,
+      fieldsToUpdate: Object.keys(data),
+    });
+
     await this.getById(id, companyId);
 
     // Validate using Zod schema (partial validation for updates)
@@ -267,6 +309,11 @@ export class OperationsService {
 
       if (!validationResult.success) {
         const errorMessage = formatZodErrors(validationResult.error);
+        logger.warn('Operation update validation failed', {
+          companyId,
+          operationId: id,
+          error: errorMessage,
+        });
         throw new AppError(`Ошибка валидации: ${errorMessage}`, 400);
       }
 
@@ -286,6 +333,11 @@ export class OperationsService {
           companyId
         );
         if (!isLeaf) {
+          logger.warn('Attempt to update operation with non-leaf article', {
+            companyId,
+            operationId: id,
+            articleId: validatedData.articleId,
+          });
           throw new AppError(
             'Нельзя использовать родительскую статью в операции. Выберите дочернюю статью или статью без дочерних элементов.',
             400
@@ -293,34 +345,75 @@ export class OperationsService {
         }
       }
 
-      return prisma.operation.update({
+      const updated = await prisma.operation.update({
         where: { id },
         data: validatedData,
       });
+
+      logger.info('Operation updated successfully', {
+        companyId,
+        operationId: id,
+        fieldsUpdated: Object.keys(validatedData),
+      });
+
+      return updated;
     }
 
     return prisma.operation.findUnique({ where: { id } });
   }
 
   async delete(id: string, companyId: string) {
+    logger.debug('Deleting operation', {
+      companyId,
+      operationId: id,
+    });
+
     await this.getById(id, companyId);
 
-    return prisma.operation.delete({
+    const deleted = await prisma.operation.delete({
       where: { id },
     });
+
+    logger.info('Operation deleted successfully', {
+      companyId,
+      operationId: id,
+    });
+
+    return deleted;
   }
 
   async confirmOperation(id: string, companyId: string) {
+    logger.debug('Confirming operation', {
+      companyId,
+      operationId: id,
+    });
+
     await this.getById(id, companyId);
 
-    return prisma.operation.update({
+    const confirmed = await prisma.operation.update({
       where: { id, companyId },
       data: { isConfirmed: true },
     });
+
+    logger.info('Operation confirmed successfully', {
+      companyId,
+      operationId: id,
+    });
+
+    return confirmed;
   }
 
   async bulkDelete(companyId: string, ids: string[]) {
+    logger.debug('Bulk deleting operations', {
+      companyId,
+      operationsCount: ids.length,
+    });
+
     if (!Array.isArray(ids) || ids.length === 0) {
+      logger.warn('Bulk delete with invalid ids array', {
+        companyId,
+        ids,
+      });
       throw new AppError('ids must be a non-empty array', 400);
     }
 
@@ -329,6 +422,11 @@ export class OperationsService {
       (id) => typeof id === 'string' && id.length > 0
     );
     if (validIds.length !== ids.length) {
+      logger.warn('Bulk delete with invalid ids', {
+        companyId,
+        totalIds: ids.length,
+        validIds: validIds.length,
+      });
       throw new AppError('All ids must be non-empty strings', 400);
     }
 
@@ -346,11 +444,19 @@ export class OperationsService {
       (op) => op.companyId !== companyId
     );
     if (invalidOperations.length > 0) {
+      logger.warn(
+        'Bulk delete attempt with operations from different company',
+        {
+          companyId,
+          invalidOperationsCount: invalidOperations.length,
+          invalidOperationIds: invalidOperations.map((op) => op.id),
+        }
+      );
       throw new AppError('Some operations do not belong to your company', 403);
     }
 
     // Use transaction to ensure atomicity - all deletes succeed or none
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       return tx.operation.deleteMany({
         where: {
           companyId,
@@ -358,6 +464,14 @@ export class OperationsService {
         },
       });
     });
+
+    logger.info('Operations bulk deleted successfully', {
+      companyId,
+      deletedCount: result.count,
+      requestedCount: validIds.length,
+    });
+
+    return result;
   }
 }
 

@@ -212,7 +212,7 @@ export const RolesPage = () => {
       setIsRoleModalOpen(false);
       resetForm();
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -221,8 +221,22 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при сохранении роли';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при сохранении роли';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при сохранении роли'
+      );
     }
   };
 
@@ -236,7 +250,7 @@ export const RolesPage = () => {
       await deleteRole(role.id).unwrap();
       showSuccess('Роль успешно удалена');
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -245,8 +259,22 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при удалении роли';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при удалении роли';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при удалении роли'
+      );
     }
   };
 
@@ -282,7 +310,7 @@ export const RolesPage = () => {
       setSelectedRole(null);
       setPermissions({});
     } catch (error) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -291,8 +319,22 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : 'Ошибка при обновлении прав';
-      showError(errorMessage);
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при обновлении прав';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при обновлении прав'
+      );
     }
   };
 

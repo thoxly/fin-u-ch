@@ -3,10 +3,24 @@ import { TenantRequest } from '../../middlewares/tenant';
 import { AppError } from '../../middlewares/error';
 import operationsService from './operations.service';
 import auditLogService from '../audit/audit.service';
+import logger from '../../config/logger';
 
 export class OperationsController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.debug('Get all operations request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        filters: {
+          type: req.query.type,
+          dateFrom: req.query.dateFrom,
+          dateTo: req.query.dateTo,
+          articleId: req.query.articleId,
+          isConfirmed: req.query.isConfirmed,
+          isTemplate: req.query.isTemplate,
+        },
+      });
+
       const filters = {
         type: req.query.type as string,
         dateFrom: req.query.dateFrom
@@ -35,27 +49,73 @@ export class OperationsController {
       };
 
       const result = await operationsService.getAll(req.companyId!, filters);
+
+      logger.debug('Operations retrieved successfully', {
+        companyId: req.companyId,
+        operationsCount: result.operations.length,
+        total: result.total,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get operations', {
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.debug('Get operation by ID request', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       const result = await operationsService.getById(
         req.params.id,
         req.companyId!
       );
+
+      logger.debug('Operation retrieved successfully', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get operation', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Create operation request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        operationType: req.body.type,
+        amount: req.body.amount,
+        ip: req.ip,
+      });
+
       const result = await operationsService.create(req.companyId!, req.body);
+
+      logger.info('Operation created successfully', {
+        operationId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        operationType: result.type,
+        amount: result.amount,
+      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -79,6 +139,13 @@ export class OperationsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Update operation request', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       // Получаем старую версию для логирования
       const oldOperation = await operationsService.getById(
         req.params.id,
@@ -94,6 +161,12 @@ export class OperationsController {
       if (!result) {
         throw new AppError('Операция не найдена', 404);
       }
+
+      logger.info('Operation updated successfully', {
+        operationId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -117,6 +190,13 @@ export class OperationsController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Delete operation request', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       // Получаем данные перед удалением для логирования
       const oldOperation = await operationsService.getById(
         req.params.id,
@@ -127,6 +207,12 @@ export class OperationsController {
         req.params.id,
         req.companyId!
       );
+
+      logger.info('Operation deleted successfully', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -150,6 +236,13 @@ export class OperationsController {
 
   async confirm(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Confirm operation request', {
+        operationId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       // Получаем старую версию для логирования
       const oldOperation = await operationsService.getById(
         req.params.id,
@@ -160,6 +253,12 @@ export class OperationsController {
         req.params.id,
         req.companyId!
       );
+
+      logger.info('Operation confirmed successfully', {
+        operationId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -185,6 +284,13 @@ export class OperationsController {
     try {
       const { ids } = req.body as { ids: string[] };
 
+      logger.info('Bulk delete operations request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        operationsCount: ids.length,
+        ip: req.ip,
+      });
+
       // Получаем данные перед удалением для логирования
       const oldOperations = await Promise.all(
         ids.map((id) =>
@@ -193,6 +299,12 @@ export class OperationsController {
       );
 
       const result = await operationsService.bulkDelete(req.companyId!, ids);
+
+      logger.info('Operations bulk deleted successfully', {
+        companyId: req.companyId,
+        userId: req.userId,
+        deletedCount: ids.length,
+      });
 
       // Логируем каждое удаление
       await Promise.all(
