@@ -129,8 +129,8 @@ export class RolesService {
       companyId,
       name: role.name,
       isSystem: role.isSystem,
-      permissionsCount: role.role_permissions.length,
-      usersCount: role._count.user_roles,
+      permissionsCount: role.role_permissions?.length || 0,
+      usersCount: role._count?.user_roles || 0,
     });
 
     return role;

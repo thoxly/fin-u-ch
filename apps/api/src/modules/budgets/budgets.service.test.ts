@@ -55,13 +55,13 @@ describe('BudgetsService', () => {
           id: '1',
           name: 'Budget 2024',
           status: 'active',
-          _count: { plan_items: 5 },
+          _count: { planItems: 5 },
         },
         {
           id: '2',
           name: 'Budget 2025',
           status: 'active',
-          _count: { plan_items: 3 },
+          _count: { planItems: 3 },
         },
       ];
       (prisma.budget.findMany as jest.Mock).mockResolvedValue(mockBudgets);
@@ -74,7 +74,7 @@ describe('BudgetsService', () => {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { plan_items: true },
+            select: { planItems: true },
           },
         },
       });
@@ -86,7 +86,7 @@ describe('BudgetsService', () => {
           id: '1',
           name: 'Budget 2024',
           status: 'active',
-          _count: { plan_items: 5 },
+          _count: { planItems: 5 },
         },
       ];
       (prisma.budget.findMany as jest.Mock).mockResolvedValue(mockBudgets);
@@ -98,7 +98,7 @@ describe('BudgetsService', () => {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { plan_items: true },
+            select: { planItems: true },
           },
         },
       });
@@ -236,7 +236,7 @@ describe('BudgetsService', () => {
         id: '1',
         name: 'Budget 2024',
         companyId,
-        _count: { plan_items: 0 },
+        _count: { planItems: 0 },
       };
       (prisma.budget.findFirst as jest.Mock).mockResolvedValue(mockBudget);
       (prisma.budget.findUnique as jest.Mock).mockResolvedValue(mockBudget);
@@ -254,7 +254,7 @@ describe('BudgetsService', () => {
         id: '1',
         name: 'Budget 2024',
         companyId,
-        _count: { plan_items: 5 },
+        _count: { planItems: 5 },
       };
       (prisma.budget.findFirst as jest.Mock).mockResolvedValue(mockBudget);
       (prisma.budget.findUnique as jest.Mock).mockResolvedValue(mockBudget);

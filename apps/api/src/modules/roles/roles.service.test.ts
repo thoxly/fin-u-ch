@@ -86,7 +86,8 @@ describe('RolesService', () => {
         name: 'Role 1',
         companyId,
         permissions: [],
-        _count: { userRoles: 0 },
+        role_permissions: [],
+        _count: { user_roles: 0 },
       };
 
       mockedPrisma.role.findFirst.mockResolvedValue(mockRole as any);
