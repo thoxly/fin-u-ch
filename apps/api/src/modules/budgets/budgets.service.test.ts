@@ -236,7 +236,7 @@ describe('BudgetsService', () => {
         id: '1',
         name: 'Budget 2024',
         companyId,
-        _count: { planItems: 0 },
+        _count: { plan_items: 0 },
       };
       (prisma.budget.findFirst as jest.Mock).mockResolvedValue(mockBudget);
       (prisma.budget.findUnique as jest.Mock).mockResolvedValue(mockBudget);
@@ -254,7 +254,7 @@ describe('BudgetsService', () => {
         id: '1',
         name: 'Budget 2024',
         companyId,
-        _count: { planItems: 5 },
+        _count: { plan_items: 5 },
       };
       (prisma.budget.findFirst as jest.Mock).mockResolvedValue(mockBudget);
       (prisma.budget.findUnique as jest.Mock).mockResolvedValue(mockBudget);
