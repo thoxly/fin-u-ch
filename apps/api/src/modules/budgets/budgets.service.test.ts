@@ -74,7 +74,7 @@ describe('BudgetsService', () => {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { planItems: true },
+            select: { plan_items: true },
           },
         },
       });
@@ -98,7 +98,7 @@ describe('BudgetsService', () => {
         orderBy: { createdAt: 'desc' },
         include: {
           _count: {
-            select: { planItems: true },
+            select: { plan_items: true },
           },
         },
       });
