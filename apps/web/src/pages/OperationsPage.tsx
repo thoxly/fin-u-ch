@@ -1,5 +1,6 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Trash2, X, Copy, Check } from 'lucide-react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -14,8 +15,9 @@ import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { OperationForm } from '../features/operation-form/OperationForm';
 import { RecurringOperations } from '../features/recurring-operations/RecurringOperations';
+import { MappingRules } from '../features/bank-import/MappingRules';
 import {
-  useLazyGetOperationsQuery,
+  useGetOperationsQuery,
   useDeleteOperationMutation,
   useConfirmOperationMutation,
   useBulkDeleteOperationsMutation,
@@ -27,15 +29,27 @@ import {
   useGetDepartmentsQuery,
   useGetAccountsQuery,
 } from '../store/api/catalogsApi';
+import { useGetCompanyQuery } from '../store/api/companiesApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
 import { useBulkSelection } from '../shared/hooks/useBulkSelection';
-import { useIntersectionObserver } from '../shared/hooks/useIntersectionObserver';
 import { useIsMobile } from '../shared/hooks/useIsMobile';
 import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
+import { BankImportModal } from '../features/bank-import/BankImportModal';
+import { ExportMenu } from '../shared/ui/ExportMenu';
+import type { ExportRow } from '../shared/lib/exportData';
+
+import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
+import { OzonIcon } from '../features/integrations/OzonIcon';
+import {
+  useDisconnectOzonIntegrationMutation,
+  useGetOzonIntegrationQuery,
+} from '../store/api/integrationsApi';
+
+import { usePermissions } from '../shared/hooks/usePermissions';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -43,6 +57,9 @@ export const OperationsPage = () => {
     account?: { name?: string } | null;
     sourceAccount?: { name?: string } | null;
     targetAccount?: { name?: string } | null;
+    counterparty?: { name?: string } | null;
+    deal?: { name?: string } | null;
+    department?: { name?: string } | null;
     recurrenceParent?: {
       id: string;
       repeat: string;
@@ -67,6 +84,81 @@ export const OperationsPage = () => {
     null
   );
   const [isCopying, setIsCopying] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // Загружаем данные интеграции Ozon
+  const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
+    useGetOzonIntegrationQuery();
+  const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
+  const { showSuccess, showError } = useNotification();
+
+  // Инициализируем интеграции с данными из API
+  const [integrations, setIntegrations] = useState<
+    Array<{
+      id: string;
+      name: string;
+      icon: typeof OzonIcon;
+      connected: boolean;
+      data?: {
+        clientKey?: string;
+        apiKey?: string;
+        paymentSchedule?: 'next_week' | 'week_after';
+        articleId?: string;
+        accountId?: string;
+      };
+    }>
+  >([
+    {
+      id: 'ozon',
+      name: 'Ozon',
+      icon: OzonIcon,
+      connected: false,
+      data: undefined,
+    },
+  ]);
+
+  const handleIntegrationDisconnect = async (integrationId: string) => {
+    if (integrationId === 'ozon') {
+      try {
+        const result = await disconnectOzonIntegration().unwrap();
+        if (result.success) {
+          setIntegrations((prev) =>
+            prev.map((integration) =>
+              integration.id === 'ozon'
+                ? {
+                    ...integration,
+                    connected: false,
+                    data: undefined,
+                  }
+                : integration
+            )
+          );
+          showSuccess('Интеграция Ozon успешно отключена');
+        } else {
+          // Очищаем системную информацию из сообщения об ошибке
+          const rawError = result.error || 'Ошибка при отключении интеграции';
+          const sanitizedError =
+            typeof rawError === 'string'
+              ? rawError
+                  .replace(/Операция\s+[\w-]+:\s*/gi, '')
+                  .replace(/^[^:]+:\s*/i, '')
+                  .trim()
+              : 'Ошибка при отключении интеграции';
+
+          showError(
+            sanitizedError &&
+              sanitizedError.length > 5 &&
+              !sanitizedError.match(/^[A-Z_]+$/)
+              ? sanitizedError
+              : 'Ошибка при отключении интеграции'
+          );
+        }
+      } catch (error) {
+        console.error('Failed to disconnect Ozon integration:', error);
+        showError('Ошибка при отключении интеграции');
+      }
+    }
+  };
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -97,12 +189,34 @@ export const OperationsPage = () => {
   const [accountIdFilter, setAccountIdFilter] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
+  // Сортировка
+  const [sortKey, setSortKey] = useState<string>('operationDate');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+
   // Загружаем справочники для фильтров
   const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
+  const { data: company } = useGetCompanyQuery();
+
+  // Обновляем состояние интеграций при загрузке данных
+  useEffect(() => {
+    if (ozonIntegrationData?.success && ozonIntegrationData.data) {
+      setIntegrations((prev) =>
+        prev.map((integration) =>
+          integration.id === 'ozon'
+            ? {
+                ...integration,
+                connected: ozonIntegrationData.data!.connected,
+                data: ozonIntegrationData.data!.data,
+              }
+            : integration
+        )
+      );
+    }
+  }, [ozonIntegrationData]);
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -159,87 +273,64 @@ export const OperationsPage = () => {
 
   const hasActiveFilters = Object.keys(filters).length > 0;
 
-  const PAGE_SIZE = 50;
-  const [items, setItems] = useState<OperationWithRelations[]>([]);
-  const [offset, setOffset] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [trigger, { isFetching }] = useLazyGetOperationsQuery();
+  // Загружаем данные один раз при монтировании с текущими фильтрами
+  const {
+    data: operationsData = [],
+    isLoading: isFetching,
+    refetch,
+  } = useGetOperationsQuery(hasActiveFilters ? filters : undefined, {
+    // Отключаем автоматическую перезагрузку при изменении фильтров
+    refetchOnMountOrArgChange: false,
+    refetchOnFocus: false,
+    refetchOnReconnect: false,
+  });
+
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
-  const { showSuccess, showError } = useNotification();
 
-  const { selectedIds, toggleSelectOne, clearSelection } = useBulkSelection();
+  const { selectedIds, toggleSelectOne, toggleSelectAll, clearSelection } =
+    useBulkSelection();
+  const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
+  const { canCreate, canUpdate } = usePermissions();
+
+  const handleIntegrationUpdate = (
+    integrationId: string,
+    data: {
+      clientKey: string;
+      apiKey: string;
+      paymentSchedule: 'next_week' | 'week_after';
+      articleId: string;
+      accountId: string;
+    }
+  ) => {
+    setIntegrations((prev) =>
+      prev.map((integration) =>
+        integration.id === integrationId
+          ? {
+              ...integration,
+              connected: true,
+              data: {
+                ...data,
+                articleId: data.articleId,
+                accountId: data.accountId,
+              },
+            }
+          : integration
+      )
+    );
+    showSuccess('Интеграция успешно подключена');
+  };
 
   // Extract data reloading logic to avoid duplication
+
+  // Функция для ручной перезагрузки данных (после мутаций)
+
   const reloadOperationsData = useCallback(async () => {
-    setItems([]);
-    setOffset(0);
-    setHasMore(true);
     clearSelection();
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset: 0,
-    };
-    const result = await trigger(params).unwrap();
-    setItems(result as OperationWithRelations[]);
-    setHasMore(result.length === PAGE_SIZE);
-    setOffset(result.length);
-  }, [hasActiveFilters, filters, trigger, clearSelection]);
-
-  // Memoize loadMore callback to prevent unnecessary re-renders
-  const loadMore = useCallback(async () => {
-    if (isFetching || !hasMore) return;
-    const params: OpsQuery = {
-      ...(hasActiveFilters ? filters : {}),
-      limit: PAGE_SIZE,
-      offset,
-    };
-    const result = await trigger(params).unwrap();
-    const page = result || [];
-    // Фильтруем дубликаты по id при добавлении новых элементов
-    setItems((prev) => {
-      const existingIds = new Set(prev.map((item) => item.id));
-      const newItems = page.filter((item) => !existingIds.has(item.id));
-      return [...prev, ...newItems];
-    });
-    setOffset((prevOffset) => prevOffset + page.length);
-    setHasMore(page.length === PAGE_SIZE);
-  }, [isFetching, hasMore, hasActiveFilters, filters, offset, trigger]);
-
-  // Initial and filters-changed load with proper dependencies
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      await reloadOperationsData();
-      if (cancelled) {
-        // Reset state if cancelled
-        setItems([]);
-        setOffset(0);
-        setHasMore(true);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadOperationsData]);
-
-  // Use IntersectionObserver hook for infinite scroll
-  const sentinelRef = useIntersectionObserver(
-    useCallback(
-      (entry) => {
-        if (entry.isIntersecting && !isFetching && hasMore) {
-          loadMore();
-        }
-      },
-      [isFetching, hasMore, loadMore]
-    ),
-    { rootMargin: '200px', enabled: hasMore && !isFetching }
-  );
+    await refetch();
+  }, [refetch, clearSelection]);
 
   const handleCreate = () => {
     setEditingOperation(null);
@@ -349,6 +440,15 @@ export const OperationsPage = () => {
     }
   };
 
+  const handleImportClick = () => {
+    if (!company?.inn) {
+      showError(
+        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+      );
+    }
+    setIsImportModalOpen(true);
+  };
+
   const getOperationTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       income: 'Поступление',
@@ -388,6 +488,147 @@ export const OperationsPage = () => {
     };
     return labels[op.repeat] || op.repeat;
   };
+
+  // Обработчик сортировки
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      // Переключаем направление сортировки
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      // Новая колонка для сортировки
+      setSortKey(key);
+      setSortDirection('asc');
+    }
+  };
+
+  // Сортированные данные
+  const sortedItems = useMemo(() => {
+    if (!sortKey) return operationsData as OperationWithRelations[];
+
+    return [...(operationsData as OperationWithRelations[])].sort((a, b) => {
+      let aValue: unknown;
+      let bValue: unknown;
+
+      // Получаем значения для сортировки в зависимости от колонки
+      switch (sortKey) {
+        case 'operationDate':
+          aValue = new Date(a.operationDate).getTime();
+          bValue = new Date(b.operationDate).getTime();
+          break;
+        case 'type':
+          aValue = getOperationTypeLabel(a.type);
+          bValue = getOperationTypeLabel(b.type);
+          break;
+        case 'amount':
+          aValue = a.amount;
+          bValue = b.amount;
+          break;
+        case 'article':
+          aValue = a.article?.name || '';
+          bValue = b.article?.name || '';
+          break;
+        case 'account':
+          if (a.type === 'transfer' && b.type === 'transfer') {
+            aValue = `${a.sourceAccount?.name || ''} → ${a.targetAccount?.name || ''}`;
+            bValue = `${b.sourceAccount?.name || ''} → ${b.targetAccount?.name || ''}`;
+          } else {
+            aValue = a.account?.name || '';
+            bValue = b.account?.name || '';
+          }
+          break;
+        case 'description':
+          aValue = a.description || '';
+          bValue = b.description || '';
+          break;
+        case 'repeat':
+          aValue = getPeriodicityLabel(a);
+          bValue = getPeriodicityLabel(b);
+          break;
+        default:
+          return 0;
+      }
+
+      // Сравнение значений
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+      }
+
+      const aStr = String(aValue).toLowerCase();
+      const bStr = String(bValue).toLowerCase();
+
+      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [operationsData, sortKey, sortDirection]);
+
+  const selectableIds = useMemo(
+    () =>
+      sortedItems.map((op) => op.id).filter((id): id is string => Boolean(id)),
+    [sortedItems]
+  );
+  const areAllVisibleSelected =
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedIds.includes(id));
+  const hasSomeVisibleSelected = selectableIds.some((id) =>
+    selectedIds.includes(id)
+  );
+
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate =
+        hasSomeVisibleSelected && !areAllVisibleSelected;
+    }
+  }, [hasSomeVisibleSelected, areAllVisibleSelected]);
+
+  // Определение колонок для экспорта
+  const exportColumns = [
+    'Дата',
+    'Тип',
+    'Сумма',
+    'Валюта',
+    'Статья',
+    'Счет',
+    'Контрагент',
+    'Сделка',
+    'Отдел',
+    'Описание',
+    'Периодичность',
+    'Статус подтверждения',
+  ];
+
+  // Функция для преобразования операций в формат экспорта
+  const buildExportRows = useCallback((): ExportRow[] => {
+    return sortedItems.map((op) => {
+      // Форматируем счет в зависимости от типа операции
+      let accountDisplay = '-';
+      if (op.type === 'transfer') {
+        const source = op.sourceAccount?.name || '-';
+        const target = op.targetAccount?.name || '-';
+        accountDisplay = `${source} → ${target}`;
+      } else {
+        accountDisplay = op.account?.name || '-';
+      }
+
+      return {
+        Дата: formatDate(op.operationDate),
+        Тип: getOperationTypeLabel(op.type),
+        Сумма: op.amount,
+        Валюта: op.currency,
+        Статья: op.article?.name || '-',
+        Счет: accountDisplay,
+        Контрагент: op.counterparty?.name || '-',
+        Сделка: op.deal?.name || '-',
+        Отдел: op.department?.name || '-',
+        Описание: op.description || '-',
+        Периодичность: getPeriodicityLabel(op),
+        'Статус подтверждения': op.isConfirmed
+          ? 'Подтверждена'
+          : 'Не подтверждена',
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedItems]);
 
   const handleClearFilters = () => {
     setTypeFilter('');
@@ -434,24 +675,61 @@ export const OperationsPage = () => {
     }
   }, [counterpartyIdFilter, dealIdFilter, deals]);
 
+  // Автоматически открываем модальное окно импорта, если есть флаг в sessionStorage
+  useEffect(() => {
+    const shouldOpen = sessionStorage.getItem('openImportModal');
+
+    if (shouldOpen === 'true') {
+      setIsImportModalOpen(true);
+      sessionStorage.removeItem('openImportModal');
+    }
+  }, []);
+
+  // Слушаем событие storage для открытия модального окна из свернутых секций
+  useEffect(() => {
+    const handleStorageEvent = () => {
+      const shouldOpen = sessionStorage.getItem('openImportModal');
+      if (shouldOpen === 'true') {
+        setIsImportModalOpen(true);
+        sessionStorage.removeItem('openImportModal');
+      }
+    };
+
+    window.addEventListener('storage', handleStorageEvent);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageEvent);
+    };
+  }, []);
+
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
     setDateRangeStart(startDate);
     setDateRangeEnd(endDate);
-    // Форматируем даты в формат YYYY-MM-DD для API
-    const formatDateForAPI = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
-    setDateFromFilter(formatDateForAPI(startDate));
-    setDateToFilter(formatDateForAPI(endDate));
+
+    // Отправляем полные ISO даты с временем вместо формата YYYY-MM-DD
+    // Это гарантирует правильную обработку часовых поясов на backend
+    setDateFromFilter(startDate.toISOString());
+    setDateToFilter(endDate.toISOString());
   };
 
   const columns = [
     {
       key: 'select',
-      header: '',
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Выбрать все операции на странице"
+          ref={selectAllCheckboxRef}
+          checked={areAllVisibleSelected && selectableIds.length > 0}
+          onChange={(e) => {
+            e.stopPropagation();
+            toggleSelectAll(selectableIds);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          disabled={selectableIds.length === 0}
+          className="rounded border-gray-300"
+        />
+      ),
       render: (op: Operation) => (
         <input
           type="checkbox"
@@ -461,32 +739,38 @@ export const OperationsPage = () => {
             e.stopPropagation();
             toggleSelectOne(op.id);
           }}
+          onClick={(e) => e.stopPropagation()}
         />
       ),
       width: '40px',
+      sortable: false,
     },
     {
       key: 'operationDate',
       header: 'Дата',
       render: (op: Operation) => formatDate(op.operationDate),
       width: '120px',
+      sortable: true,
     },
     {
       key: 'type',
       header: 'Тип',
       render: (op: Operation) => getOperationTypeLabel(op.type),
       width: '100px',
+      sortable: true,
     },
     {
       key: 'amount',
       header: 'Сумма',
       render: (op: Operation) => formatMoney(op.amount, op.currency),
       width: '150px',
+      sortable: true,
     },
     {
       key: 'article',
       header: 'Статья',
       render: (op: OperationWithRelations) => op.article?.name || '-',
+      sortable: true,
     },
     {
       key: 'account',
@@ -499,21 +783,25 @@ export const OperationsPage = () => {
         }
         return op.account?.name || '-';
       },
+      sortable: true,
     },
     {
       key: 'description',
       header: 'Описание',
       render: (op: Operation) => op.description || '-',
+      sortable: true,
     },
     {
       key: 'repeat',
       header: 'Периодичность',
       render: (op: OperationWithRelations) => getPeriodicityLabel(op),
       width: '130px',
+      sortable: true,
     },
     {
       key: 'actions',
       header: 'Действия',
+      sortable: false,
       render: (op: Operation) => (
         <div className="flex gap-2">
           {!op.isConfirmed ? (
@@ -577,15 +865,46 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-            <RecurringOperations onEdit={handleEdit} />
-            <Button
-              onClick={handleCreate}
-              size="sm"
-              className="text-sm sm:text-base whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">Создать операцию</span>
-              <span className="sm:hidden">Создать</span>
-            </Button>
+            <IntegrationsDropdown
+              integrations={integrations}
+              onIntegrationUpdate={handleIntegrationUpdate}
+              onIntegrationDisconnect={handleIntegrationDisconnect}
+              isLoading={isLoadingOzonIntegration}
+            />
+            {canUpdate('operations') && (
+              <>
+                <RecurringOperations onEdit={handleEdit} />
+                <MappingRules />
+              </>
+            )}
+
+            <ExportMenu
+              filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
+              buildRows={buildExportRows}
+              columns={exportColumns}
+            />
+            {canUpdate('operations') && (
+              <button
+                onClick={handleImportClick}
+                className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+                title="Импорт выписки"
+              >
+                <FileUp
+                  size={18}
+                  className="text-primary-600 dark:text-primary-400"
+                />
+              </button>
+            )}
+            {canCreate('operations') && (
+              <Button
+                onClick={handleCreate}
+                size="sm"
+                className="text-sm sm:text-base whitespace-nowrap"
+              >
+                <span className="hidden sm:inline">Создать операцию</span>
+                <span className="sm:hidden">Создать</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -646,7 +965,7 @@ export const OperationsPage = () => {
             {showAdvancedFilters && (
               <div className="space-y-3 pt-3 border-t border-gray-200 dark:border-zinc-700">
                 <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Контекст
+                  Дополнительные
                 </div>
                 {/* На мобильных устройствах - горизонтальная прокрутка в один ряд */}
                 <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 filters-scroll md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-4 md:overflow-x-visible md:pb-0 md:-mx-0 md:px-0">
@@ -749,9 +1068,9 @@ export const OperationsPage = () => {
             </div>
           </div>
 
-          {items.length === 0 && isFetching ? (
+          {operationsData.length === 0 && isFetching ? (
             <TableSkeleton rows={5} columns={6} />
-          ) : items.length === 0 ? (
+          ) : operationsData.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
               title="Нет операций"
@@ -759,24 +1078,43 @@ export const OperationsPage = () => {
             />
           ) : isMobile ? (
             <div className="space-y-3">
-              {items.map((op, index) => (
+              {sortedItems.map((op, index) => (
                 <div
                   key={op.id || `operation-${index}`}
-                  onClick={() => handleEdit(op)}
+                  onClick={() => {
+                    // Не открываем модальное окно редактирования, если есть выбранные элементы
+                    if (selectedIds.length > 0) {
+                      return;
+                    }
+                    handleEdit(op);
+                  }}
                   className={`rounded-lg border p-4 shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors ${
                     !op.isConfirmed
                       ? 'bg-yellow-50 dark:bg-yellow-950 border-yellow-300 dark:border-yellow-700'
                       : 'bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700'
                   }`}
                 >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-500 dark:text-zinc-400">
-                      {formatDate(op.operationDate)}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {getOperationTypeLabel(op.type)} —{' '}
-                      {formatMoney(op.amount, op.currency)}
-                    </span>
+                  <div className="flex items-center gap-3 mb-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Выбрать операцию"
+                      checked={selectedIds.includes(op.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleSelectOne(op.id);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-shrink-0"
+                    />
+                    <div className="flex-1 flex justify-between items-center gap-2">
+                      <span className="text-sm text-gray-500 dark:text-zinc-400">
+                        {formatDate(op.operationDate)}
+                      </span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {getOperationTypeLabel(op.type)} —{' '}
+                        {formatMoney(op.amount, op.currency)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
@@ -872,17 +1210,27 @@ export const OperationsPage = () => {
           ) : (
             <Table
               columns={columns}
-              data={items}
+              data={sortedItems}
               keyExtractor={(op, index) => op.id || `operation-${index}`}
               rowClassName={(op) =>
                 !op.isConfirmed ? 'bg-yellow-50 dark:bg-yellow-950/30' : ''
               }
-              onRowClick={handleEdit}
+              onRowClick={(op) => {
+                // Не открываем модальное окно редактирования, если есть выбранные элементы
+                if (selectedIds.length > 0) {
+                  return;
+                }
+                handleEdit(op);
+              }}
+              sortKey={sortKey}
+              sortDirection={sortDirection}
+              onSort={handleSort}
             />
           )}
           <BulkActionsBar
             selectedCount={selectedIds.length}
             onClear={clearSelection}
+            className="sticky top-4 z-30 shadow-sm"
             actions={[
               {
                 label: `Удалить выбранные (${selectedIds.length})`,
@@ -898,7 +1246,6 @@ export const OperationsPage = () => {
               },
             ]}
           />
-          <div ref={sentinelRef as React.RefObject<HTMLDivElement>} />
         </Card>
 
         <Modal
@@ -948,6 +1295,15 @@ export const OperationsPage = () => {
                 : 'Удалить'
           }
           variant={deleteModal.type === 'reject' ? 'warning' : 'delete'}
+        />
+
+        <BankImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => {
+            setIsImportModalOpen(false);
+            // Перезагружаем операции после закрытия модального окна импорта
+            reloadOperationsData();
+          }}
         />
       </div>
     </Layout>

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
+import { requirePermission } from '../../middlewares/permissions';
 import budgetsController from './budgets.controller';
 
 const router: Router = Router();
@@ -27,7 +28,7 @@ router.use(extractTenant);
  *       200:
  *         description: List of budgets
  */
-router.get('/', budgetsController.getAll);
+router.get('/', requirePermission('budgets', 'read'), budgetsController.getAll);
 
 /**
  * @swagger
@@ -49,7 +50,11 @@ router.get('/', budgetsController.getAll);
  *       404:
  *         description: Budget not found
  */
-router.get('/:id', budgetsController.getById);
+router.get(
+  '/:id',
+  requirePermission('budgets', 'read'),
+  budgetsController.getById
+);
 
 /**
  * @swagger
@@ -81,7 +86,11 @@ router.get('/:id', budgetsController.getById);
  *       201:
  *         description: Budget created
  */
-router.post('/', budgetsController.create);
+router.post(
+  '/',
+  requirePermission('budgets', 'create'),
+  budgetsController.create
+);
 
 /**
  * @swagger
@@ -118,7 +127,11 @@ router.post('/', budgetsController.create);
  *       200:
  *         description: Budget updated
  */
-router.patch('/:id', budgetsController.update);
+router.patch(
+  '/:id',
+  requirePermission('budgets', 'update'),
+  budgetsController.update
+);
 
 /**
  * @swagger
@@ -138,6 +151,10 @@ router.patch('/:id', budgetsController.update);
  *       200:
  *         description: Budget deleted
  */
-router.delete('/:id', budgetsController.delete);
+router.delete(
+  '/:id',
+  requirePermission('budgets', 'delete'),
+  budgetsController.delete
+);
 
 export default router;

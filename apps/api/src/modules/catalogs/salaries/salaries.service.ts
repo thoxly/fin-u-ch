@@ -18,9 +18,9 @@ export class SalariesService {
     return prisma.salary.findMany({
       where: { companyId },
       include: {
-        employeeCounterparty: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      },
+      } as any,
       orderBy: { effectiveFrom: 'desc' },
     });
   }
@@ -29,9 +29,9 @@ export class SalariesService {
     const salary = await prisma.salary.findFirst({
       where: { id, companyId },
       include: {
-        employeeCounterparty: { select: { id: true, name: true } },
+        counterparty: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      },
+      } as any,
     });
 
     if (!salary) {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth';
 import { extractTenant } from '../../../middlewares/tenant';
+import { requirePermission } from '../../../middlewares/permissions';
 import articlesController from './articles.controller';
 
 const router: Router = Router();
@@ -13,14 +14,101 @@ router.use(extractTenant);
  * /api/articles:
  *   get:
  *     summary: Get all articles
+ *     description: Returns articles as a flat list or tree structure based on asTree parameter
  *     tags: [Articles]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [income, expense]
+ *         description: Filter by article type
+ *       - in: query
+ *         name: activity
+ *         schema:
+ *           type: string
+ *           enum: [operating, investing, financing]
+ *         description: Filter by activity type
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: asTree
+ *         schema:
+ *           type: boolean
+ *         description: If true, returns articles as a tree structure. Default is false (flat list)
  *     responses:
  *       200:
- *         description: List of articles
+ *         description: List of articles (flat or tree structure)
  */
-router.get('/', articlesController.getAll);
+router.get(
+  '/',
+  requirePermission('articles', 'read'),
+  articlesController.getAll
+);
+
+/**
+ * @swagger
+ * /api/articles/tree:
+ *   get:
+ *     summary: Get all articles as a tree
+ *     description: Returns articles in hierarchical structure with nested children
+ *     tags: [Articles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [income, expense]
+ *         description: Filter by article type
+ *       - in: query
+ *         name: activity
+ *         schema:
+ *           type: string
+ *           enum: [operating, investing, financing]
+ *         description: Filter by activity type
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *     responses:
+ *       200:
+ *         description: Tree of articles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Article'
+ *             example:
+ *               - id: "article-1"
+ *                 name: "Аренда"
+ *                 type: "expense"
+ *                 parentId: null
+ *                 children:
+ *                   - id: "article-2"
+ *                     name: "Аренда Барселона"
+ *                     type: "expense"
+ *                     parentId: "article-1"
+ *                     children: []
+ *                   - id: "article-3"
+ *                     name: "Аренда Лиссабон"
+ *                     type: "expense"
+ *                     parentId: "article-1"
+ *                     children: []
+ */
+router.get(
+  '/tree',
+  requirePermission('articles', 'read'),
+  articlesController.getTree
+);
 
 /**
  * @swagger
@@ -42,7 +130,11 @@ router.get('/', articlesController.getAll);
  *       404:
  *         description: Article not found
  */
-router.get('/:id', articlesController.getById);
+router.get(
+  '/:id',
+  requirePermission('articles', 'read'),
+  articlesController.getById
+);
 
 /**
  * @swagger
@@ -56,7 +148,11 @@ router.get('/:id', articlesController.getById);
  *       201:
  *         description: Article created
  */
-router.post('/', articlesController.create);
+router.post(
+  '/',
+  requirePermission('articles', 'create'),
+  articlesController.create
+);
 
 /**
  * @swagger
@@ -76,7 +172,11 @@ router.post('/', articlesController.create);
  *       200:
  *         description: Article updated
  */
-router.patch('/:id', articlesController.update);
+router.patch(
+  '/:id',
+  requirePermission('articles', 'update'),
+  articlesController.update
+);
 
 /**
  * @swagger
@@ -96,7 +196,11 @@ router.patch('/:id', articlesController.update);
  *       200:
  *         description: Article deleted
  */
-router.delete('/:id', articlesController.delete);
+router.delete(
+  '/:id',
+  requirePermission('articles', 'delete'),
+  articlesController.delete
+);
 
 /**
  * @swagger
@@ -116,7 +220,11 @@ router.delete('/:id', articlesController.delete);
  *       200:
  *         description: Article archived
  */
-router.post('/:id/archive', articlesController.archive);
+router.post(
+  '/:id/archive',
+  requirePermission('articles', 'archive'),
+  articlesController.archive
+);
 
 /**
  * @swagger
@@ -136,7 +244,11 @@ router.post('/:id/archive', articlesController.archive);
  *       200:
  *         description: Article unarchived
  */
-router.post('/:id/unarchive', articlesController.unarchive);
+router.post(
+  '/:id/unarchive',
+  requirePermission('articles', 'restore'),
+  articlesController.unarchive
+);
 
 /**
  * @swagger
@@ -161,6 +273,10 @@ router.post('/:id/unarchive', articlesController.unarchive);
  *       200:
  *         description: UpdateMany result
  */
-router.post('/bulk-archive', articlesController.bulkArchive);
+router.post(
+  '/bulk-archive',
+  requirePermission('articles', 'archive'),
+  articlesController.bulkArchive
+);
 
 export default router;

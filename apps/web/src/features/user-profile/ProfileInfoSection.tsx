@@ -1,78 +1,42 @@
-import { Building } from 'lucide-react';
 import { Input } from '../../shared/ui/Input';
-import { CurrencySelect } from '../../shared/ui/CurrencySelect';
 
 interface ProfileInfoSectionProps {
   firstName: string;
   lastName: string;
-  companyName: string;
-  currencyBase: string;
   onFirstNameChange: (value: string) => void;
   onLastNameChange: (value: string) => void;
-  onCompanyNameChange: (value: string) => void;
-  onCurrencyBaseChange: (value: string) => void;
 }
 
 export const ProfileInfoSection = ({
   firstName,
   lastName,
-  companyName,
-  currencyBase,
   onFirstNameChange,
   onLastNameChange,
-  onCompanyNameChange,
-  onCurrencyBaseChange,
 }: ProfileInfoSectionProps) => {
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Имя
-          </label>
-          <Input
-            type="text"
-            value={firstName}
-            onChange={(e) => onFirstNameChange(e.target.value)}
-            placeholder="Введите имя"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Фамилия
-          </label>
-          <Input
-            type="text"
-            value={lastName}
-            onChange={(e) => onLastNameChange(e.target.value)}
-            placeholder="Введите фамилию"
-          />
-        </div>
-      </div>
-
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Название компании
+          Имя
         </label>
         <Input
           type="text"
-          value={companyName}
-          onChange={(e) => onCompanyNameChange(e.target.value)}
-          icon={<Building size={16} />}
-          placeholder="Введите название компании"
+          value={firstName}
+          onChange={(e) => onFirstNameChange(e.target.value)}
+          placeholder="Введите имя"
         />
       </div>
-
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Базовая валюта
+          Фамилия
         </label>
-        <CurrencySelect
-          value={currencyBase}
-          onChange={(value) => onCurrencyBaseChange(value)}
-          placeholder="Выберите базовую валюту"
+        <Input
+          type="text"
+          value={lastName}
+          onChange={(e) => onLastNameChange(e.target.value)}
+          placeholder="Введите фамилию"
         />
       </div>
-    </>
+    </div>
   );
 };

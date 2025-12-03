@@ -22,6 +22,8 @@ import type { PlanItem } from '@fin-u-ch/shared';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
+import { usePermissions } from '../shared/hooks/usePermissions';
+import { ProtectedAction } from '../shared/components/ProtectedAction';
 
 // RTK Query возвращает данные с датами как строки
 type PlanItemFromAPI = Omit<
@@ -41,11 +43,13 @@ export const BudgetDetailsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanItemFromAPI | null>(null);
 
+  const { canRead } = usePermissions();
+
   const { data: budget, isLoading: isBudgetLoading } = useGetBudgetQuery(
-    budgetId || skipToken
+    budgetId && canRead('budgets') ? budgetId : skipToken
   );
   const { data: plansData = [], isLoading: isPlansLoading } = useGetPlansQuery(
-    budgetId ? { budgetId } : skipToken
+    budgetId && canRead('budgets') ? { budgetId } : skipToken
   );
   // RTK Query возвращает строки, но типы указывают Date - приводим к правильному типу
   const plans = plansData as unknown as PlanItemFromAPI[];
@@ -121,10 +125,43 @@ export const BudgetDetailsPage = () => {
   const handleArchive = async () => {
     if (!budget) return;
     const newStatus = budget.status === 'active' ? 'archived' : 'active';
-    await updateBudget({
-      id: budget.id,
-      data: { status: newStatus },
-    });
+    try {
+      await updateBudget({
+        id: budget.id,
+        data: { status: newStatus },
+      }).unwrap();
+      showSuccess(
+        newStatus === 'archived'
+          ? 'Бюджет успешно архивирован'
+          : 'Бюджет успешно восстановлен'
+      );
+    } catch (error) {
+      const rawErrorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : 'Ошибка при изменении статуса бюджета';
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : 'Ошибка при изменении статуса бюджета'
+      );
+    }
   };
 
   const getTypeLabel = (type: string) => {
@@ -186,22 +223,52 @@ export const BudgetDetailsPage = () => {
       header: 'Действия',
       render: (plan: PlanItemFromAPI) => (
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => handleEdit(plan)}
-            title="Редактировать"
+          <ProtectedAction
+            entity="budgets"
+            action="update"
+            fallback={
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled
+                title="Нет прав на редактирование"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+            }
           >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => handleDelete(plan.id)}
-            title="Удалить"
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleEdit(plan)}
+              title="Редактировать"
+            >
+              <Pencil className="w-4 h-4" />
+            </Button>
+          </ProtectedAction>
+          <ProtectedAction
+            entity="budgets"
+            action="delete"
+            fallback={
+              <Button
+                variant="danger"
+                size="sm"
+                disabled
+                title="Нет прав на удаление"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            }
           >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleDelete(plan.id)}
+              title="Удалить"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </ProtectedAction>
         </div>
       ),
       width: '120px',
@@ -255,14 +322,36 @@ export const BudgetDetailsPage = () => {
             {budget.endDate ? formatDate(budget.endDate) : '∞'}
           </p>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleArchive}>
-              <Archive className="w-4 h-4 mr-2" />
-              {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
-            </Button>
-            <Button onClick={handleCreate}>
-              <Plus className="w-4 h-4 mr-2" />
-              Добавить позицию
-            </Button>
+            <ProtectedAction
+              entity="budgets"
+              action="archive"
+              fallback={
+                <Button variant="secondary" disabled>
+                  <Archive className="w-4 h-4 mr-2" />
+                  {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
+                </Button>
+              }
+            >
+              <Button variant="secondary" onClick={handleArchive}>
+                <Archive className="w-4 h-4 mr-2" />
+                {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
+              </Button>
+            </ProtectedAction>
+            <ProtectedAction
+              entity="budgets"
+              action="create"
+              fallback={
+                <Button disabled>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Добавить позицию
+                </Button>
+              }
+            >
+              <Button onClick={handleCreate}>
+                <Plus className="w-4 h-4 mr-2" />
+                Добавить позицию
+              </Button>
+            </ProtectedAction>
           </div>
         </div>
       </div>

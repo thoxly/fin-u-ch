@@ -13,6 +13,7 @@ import {
 } from '../store/api/reportsApi';
 import { useGetOperationsQuery } from '../store/api/operationsApi';
 import { formatMoney } from '../shared/lib/money';
+import { usePermissions } from '../shared/hooks/usePermissions';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
@@ -29,6 +30,11 @@ import {
 const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
+
+  // Нормализуем даты (убираем время для корректного сравнения)
+  fromDate.setHours(0, 0, 0, 0);
+  toDate.setHours(0, 0, 0, 0);
+
   const daysDiff =
     Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
     1;
@@ -48,6 +54,7 @@ const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
 
 export const DashboardPage = () => {
   const today = new Date();
+  const { canRead } = usePermissions();
 
   // Инициализируем фильтры периода с текущим месяцем
   const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
@@ -58,14 +65,30 @@ export const DashboardPage = () => {
     };
   });
 
+  // Проверяем права на просмотр различных виджетов
+  const canViewOperations = canRead('operations');
+  const canViewReports = canRead('reports');
+  const canViewAccounts = canRead('accounts');
+
+  // Получаем данные дашборда из API (только если есть права на просмотр)
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
-    const format = detectPeriodFormat(
-      periodFilters.range.from,
-      periodFilters.range.to
-    );
-    const newRange = getPreviousPeriod(periodFilters.range, format);
-    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    // Определяем текущий формат: используем сохраненный или определяем автоматически
+    const currentFormat =
+      periodFilters.format ||
+      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+
+    // Если формат 'day', всегда используем его для переключения
+    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
+
+    const newRange = getPreviousPeriod(periodFilters.range, formatToUse);
+
+    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
+    const newFormat =
+      currentFormat === 'day'
+        ? 'day'
+        : detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -73,12 +96,22 @@ export const DashboardPage = () => {
   };
 
   const handleNextPeriod = () => {
-    const format = detectPeriodFormat(
-      periodFilters.range.from,
-      periodFilters.range.to
-    );
-    const newRange = getNextPeriod(periodFilters.range, format);
-    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    // Определяем текущий формат: используем сохраненный или определяем автоматически
+    const currentFormat =
+      periodFilters.format ||
+      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+
+    // Если формат 'day', всегда используем его для переключения
+    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
+
+    const newRange = getNextPeriod(periodFilters.range, formatToUse);
+
+    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
+    const newFormat =
+      currentFormat === 'day'
+        ? 'day'
+        : detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -86,17 +119,36 @@ export const DashboardPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    const formatDateForAPI = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+    // Нормализуем даты (убираем время для корректного сравнения)
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    // Вычисляем разницу в днях для определения формата
+    const daysDiff =
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Определяем формат на основе разницы дней
+    let format: PeriodFormat = 'day';
+    if (daysDiff === 1) {
+      format = 'day';
+    } else if (daysDiff <= 7) {
+      format = 'week';
+    } else if (daysDiff <= 31) {
+      format = 'month';
+    } else if (daysDiff <= 93) {
+      format = 'quarter';
+    } else {
+      format = 'year';
+    }
+
+    // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
     const newRange = {
-      from: formatDateForAPI(startDate),
-      to: formatDateForAPI(endDate),
+      from: start.toISOString(),
+      to: end.toISOString(),
     };
-    const format = detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format,
       range: newRange,
@@ -108,27 +160,45 @@ export const DashboardPage = () => {
     data: dashboardData,
     isLoading,
     error,
-  } = useGetDashboardQuery({
-    periodFrom: periodFilters.range.from,
-    periodTo: periodFilters.range.to,
-    mode: 'both',
-    periodFormat: periodFilters.format, // Передаем формат периода
-  });
-
-  // Получаем накопительные данные для графика поступлений/списаний
-  const { data: cumulativeData, isLoading: cumulativeLoading } =
-    useGetCumulativeCashFlowQuery({
+  } = useGetDashboardQuery(
+    {
       periodFrom: periodFilters.range.from,
       periodTo: periodFilters.range.to,
       mode: 'both',
-      periodFormat: periodFilters.format,
-    });
+      periodFormat: periodFilters.format, // Передаем формат периода
+    },
+    {
+      skip: !canViewOperations && !canViewReports,
+      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+    }
+  );
 
-  // Получаем последние операции
-  const { data: operations = [] } = useGetOperationsQuery({
-    dateFrom: periodFilters.range.from,
-    dateTo: periodFilters.range.to,
-  });
+  // Получаем накопительные данные для графика поступлений/списаний
+  const { data: cumulativeData, isLoading: cumulativeLoading } =
+    useGetCumulativeCashFlowQuery(
+      {
+        periodFrom: periodFilters.range.from,
+        periodTo: periodFilters.range.to,
+        mode: 'both',
+        periodFormat: periodFilters.format,
+      },
+      {
+        skip: !canViewOperations && !canViewReports,
+        refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+      }
+    );
+
+  // Получаем последние операции (только если есть права на просмотр операций)
+  const { data: operations = [] } = useGetOperationsQuery(
+    {
+      dateFrom: periodFilters.range.from,
+      dateTo: periodFilters.range.to,
+    },
+    {
+      skip: !canViewOperations,
+      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+    }
+  );
 
   // Трансформируем данные для графиков
   const incomeExpenseData = cumulativeData?.cumulativeSeries || [];
@@ -221,12 +291,6 @@ export const DashboardPage = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Дашборд
-          </h1>
-        </div>
-
         {/* Компактная панель: фильтр периода + метрики */}
         <Card className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm">
           {/* Навигация и фильтр периода */}
@@ -346,11 +410,6 @@ export const DashboardPage = () => {
         {/* Loading state */}
         {(isLoading || cumulativeLoading) && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <CardSkeleton size="md" lines={2} />
-              <CardSkeleton size="md" lines={2} />
-              <CardSkeleton size="md" lines={2} />
-            </div>
             <CardSkeleton size="lg" lines={4} />
             <CardSkeleton size="lg" lines={6} />
           </>
@@ -369,23 +428,29 @@ export const DashboardPage = () => {
         {dashboardData && (
           <>
             {/* Графики и таблицы */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* График поступлений/списаний/чистого потока */}
-              <IncomeExpenseChart data={incomeExpenseData} />
+            {canViewReports && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* График поступлений/списаний/чистого потока */}
+                <IncomeExpenseChart data={incomeExpenseData} />
 
-              {/* График динамики поступлений и списаний */}
-              <WeeklyFlowChart data={weeklyFlowData} />
-            </div>
+                {/* График динамики поступлений и списаний */}
+                <WeeklyFlowChart data={weeklyFlowData} />
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* График остатков на счетах */}
-              <AccountBalancesChart
-                data={accountBalancesData}
-                accounts={dashboardData?.accounts || []}
-              />
+              {canViewAccounts && (
+                <AccountBalancesChart
+                  data={accountBalancesData}
+                  accounts={dashboardData?.accounts || []}
+                />
+              )}
 
               {/* Таблица последних операций */}
-              <RecentOperationsTable operations={operations} />
+              {canViewOperations && (
+                <RecentOperationsTable operations={operations} />
+              )}
             </div>
           </>
         )}

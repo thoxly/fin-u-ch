@@ -6,7 +6,6 @@ import {
   useChangePasswordMutation,
   useRequestEmailChangeMutation,
 } from '../../store/api/authApi';
-import { useUpdateCompanyMutation } from '../../store/api/companiesApi';
 import { Button } from '../../shared/ui/Button';
 import { ProfileInfoSection } from './ProfileInfoSection';
 import { EmailChangeSection } from './EmailChangeSection';
@@ -24,15 +23,11 @@ export const UserProfileForm = ({
     email: '',
     firstName: '',
     lastName: '',
-    companyName: '',
-    currencyBase: 'RUB',
   });
 
   const { data: user, isLoading: userLoading } = useGetMeQuery();
   const [updateUser, { isLoading: updateUserLoading }] =
     useUpdateUserMutation();
-  const [updateCompany, { isLoading: updateCompanyLoading }] =
-    useUpdateCompanyMutation();
   const [changePassword, { isLoading: changePasswordLoading }] =
     useChangePasswordMutation();
   const [requestEmailChange, { isLoading: requestEmailChangeLoading }] =
@@ -40,16 +35,12 @@ export const UserProfileForm = ({
 
   const { showSuccess, showError } = useNotification();
 
-  const updateLoading = updateUserLoading || updateCompanyLoading;
-
   useEffect(() => {
     if (user) {
       setFormData({
         email: user.email || '',
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        companyName: user.companyName || '',
-        currencyBase: user.company?.currencyBase || 'RUB',
       });
     }
   }, [user]);
@@ -63,16 +54,10 @@ export const UserProfileForm = ({
 
   const handleSave = async (): Promise<void> => {
     try {
-      // Обновляем данные пользователя (без email, так как его нельзя менять напрямую)
+      // Обновляем только данные пользователя
       await updateUser({
         firstName: formData.firstName,
         lastName: formData.lastName,
-      }).unwrap();
-
-      // Обновляем данные компании
-      await updateCompany({
-        name: formData.companyName,
-        currencyBase: formData.currencyBase,
       }).unwrap();
 
       showSuccess('Профиль успешно обновлен');
@@ -134,26 +119,24 @@ export const UserProfileForm = ({
       <ProfileInfoSection
         firstName={formData.firstName}
         lastName={formData.lastName}
-        companyName={formData.companyName}
-        currencyBase={formData.currencyBase}
         onFirstNameChange={(value) => handleInputChange('firstName', value)}
         onLastNameChange={(value) => handleInputChange('lastName', value)}
-        onCompanyNameChange={(value) => handleInputChange('companyName', value)}
-        onCurrencyBaseChange={(value) =>
-          handleInputChange('currencyBase', value)
-        }
       />
 
       <div className="flex items-center justify-end gap-3 pt-4">
-        <Button variant="outline" onClick={onClose} disabled={updateLoading}>
+        <Button
+          variant="outline"
+          onClick={onClose}
+          disabled={updateUserLoading}
+        >
           Отмена
         </Button>
         <Button
           onClick={handleSave}
-          disabled={updateLoading}
+          disabled={updateUserLoading}
           icon={<Save size={16} />}
         >
-          {updateLoading ? 'Сохранение...' : 'Сохранить'}
+          {updateUserLoading ? 'Сохранение...' : 'Сохранить'}
         </Button>
       </div>
     </div>

@@ -1,7 +1,23 @@
 // Load environment variables FIRST, before any other imports
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// Determine project root: go up from apps/api/src to project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const projectRoot = path.resolve(__dirname, '../../..');
+const apiRoot = path.resolve(__dirname, '../..');
+
+const rootEnvPath = path.resolve(projectRoot, '.env');
+const apiEnvPath = path.resolve(apiRoot, '.env');
+dotenv.config({ path: rootEnvPath });
+
+if (!process.env.DATABASE_URL) {
+  dotenv.config({ path: apiEnvPath });
+}
 
 import app from './app';
 import { env } from './config/env';

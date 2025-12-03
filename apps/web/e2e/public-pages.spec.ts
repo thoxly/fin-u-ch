@@ -137,9 +137,7 @@ test.describe('Public Pages Tests', () => {
     );
 
     // Log errors for debugging but don't fail for minor issues
-    if (criticalErrors.length > 0) {
-      console.log('Console errors found:', criticalErrors);
-    }
+    // Errors are checked below without logging
 
     // Only fail for truly critical errors
     const trulyCritical = criticalErrors.filter(

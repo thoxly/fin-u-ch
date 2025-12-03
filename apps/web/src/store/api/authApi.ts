@@ -19,6 +19,13 @@ interface AuthResponse {
     firstName?: string;
     lastName?: string;
     companyName?: string;
+    isSuperAdmin?: boolean;
+    company?: {
+      id: string;
+      name: string;
+      currencyBase: string;
+      inn?: string | null;
+    };
   };
   accessToken: string;
   refreshToken: string;
@@ -70,6 +77,11 @@ interface ConfirmEmailChangeRequest {
   token: string;
 }
 
+export interface UserPreferences {
+  theme?: 'light' | 'dark' | 'system';
+  navigationIcons?: Record<string, string>;
+}
+
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     login: builder.mutation<AuthResponse, LoginRequest>({
@@ -78,6 +90,7 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: credentials,
       }),
+      invalidatesTags: ['User'],
     }),
     register: builder.mutation<AuthResponse, RegisterRequest>({
       query: (data) => ({
@@ -85,6 +98,7 @@ export const authApi = apiSlice.injectEndpoints({
         method: 'POST',
         body: data,
       }),
+      invalidatesTags: ['User'],
     }),
     getMe: builder.query<AuthResponse['user'], void>({
       query: () => '/users/me',
@@ -180,6 +194,18 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    getPreferences: builder.query<UserPreferences, void>({
+      query: () => '/users/me/preferences',
+      providesTags: ['User'],
+    }),
+    updatePreferences: builder.mutation<UserPreferences, UserPreferences>({
+      query: (preferences) => ({
+        url: '/users/me/preferences',
+        method: 'PUT',
+        body: preferences,
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -197,4 +223,6 @@ export const {
   useRequestEmailChangeMutation,
   useConfirmOldEmailForChangeMutation,
   useConfirmEmailChangeMutation,
+  useGetPreferencesQuery,
+  useUpdatePreferencesMutation,
 } = authApi;

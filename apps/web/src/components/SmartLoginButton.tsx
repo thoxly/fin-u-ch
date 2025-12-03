@@ -23,8 +23,8 @@ export const SmartLoginButton = ({
 
   const handleClick = () => {
     if (isAuthenticated) {
-      // Если пользователь уже авторизован, перенаправляем на dashboard
-      navigate('/dashboard');
+      // Если пользователь уже авторизован, перенаправляем на первую доступную страницу
+      navigate('/redirect', { replace: true });
     } else {
       // Если не авторизован, переходим на страницу входа
       navigate('/login');

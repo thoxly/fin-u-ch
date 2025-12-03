@@ -1,14 +1,14 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useGetMeQuery } from '../../store/api/authApi';
 import * as Icons from 'lucide-react';
-import { IconPickerPopover } from './IconPickerPopover';
 import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
 import { OffCanvas } from './OffCanvas';
 import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
-import { UserProfileForm } from '../../features/user-profile/UserProfileForm';
+import { usePermissions } from '../hooks/usePermissions';
+import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
 
 interface LayoutProps {
   children: ReactNode;
@@ -20,44 +20,188 @@ interface NavigationItem {
   children?: NavigationItem[];
   disabled?: boolean;
   tooltip?: string;
+  // Права доступа для фильтрации
+  entity?: string;
+  action?: string;
 }
 
-const navigation: NavigationItem[] = [
-  { name: 'Дашборд', href: '/dashboard' },
-  { name: 'Операции', href: '/operations' },
-  { name: 'Бюджеты', href: '/budgets' },
-  {
-    name: 'Отчеты',
-    children: [
-      { name: 'ДДС', href: '/reports?type=cashflow' },
-      { name: '🔒ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
-    ],
-  },
-  {
-    name: 'Справочники',
-    children: [
-      { name: 'Статьи', href: '/catalogs/articles' },
-      { name: 'Счета', href: '/catalogs/accounts' },
-      { name: 'Подразделения', href: '/catalogs/departments' },
-      { name: 'Контрагенты', href: '/catalogs/counterparties' },
-      { name: 'Сделки', href: '/catalogs/deals' },
-      { name: 'Зарплаты', href: '/catalogs/salaries' },
-    ],
-  },
-];
+// Маппинг названий пунктов меню к сущностям для проверки прав
+const getEntityForMenuItem = (
+  name: string
+): { entity: string; action: string } | null => {
+  const mapping: Record<string, { entity: string; action: string }> = {
+    Дашборд: { entity: 'dashboard', action: 'read' }, // Исправлено: было 'reports'
+    Операции: { entity: 'operations', action: 'read' },
+    Бюджеты: { entity: 'budgets', action: 'read' },
+    Отчеты: { entity: 'reports', action: 'read' },
+    ДДС: { entity: 'reports', action: 'read' },
+    Справочники: { entity: 'articles', action: 'read' }, // Проверяем хотя бы один справочник
+    Статьи: { entity: 'articles', action: 'read' },
+    Счета: { entity: 'accounts', action: 'read' },
+    Подразделения: { entity: 'departments', action: 'read' },
+    Контрагенты: { entity: 'counterparties', action: 'read' },
+    Сделки: { entity: 'deals', action: 'read' },
+    Зарплаты: { entity: 'salaries', action: 'read' },
+    Администрирование: { entity: 'users', action: 'read' },
+  };
+
+  return mapping[name] || null;
+};
+
+const getBaseNavigation = (): NavigationItem[] => {
+  return [
+    {
+      name: 'Дашборд',
+      href: '/dashboard',
+      entity: 'dashboard',
+      action: 'read',
+    },
+    {
+      name: 'Операции',
+      href: '/operations',
+      entity: 'operations',
+      action: 'read',
+    },
+    { name: 'Бюджеты', href: '/budgets', entity: 'budgets', action: 'read' },
+    {
+      name: 'Отчеты',
+      entity: 'reports',
+      action: 'read',
+      children: [
+        {
+          name: 'ДДС',
+          href: '/reports?type=cashflow',
+          entity: 'reports',
+          action: 'read',
+        },
+        { name: '🔒ОПиУ', href: '#', disabled: true, tooltip: 'Скоро!' },
+      ],
+    },
+    {
+      name: 'Справочники',
+      entity: 'articles', // Проверяем хотя бы один справочник
+      action: 'read',
+      children: [
+        {
+          name: 'Статьи',
+          href: '/catalogs/articles',
+          entity: 'articles',
+          action: 'read',
+        },
+        {
+          name: 'Счета',
+          href: '/catalogs/accounts',
+          entity: 'accounts',
+          action: 'read',
+        },
+        {
+          name: 'Подразделения',
+          href: '/catalogs/departments',
+          entity: 'departments',
+          action: 'read',
+        },
+        {
+          name: 'Контрагенты',
+          href: '/catalogs/counterparties',
+          entity: 'counterparties',
+          action: 'read',
+        },
+        {
+          name: 'Сделки',
+          href: '/catalogs/deals',
+          entity: 'deals',
+          action: 'read',
+        },
+        {
+          name: 'Зарплаты',
+          href: '/catalogs/salaries',
+          entity: 'salaries',
+          action: 'read',
+        },
+      ],
+    },
+  ];
+};
 
 export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
-  const { getIcon, updateIcon } = useNavigationIcons();
+  const { getIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
+  const {
+    hasPermission,
+    isLoading: permissionsLoading,
+    permissions: permissionsMap,
+  } = usePermissions();
+
+  // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
+  const baseNavigation = useMemo(() => {
+    return getBaseNavigation();
+  }, []);
+
+  // Фильтруем навигацию по правам
+  const navigation = useMemo(() => {
+    if (permissionsLoading) {
+      return [];
+    }
+
+    // Создаём локальную функцию проверки прав на основе permissionsMap
+    const checkPermission = (entity: string, action: string): boolean => {
+      if (user?.isSuperAdmin) {
+        return true;
+      }
+      const entityPermissions = permissionsMap[entity];
+      if (!entityPermissions) {
+        return false;
+      }
+      return entityPermissions.includes(action);
+    };
+
+    return baseNavigation
+      .map((item) => {
+        // Если у элемента есть дочерние элементы, фильтруем их
+        if (item.children) {
+          const filteredChildren = item.children.filter((child) => {
+            if (child.disabled) return true;
+            const entityInfo = getEntityForMenuItem(child.name);
+            if (!entityInfo) return true;
+            return checkPermission(entityInfo.entity, entityInfo.action);
+          });
+
+          if (filteredChildren.length > 0 || item.name === 'Справочники') {
+            if (item.name === 'Справочники') {
+              const hasAnyCatalogAccess =
+                checkPermission('articles', 'read') ||
+                checkPermission('accounts', 'read') ||
+                checkPermission('departments', 'read') ||
+                checkPermission('counterparties', 'read') ||
+                checkPermission('deals', 'read') ||
+                checkPermission('salaries', 'read');
+
+              if (!hasAnyCatalogAccess) {
+                return null;
+              }
+            }
+
+            return {
+              ...item,
+              children: filteredChildren,
+            };
+          }
+          return null;
+        }
+
+        if (item.disabled) return item;
+        const entityInfo = getEntityForMenuItem(item.name);
+        if (!entityInfo) return item;
+        if (checkPermission(entityInfo.entity, entityInfo.action)) {
+          return item;
+        }
+        return null;
+      })
+      .filter((item): item is NavigationItem => item !== null);
+  }, [baseNavigation, permissionsLoading, permissionsMap, user?.isSuperAdmin]);
 
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-
-  const [iconPickerState, setIconPickerState] = useState<{
-    isOpen: boolean;
-    itemName: string;
-    position: { top: number; left: number };
-  }>({ isOpen: false, itemName: '', position: { top: 0, left: 0 } });
 
   const [menuPopoverState, setMenuPopoverState] = useState<{
     isOpen: boolean;
@@ -74,43 +218,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     editingData?: unknown; // Данные для редактирования
   }>({ isOpen: false, title: '', catalogType: '' });
 
-  const [userProfileOffCanvasOpen, setUserProfileOffCanvasOpen] =
-    useState(false);
-
   const isActive = (href: string): boolean => location.pathname === href;
 
   const isPopoverActive = (itemName: string): boolean =>
     menuPopoverState.isOpen && menuPopoverState.activeParentName === itemName;
-
-  const handleIconClick = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    itemName: string
-  ): void => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    setIconPickerState({
-      isOpen: true,
-      itemName,
-      position: {
-        top: rect.bottom + 5,
-        left: rect.left,
-      },
-    });
-  };
-
-  const handleIconSelect = (iconName: string): void => {
-    updateIcon(iconPickerState.itemName, iconName);
-  };
-
-  const handleCloseIconPicker = (): void => {
-    setIconPickerState({
-      isOpen: false,
-      itemName: '',
-      position: { top: 0, left: 0 },
-    });
-  };
 
   const getCatalogCreateTitle = (catalogName: string): string => {
     const titles: Record<string, string> = {
@@ -125,6 +236,13 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
   };
 
   const handleCreateCatalog = (catalogName: string): void => {
+    // Проверяем права на создание перед открытием формы
+    const entityInfo = getEntityForMenuItem(catalogName);
+    if (entityInfo && !hasPermission(entityInfo.entity, 'create')) {
+      // Если нет прав, не открываем форму
+      return;
+    }
+
     setOffCanvasState({
       isOpen: true,
       title: getCatalogCreateTitle(catalogName),
@@ -146,19 +264,35 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     // Determine if this is a catalog menu (Справочники)
     const isCatalogMenu = parentName === 'Справочники';
 
-    const menuItems: MenuPopoverItem[] = children.map((child) => ({
-      name: child.name,
-      href: child.href || '/',
-      icon: getIcon(child.name),
-      createAction: isCatalogMenu
-        ? {
-            label: getCatalogCreateTitle(child.name),
-            onClick: () => handleCreateCatalog(child.name),
-          }
-        : undefined,
-      disabled: child.disabled,
-      tooltip: child.tooltip,
-    }));
+    const menuItems: MenuPopoverItem[] = children
+      .filter((child) => {
+        // Фильтруем элементы по правам
+        if (child.disabled) return true; // Оставляем disabled элементы
+        const entityInfo = getEntityForMenuItem(child.name);
+        if (!entityInfo) return true; // Если нет маппинга, показываем
+        return hasPermission(entityInfo.entity, entityInfo.action);
+      })
+      .map((child) => {
+        const entityInfo = getEntityForMenuItem(child.name);
+        const hasCreatePermission = entityInfo
+          ? hasPermission(entityInfo.entity, 'create')
+          : false;
+
+        return {
+          name: child.name,
+          href: child.href || '/',
+          icon: getIcon(child.name),
+          createAction:
+            isCatalogMenu && hasCreatePermission
+              ? {
+                  label: getCatalogCreateTitle(child.name),
+                  onClick: () => handleCreateCatalog(child.name),
+                }
+              : undefined,
+          disabled: child.disabled,
+          tooltip: child.tooltip,
+        };
+      });
 
     setMenuPopoverState({
       isOpen: true,
@@ -223,10 +357,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-            <UserMenu
-              userEmail={user?.email}
-              onProfileClick={() => setUserProfileOffCanvasOpen(true)}
-            />
+            <UserMenu userEmail={user?.email} />
           </div>
         </div>
       </header>
@@ -260,13 +391,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       }
                     }}
                   >
-                    <button
-                      onClick={(e) => handleIconClick(e, item.name)}
-                      className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-700"
-                      title="Изменить иконку"
-                    >
+                    <div className="flex-shrink-0 opacity-70 group-hover:opacity-100">
                       {renderIcon(item.name)}
-                    </button>
+                    </div>
                     <span>{item.name}</span>
                     <Icons.ChevronRight
                       size={16}
@@ -284,13 +411,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <button
-                    onClick={(e) => handleIconClick(e, item.name)}
-                    className="flex-shrink-0 opacity-70 group-hover:opacity-100 hover:bg-gray-200 p-1 rounded transition-all dark:hover:bg-gray-600"
-                    title="Изменить иконку"
-                  >
+                  <div className="flex-shrink-0 opacity-70 group-hover:opacity-100">
                     {renderIcon(item.name)}
-                  </button>
+                  </div>
                   <span>{item.name}</span>
                 </Link>
               )
@@ -301,16 +424,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
         {/* Main content */}
         <main className="flex-1 min-w-0 lg:pl-4">{children}</main>
       </div>
-
-      {/* Icon Picker Popover */}
-      {iconPickerState.isOpen && (
-        <IconPickerPopover
-          currentIcon={getIcon(iconPickerState.itemName)}
-          onSelectIcon={handleIconSelect}
-          onClose={handleCloseIconPicker}
-          anchorPosition={iconPickerState.position}
-        />
-      )}
 
       {/* Menu Popover */}
       {menuPopoverState.isOpen && (
@@ -336,17 +449,6 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             onClose={handleCloseOffCanvas}
             editingData={offCanvasState.editingData}
           />
-        </OffCanvas>
-      )}
-
-      {/* User Profile OffCanvas */}
-      {userProfileOffCanvasOpen && (
-        <OffCanvas
-          isOpen={userProfileOffCanvasOpen}
-          onClose={() => setUserProfileOffCanvasOpen(false)}
-          title="Мой профиль"
-        >
-          <UserProfileForm onClose={() => setUserProfileOffCanvasOpen(false)} />
         </OffCanvas>
       )}
 
@@ -403,6 +505,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
           </div>
         </OffCanvas>
       )}
+
+      {/* Свернутые секции импорта на всех роутах */}
+      <CollapsedImportSections />
     </div>
   );
 };

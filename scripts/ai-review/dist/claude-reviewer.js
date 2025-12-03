@@ -1,74 +1,42 @@
 import OpenAI from 'openai';
 import { CONFIG } from './config.js';
-import { ReviewComment, PullRequestFile } from './github-client.js';
-
-interface ClaudeIssue {
-  file: string;
-  line: number;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  category:
-    | 'security'
-    | 'performance'
-    | 'bug'
-    | 'style'
-    | 'best-practice'
-    | 'architecture';
-  message: string;
-  suggestion?: string;
-}
-
 export class ClaudeReviewer {
-  private openai: OpenAI;
-
-  constructor() {
-    this.openai = new OpenAI({
-      apiKey: CONFIG.deepseek.apiKey,
-      baseURL: 'https://api.deepseek.com/v1',
-    });
-  }
-
-  async reviewCode(
-    files: PullRequestFile[],
-    diff: string,
-    projectContext: string
-  ): Promise<ReviewComment[]> {
-    console.log('Sending code to DeepSeek for review...');
-
-    const prompt = this.buildPrompt(files, diff, projectContext);
-
-    try {
-      const completion = await this.openai.chat.completions.create({
-        model: CONFIG.deepseek.model,
-        max_tokens: CONFIG.deepseek.maxTokens,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      });
-
-      const responseText = completion.choices[0]?.message?.content || '';
-
-      console.log('  DeepSeek review completed\n');
-      console.log('DeepSeek response:');
-      console.log(responseText);
-      console.log('\n');
-
-      const issues = this.parseClaudeResponse(responseText);
-      return this.convertToReviewComments(issues, files);
-    } catch (error) {
-      console.error('Error calling DeepSeek API:', error);
-      throw error;
+    openai;
+    constructor() {
+        this.openai = new OpenAI({
+            apiKey: CONFIG.deepseek.apiKey,
+            baseURL: 'https://api.deepseek.com/v1',
+        });
     }
-  }
-
-  private buildPrompt(
-    files: PullRequestFile[],
-    diff: string,
-    projectContext: string
-  ): string {
-    const basePrompt = `You are an expert code reviewer for the Fin-U-CH financial management system.
+    async reviewCode(files, diff, projectContext) {
+        console.log('Sending code to DeepSeek for review...');
+        const prompt = this.buildPrompt(files, diff, projectContext);
+        try {
+            const completion = await this.openai.chat.completions.create({
+                model: CONFIG.deepseek.model,
+                max_tokens: CONFIG.deepseek.maxTokens,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+            });
+            const responseText = completion.choices[0]?.message?.content || '';
+            console.log('  DeepSeek review completed\n');
+            console.log('DeepSeek response:');
+            console.log(responseText);
+            console.log('\n');
+            const issues = this.parseClaudeResponse(responseText);
+            return this.convertToReviewComments(issues, files);
+        }
+        catch (error) {
+            console.error('Error calling DeepSeek API:', error);
+            throw error;
+        }
+    }
+    buildPrompt(files, diff, projectContext) {
+        const basePrompt = `You are an expert code reviewer for the Fin-U-CH financial management system.
 
 # PROJECT CONTEXT
 
@@ -263,165 +231,123 @@ Example:
 - For configuration files, always check for security risks and dependency changes
 
 Begin your review:`;
-
-    return basePrompt;
-  }
-
-  private parseClaudeResponse(response: string): ClaudeIssue[] {
-    try {
-      // Extract JSON from markdown code blocks if present
-      const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
-      const jsonStr = jsonMatch ? jsonMatch[1] : response;
-
-      const issues = JSON.parse(jsonStr.trim());
-
-      if (!Array.isArray(issues)) {
-        console.warn('Claude response is not an array, returning empty');
-        return [];
-      }
-
-      return issues;
-    } catch (error) {
-      console.error('Failed to parse Claude response as JSON:', error);
-      console.log('Response was:', response);
-      return [];
+        return basePrompt;
     }
-  }
-
-  private convertToReviewComments(
-    issues: ClaudeIssue[],
-    files: PullRequestFile[]
-  ): ReviewComment[] {
-    const comments: ReviewComment[] = [];
-
-    for (const issue of issues) {
-      const file = files.find((f) => f.filename === issue.file);
-
-      if (!file || !file.patch) {
-        console.warn(
-          `  ⚠ Skipping issue for ${issue.file}: file not found or no patch`
-        );
-        continue;
-      }
-
-      // Calculate position in the diff
-      const position = this.calculateDiffPosition(
-        file.patch,
-        issue.line,
-        issue.file
-      );
-
-      if (position === null) {
-        console.warn(
-          `  ⚠ Skipping issue at ${issue.file}:${issue.line}: line not found in diff (may be already fixed or outside changed blocks)`
-        );
-        // Log the issue details for debugging
-        console.warn(
-          `    Issue: ${issue.category} - ${issue.message.substring(0, 100)}...`
-        );
-        continue;
-      }
-
-      const body = `**${issue.category}**: ${issue.message}${
-        issue.suggestion ? `\n\n💡 **Suggestion**: ${issue.suggestion}` : ''
-      }`;
-
-      comments.push({
-        path: issue.file,
-        position,
-        body,
-        severity: issue.severity,
-      });
-    }
-
-    return comments;
-  }
-
-  private calculateDiffPosition(
-    patch: string,
-    targetLine: number,
-    filename: string
-  ): number | null {
-    const lines = patch.split('\n');
-    // Position in the unified diff for this file. GitHub expects a 1-based index
-    // across the entire file patch, including hunk headers.
-    let diffPosition = 0;
-    // Tracks the current line number in the NEW file (+ side) across all hunks.
-    let newFileLineNumber = 0;
-    // Track if we're inside a hunk (to skip lines before first hunk)
-    let insideHunk = false;
-    // Track hunk ranges for debugging
-    const hunkRanges: Array<{ start: number; end: number; diffStart: number }> =
-      [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      diffPosition++;
-
-      // Hunk header: @@ -old_start,old_count +new_start,new_count @@
-      if (line.startsWith('@@')) {
-        insideHunk = true;
-        const match = line.match(/\+(\d+),?(\d*)/);
-        if (match) {
-          const hunkStart = parseInt(match[1], 10);
-          const hunkCount = match[2] ? parseInt(match[2], 10) : 1;
-          // Reset to the starting line number of this hunk (minus 1, will be incremented)
-          newFileLineNumber = hunkStart - 1;
-          hunkRanges.push({
-            start: hunkStart,
-            end: hunkStart + hunkCount - 1,
-            diffStart: diffPosition,
-          });
+    parseClaudeResponse(response) {
+        try {
+            // Extract JSON from markdown code blocks if present
+            const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/);
+            const jsonStr = jsonMatch ? jsonMatch[1] : response;
+            const issues = JSON.parse(jsonStr.trim());
+            if (!Array.isArray(issues)) {
+                console.warn('Claude response is not an array, returning empty');
+                return [];
+            }
+            return issues;
         }
-        // Continue; header counts toward position, but not a commentable line itself.
-        continue;
-      }
-
-      // Only process lines inside hunks
-      if (!insideHunk) {
-        continue;
-      }
-
-      if (line.startsWith('+')) {
-        // Added line exists in the new file; can be commented on.
-        newFileLineNumber++;
-        if (newFileLineNumber === targetLine) {
-          return diffPosition;
+        catch (error) {
+            console.error('Failed to parse Claude response as JSON:', error);
+            console.log('Response was:', response);
+            return [];
         }
-      } else if (line.startsWith(' ')) {
-        // Context (unchanged) line also exists in the new file; can be commented on.
-        newFileLineNumber++;
-        if (newFileLineNumber === targetLine) {
-          return diffPosition;
+    }
+    convertToReviewComments(issues, files) {
+        const comments = [];
+        for (const issue of issues) {
+            const file = files.find((f) => f.filename === issue.file);
+            if (!file || !file.patch) {
+                console.warn(`  ⚠ Skipping issue for ${issue.file}: file not found or no patch`);
+                continue;
+            }
+            // Calculate position in the diff
+            const position = this.calculateDiffPosition(file.patch, issue.line, issue.file);
+            if (position === null) {
+                console.warn(`  ⚠ Skipping issue at ${issue.file}:${issue.line}: line not found in diff (may be already fixed or outside changed blocks)`);
+                // Log the issue details for debugging
+                console.warn(`    Issue: ${issue.category} - ${issue.message.substring(0, 100)}...`);
+                continue;
+            }
+            const body = `**${issue.category}**: ${issue.message}${issue.suggestion ? `\n\n💡 **Suggestion**: ${issue.suggestion}` : ''}`;
+            comments.push({
+                path: issue.file,
+                position,
+                body,
+                severity: issue.severity,
+            });
         }
-      } else if (line.startsWith('-')) {
-        // Deletion; does not advance new file line number and cannot be commented via position.
-        // But we still need to track diffPosition for it.
-        continue;
-      } else {
-        // Any other line (shouldn't normally occur) — treat conservatively.
-        continue;
-      }
+        return comments;
     }
-
-    // Target line not present in the diff for this file (likely unchanged outside hunks).
-    // Log warning for debugging with more context
-    console.warn(
-      `  ⚠ Could not find line ${targetLine} in ${filename}. Last tracked line was ${newFileLineNumber}`
-    );
-    if (hunkRanges.length > 0) {
-      console.warn(
-        `    Hunk ranges in diff: ${hunkRanges.map((r) => `${r.start}-${r.end}`).join(', ')}`
-      );
-      const isInRange = hunkRanges.some(
-        (r) => targetLine >= r.start && targetLine <= r.end
-      );
-      if (!isInRange) {
-        console.warn(
-          `    Line ${targetLine} is outside all hunk ranges - may indicate issue was already fixed or AI is referencing old code`
-        );
-      }
+    calculateDiffPosition(patch, targetLine, filename) {
+        const lines = patch.split('\n');
+        // Position in the unified diff for this file. GitHub expects a 1-based index
+        // across the entire file patch, including hunk headers.
+        let diffPosition = 0;
+        // Tracks the current line number in the NEW file (+ side) across all hunks.
+        let newFileLineNumber = 0;
+        // Track if we're inside a hunk (to skip lines before first hunk)
+        let insideHunk = false;
+        // Track hunk ranges for debugging
+        const hunkRanges = [];
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            diffPosition++;
+            // Hunk header: @@ -old_start,old_count +new_start,new_count @@
+            if (line.startsWith('@@')) {
+                insideHunk = true;
+                const match = line.match(/\+(\d+),?(\d*)/);
+                if (match) {
+                    const hunkStart = parseInt(match[1], 10);
+                    const hunkCount = match[2] ? parseInt(match[2], 10) : 1;
+                    // Reset to the starting line number of this hunk (minus 1, will be incremented)
+                    newFileLineNumber = hunkStart - 1;
+                    hunkRanges.push({
+                        start: hunkStart,
+                        end: hunkStart + hunkCount - 1,
+                        diffStart: diffPosition,
+                    });
+                }
+                // Continue; header counts toward position, but not a commentable line itself.
+                continue;
+            }
+            // Only process lines inside hunks
+            if (!insideHunk) {
+                continue;
+            }
+            if (line.startsWith('+')) {
+                // Added line exists in the new file; can be commented on.
+                newFileLineNumber++;
+                if (newFileLineNumber === targetLine) {
+                    return diffPosition;
+                }
+            }
+            else if (line.startsWith(' ')) {
+                // Context (unchanged) line also exists in the new file; can be commented on.
+                newFileLineNumber++;
+                if (newFileLineNumber === targetLine) {
+                    return diffPosition;
+                }
+            }
+            else if (line.startsWith('-')) {
+                // Deletion; does not advance new file line number and cannot be commented via position.
+                // But we still need to track diffPosition for it.
+                continue;
+            }
+            else {
+                // Any other line (shouldn't normally occur) — treat conservatively.
+                continue;
+            }
+        }
+        // Target line not present in the diff for this file (likely unchanged outside hunks).
+        // Log warning for debugging with more context
+        console.warn(`  ⚠ Could not find line ${targetLine} in ${filename}. Last tracked line was ${newFileLineNumber}`);
+        if (hunkRanges.length > 0) {
+            console.warn(`    Hunk ranges in diff: ${hunkRanges.map((r) => `${r.start}-${r.end}`).join(', ')}`);
+            const isInRange = hunkRanges.some((r) => targetLine >= r.start && targetLine <= r.end);
+            if (!isInRange) {
+                console.warn(`    Line ${targetLine} is outside all hunk ranges - may indicate issue was already fixed or AI is referencing old code`);
+            }
+        }
+        return null;
     }
-    return null;
-  }
 }
+//# sourceMappingURL=claude-reviewer.js.map

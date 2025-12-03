@@ -18,7 +18,8 @@ test.describe('Operations Page', () => {
 
     // Navigate to operations page
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Check that we're on operations page
     await expect(page).toHaveURL(/\/operations/);
@@ -44,7 +45,8 @@ test.describe('Operations Page', () => {
 
     // Navigate to operations page
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for form elements or data table
     const formElements = page.locator(
@@ -68,7 +70,8 @@ test.describe('Operations Page', () => {
 
     // Navigate to operations page
     await page.goto('/operations');
-    await page.waitForLoadState('networkidle');
+    // Ждем появления контента страницы вместо networkidle
+    await page.waitForSelector('body', { timeout: 10000 });
 
     // Look for "Add" or "Create" button
     const addButton = page.locator(

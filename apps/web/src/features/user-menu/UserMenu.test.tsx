@@ -4,6 +4,20 @@ import { BrowserRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { UserMenu } from './UserMenu';
 
+// Mock navigate
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
+  useNavigate: () => mockNavigate,
+}));
+
+// Mock usePermissions hook
+jest.mock('../../shared/hooks/usePermissions', () => ({
+  usePermissions: () => ({
+    hasPermission: jest.fn().mockReturnValue(true),
+  }),
+}));
+
 // Mock store
 const createMockStore = () => {
   return configureStore({
@@ -33,38 +47,24 @@ const renderWithProviders = (component: React.ReactElement) => {
 };
 
 describe('UserMenu', () => {
-  const mockOnProfileClick = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
   it('renders user email when provided', () => {
-    renderWithProviders(
-      <UserMenu
-        userEmail="test@example.com"
-        onProfileClick={mockOnProfileClick}
-      />
-    );
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
 
     expect(screen.getByText('test@example.com')).toBeInTheDocument();
   });
 
   it('renders default text when user email is not provided', () => {
-    renderWithProviders(
-      <UserMenu userEmail={undefined} onProfileClick={mockOnProfileClick} />
-    );
+    renderWithProviders(<UserMenu userEmail={undefined} />);
 
     expect(screen.getByText('Пользователь')).toBeInTheDocument();
   });
 
   it('opens dropdown menu when clicked', async () => {
-    renderWithProviders(
-      <UserMenu
-        userEmail="test@example.com"
-        onProfileClick={mockOnProfileClick}
-      />
-    );
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
 
     const menuButton = screen.getByRole('button');
     fireEvent.click(menuButton);
@@ -72,19 +72,16 @@ describe('UserMenu', () => {
     await waitFor(
       () => {
         expect(screen.getByText('Мой профиль')).toBeInTheDocument();
+        expect(screen.getByText('Моя компания')).toBeInTheDocument();
+        expect(screen.getByText('Администрирование')).toBeInTheDocument();
         expect(screen.getByText('Выйти')).toBeInTheDocument();
       },
       { timeout: 10000 }
     );
   }, 10000);
 
-  it('calls onProfileClick when profile button is clicked', async () => {
-    renderWithProviders(
-      <UserMenu
-        userEmail="test@example.com"
-        onProfileClick={mockOnProfileClick}
-      />
-    );
+  it('navigates to profile page when profile button is clicked', async () => {
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
 
     const menuButton = screen.getByRole('button');
     fireEvent.click(menuButton);
@@ -94,16 +91,39 @@ describe('UserMenu', () => {
       fireEvent.click(profileButton);
     });
 
-    expect(mockOnProfileClick).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('/profile');
+  });
+
+  it('navigates to company page when company button is clicked', async () => {
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
+
+    const menuButton = screen.getByRole('button');
+    fireEvent.click(menuButton);
+
+    await waitFor(() => {
+      const companyButton = screen.getByText('Моя компания');
+      fireEvent.click(companyButton);
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/company');
+  });
+
+  it('navigates to admin page when admin button is clicked', async () => {
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
+
+    const menuButton = screen.getByRole('button');
+    fireEvent.click(menuButton);
+
+    await waitFor(() => {
+      const adminButton = screen.getByText('Администрирование');
+      fireEvent.click(adminButton);
+    });
+
+    expect(mockNavigate).toHaveBeenCalledWith('/admin');
   });
 
   it('closes dropdown when clicking outside', async () => {
-    renderWithProviders(
-      <UserMenu
-        userEmail="test@example.com"
-        onProfileClick={mockOnProfileClick}
-      />
-    );
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
 
     const menuButton = screen.getByRole('button');
     fireEvent.click(menuButton);
@@ -121,12 +141,7 @@ describe('UserMenu', () => {
   });
 
   it('shows chevron icon that rotates when menu is open', async () => {
-    renderWithProviders(
-      <UserMenu
-        userEmail="test@example.com"
-        onProfileClick={mockOnProfileClick}
-      />
-    );
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
 
     const menuButton = screen.getByRole('button');
     const chevrons = menuButton.querySelectorAll('svg');
