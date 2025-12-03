@@ -316,11 +316,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       }
     }, [isOpen]);
 
-    // Фильтруем опции по поисковому запросу, исключая опции __create__ если используется onCreateNew
+    // Проверяем, есть ли опция __create__ в списке
+    const hasCreateOption = (options || []).some(
+      (opt) => String(opt.value) === '__create__'
+    );
+
+    // Фильтруем опции по поисковому запросу, всегда исключая опции __create__ (они показываются как кнопка)
     const filteredOptions = useMemo(() => {
       const filtered = (options || []).filter((option) => {
-        // Исключаем опции __create__ если используется onCreateNew
-        if (onCreateNew && String(option.value) === '__create__') {
+        // Всегда исключаем опции __create__ из списка
+        if (String(option.value) === '__create__') {
           return false;
         }
         // Фильтруем по поисковому запросу
@@ -332,7 +337,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         return true;
       });
       return filtered;
-    }, [options, searchQuery, onCreateNew]);
+    }, [options, searchQuery]);
 
     const optionsContent = (
       <Transition
@@ -359,10 +364,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           }}
         >
           {/* Поисковая строка с кнопкой "+" */}
-          {(onCreateNew ||
-            (options || []).some(
-              (opt) => String(opt.value) === '__create__'
-            )) && (
+          {(onCreateNew || hasCreateOption) && (
             <div className="p-2 border-b border-gray-200 dark:border-zinc-700">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -386,12 +388,17 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     }}
                   />
                 </div>
-                {onCreateNew && (
+                {(onCreateNew || hasCreateOption) && (
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onCreateNew();
+                      if (onCreateNew) {
+                        onCreateNew();
+                      } else if (hasCreateOption && onChange) {
+                        // Если нет onCreateNew, но есть опция __create__, вызываем onChange
+                        onChange('__create__');
+                      }
                       setIsOpen(false);
                       setSearchQuery('');
                     }}
@@ -410,13 +417,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             className="overflow-y-auto"
             style={{
               maxHeight: `${
-                position.maxHeight -
-                (onCreateNew ||
-                (options || []).some(
-                  (opt) => String(opt.value) === '__create__'
-                )
-                  ? 60
-                  : 0)
+                position.maxHeight - (onCreateNew || hasCreateOption ? 60 : 0)
               }px`,
             }}
           >
@@ -425,71 +426,45 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 Ничего не найдено
               </div>
             ) : (
-              filteredOptions.map((option, index) => {
-                const isCreateOption = String(option.value) === '__create__';
-                const prevOption =
-                  index > 0 ? filteredOptions[index - 1] : null;
-                const showDivider =
-                  isCreateOption &&
-                  prevOption &&
-                  String(prevOption.value) !== '__create__';
-
+              filteredOptions.map((option) => {
                 return (
-                  <Fragment key={option.value}>
-                    {showDivider && (
-                      <div className="border-t border-gray-200 dark:border-zinc-700 my-1" />
-                    )}
-                    <Listbox.Option
-                      value={option}
-                      className={({ active }) =>
-                        classNames(
-                          'relative cursor-pointer select-none py-2 pl-3 pr-9',
-                          isCreateOption
-                            ? active
-                              ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400'
-                              : 'text-primary-600 dark:text-primary-400 bg-primary-50/50 dark:bg-primary-900/10'
-                            : active
-                              ? 'bg-primary-100 dark:bg-zinc-800 text-primary-900 dark:text-white'
-                              : 'text-gray-900 dark:text-gray-100'
-                        )
-                      }
-                    >
-                      {({ selected, active }) => (
-                        <>
+                  <Listbox.Option
+                    key={option.value}
+                    value={option}
+                    className={({ active }) =>
+                      classNames(
+                        'relative cursor-pointer select-none py-2 pl-3 pr-9',
+                        active
+                          ? 'bg-primary-100 dark:bg-zinc-800 text-primary-900 dark:text-white'
+                          : 'text-gray-900 dark:text-gray-100'
+                      )
+                    }
+                  >
+                    {({ selected, active }) => (
+                      <>
+                        <span
+                          className={classNames(
+                            'block truncate',
+                            selected ? 'font-medium' : 'font-normal'
+                          )}
+                        >
+                          {option.label}
+                        </span>
+                        {selected ? (
                           <span
                             className={classNames(
-                              'block truncate flex items-center gap-2',
-                              selected ? 'font-medium' : 'font-normal',
-                              isCreateOption && 'font-semibold'
+                              'absolute inset-y-0 right-0 flex items-center pr-3',
+                              active
+                                ? 'text-primary-600 dark:text-primary-400'
+                                : 'text-primary-600 dark:text-primary-400'
                             )}
                           >
-                            {isCreateOption && (
-                              <PlusIcon
-                                className="w-4 h-4 flex-shrink-0"
-                                aria-hidden="true"
-                              />
-                            )}
-                            {option.label}
+                            <CheckIcon className="w-5 h-5" aria-hidden="true" />
                           </span>
-                          {selected && !isCreateOption ? (
-                            <span
-                              className={classNames(
-                                'absolute inset-y-0 right-0 flex items-center pr-3',
-                                active
-                                  ? 'text-primary-600 dark:text-primary-400'
-                                  : 'text-primary-600 dark:text-primary-400'
-                              )}
-                            >
-                              <CheckIcon
-                                className="w-5 h-5"
-                                aria-hidden="true"
-                              />
-                            </span>
-                          ) : null}
-                        </>
-                      )}
-                    </Listbox.Option>
-                  </Fragment>
+                        ) : null}
+                      </>
+                    )}
+                  </Listbox.Option>
                 );
               })
             )}

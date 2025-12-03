@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -17,6 +17,7 @@ import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
 import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
+import { calculateYAxisFontSize, findMaxValue } from '../lib/chartUtils';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -113,6 +114,21 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
 
   // data transformation and interactions are handled by hook
 
+  // Вычисляем оптимальный размер шрифта для оси Y на основе максимального значения
+  const yAxisFontSize = useMemo(() => {
+    const dataToCheck = processedData || data;
+    if (
+      !dataToCheck ||
+      dataToCheck.length === 0 ||
+      !accounts ||
+      accounts.length === 0
+    )
+      return 12;
+    const accountKeys = accounts.map((acc) => acc.name);
+    const maxValue = findMaxValue(dataToCheck, accountKeys);
+    return calculateYAxisFontSize(maxValue);
+  }, [processedData, data, accounts]);
+
   // Если нет данных, показываем график без линий, но с сообщением
   if (!data || data.length === 0 || !hasData) {
     return (
@@ -127,7 +143,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data || []}
-              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+              margin={{ top: 5, right: 30, left: 5, bottom: 48 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -140,8 +156,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={yAxisFontSize}
+                tick={{ fontSize: yAxisFontSize }}
                 tickFormatter={(value) => formatMoney(value)}
+                width={80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -218,7 +236,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={processedData || data}
-            margin={{ top: 5, right: 30, left: 20, bottom: 56 }}
+            margin={{ top: 5, right: 30, left: 5, bottom: 56 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -235,8 +253,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
+              fontSize={yAxisFontSize}
+              tick={{ fontSize: yAxisFontSize }}
               tickFormatter={(value) => formatMoney(value)}
+              width={80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
