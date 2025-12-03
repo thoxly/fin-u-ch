@@ -167,7 +167,10 @@ export const DashboardPage = () => {
       mode: 'both',
       periodFormat: periodFilters.format, // Передаем формат периода
     },
-    { skip: !canViewOperations && !canViewReports }
+    {
+      skip: !canViewOperations && !canViewReports,
+      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+    }
   );
 
   // Получаем накопительные данные для графика поступлений/списаний
@@ -179,7 +182,10 @@ export const DashboardPage = () => {
         mode: 'both',
         periodFormat: periodFilters.format,
       },
-      { skip: !canViewOperations && !canViewReports }
+      {
+        skip: !canViewOperations && !canViewReports,
+        refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+      }
     );
 
   // Получаем последние операции (только если есть права на просмотр операций)
@@ -188,7 +194,10 @@ export const DashboardPage = () => {
       dateFrom: periodFilters.range.from,
       dateTo: periodFilters.range.to,
     },
-    { skip: !canViewOperations }
+    {
+      skip: !canViewOperations,
+      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
+    }
   );
 
   // Трансформируем данные для графиков

@@ -260,9 +260,9 @@ model Salary {
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employeeCounterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-  department           Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  counterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
+  department  Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@map("salaries")
