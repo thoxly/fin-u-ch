@@ -317,11 +317,21 @@ export class AiReviewer {
                 : JSON.stringify(truncatedResult).substring(0, 200);
             console.log(`    ← ${resultPreview}`);
 
-            messages.push({
+            // DeepSeek API requires reasoning_content field when using tools
+            const assistantMessage: any = {
               role: 'assistant',
               content: null,
-              tool_calls: [toolCall] as any,
-            } as any);
+              tool_calls: [toolCall],
+            };
+
+            // Include reasoning_content if present in the original message
+            if ((message as any).reasoning_content) {
+              assistantMessage.reasoning_content = (
+                message as any
+              ).reasoning_content;
+            }
+
+            messages.push(assistantMessage);
 
             messages.push({
               role: 'tool',
@@ -572,11 +582,21 @@ IMPORTANT:
               : JSON.stringify(truncatedResult).substring(0, 200);
           console.log(`    ← verifier result: ${resultPreview}`);
 
-          messages.push({
+          // DeepSeek API requires reasoning_content field when using tools
+          const assistantMessage: any = {
             role: 'assistant',
             content: null,
-            tool_calls: [toolCall] as any,
-          } as any);
+            tool_calls: [toolCall],
+          };
+
+          // Include reasoning_content if present in the original message
+          if ((message as any).reasoning_content) {
+            assistantMessage.reasoning_content = (
+              message as any
+            ).reasoning_content;
+          }
+
+          messages.push(assistantMessage);
 
           messages.push({
             role: 'tool',

@@ -11,6 +11,20 @@ import type {
 export const catalogsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Articles
+    /**
+     * Получает все статьи (включая родительские)
+     *
+     * ⚠️ ВНИМАНИЕ: Для выбора статьи в операциях, планах и импорте используйте `useLeafArticles()`
+     * из `@/shared/hooks/useArticleTree` вместо прямого использования этого хука.
+     *
+     * Используйте напрямую только для:
+     * - Отображения каталога статей (ArticlesPage)
+     * - Администрирования и управления статьями
+     * - Аналитики, где нужны все статьи
+     *
+     * @param filters - Фильтры для статей
+     * @returns Query результат с массивом всех статей
+     */
     getArticles: builder.query<
       Article[],
       {

@@ -28,7 +28,7 @@ export class BudgetsService {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
-          select: { plan_items: true },
+          select: { plan_items: true } as any,
         },
       },
     });
@@ -39,7 +39,7 @@ export class BudgetsService {
       where: { id, companyId },
       include: {
         _count: {
-          select: { plan_items: true },
+          select: { plan_items: true } as any,
         },
       },
     });
@@ -110,12 +110,12 @@ export class BudgetsService {
       where: { id },
       include: {
         _count: {
-          select: { plan_items: true },
+          select: { plan_items: true } as any,
         },
       },
     });
 
-    if (budget && budget._count.plan_items > 0) {
+    if (budget && (budget as any)._count?.plan_items > 0) {
       throw new AppError(
         'Cannot delete budget with plan items. Archive it instead or delete plan items first.',
         400

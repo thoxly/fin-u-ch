@@ -6,10 +6,8 @@ import {
   useCreatePlanMutation,
   useUpdatePlanMutation,
 } from '../../store/api/plansApi';
-import {
-  useGetArticlesQuery,
-  useGetAccountsQuery,
-} from '../../store/api/catalogsApi';
+import { useGetAccountsQuery } from '../../store/api/catalogsApi';
+import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import { toISODate } from '../../shared/lib/date';
 import type { PlanItem } from '@shared/types/operations';
 import { OperationType, Periodicity, PlanStatus } from '@fin-u-ch/shared';
@@ -55,7 +53,8 @@ export const PlanForm = ({ plan, budgetId, onClose }: PlanFormProps) => {
   const [repeat, setRepeat] = useState(plan?.repeat || 'monthly');
   const [status, setStatus] = useState(plan?.status || 'active');
 
-  const { data: articles = [] } = useGetArticlesQuery();
+  // Используем только листья (статьи без дочерних) для планов
+  const { leafArticles: articles = [] } = useLeafArticles();
   const { data: accounts = [] } = useGetAccountsQuery();
 
   const [createPlan, { isLoading: isCreating }] = useCreatePlanMutation();

@@ -278,10 +278,15 @@ export class CashflowService {
           aggregateFromChildren(child);
         }
 
-        // Затем суммируем суммы всех детей
+        // Начинаем с текущих сумм родительской статьи (уже содержат операции по этой статье)
         const aggregatedMonths = new Map<string, number>();
-        let aggregatedTotal = 0;
+        // Инициализируем карту текущими суммами родительской статьи
+        for (const monthData of article.months) {
+          aggregatedMonths.set(monthData.month, monthData.amount);
+        }
+        let aggregatedTotal = article.total;
 
+        // Добавляем суммы всех дочерних статей к суммам родителя
         for (const child of article.children) {
           for (const monthData of child.months) {
             const current = aggregatedMonths.get(monthData.month) || 0;
@@ -290,7 +295,7 @@ export class CashflowService {
           aggregatedTotal += child.total;
         }
 
-        // Обновляем суммы родительской статьи
+        // Обновляем суммы родительской статьи (родитель + все дети)
         article.months = months.map((m) => ({
           month: m,
           amount: applyRounding(aggregatedMonths.get(m) || 0),
