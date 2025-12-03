@@ -8,6 +8,7 @@ import {
 } from '@fin-u-ch/shared';
 import articlesService from '../catalogs/articles/articles.service';
 import logger from '../../config/logger';
+import { invalidateReportCache } from '../reports/utils/cache';
 
 // Keep for backward compatibility with tests
 export type CreateOperationDTO = CreateOperationInput;
@@ -225,7 +226,7 @@ export class OperationsService {
         repeat: validatedData.repeat,
       });
 
-      return prisma.$transaction(async (tx) => {
+      const template = await prisma.$transaction(async (tx) => {
         // Создаем шаблон (isTemplate: true)
         const template = await tx.operation.create({
           data: {
@@ -269,6 +270,11 @@ export class OperationsService {
 
         return template;
       });
+
+      // Инвалидируем кэш отчетов после успешного создания повторяющейся операции
+      await invalidateReportCache(companyId);
+
+      return template;
     }
 
     // Обычная операция (не повторяющаяся)
@@ -286,6 +292,9 @@ export class OperationsService {
       operationType: operation.type,
       amount: operation.amount,
     });
+
+    // Инвалидируем кэш отчетов после создания операции
+    await invalidateReportCache(companyId);
 
     return operation;
   }
@@ -356,6 +365,9 @@ export class OperationsService {
         fieldsUpdated: Object.keys(validatedData),
       });
 
+      // Инвалидируем кэш отчетов после обновления операции
+      await invalidateReportCache(companyId);
+
       return updated;
     }
 
@@ -379,6 +391,9 @@ export class OperationsService {
       operationId: id,
     });
 
+    // Инвалидируем кэш отчетов после удаления операции
+    await invalidateReportCache(companyId);
+
     return deleted;
   }
 
@@ -399,6 +414,9 @@ export class OperationsService {
       companyId,
       operationId: id,
     });
+
+    // Инвалидируем кэш отчетов после подтверждения операции
+    await invalidateReportCache(companyId);
 
     return confirmed;
   }
@@ -470,6 +488,9 @@ export class OperationsService {
       deletedCount: result.count,
       requestedCount: validIds.length,
     });
+
+    // Инвалидируем кэш отчетов после массового удаления операций
+    await invalidateReportCache(companyId);
 
     return result;
   }

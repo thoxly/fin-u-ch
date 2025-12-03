@@ -42,7 +42,7 @@ export async function generateSalaryOperations(
             currencyBase: true,
           },
         },
-        employeeCounterparty: {
+        counterparty: {
           select: {
             id: true,
             name: true,
@@ -101,7 +101,7 @@ export async function generateSalaryOperations(
               articleId: articles.wage.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Зарплата за ${month} - ${salary.employeeCounterparty.name}`,
+              description: `Зарплата за ${month} - ${salary.counterparty.name}`,
             },
           });
 
@@ -118,7 +118,7 @@ export async function generateSalaryOperations(
               articleId: articles.contributions.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Страховые взносы за ${month} - ${salary.employeeCounterparty.name} (${salary.contributionsPct}%)`,
+              description: `Страховые взносы за ${month} - ${salary.counterparty.name} (${salary.contributionsPct}%)`,
             },
           });
 
@@ -135,19 +135,19 @@ export async function generateSalaryOperations(
               articleId: articles.incomeTax.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `НДФЛ за ${month} - ${salary.employeeCounterparty.name} (${salary.incomeTaxPct}%)`,
+              description: `НДФЛ за ${month} - ${salary.counterparty.name} (${salary.incomeTaxPct}%)`,
             },
           });
         });
 
         totalOperations += 3;
         logger.info(
-          `Generated salary operations for ${salary.employeeCounterparty.name}: ` +
+          `Generated salary operations for ${salary.counterparty.name}: ` +
             `wage=${baseWage}, contributions=${contributions.toFixed(2)}, tax=${incomeTax.toFixed(2)}`
         );
       } catch (error) {
         logger.error(
-          `Error generating salary for ${salary.employeeCounterparty?.name || salary.employeeCounterpartyId}:`,
+          `Error generating salary for ${salary.counterparty?.name || salary.employeeCounterpartyId}:`,
           error
         );
         // Продолжаем обработку остальных записей
