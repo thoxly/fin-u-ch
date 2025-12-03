@@ -2,6 +2,7 @@ import prisma from '../../../config/db';
 import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import articlesService from '../../catalogs/articles/articles.service';
+import logger from '../../../config/logger';
 
 export interface CashflowParams {
   periodFrom: Date;
@@ -58,9 +59,28 @@ export class CashflowService {
     companyId: string,
     params: CashflowParams
   ): Promise<CashflowReport> {
+    const startTime = Date.now();
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
+
+    logger.debug('Cashflow report generation started', {
+      companyId,
+      params: {
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        activity: params.activity,
+        rounding: params.rounding,
+        parentArticleId: params.parentArticleId,
+      },
+    });
+
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as CashflowReport;
+    if (cached) {
+      logger.debug('Cashflow report retrieved from cache', {
+        companyId,
+        cacheKey,
+      });
+      return cached as CashflowReport;
+    }
 
     // Если указан parentArticleId, получаем все ID потомков
     let articleIdsFilter: string[] | undefined;
@@ -74,6 +94,13 @@ export class CashflowService {
     }
 
     // Получаем все операции за период
+    logger.debug('Fetching operations for cashflow report', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      articleIdsFilter: articleIdsFilter?.length || 0,
+    });
+
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -96,11 +123,19 @@ export class CashflowService {
       },
     });
 
+    logger.debug('Operations fetched for cashflow report', {
+      companyId,
+      operationsCount: operations.length,
+    });
+
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
     // Фильтруем операции по активности, если указана
     const filteredOperations = params.activity
-      ? operations.filter((op) => op.article?.activity === params.activity)
+      ? operations.filter(
+          (op: (typeof operations)[0]) =>
+            op.article?.activity === params.activity
+        )
       : operations;
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
@@ -147,7 +182,16 @@ export class CashflowService {
     });
 
     // Создаем Map для быстрого доступа к статьям
-    const articleDataMap = new Map(allArticles.map((a) => [a.id, a]));
+    type ArticleData = {
+      id: string;
+      name: string;
+      parentId: string | null;
+      activity: string | null;
+      type: string;
+    };
+    const articleDataMap = new Map<string, ArticleData>(
+      allArticles.map((a: ArticleData) => [a.id, a])
+    );
 
     // Агрегируем операции по статьям (используем уже отфильтрованные операции)
     const operationsByArticle = new Map<string, CashflowRow>();
@@ -339,6 +383,15 @@ export class CashflowService {
     };
 
     await cacheReport(cacheKey, response);
+
+    const duration = Date.now() - startTime;
+    logger.info('Cashflow report generated successfully', {
+      companyId,
+      duration: `${duration}ms`,
+      activitiesCount: response.activities.length,
+      operationsCount: operations.length,
+    });
+
     return response;
   }
 }

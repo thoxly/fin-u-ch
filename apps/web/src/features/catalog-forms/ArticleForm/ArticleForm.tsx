@@ -7,6 +7,8 @@ import {
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 import { ArticleParentSelect } from '@/features/articles';
+import { useNotification } from '@/shared/hooks/useNotification';
+import { NOTIFICATION_MESSAGES } from '@/constants/notificationMessages';
 
 interface ArticleFormProps {
   article: Article | null;
@@ -38,6 +40,7 @@ export const ArticleForm = ({
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
+  const { showSuccess, showError } = useNotification();
   useEffect(() => {
     if (article) {
       setName(article.name || '');
@@ -68,6 +71,8 @@ export const ArticleForm = ({
             counterpartyId: counterpartyId || undefined,
           },
         }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.ARTICLE.UPDATE_SUCCESS);
+        onClose();
       } else {
         const result = await create({
           name,
@@ -77,17 +82,43 @@ export const ArticleForm = ({
           isActive: true,
           counterpartyId: counterpartyId || undefined,
         }).unwrap();
+        showSuccess(NOTIFICATION_MESSAGES.ARTICLE.CREATE_SUCCESS);
         if (onSuccess && result.id) {
           onSuccess(result.id);
         } else {
           onClose();
         }
       }
-      if (article) {
-        onClose();
-      }
     } catch (error) {
-      console.error('Failed to save article:', error);
+      const rawErrorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : undefined;
+
+      const errorMessage = rawErrorMessage
+        ? rawErrorMessage
+            .replace(/Операция\s+[\w-]+:\s*/gi, '')
+            .replace(/^[^:]+:\s*/i, '')
+            .trim()
+        : article
+          ? NOTIFICATION_MESSAGES.ARTICLE.UPDATE_ERROR
+          : NOTIFICATION_MESSAGES.ARTICLE.CREATE_ERROR;
+
+      showError(
+        errorMessage &&
+          errorMessage.length > 5 &&
+          !errorMessage.match(/^[A-Z_]+$/)
+          ? errorMessage
+          : article
+            ? NOTIFICATION_MESSAGES.ARTICLE.UPDATE_ERROR
+            : NOTIFICATION_MESSAGES.ARTICLE.CREATE_ERROR
+      );
     }
   };
 

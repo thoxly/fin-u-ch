@@ -182,7 +182,7 @@ export const MappingRuleDialog = ({
 
       onClose();
     } catch (error: unknown) {
-      const errorMessage =
+      const rawErrorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -192,7 +192,23 @@ export const MappingRuleDialog = ({
         typeof error.data.error === 'string'
           ? error.data.error
           : 'Ошибка при сохранении правила';
-      showError(errorMessage);
+
+      // Очищаем системную информацию из сообщения
+      const sanitizedMessage =
+        typeof rawErrorMessage === 'string'
+          ? rawErrorMessage
+              .replace(/Операция\s+[\w-]+:\s*/gi, '')
+              .replace(/^[^:]+:\s*/i, '')
+              .trim()
+          : 'Ошибка при сохранении правила';
+
+      showError(
+        sanitizedMessage &&
+          sanitizedMessage.length > 5 &&
+          !sanitizedMessage.match(/^[A-Z_]+$/)
+          ? sanitizedMessage
+          : 'Ошибка при сохранении правила'
+      );
     }
   };
 

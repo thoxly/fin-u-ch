@@ -305,7 +305,7 @@ class OzonIntegrationDebugger {
     });
 
     console.log(`   Найдено операций: ${operations.length}`);
-    operations.forEach((op, index) => {
+    operations.forEach((op: (typeof operations)[0], index: number) => {
       console.log(
         `   ${index + 1}. ${op.operationDate.toLocaleDateString('ru-RU')} - ${op.amount} ${op.currency} - ${op.description?.substring(0, 50)}...`
       );

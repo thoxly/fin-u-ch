@@ -258,7 +258,23 @@ export const OzonIntegration = ({
         // Вызываем колбэк onSave с данными
         onSave(integrationData);
       } else {
-        showError(result.error || 'Ошибка при подключении интеграции');
+        // Очищаем системную информацию из сообщения об ошибке
+        const rawError = result.error || 'Ошибка при подключении интеграции';
+        const sanitizedError =
+          typeof rawError === 'string'
+            ? rawError
+                .replace(/Операция\s+[\w-]+:\s*/gi, '')
+                .replace(/^[^:]+:\s*/i, '')
+                .trim()
+            : 'Ошибка при подключении интеграции';
+
+        showError(
+          sanitizedError &&
+            sanitizedError.length > 5 &&
+            !sanitizedError.match(/^[A-Z_]+$/)
+            ? sanitizedError
+            : 'Ошибка при подключении интеграции'
+        );
       }
     } catch (error) {
       console.error('Failed to save Ozon integration:', error);

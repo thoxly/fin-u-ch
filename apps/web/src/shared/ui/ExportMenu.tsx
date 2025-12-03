@@ -55,14 +55,11 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+        className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
         aria-label="Экспорт"
         title="Экспорт"
       >
-        <Download
-          size={18}
-          className="text-primary-600 dark:text-primary-400"
-        />
+        <Download size={14} />
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50">

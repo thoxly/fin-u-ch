@@ -3,6 +3,7 @@ import { getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
 import articlesService from '../../catalogs/articles/articles.service';
+import logger from '../../../config/logger';
 
 export interface BDDSParams {
   periodFrom: Date;
@@ -38,14 +39,35 @@ export class BDDSService {
     companyId: string,
     params: BDDSParams
   ): Promise<BDDSActivity[]> {
+    const startTime = Date.now();
+
+    logger.debug('BDDS report generation started', {
+      companyId,
+      params: {
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        budgetId: params.budgetId,
+        parentArticleId: params.parentArticleId,
+      },
+    });
+
     // If no budgetId provided, return empty result
     if (!params.budgetId) {
+      logger.debug('BDDS report skipped: no budgetId provided', {
+        companyId,
+      });
       return [];
     }
 
     const cacheKey = generateCacheKey(companyId, 'bdds', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as BDDSActivity[];
+    if (cached) {
+      logger.debug('BDDS report retrieved from cache', {
+        companyId,
+        cacheKey,
+      });
+      return cached as BDDSActivity[];
+    }
 
     // Если указан parentArticleId, получаем все ID потомков
     let articleIdsFilter: string[] | undefined;
@@ -196,6 +218,16 @@ export class BDDSService {
 
     const activities = Array.from(activitiesMap.values());
     await cacheReport(cacheKey, activities);
+
+    const duration = Date.now() - startTime;
+    logger.info('BDDS report generated successfully', {
+      companyId,
+      duration: `${duration}ms`,
+      budgetId: params.budgetId,
+      planItemsCount: planItems.length,
+      activitiesCount: activities.length,
+    });
+
     return activities;
   }
 }

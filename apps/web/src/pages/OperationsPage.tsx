@@ -135,7 +135,23 @@ export const OperationsPage = () => {
           );
           showSuccess('Интеграция Ozon успешно отключена');
         } else {
-          showError(result.error || 'Ошибка при отключении интеграции');
+          // Очищаем системную информацию из сообщения об ошибке
+          const rawError = result.error || 'Ошибка при отключении интеграции';
+          const sanitizedError =
+            typeof rawError === 'string'
+              ? rawError
+                  .replace(/Операция\s+[\w-]+:\s*/gi, '')
+                  .replace(/^[^:]+:\s*/i, '')
+                  .trim()
+              : 'Ошибка при отключении интеграции';
+
+          showError(
+            sanitizedError &&
+              sanitizedError.length > 5 &&
+              !sanitizedError.match(/^[A-Z_]+$/)
+              ? sanitizedError
+              : 'Ошибка при отключении интеграции'
+          );
         }
       } catch (error) {
         console.error('Failed to disconnect Ozon integration:', error);

@@ -326,6 +326,9 @@ const ImportMappingRowComponent = ({
         // Проверяем наличие похожих операций
         // Результат игнорируем, так как операция уже обновлена
         await onFieldUpdate(operation, field, value, updateData, lastClickRect);
+      } else {
+        // Если не показываем popover, показываем успешное уведомление
+        showSuccess('Операция обновлена');
       }
     } catch (error) {
       showError('Ошибка при обновлении');

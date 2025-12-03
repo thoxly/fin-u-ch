@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../../middlewares/tenant';
 import articlesService from './articles.service';
 import auditLogService from '../../audit/audit.service';
+import logger from '../../../config/logger';
 
 export class ArticlesController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
@@ -34,12 +35,29 @@ export class ArticlesController {
       // Если запрошен формат дерева, используем getTree
       const asTree = req.query.asTree === 'true';
 
+      logger.debug('Get all articles request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        filters,
+        asTree,
+      });
+
       const result = asTree
         ? await articlesService.getTree(req.companyId!, filters)
         : await articlesService.getAll(req.companyId!, filters);
 
+      logger.debug('Articles retrieved successfully', {
+        companyId: req.companyId,
+        articlesCount: Array.isArray(result) ? result.length : 'tree',
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get articles', {
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
@@ -71,28 +89,76 @@ export class ArticlesController {
             isActiveValue.toLowerCase() === 'true');
       }
 
+      logger.debug('Get articles tree request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        filters,
+      });
+
       const result = await articlesService.getTree(req.companyId!, filters);
+
+      logger.debug('Articles tree retrieved successfully', {
+        companyId: req.companyId,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get articles tree', {
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.debug('Get article by ID request', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
+
       const result = await articlesService.getById(
         req.params.id,
         req.companyId!
       );
+
+      logger.debug('Article retrieved successfully', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+      });
+
       res.json(result);
     } catch (error) {
+      logger.error('Failed to get article', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       next(error);
     }
   }
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Create article request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        articleName: req.body.name,
+        articleType: req.body.type,
+        ip: req.ip,
+      });
+
       const result = await articlesService.create(req.companyId!, req.body);
+
+      logger.info('Article created successfully', {
+        articleId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       await auditLogService.logAction({
         userId: req.userId!,
@@ -112,6 +178,13 @@ export class ArticlesController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Update article request', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       const oldArticle = await articlesService.getById(
         req.params.id,
         req.companyId!
@@ -122,6 +195,12 @@ export class ArticlesController {
         req.companyId!,
         req.body
       );
+
+      logger.info('Article updated successfully', {
+        articleId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       await auditLogService.logAction({
         userId: req.userId!,
@@ -141,6 +220,13 @@ export class ArticlesController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Delete article request', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       const oldArticle = await articlesService.getById(
         req.params.id,
         req.companyId!
@@ -150,6 +236,12 @@ export class ArticlesController {
         req.params.id,
         req.companyId!
       );
+
+      logger.info('Article deleted successfully', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       await auditLogService.logAction({
         userId: req.userId!,
@@ -169,6 +261,13 @@ export class ArticlesController {
 
   async archive(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Archive article request', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       const oldArticle = await articlesService.getById(
         req.params.id,
         req.companyId!
@@ -178,6 +277,12 @@ export class ArticlesController {
         req.params.id,
         req.companyId!
       );
+
+      logger.info('Article archived successfully', {
+        articleId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       await auditLogService.logAction({
         userId: req.userId!,
@@ -197,6 +302,13 @@ export class ArticlesController {
 
   async unarchive(req: TenantRequest, res: Response, next: NextFunction) {
     try {
+      logger.info('Unarchive article request', {
+        articleId: req.params.id,
+        companyId: req.companyId,
+        userId: req.userId,
+        ip: req.ip,
+      });
+
       const oldArticle = await articlesService.getById(
         req.params.id,
         req.companyId!
@@ -206,6 +318,12 @@ export class ArticlesController {
         req.params.id,
         req.companyId!
       );
+
+      logger.info('Article unarchived successfully', {
+        articleId: result.id,
+        companyId: req.companyId,
+        userId: req.userId,
+      });
 
       await auditLogService.logAction({
         userId: req.userId!,
@@ -227,6 +345,13 @@ export class ArticlesController {
     try {
       const { ids } = req.body as { ids: string[] };
 
+      logger.info('Bulk archive articles request', {
+        companyId: req.companyId,
+        userId: req.userId,
+        articlesCount: ids.length,
+        ip: req.ip,
+      });
+
       const oldArticles = await Promise.all(
         ids.map((id) =>
           articlesService.getById(id, req.companyId!).catch(() => null)
@@ -234,6 +359,12 @@ export class ArticlesController {
       );
 
       const result = await articlesService.bulkArchive(req.companyId!, ids);
+
+      logger.info('Articles bulk archived successfully', {
+        companyId: req.companyId,
+        userId: req.userId,
+        archivedCount: ids.length,
+      });
 
       await Promise.all(
         ids.map((id, index) =>
