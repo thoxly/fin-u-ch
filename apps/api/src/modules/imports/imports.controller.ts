@@ -225,7 +225,7 @@ export class ImportsController {
         companyId: req.companyId,
         userId: req.userId,
         sessionId,
-        appliedCount: result.appliedCount,
+        appliedCount: result.applied,
       });
 
       res.json(result);
@@ -270,8 +270,8 @@ export class ImportsController {
         companyId: req.companyId,
         userId: req.userId,
         sessionId,
-        importedCount: result.importedCount,
-        errorsCount: result.errors?.length || 0,
+        importedCount: result.imported,
+        errorsCount: result.errorMessages?.length || 0,
       });
 
       res.json(result);

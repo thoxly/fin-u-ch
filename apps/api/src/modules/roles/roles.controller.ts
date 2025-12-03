@@ -233,7 +233,7 @@ export class RolesController {
 
       logger.debug('Role permissions retrieved successfully', {
         roleId: req.params.id,
-        permissionsCount: permissions.length,
+        permissionsCount: permissions.rawPermissions.length,
       });
 
       res.json(permissions);
@@ -326,7 +326,7 @@ export class RolesController {
       logger.debug('Roles by category retrieved successfully', {
         category: req.params.category,
         companyId: req.companyId,
-        rolesCount: roles.length,
+        rolesCount: roles.roles.length,
       });
 
       res.json(roles);

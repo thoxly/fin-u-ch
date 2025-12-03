@@ -52,8 +52,7 @@ export class OperationsController {
 
       logger.debug('Operations retrieved successfully', {
         companyId: req.companyId,
-        operationsCount: result.operations.length,
-        total: result.total,
+        operationsCount: result.length,
       });
 
       res.json(result);

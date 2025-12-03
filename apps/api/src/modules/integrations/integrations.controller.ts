@@ -63,7 +63,7 @@ export class IntegrationsController {
       );
 
       logger.info('Ozon integration saved successfully', {
-        integrationId: result.id,
+        integrationId: result.data?.id,
         companyId: req.companyId,
         userId: req.userId,
       });

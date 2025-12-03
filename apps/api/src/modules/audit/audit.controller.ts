@@ -90,7 +90,7 @@ export class AuditLogController {
         companyId: req.companyId,
         entity,
         entityId,
-        logsCount: result.length,
+        logsCount: result.logs.length,
       });
 
       res.json(result);
@@ -132,7 +132,7 @@ export class AuditLogController {
       logger.debug('User audit logs retrieved successfully', {
         companyId: req.companyId,
         targetUserId: userId,
-        logsCount: result.length,
+        logsCount: result.logs.length,
       });
 
       res.json(result);
