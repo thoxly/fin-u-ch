@@ -4,7 +4,11 @@ export interface ReadFileParams {
 export interface ReadFileRangeParams {
     path: string;
     start: number;
-    end: number;
+    /**
+     * Optional end line (1-based, inclusive). If omitted, the tool will return
+     * a reasonable window of lines after `start` instead of an empty string.
+     */
+    end?: number;
 }
 export interface ListFilesParams {
     pattern: string;

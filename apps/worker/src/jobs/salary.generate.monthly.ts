@@ -36,8 +36,18 @@ export async function generateSalaryOperations(
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: targetDate } }],
       },
       include: {
-        company: true,
-        employeeCounterparty: true,
+        company: {
+          select: {
+            id: true,
+            currencyBase: true,
+          },
+        },
+        employeeCounterparty: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         department: true,
       },
     });
@@ -137,7 +147,7 @@ export async function generateSalaryOperations(
         );
       } catch (error) {
         logger.error(
-          `Error generating salary for ${salary.employeeCounterparty.name}:`,
+          `Error generating salary for ${salary.employeeCounterparty?.name || salary.employeeCounterpartyId}:`,
           error
         );
         // Продолжаем обработку остальных записей

@@ -20,7 +20,7 @@ export class SalariesService {
       include: {
         counterparty: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      },
+      } as any,
       orderBy: { effectiveFrom: 'desc' },
     });
   }
@@ -31,7 +31,7 @@ export class SalariesService {
       include: {
         counterparty: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      },
+      } as any,
     });
 
     if (!salary) {
