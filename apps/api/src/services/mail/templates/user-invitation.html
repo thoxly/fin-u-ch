@@ -3,41 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Подтвердите ваш email</title>
+  <title>Приглашение в компанию</title>
 </head>
 <body style="margin:0; padding:0; background:#fafafa; font-family: Arial, sans-serif;">
 
   <div style="max-width:600px; margin:40px auto; background:#ffffff; border-radius:12px; padding:32px; box-shadow:0 4px 16px rgba(0,0,0,0.06); color:#333;">
 
     <h1 style="font-size:24px; margin:0 0 16px; color:#1f2d3d; font-weight:600;">
-      Подтвердите email
+      Приглашение в компанию
     </h1>
 
     <p style="margin:0 0 16px; font-size:15px; color:#444;">
-      Спасибо за регистрацию в <strong>Vecta — Финучёт</strong>!
+      Вас пригласили присоединиться к компании <strong>{{companyName}}</strong> в системе <strong>Vecta — Финучёт</strong>.
     </p>
 
     <p style="margin:0 0 28px; font-size:15px; color:#444;">
-      Для завершения регистрации подтвердите ваш email, перейдя по ссылке ниже:
+      Чтобы активировать аккаунт и завершить регистрацию, перейдите по ссылке:
     </p>
 
     <div style="text-align:center; margin:32px 0;">
-      <a href="{{verificationUrl}}"
+      <a href="{{invitationUrl}}"
          style="display:inline-block; background:#3498db; padding:14px 36px; color:#fff; text-decoration:none; border-radius:8px; font-size:16px; font-weight:bold;">
-        Подтвердить email
+        Принять приглашение
       </a>
     </div>
 
     <p style="margin:0 0 8px; font-size:14px; color:#555;">
-      Если кнопка не открывается, используйте ссылку:
+      Если ссылка не открывается, используйте адрес ниже:
     </p>
 
     <p style="word-break:break-all; margin:0 0 24px; font-size:13px; color:#88909a;">
-      {{verificationUrl}}
+      {{invitationUrl}}
     </p>
 
     <p style="margin-top:24px; font-size:12px; color:#a0a7b0;">
-      Если вы не регистрировались в системе — просто игнорируйте письмо.
+      Если вы не ожидали приглашения — просто игнорируйте письмо.
+    </p>
+
+    <p style="margin-top:4px; font-size:12px; color:#a0a7b0;">
+      Ссылка действительна в течение 7 дней.
     </p>
 
   </div>

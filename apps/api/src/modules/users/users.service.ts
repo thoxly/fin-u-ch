@@ -11,6 +11,7 @@ import {
   sendPasswordChangedEmail,
   sendEmailChangeOldVerificationEmail,
   sendEmailChangeVerificationEmail,
+  sendInvitationEmail,
 } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 import logger from '../../config/logger';
@@ -432,22 +433,28 @@ export class UsersService {
       }
     }
 
-    // TODO: В будущем здесь будет отправка email с приглашением
-    // Пока просто создаём пользователя с временным паролем или флагом "ожидает активации"
-    // Для простоты создаём пользователя с дефолтным паролем (в продакшене нужно генерировать токен приглашения)
+    // Получаем название компании для письма
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
 
-    // Генерируем временный пароль (в продакшене это должно быть через токен приглашения)
+    if (!company) {
+      throw new AppError('Company not found', 404);
+    }
+
+    // Генерируем временный пароль (будет заменен при принятии приглашения)
     const tempPassword = `temp_${Math.random().toString(36).slice(2)}`;
     const passwordHash = await hashPassword(tempPassword);
 
-    // Создаём пользователя
+    // Создаём пользователя с isActive: false - он не сможет войти до принятия приглашения
     const newUser = await prisma.user.create({
       data: {
         email,
         passwordHash,
         companyId,
-        isActive: true, // Или false, если требуется активация через email
-        // Можно добавить поле isInvited: true для отслеживания
+        isActive: false, // Пользователь неактивен до принятия приглашения
+        isEmailVerified: false, // Email не подтвержден до принятия приглашения
       },
       select: {
         id: true,
@@ -462,15 +469,40 @@ export class UsersService {
       },
     });
 
-    // Назначаем роли, если указаны
+    // Назначаем роли, если указаны (сохраняем в metadata токена для применения после принятия)
     if (roleIds.length > 0) {
-      await prisma.userRole.createMany({
-        data: roleIds.map((roleId) => ({
-          userId: newUser.id,
-          roleId,
-          assignedBy: invitedBy,
-        })),
+      // Роли будут назначены после принятия приглашения
+      // Сохраняем их в metadata токена
+    }
+
+    // Создаём токен приглашения
+    const invitationToken = await tokenService.createToken({
+      userId: newUser.id,
+      type: 'user_invitation',
+      metadata: {
+        roleIds,
+        companyId,
+        invitedBy,
+      },
+    });
+
+    // Отправляем письмо с приглашением
+    try {
+      await sendInvitationEmail(email, invitationToken, company.name);
+      logger.info('Invitation email sent successfully', {
+        userId: newUser.id,
+        email,
+        companyId,
       });
+    } catch (error) {
+      logger.error('Failed to send invitation email', {
+        userId: newUser.id,
+        email,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      // Не блокируем создание пользователя, если письмо не отправилось
+      // Администратор может отправить приглашение повторно
     }
 
     logger.debug('[UsersService.inviteUser] Пользователь успешно приглашён', {
@@ -480,12 +512,9 @@ export class UsersService {
       invitedBy,
     });
 
-    // TODO: Отправить email с приглашением
-
-    // Возвращаем пользователя с временным паролем (только для отображения администратору)
+    // Возвращаем пользователя без временного пароля (теперь используется токен)
     return {
       ...newUser,
-      tempPassword, // Временный пароль возвращаем только один раз
     };
   }
 

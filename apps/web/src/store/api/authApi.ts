@@ -77,6 +77,11 @@ interface ConfirmEmailChangeRequest {
   token: string;
 }
 
+interface AcceptInvitationRequest {
+  token: string;
+  password: string;
+}
+
 export interface UserPreferences {
   theme?: 'light' | 'dark' | 'system';
   navigationIcons?: Record<string, string>;
@@ -178,7 +183,7 @@ export const authApi = apiSlice.injectEndpoints({
       ConfirmOldEmailForChangeRequest
     >({
       query: (data) => ({
-        url: '/users/me/confirm-email-change-old',
+        url: '/auth/confirm-email-change-old',
         method: 'POST',
         body: data,
       }),
@@ -188,7 +193,15 @@ export const authApi = apiSlice.injectEndpoints({
       ConfirmEmailChangeRequest
     >({
       query: (data) => ({
-        url: '/users/me/confirm-email-change',
+        url: '/auth/confirm-email-change',
+        method: 'POST',
+        body: data,
+      }),
+      invalidatesTags: ['User'],
+    }),
+    acceptInvitation: builder.mutation<AuthResponse, AcceptInvitationRequest>({
+      query: (data) => ({
+        url: '/auth/accept-invitation',
         method: 'POST',
         body: data,
       }),
@@ -223,6 +236,7 @@ export const {
   useRequestEmailChangeMutation,
   useConfirmOldEmailForChangeMutation,
   useConfirmEmailChangeMutation,
+  useAcceptInvitationMutation,
   useGetPreferencesQuery,
   useUpdatePreferencesMutation,
 } = authApi;

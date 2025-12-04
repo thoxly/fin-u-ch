@@ -397,6 +397,122 @@ export class AuthService {
       throw new AppError('Failed to send verification email', 500);
     }
   }
+
+  async acceptInvitation(
+    token: string,
+    password: string
+  ): Promise<TokensResponse> {
+    validateRequired({ token, password });
+    validatePassword(password);
+
+    const validation = await tokenService.validateToken(
+      token,
+      'user_invitation'
+    );
+
+    if (!validation.valid || !validation.userId) {
+      logger.warn(
+        'Invitation acceptance attempted with invalid or expired token',
+        {
+          error: validation.error,
+        }
+      );
+      throw new AppError(validation.error || 'Invalid or expired token', 400);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: validation.userId },
+      select: {
+        id: true,
+        email: true,
+        companyId: true,
+        isActive: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.isActive) {
+      throw new AppError('Invitation already accepted', 400);
+    }
+
+    const roleIds: string[] = (validation.metadata?.roleIds as string[]) || [];
+    const companyId = validation.metadata?.companyId as string | undefined;
+    const invitedBy = validation.metadata?.invitedBy as string | undefined;
+
+    // Проверяем, что компания из токена совпадает с компанией пользователя
+    if (companyId && companyId !== user.companyId) {
+      logger.warn('Company mismatch in invitation token', {
+        userId: user.id,
+        tokenCompanyId: companyId,
+        userCompanyId: user.companyId,
+      });
+      throw new AppError('Invalid invitation token', 400);
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    await prisma.$transaction(async (tx) => {
+      // Обновляем пароль, активируем пользователя и подтверждаем email
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          isActive: true,
+          isEmailVerified: true,
+        },
+      });
+
+      // Назначаем роли, если они были указаны в приглашении
+      if (roleIds.length > 0) {
+        // Удаляем старые роли (если есть)
+        await tx.userRole.deleteMany({
+          where: { userId: user.id },
+        });
+
+        // Создаём новые роли
+        await tx.userRole.createMany({
+          data: roleIds.map((roleId) => ({
+            userId: user.id,
+            roleId,
+            assignedBy: invitedBy || user.id, // Используем ID пригласившего, если есть
+          })),
+        });
+      }
+
+      // Помечаем токен как использованный
+      await tokenService.markTokenAsUsed(token);
+    });
+
+    logger.info('Invitation accepted successfully', {
+      userId: user.id,
+      email: user.email,
+      roleIds,
+    });
+
+    // Генерируем токены для автоматического входа
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      email: user.email,
+    });
+
+    const refreshToken = generateRefreshToken({
+      userId: user.id,
+      email: user.email,
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        companyId: user.companyId,
+      },
+    };
+  }
 }
 
 export default new AuthService();
