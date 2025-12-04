@@ -3,6 +3,9 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
+import { VerifyEmailChangeOldPage } from './pages/auth/VerifyEmailChangeOldPage';
+import { VerifyEmailChangePage } from './pages/auth/VerifyEmailChangePage';
+import { AcceptInvitationPage } from './pages/auth/AcceptInvitationPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -36,6 +39,15 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route
+          path="/verify-email-change-old"
+          element={<VerifyEmailChangeOldPage />}
+        />
+        <Route
+          path="/verify-email-change"
+          element={<VerifyEmailChangePage />}
+        />
+        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 

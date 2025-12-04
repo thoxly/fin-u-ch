@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import authService from './auth.service';
 import passwordResetService from './password-reset.service';
+import usersService from '../users/users.service';
+import tokenService from '../../services/mail/token.service';
+import prisma from '../../config/db';
 import logger from '../../config/logger';
+import { AppError } from '../../middlewares/error';
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
@@ -189,6 +193,143 @@ export class AuthController {
       res.json({ message: 'Password reset successfully' });
     } catch (error) {
       logger.error('Password reset failed', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        ip: req.ip,
+      });
+      next(error);
+    }
+  }
+
+  async confirmOldEmailForChange(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ) {
+    try {
+      logger.info('Confirm old email for change (public)', {
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      const { token } = req.body;
+
+      // Валидируем токен и получаем userId
+      const validation = await tokenService.validateToken(
+        token,
+        'email_change_old'
+      );
+
+      if (!validation.valid || !validation.userId) {
+        throw new AppError(validation.error || 'Invalid token', 400);
+      }
+
+      // Получаем companyId из базы данных по userId
+      const user = await prisma.user.findUnique({
+        where: { id: validation.userId },
+        select: { companyId: true },
+      });
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      // Вызываем метод сервиса
+      await usersService.confirmOldEmailForChange(token, user.companyId);
+
+      logger.info('Old email confirmed for change (public)', {
+        userId: validation.userId,
+        companyId: user.companyId,
+        ip: req.ip,
+      });
+
+      res.json({
+        message:
+          'Старый email подтверждён. Письмо с подтверждением отправлено на новый email адрес',
+      });
+    } catch (error) {
+      logger.error('Failed to confirm old email for change (public)', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        ip: req.ip,
+      });
+      next(error);
+    }
+  }
+
+  async confirmEmailChange(req: Request, res: Response, next: NextFunction) {
+    try {
+      logger.info('Confirm email change (public)', {
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      const { token } = req.body;
+
+      // Валидируем токен и получаем userId
+      const validation = await tokenService.validateToken(
+        token,
+        'email_change_new'
+      );
+
+      if (!validation.valid || !validation.userId) {
+        throw new AppError(validation.error || 'Invalid token', 400);
+      }
+
+      // Получаем companyId из базы данных по userId
+      const user = await prisma.user.findUnique({
+        where: { id: validation.userId },
+        select: { companyId: true },
+      });
+
+      if (!user) {
+        throw new AppError('User not found', 404);
+      }
+
+      // Вызываем метод сервиса
+      await usersService.confirmEmailChangeWithEmail(token, user.companyId);
+
+      logger.info('Email changed successfully (public)', {
+        userId: validation.userId,
+        companyId: user.companyId,
+        ip: req.ip,
+      });
+
+      res.json({ message: 'Email changed successfully' });
+    } catch (error) {
+      logger.error('Failed to confirm email change (public)', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        ip: req.ip,
+      });
+      next(error);
+    }
+  }
+
+  async acceptInvitation(req: Request, res: Response, next: NextFunction) {
+    try {
+      logger.info('Accept invitation request received', {
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        throw new AppError('Token and password are required', 400);
+      }
+
+      const result = await authService.acceptInvitation(token, password);
+
+      logger.info('Invitation accepted successfully', {
+        userId: result.user.id,
+        email: result.user.email,
+        ip: req.ip,
+      });
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Failed to accept invitation', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         ip: req.ip,

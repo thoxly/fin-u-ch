@@ -13,10 +13,20 @@ const apiRoot = path.resolve(__dirname, '../..');
 
 const rootEnvPath = path.resolve(projectRoot, '.env');
 const apiEnvPath = path.resolve(apiRoot, '.env');
-dotenv.config({ path: rootEnvPath });
+
+// Load .env with override to ensure latest values are used
+const rootResult = dotenv.config({ path: rootEnvPath, override: true });
+if (rootResult.error) {
+  console.warn(`Failed to load .env from root: ${rootResult.error.message}`);
+}
 
 if (!process.env.DATABASE_URL) {
-  dotenv.config({ path: apiEnvPath });
+  const apiResult = dotenv.config({ path: apiEnvPath, override: true });
+  if (apiResult.error) {
+    console.warn(
+      `Failed to load .env from apps/api: ${apiResult.error.message}`
+    );
+  }
 }
 
 import app from './app';
