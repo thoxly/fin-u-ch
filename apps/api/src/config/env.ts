@@ -13,10 +13,21 @@ const apiRoot = path.resolve(__dirname, '../..');
 // Load .env from monorepo root, fallback to apps/api
 const rootEnvPath = path.resolve(projectRoot, '.env');
 const apiEnvPath = path.resolve(apiRoot, '.env');
-dotenv.config({ path: rootEnvPath });
+
+// Load .env with override to ensure latest values are used
+const rootResult = dotenv.config({ path: rootEnvPath, override: true });
+if (rootResult.error) {
+  console.warn(`Failed to load .env from root: ${rootResult.error.message}`);
+}
+
 // If DATABASE_URL is still not set, try loading from apps/api
 if (!process.env.DATABASE_URL) {
-  dotenv.config({ path: apiEnvPath });
+  const apiResult = dotenv.config({ path: apiEnvPath, override: true });
+  if (apiResult.error) {
+    console.warn(
+      `Failed to load .env from apps/api: ${apiResult.error.message}`
+    );
+  }
 }
 
 export const env = {
@@ -32,7 +43,9 @@ export const env = {
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '465', 10),
   SMTP_SECURE:
-    process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+    process.env.SMTP_SECURE !== undefined
+      ? process.env.SMTP_SECURE === 'true'
+      : process.env.SMTP_PORT === '465',
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || '',

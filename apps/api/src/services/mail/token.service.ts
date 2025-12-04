@@ -7,7 +7,8 @@ export type TokenType =
   | 'email_verification'
   | 'password_reset'
   | 'email_change_old'
-  | 'email_change_new';
+  | 'email_change_new'
+  | 'user_invitation';
 
 export interface CreateTokenOptions {
   userId: string;
@@ -28,6 +29,7 @@ const DEFAULT_EXPIRY: Record<TokenType, number> = {
   password_reset: 30, // 30 minutes
   email_change_old: 24 * 60, // 24 hours
   email_change_new: 7 * 24 * 60, // 7 days
+  user_invitation: 7 * 24 * 60, // 7 days
 };
 
 export class TokenService {
@@ -104,7 +106,8 @@ export class TokenService {
       };
     }
 
-    if (!emailToken.user.isActive) {
+    // Для токена приглашения не проверяем isActive, так как пользователь еще не активирован
+    if (type !== 'user_invitation' && !emailToken.user.isActive) {
       return {
         valid: false,
         error: 'User account is inactive',

@@ -5,23 +5,33 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const transporter = nodemailer.createTransport({
-  host: env.SMTP_HOST,
-  port: env.SMTP_PORT,
-  secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
-  requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
-  auth: {
-    user: env.SMTP_USER,
-    pass: env.SMTP_PASS,
-  },
-});
+// Создаем transporter на основе переменных окружения
+function createTransporter() {
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
+    throw new Error(
+      'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file'
+    );
+  }
+
+  return nodemailer.createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_SECURE,
+    requireTLS: !env.SMTP_SECURE && env.SMTP_PORT === 587, // Требовать TLS для порта 587 (STARTTLS)
+    auth: {
+      user: env.SMTP_USER,
+      pass: env.SMTP_PASS,
+    },
+  });
+}
 
 export type EmailTemplate =
   | 'email-verification'
   | 'password-reset'
   | 'password-changed'
   | 'email-change-old-verification'
-  | 'email-change-verification';
+  | 'email-change-verification'
+  | 'user-invitation';
 
 export interface EmailOptions {
   to: string;
@@ -55,25 +65,34 @@ function replaceVariables(
 }
 
 export async function sendEmail(options: EmailOptions): Promise<void> {
-  // Проверяем настройки SMTP
+  // Проверяем наличие SMTP настроек
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
-    const missingConfig = [];
-    if (!env.SMTP_HOST) missingConfig.push('SMTP_HOST');
-    if (!env.SMTP_USER) missingConfig.push('SMTP_USER');
-    if (!env.SMTP_PASS) missingConfig.push('SMTP_PASS');
-
-    logger.error('SMTP configuration is missing', {
-      missing: missingConfig,
-      smtpHost: env.SMTP_HOST || 'not set',
-      smtpUser: env.SMTP_USER || 'not set',
-      smtpPass: env.SMTP_PASS ? '***' : 'not set',
+    logger.warn('SMTP configuration is missing - email will not be sent', {
+      missing: [
+        !env.SMTP_HOST && 'SMTP_HOST',
+        !env.SMTP_USER && 'SMTP_USER',
+        !env.SMTP_PASS && 'SMTP_PASS',
+      ].filter(Boolean),
+      to: options.to,
+      template: options.template,
     });
+
+    if (env.NODE_ENV === 'development') {
+      logger.warn(
+        'Skipping email send in development mode due to missing SMTP configuration'
+      );
+      return;
+    }
+
     throw new Error(
-      `SMTP configuration is incomplete. Missing: ${missingConfig.join(', ')}`
+      'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file'
     );
   }
 
   try {
+    const transporter = createTransporter();
+    const fromAddress = env.SMTP_FROM || env.SMTP_USER;
+
     logger.info('Attempting to send email', {
       to: options.to,
       template: options.template,
@@ -86,7 +105,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     const html = replaceVariables(template, options.variables);
 
     const result = await transporter.sendMail({
-      from: `"Vecta — Финучёт" <${env.SMTP_FROM}>`,
+      from: `"Vecta — Финучёт" <${fromAddress}>`,
       to: options.to,
       subject: options.subject,
       html,
@@ -173,6 +192,23 @@ export async function sendEmailChangeVerificationEmail(
     template: 'email-change-verification',
     variables: {
       verificationUrl,
+    },
+  });
+}
+
+export async function sendInvitationEmail(
+  email: string,
+  token: string,
+  companyName: string
+): Promise<void> {
+  const invitationUrl = `${env.FRONTEND_URL}/accept-invitation?token=${token}`;
+  await sendEmail({
+    to: email,
+    subject: 'Приглашение в компанию',
+    template: 'user-invitation',
+    variables: {
+      invitationUrl,
+      companyName,
     },
   });
 }
