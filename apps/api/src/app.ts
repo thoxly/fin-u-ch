@@ -25,6 +25,7 @@ import auditLogRoutes from './modules/audit/audit.routes';
 import demoRoutes from './modules/demo/demo.routes';
 import importsRoutes from './modules/imports/imports.routes';
 import integrationsRoutes from './modules/integrations/integrations.routes';
+import subscriptionRoutes from './modules/subscription/subscription.routes';
 
 const app: Application = express();
 
@@ -68,6 +69,7 @@ app.use('/api/demo', demoRoutes);
 app.use('/api/imports', importsRoutes);
 
 app.use('/api/integrations', integrationsRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Error handling
 app.use(errorHandler);

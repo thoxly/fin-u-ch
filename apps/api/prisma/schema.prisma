@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SubscriptionPlan {
+  START
+  TEAM
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIAL
+}
+
 model Account {
   id                      String              @id @default(uuid())
   companyId               String
@@ -93,6 +106,41 @@ model Budget {
   @@map("budgets")
 }
 
+model PromoCode {
+  id           String           @id @default(uuid())
+  code         String           @unique
+  plan         SubscriptionPlan
+  durationDays Int? // Длительность триала/подписки (null = вечно)
+  maxUsages    Int? // Лимит использования (null = безлимит)
+  usedCount    Int              @default(0)
+  isActive     Boolean          @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([code])
+  @@index([isActive, expiresAt])
+  @@map("promo_codes")
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  companyId   String             @unique
+  plan        SubscriptionPlan   @default(START)
+  status      SubscriptionStatus @default(ACTIVE)
+  startDate   DateTime           @default(now())
+  endDate     DateTime? // Null для вечных/бесплатных или автопродлеваемых
+  trialEndsAt DateTime?
+  promoCode   String? // Промокод, по которому активирована подписка
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([plan])
+  @@map("subscriptions")
+}
+
 model Company {
   id                  String              @id @default(uuid())
   name                String
@@ -111,12 +159,13 @@ model Company {
   departments         Department[]
   import_sessions     ImportSession[]
   imported_operations ImportedOperation[]
-  integrations       Integration[]
+  integrations        Integration[]
   mapping_rules       MappingRule[]
   operations          Operation[]
   plan_items          PlanItem[]
   roles               Role[]
   salaries            Salary[]
+  subscription        Subscription?
   users               User[]
 
   @@map("companies")

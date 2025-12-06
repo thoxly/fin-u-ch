@@ -9,8 +9,8 @@ import logger from './logger';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // From apps/api/src/config/db.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
-const projectRoot = path.resolve(__dirname, '../../..');
-const apiRoot = path.resolve(__dirname, '../..');
+const projectRoot = path.resolve(__dirname, '../../../..'); // up to monorepo root
+const apiRoot = path.resolve(__dirname, '..'); // apps/api
 
 // Load .env before initializing Prisma
 // Try root first, then fallback to apps/api

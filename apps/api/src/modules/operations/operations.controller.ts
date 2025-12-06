@@ -4,6 +4,7 @@ import { AppError } from '../../middlewares/error';
 import operationsService from './operations.service';
 import auditLogService from '../audit/audit.service';
 import logger from '../../config/logger';
+import { getCompanyPlan, enforceFeatureAccess } from '../../utils/subscription';
 
 export class OperationsController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
@@ -105,6 +106,12 @@ export class OperationsController {
         amount: req.body.amount,
         ip: req.ip,
       });
+
+      // Проверка доступа к повторяющимся операциям
+      if (req.body.repeat && req.body.repeat !== 'none') {
+        const plan = await getCompanyPlan(req.companyId!);
+        enforceFeatureAccess(plan, 'recurring');
+      }
 
       const result = await operationsService.create(req.companyId!, req.body);
 

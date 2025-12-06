@@ -12,11 +12,15 @@ import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
 import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
+import subscriptionService from '../subscription/subscription.service';
+import promoCodeService from '../subscription/promo-code.service';
+import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
 export interface RegisterDTO {
   email: string;
   password: string;
   companyName: string;
+  promoCode?: string; // Опциональный промокод для Beta-доступа
 }
 
 export interface LoginDTO {
@@ -123,8 +127,53 @@ export class AuthService {
           throw new AppError('Failed to initialize company data', 500);
         }
 
+        // Создаем подписку START по умолчанию
+        await tx.subscription.create({
+          data: {
+            companyId: company.id,
+            plan: SubscriptionPlan.START,
+            status: SubscriptionStatus.ACTIVE,
+            promoCode: null,
+          },
+        });
+
+        logger.info('Default START subscription created', {
+          companyId: company.id,
+        });
+
         return { user, company };
       });
+
+      // Применяем промокод, если он указан
+      let appliedPromoCode: string | null = null;
+      if (data.promoCode) {
+        try {
+          logger.info('Applying promo code during registration', {
+            companyId: result.company.id,
+            promoCode: data.promoCode,
+          });
+
+          const promoResult = await promoCodeService.applyPromoCode(
+            result.company.id,
+            data.promoCode
+          );
+
+          appliedPromoCode = promoResult.promoCode.code;
+          logger.info('Promo code applied successfully during registration', {
+            companyId: result.company.id,
+            promoCode: appliedPromoCode,
+            plan: promoResult.subscription.plan,
+          });
+        } catch (error) {
+          logger.warn('Failed to apply promo code during registration', {
+            companyId: result.company.id,
+            promoCode: data.promoCode,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Не прерываем регистрацию, если промокод невалиден
+          // Просто логируем предупреждение
+        }
+      }
 
       // Получаем активные роли компании после регистрации
       try {

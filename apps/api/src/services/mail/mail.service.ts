@@ -31,7 +31,8 @@ export type EmailTemplate =
   | 'password-changed'
   | 'email-change-old-verification'
   | 'email-change-verification'
-  | 'user-invitation';
+  | 'user-invitation'
+  | 'beta-promo-code';
 
 export interface EmailOptions {
   to: string;
@@ -209,6 +210,21 @@ export async function sendInvitationEmail(
     variables: {
       invitationUrl,
       companyName,
+    },
+  });
+}
+
+export async function sendBetaPromoCodeEmail(
+  email: string,
+  promoCode: string
+): Promise<void> {
+  await sendEmail({
+    to: email,
+    subject: 'Добро пожаловать в Beta! Ваш код доступа',
+    template: 'beta-promo-code',
+    variables: {
+      promoCode,
+      frontendUrl: env.FRONTEND_URL,
     },
   });
 }
