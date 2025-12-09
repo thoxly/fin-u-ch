@@ -2,7 +2,7 @@ import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import { SubscriptionPlan, SubscriptionStatus, Prisma } from '@prisma/client';
 import {
-  getPlanLimits,
+  getPlanLimitsUtil,
   getUserLimitInfo,
   getCompanyPlan,
 } from '../../utils/subscription';
@@ -73,7 +73,7 @@ export class SubscriptionService {
     }
 
     const plan = subscription.plan;
-    const limits = getPlanLimits(plan);
+    const limits = getPlanLimitsUtil(plan);
     const userLimit = await getUserLimitInfo(companyId, plan);
 
     return {
@@ -236,7 +236,7 @@ export class SubscriptionService {
     logger.debug('Checking and enforcing limits', { companyId });
 
     const plan = await getCompanyPlan(companyId);
-    const limits = getPlanLimits(plan);
+    // const limits = getPlanLimitsUtil(plan);
     const userLimit = await getUserLimitInfo(companyId, plan);
 
     // Проверяем лимит пользователей

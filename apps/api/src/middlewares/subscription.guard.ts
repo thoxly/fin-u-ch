@@ -74,20 +74,20 @@ export const requireFeature = (
         BUSINESS: 3,
       };
 
-      if (planHierarchy[currentPlan] < planHierarchy[minPlan]) {
-        logger.warn('Subscription plan insufficient', {
-          companyId: req.companyId,
-          currentPlan,
-          requiredPlan: minPlan,
-          feature,
-          path: req.path,
-          method: req.method,
-        });
-        throw new AppError(
-          `This feature requires a ${minPlan} plan or higher. Your current plan is ${currentPlan}. Please upgrade your subscription.`,
-          403
-        );
-      }
+      // if (planHierarchy[currentPlan] < planHierarchy[minPlan]) {
+      //   logger.warn('Subscription plan insufficient', {
+      //     companyId: req.companyId,
+      //     currentPlan,
+      //     requiredPlan: minPlan,
+      //     feature,
+      //     path: req.path,
+      //     method: req.method,
+      //   });
+      //   throw new AppError(
+      //     `Для использования этой функции требуется тарифный план ${minPlan} или выше. Ваш текущий тарифный план равен ${currentPlan}. Пожалуйста, обновите подписку.`,
+      //     403
+      //   );
+      // }
 
       // Проверяем доступ к конкретной фиче
       enforceFeatureAccess(currentPlan, feature);
@@ -161,10 +161,10 @@ export const requirePlan = (requiredPlan: SubscriptionPlan) => {
           path: req.path,
           method: req.method,
         });
-        throw new AppError(
-          'Your subscription is not active. Please renew your subscription to access this feature.',
-          403
-        );
+        // throw new AppError(
+        //   'Your subscription is not active. Please renew your subscription to access this feature.',
+        //   403
+        // );
       }
 
       // Получаем текущий план компании
@@ -178,10 +178,10 @@ export const requirePlan = (requiredPlan: SubscriptionPlan) => {
           path: req.path,
           method: req.method,
         });
-        throw new AppError(
-          `This feature requires a ${requiredPlan} plan. Your current plan is ${currentPlan}. Please upgrade your subscription.`,
-          403
-        );
+        // throw new AppError(
+        //   `Для использования этой функции требуется тарифный план ${requiredPlan}. Ваш текущий тарифный план равен ${currentPlan}. Пожалуйста, обновите свою подписку.`,
+        //   403
+        // );
       }
 
       logger.debug('Subscription plan check passed', {

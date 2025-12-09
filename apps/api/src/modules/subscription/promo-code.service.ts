@@ -291,6 +291,65 @@ export class PromoCodeService {
       expiresAt: promoCode.expiresAt,
     };
   }
+
+  /**
+   * Генерирует персональный промокод для новозарегистрированного пользователя
+   * Формат: USER-{UUID первые 8 символов}-{текущая дата в формате YYYYMMDD}
+   * По умолчанию: дает доступ к TEAM на 14 дней, одноразовый
+   */
+  async generatePersonalPromoCode(userId: string): Promise<string> {
+    logger.info('Generating personal promo code', { userId });
+
+    // Генерируем уникальный код
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomPart = userId.slice(0, 8).toUpperCase();
+    const code = `USER-${randomPart}-${timestamp}`;
+
+    try {
+      // Проверяем, не существует ли уже такой код
+      const existing = await prisma.promoCode.findUnique({
+        where: { code },
+      });
+
+      if (existing) {
+        // Если код существует, добавляем случайный суффикс
+        const randomSuffix = Math.random()
+          .toString(36)
+          .substring(7)
+          .toUpperCase();
+        return await this.generatePersonalPromoCode(userId + randomSuffix);
+      }
+
+      // Создаем промокод (доступ к TEAM на 14 дней, одноразовый)
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // Промокод действует 30 дней
+
+      const promoCode = await prisma.promoCode.create({
+        data: {
+          code,
+          plan: SubscriptionPlan.TEAM,
+          durationDays: 14, // Пробный период 14 дней на TEAM
+          maxUsages: 1, // Одноразовый
+          isActive: true,
+          expiresAt,
+        },
+      });
+
+      logger.info('Personal promo code generated successfully', {
+        userId,
+        code: promoCode.code,
+        expiresAt,
+      });
+
+      return code;
+    } catch (error) {
+      logger.error('Failed to generate personal promo code', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new AppError('Failed to generate promo code', 500);
+    }
+  }
 }
 
 export default new PromoCodeService();

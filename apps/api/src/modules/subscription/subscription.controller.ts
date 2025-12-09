@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../middlewares/tenant';
 import subscriptionService from './subscription.service';
 import logger from '../../config/logger';
+import auditLogService from '../audit/audit.service';
 
 export class SubscriptionController {
   /**
@@ -71,6 +72,25 @@ export class SubscriptionController {
         promoCode,
         newPlan: result.subscription.plan,
       });
+
+      // Audit log: promo activation / subscription update
+      try {
+        await auditLogService.logAction({
+          userId: req.userId || 'system',
+          companyId: req.companyId!,
+          action: 'update',
+          entity: 'subscription',
+          entityId: result.subscription.id,
+          changes: { new: result.subscription },
+          metadata: { promoCode },
+        });
+      } catch (err) {
+        logger.warn('Failed to write audit log for promo activation', {
+          companyId: req.companyId,
+          promoCode,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
 
       res.status(200).json(result);
     } catch (error) {

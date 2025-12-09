@@ -21,6 +21,8 @@ import {
   getPreviousPeriod,
 } from '../shared/lib/period';
 import { skipToken } from '@reduxjs/toolkit/query';
+import { useAppSelector } from '@/shared/hooks/useRedux';
+import { FeatureBlocker } from '@/shared/ui/FeatureBlocker';
 
 type ReportType = 'cashflow';
 
@@ -80,12 +82,16 @@ export const ReportsPage = () => {
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
   const articleFilterRef = useRef<HTMLDivElement>(null);
+  const subscriptionData = useAppSelector((state) => state.subscription.data);
+  const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
+  const requiredLevel = planHierarchy['TEAM'];
+  const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
 
   // Загружаем дерево статей для фильтра
-  const { tree: articleTree = [] } = useArticleTree({ isActive: true });
+  const { tree: _articleTree = [] } = useArticleTree({ isActive: true });
 
   // Загружаем активные бюджеты (только если есть права на просмотр отчётов)
   const { data: budgets = [] } = useGetBudgetsQuery(
@@ -97,6 +103,14 @@ export const ReportsPage = () => {
   const { data: plans = [] } = useGetPlansQuery(undefined, {
     skip: !canRead('reports'),
   });
+
+  // if (currentLevel < requiredLevel) {
+  //   return (
+  //     <Layout>
+  //       <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
+  //     </Layout>
+  //   );
+  // }
   const hasPlans = plans.length > 0;
 
   // Если планов нет, принудительно устанавливаем режим "Факт"
@@ -294,6 +308,15 @@ export const ReportsPage = () => {
             </div>
           </Card>
         </div>
+      </Layout>
+    );
+  }
+
+  // Проверка тарифа
+  if (currentLevel < requiredLevel) {
+    return (
+      <Layout>
+        <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
       </Layout>
     );
   }

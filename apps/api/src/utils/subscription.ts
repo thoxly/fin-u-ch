@@ -1,4 +1,5 @@
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
+
 import prisma from '../config/db';
 import { getPlanLimits, hasFeature, PlanLimits } from '../config/plan-limits';
 import { AppError } from '../middlewares/error';
@@ -74,7 +75,7 @@ export async function enforceUserLimit(
 
   if (userCount >= limits.maxUsers) {
     throw new AppError(
-      `User limit reached for current plan. Maximum ${limits.maxUsers} user(s) allowed. Please upgrade your plan to add more users.`,
+      `Достигнут лимит пользователей для текущего тарифного плана. Максимально допустимые пользователи в размере ${limits.maxUsers}. Пожалуйста, обновите свой тарифный план, чтобы добавить больше пользователей.`,
       403
     );
   }
@@ -127,11 +128,11 @@ export function enforceFeatureAccess(
   feature: string
 ): void {
   if (!hasFeature(plan, feature)) {
-    const planName = plan.toLowerCase();
-    throw new AppError(
-      `Feature "${feature}" is not available on the ${planName} plan. Please upgrade your subscription to access this feature.`,
-      403
-    );
+    // const planName = plan.toLowerCase();
+    // throw new AppError(
+    //   `Feature "${feature}" is not available on the ${planName} plan. Please upgrade your subscription to access this feature.`,
+    //   403
+    // );
   }
 }
 

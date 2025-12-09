@@ -34,7 +34,6 @@ export const MenuPopover = ({
   items,
   onClose,
   anchorPosition,
-  _renderIcon,
   className = '',
   createAction,
   position = 'left',
@@ -82,15 +81,23 @@ export const MenuPopover = ({
   // const iconRenderer = renderIcon || defaultRenderIcon;
 
   const offset = 8;
+
+  // Обеспечиваем безопасные дефолтные значения для anchorPosition
+  const safeAnchorPosition = anchorPosition || {
+    top: 0,
+    left: 0,
+    right: undefined,
+  };
+
   const positionStyle =
-    position === 'right' && anchorPosition.right !== undefined
+    position === 'right' && safeAnchorPosition.right !== undefined
       ? {
-          top: `${anchorPosition.top + offset}px`,
-          left: `${anchorPosition.right}px`,
+          top: `${safeAnchorPosition.top + offset}px`,
+          left: `${safeAnchorPosition.right}px`,
         }
       : {
-          top: `${anchorPosition.top + offset}px`,
-          left: `${anchorPosition.left}px`,
+          top: `${safeAnchorPosition.top + offset}px`,
+          left: `${safeAnchorPosition.left}px`,
         };
 
   return (

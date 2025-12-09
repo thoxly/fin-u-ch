@@ -12,7 +12,7 @@ import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
 import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
-import subscriptionService from '../subscription/subscription.service';
+// import subscriptionService from '../subscription/subscription.service';
 import promoCodeService from '../subscription/promo-code.service';
 import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
@@ -141,7 +141,15 @@ export class AuthService {
           companyId: company.id,
         });
 
-        return { user, company };
+        // Генерируем персональный промокод для пользователя (для бета-программы)
+        const personalPromoCode =
+          await promoCodeService.generatePersonalPromoCode(user.id);
+        logger.info('Personal promo code generated for user', {
+          userId: user.id,
+          promoCode: personalPromoCode,
+        });
+
+        return { user, company, personalPromoCode };
       });
 
       // Применяем промокод, если он указан

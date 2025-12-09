@@ -21,18 +21,21 @@ import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CompanyPage } from './pages/CompanyPage';
+import { PricingPage } from './pages/PricingPage';
 import { AdminPage } from './pages/AdminPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
 import { NotificationContainer } from './components/Notification';
 import { ThemeProvider } from './components/ThemeProvider';
+import { DevTools } from './shared/ui/DevTools/DevTools';
 
 function App() {
   return (
     <>
       <ThemeProvider />
       <NotificationContainer />
+      <DevTools />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
@@ -187,6 +190,16 @@ function App() {
           element={
             <PrivateRoute>
               <CompanyPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Pricing page - for selecting and upgrading tariffs */}
+        <Route
+          path="/pricing"
+          element={
+            <PrivateRoute>
+              <PricingPage />
             </PrivateRoute>
           }
         />

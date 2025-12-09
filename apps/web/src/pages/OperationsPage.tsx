@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
+import { Trash2, X, Copy, Check, FileUp } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -67,17 +67,17 @@ export const OperationsPage = () => {
     } | null;
   };
 
-  type OpsQuery = {
-    type?: string;
-    dateFrom?: string;
-    dateTo?: string;
-    articleId?: string;
-    counterpartyId?: string;
-    dealId?: string;
-    departmentId?: string;
-    limit?: number;
-    offset?: number;
-  };
+  // type OpsQuery = {
+  //   type?: string;
+  //   dateFrom?: string;
+  //   dateTo?: string;
+  //   articleId?: string;
+  //   counterpartyId?: string;
+  //   dealId?: string;
+  //   departmentId?: string;
+  //   limit?: number;
+  //   offset?: number;
+  // };
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
@@ -91,6 +91,8 @@ export const OperationsPage = () => {
     useGetOzonIntegrationQuery();
   const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
   const { showSuccess, showError } = useNotification();
+
+  // ...existing code...
 
   // Инициализируем интеграции с данными из API
   const [integrations, setIntegrations] = useState<
@@ -199,7 +201,7 @@ export const OperationsPage = () => {
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
-  const { data: company } = useGetCompanyQuery();
+  const { data: _company } = useGetCompanyQuery();
 
   // Обновляем состояние интеграций при загрузке данных
   useEffect(() => {
@@ -441,11 +443,11 @@ export const OperationsPage = () => {
   };
 
   const handleImportClick = () => {
-    if (!company?.inn) {
-      showError(
-        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
-      );
-    }
+    // if (!company?.inn) {
+    //   showError(
+    //     'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+    //   );
+    // }
     setIsImportModalOpen(true);
   };
 
@@ -458,36 +460,7 @@ export const OperationsPage = () => {
     return labels[type] || type;
   };
 
-  const getPeriodicityLabel = (op: OperationWithRelations) => {
-    // Если это дочерняя операция (есть родитель)
-    if (op.recurrenceParentId && op.recurrenceParent) {
-      const parentRepeat = op.recurrenceParent.repeat;
-      const parentDate = op.recurrenceParent.operationDate;
-      const labels: Record<string, string> = {
-        daily: 'Ежедневно',
-        weekly: 'Еженедельно',
-        monthly: 'Ежемесячно',
-        quarterly: 'Ежеквартально',
-        semiannual: 'Раз в полгода',
-        annual: 'Ежегодно',
-      };
-      const periodLabel = labels[parentRepeat] || parentRepeat;
-      const formattedDate = formatDate(parentDate);
-      return `${periodLabel} с ${formattedDate}`;
-    }
-
-    // Если это родительская операция или обычная операция
-    const labels: Record<string, string> = {
-      none: '-',
-      daily: 'Ежедневно',
-      weekly: 'Еженедельно',
-      monthly: 'Ежемесячно',
-      quarterly: 'Ежеквартально',
-      semiannual: 'Раз в полгода',
-      annual: 'Ежегодно',
-    };
-    return labels[op.repeat] || op.repeat;
-  };
+  // Обработчик сортировки
 
   // Обработчик сортировки
   const handleSort = (key: string) => {
@@ -1308,4 +1281,43 @@ export const OperationsPage = () => {
       </div>
     </Layout>
   );
+};
+
+const getPeriodicityLabel = (
+  op: Operation & {
+    recurrenceParent?: {
+      id: string;
+      repeat: string;
+      operationDate: Date | string;
+    } | null;
+  }
+) => {
+  // Если это дочерняя операция (есть родитель)
+  if (op.recurrenceParentId && op.recurrenceParent) {
+    const parentRepeat = op.recurrenceParent.repeat;
+    const parentDate = op.recurrenceParent.operationDate;
+    const labels: Record<string, string> = {
+      daily: 'Ежедневно',
+      weekly: 'Еженедельно',
+      monthly: 'Ежемесячно',
+      quarterly: 'Ежеквартально',
+      semiannual: 'Раз в полгода',
+      annual: 'Ежегодно',
+    };
+    const periodLabel = labels[parentRepeat] || parentRepeat;
+    const formattedDate = formatDate(parentDate);
+    return `${periodLabel} с ${formattedDate}`;
+  }
+
+  // Если это родительская операция или обычная операция
+  const labels: Record<string, string> = {
+    none: '-',
+    daily: 'Ежедневно',
+    weekly: 'Еженедельно',
+    monthly: 'Ежемесячно',
+    quarterly: 'Ежеквартально',
+    semiannual: 'Раз в полгода',
+    annual: 'Ежегодно',
+  };
+  return labels[op.repeat] || op.repeat;
 };
