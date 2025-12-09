@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
+import { requireFeature } from '../../middlewares/subscription.guard';
+import { SubscriptionPlan } from '@prisma/client';
 import rolesController from './roles.controller';
 
 const router: Router = Router();
@@ -114,6 +116,7 @@ router.get(
  */
 router.post(
   '/',
+  requireFeature('roles', SubscriptionPlan.TEAM),
   requirePermission('users', 'manage_roles'),
   rolesController.create
 );
@@ -156,6 +159,7 @@ router.post(
  */
 router.put(
   '/:id',
+  requireFeature('roles', SubscriptionPlan.TEAM),
   requirePermission('users', 'manage_roles'),
   rolesController.update
 );
@@ -262,6 +266,7 @@ router.get(
  */
 router.put(
   '/:id/permissions',
+  requireFeature('roles', SubscriptionPlan.TEAM),
   requirePermission('users', 'manage_roles'),
   rolesController.updatePermissions
 );

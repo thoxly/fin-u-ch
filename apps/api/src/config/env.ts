@@ -7,8 +7,8 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // From apps/api/src/config/env.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
-const projectRoot = path.resolve(__dirname, '../../..');
-const apiRoot = path.resolve(__dirname, '../..');
+const projectRoot = path.resolve(__dirname, '../../../..'); // -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
+const apiRoot = path.resolve(__dirname, '..'); // -> apps/api
 
 // Load .env from monorepo root, fallback to apps/api
 const rootEnvPath = path.resolve(projectRoot, '.env');

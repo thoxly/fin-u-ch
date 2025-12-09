@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
+// import { requirePlan } from '../../middlewares/subscription.guard';
+// import { SubscriptionPlan } from '@prisma/client';
 import integrationsController from './integrations.controller';
 
 const router: Router = Router();

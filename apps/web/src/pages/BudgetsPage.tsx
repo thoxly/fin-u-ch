@@ -9,6 +9,7 @@ import { Table } from '../shared/ui/Table';
 import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Input } from '../shared/ui/Input';
+import { FeatureBlocker } from '../shared/ui/FeatureBlocker';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { ProtectedAction } from '../shared/components/ProtectedAction';
 import {
@@ -20,6 +21,8 @@ import {
 import { formatDate } from '../shared/lib/date';
 import type { Budget } from '@fin-u-ch/shared';
 import { useNotification } from '../shared/hooks/useNotification';
+import { useAppSelector } from '../shared/hooks/useRedux';
+import { RootState } from '../store/store';
 
 export const BudgetsPage = () => {
   const navigate = useNavigate();
@@ -288,6 +291,23 @@ export const BudgetsPage = () => {
       width: '120px',
     },
   ];
+
+  // Проверяем доступ к фиче "planning" (требует TEAM+)
+
+  const subscriptionData = useAppSelector(
+    (state: RootState) => state.subscription?.data ?? null
+  );
+  const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
+  const requiredLevel = planHierarchy['TEAM'];
+  const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
+
+  if (currentLevel < requiredLevel) {
+    return (
+      <Layout>
+        <FeatureBlocker feature="planning" requiredPlan="TEAM" />
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
