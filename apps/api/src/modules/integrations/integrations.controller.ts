@@ -1,11 +1,13 @@
 // apps/api/src/modules/integrations/integrations.controller.ts
 import { Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { TenantRequest } from '../../middlewares/tenant';
 import integrationsService from './integrations.service';
 import ozonOperationService from './ozon/ozon-operation.service';
 import prisma from '../../config/db';
 import { AppError } from '../../middlewares/error';
 import logger from '../../config/logger';
+import auditLogService from '../audit/audit.service';
 
 export class IntegrationsController {
   async saveOzonIntegration(
@@ -67,6 +69,26 @@ export class IntegrationsController {
         companyId: req.companyId,
         userId: req.userId,
       });
+
+      // Audit log: save/update integration
+      try {
+        if (result.success && result.data) {
+          await auditLogService.logAction({
+            userId: req.userId || 'system',
+            companyId: req.companyId!,
+            action: 'update',
+            entity: 'integration',
+            entityId: result.data.id,
+            changes: { new: result.data as unknown as Prisma.InputJsonObject },
+            metadata: { type: 'ozon' },
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to write audit log for integration save', {
+          companyId: req.companyId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
 
       res.json(result);
     } catch (error) {
@@ -215,6 +237,26 @@ export class IntegrationsController {
         companyId: req.companyId,
         userId: req.userId,
       });
+
+      // Audit log: disconnect integration
+      try {
+        if (result && result.data) {
+          await auditLogService.logAction({
+            userId: req.userId || 'system',
+            companyId: req.companyId!,
+            action: 'update',
+            entity: 'integration',
+            entityId: result.data.id,
+            changes: { new: result.data as unknown as Prisma.InputJsonObject },
+            metadata: { disconnected: true, type: 'ozon' },
+          });
+        }
+      } catch (err) {
+        logger.warn('Failed to write audit log for integration disconnect', {
+          companyId: req.companyId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
 
       res.json(result);
     } catch (error) {

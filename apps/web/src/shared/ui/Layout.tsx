@@ -9,6 +9,7 @@ import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
+import { PlanBadge } from './PlanBadge';
 
 interface LayoutProps {
   children: ReactNode;
@@ -357,7 +358,10 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-            <UserMenu userEmail={user?.email} />
+            <div className="flex items-center gap-4">
+              <PlanBadge compact={true} />
+              <UserMenu userEmail={user?.email} />
+            </div>
           </div>
         </div>
       </header>
@@ -400,6 +404,9 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                       className="ml-auto opacity-50"
                     />
                   </div>
+                  {/* УДАЛЕНО: {isPopoverActive(item.name) && (
+                    <MenuPopover items={item.children || []} title={item.name} />
+                  )} */}
                 </div>
               ) : (
                 <Link

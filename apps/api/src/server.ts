@@ -8,8 +8,8 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const projectRoot = path.resolve(__dirname, '../../..');
-const apiRoot = path.resolve(__dirname, '../..');
+const projectRoot = path.resolve(__dirname, '../../../..'); // -> apps/api/src -> apps/api -> apps -> root
+const apiRoot = path.resolve(__dirname, '..'); // -> apps/api
 
 const rootEnvPath = path.resolve(projectRoot, '.env');
 const apiEnvPath = path.resolve(apiRoot, '.env');
@@ -38,7 +38,8 @@ import demoUserService from './modules/demo/demo.service';
 
 const PORT = env.PORT;
 
-const server = app.listen(PORT, async () => {
+// Bind explicitly to IPv4 to avoid Windows EACCES on ::1
+const server = app.listen(PORT, '127.0.0.1', async () => {
   logger.info(`API server running on port ${PORT}`);
   logger.info(`Environment: ${env.NODE_ENV}`);
   logger.info(`Health check: http://localhost:${PORT}/api/health`);

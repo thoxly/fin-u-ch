@@ -18,6 +18,7 @@ import { Table } from '../../shared/ui/Table';
 import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
+import { UserLimitIndicator } from '../../shared/ui/UserLimitIndicator';
 import {
   useGetUsersQuery,
   useGetUserRolesQuery,
@@ -27,6 +28,7 @@ import {
   useUpdateUserMutation,
   useDeleteUserMutation,
 } from '../../store/api/usersApi';
+import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 import { useGetRolesQuery } from '../../store/api/rolesApi';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { ProtectedAction } from '../../shared/components/ProtectedAction';
@@ -151,6 +153,9 @@ export const UsersPage = () => {
   const [assignRole] = useAssignRoleMutation();
   const [removeRole] = useRemoveRoleMutation();
   const [inviteUser] = useInviteUserMutation();
+  const { data: subscription } = useGetSubscriptionQuery(undefined, {
+    skip: false,
+  });
   const [updateUser] = useUpdateUserMutation();
   const [deleteUser] = useDeleteUserMutation();
 
@@ -546,14 +551,29 @@ export const UsersPage = () => {
                 onClick={handleInviteUser}
                 icon={<UserPlus size={20} />}
                 className="w-full sm:w-auto"
+                disabled={
+                  !!subscription &&
+                  subscription.userLimit &&
+                  (subscription.userLimit.remaining === 0 ||
+                    (subscription.userLimit.remaining !== null &&
+                      subscription.userLimit.remaining <= 0))
+                }
               >
-                Пригласить пользователя
+                {subscription &&
+                subscription.userLimit &&
+                subscription.userLimit.remaining !== null &&
+                subscription.userLimit.remaining <= 0
+                  ? 'Лимит пользователей исчерпан'
+                  : 'Пригласить пользователя'}
               </Button>
             </ProtectedAction>
           </div>
         </div>
 
-        {/* Фильтры и поиск */}
+        {/* Индикатор лимита пользователей */}
+        <Card>
+          <UserLimitIndicator showLabel={true} showTooltip={true} />
+        </Card>
         <Card>
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1 w-full sm:w-auto">

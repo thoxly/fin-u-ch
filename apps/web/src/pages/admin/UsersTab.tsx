@@ -186,33 +186,12 @@ export const UsersTab = () => {
         setInviteRoleId('');
       }
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : 'Ошибка при приглашении пользователя';
-
-      // Очищаем системную информацию из сообщения
-      const sanitizedMessage =
-        typeof rawErrorMessage === 'string'
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при приглашении пользователя';
-
-      showError(
-        sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-          ? sanitizedMessage
-          : 'Ошибка при приглашении пользователя'
-      );
+      // Ошибка уже обработана в apiSlice baseQuery (глобальный обработчик 403)
+      // Здесь только логируем для отладки
+      console.error('[UsersTab] Failed to invite user:', error);
+      setIsInviteModalOpen(false);
+      setInviteEmail('');
+      setInviteRoleId('');
     }
   };
 
@@ -269,33 +248,7 @@ export const UsersTab = () => {
       setIsEditModalOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : 'Ошибка при обновлении пользователя';
-
-      // Очищаем системную информацию из сообщения
-      const sanitizedMessage =
-        typeof rawErrorMessage === 'string'
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при обновлении пользователя';
-
-      showError(
-        sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-          ? sanitizedMessage
-          : 'Ошибка при обновлении пользователя'
-      );
+      console.error('[UsersTab] Failed to update user:', error);
     }
   };
 
@@ -314,33 +267,7 @@ export const UsersTab = () => {
       }).unwrap();
       showSuccess('Роль успешно назначена');
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : 'Ошибка при назначении роли';
-
-      // Очищаем системную информацию из сообщения
-      const sanitizedMessage =
-        typeof rawErrorMessage === 'string'
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при назначении роли';
-
-      showError(
-        sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-          ? sanitizedMessage
-          : 'Ошибка при назначении роли'
-      );
+      console.error('[UsersTab] Failed to assign role:', error);
     }
   };
 
@@ -357,33 +284,7 @@ export const UsersTab = () => {
         }).unwrap();
         showSuccess('Роль успешно снята');
       } catch (error) {
-        const rawErrorMessage =
-          error &&
-          typeof error === 'object' &&
-          'data' in error &&
-          error.data &&
-          typeof error.data === 'object' &&
-          'message' in error.data &&
-          typeof error.data.message === 'string'
-            ? error.data.message
-            : 'Ошибка при снятии роли';
-
-        // Очищаем системную информацию из сообщения
-        const sanitizedMessage =
-          typeof rawErrorMessage === 'string'
-            ? rawErrorMessage
-                .replace(/Операция\s+[\w-]+:\s*/gi, '')
-                .replace(/^[^:]+:\s*/i, '')
-                .trim()
-            : 'Ошибка при снятии роли';
-
-        showError(
-          sanitizedMessage &&
-            sanitizedMessage.length > 5 &&
-            !sanitizedMessage.match(/^[A-Z_]+$/)
-            ? sanitizedMessage
-            : 'Ошибка при снятии роли'
-        );
+        console.error('[UsersTab] Failed to remove role:', error);
       }
     }
   };
@@ -408,33 +309,7 @@ export const UsersTab = () => {
       showSuccess('Пользователь успешно удалён');
       setDeleteModal({ isOpen: false, user: null });
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : 'Ошибка при удалении пользователя';
-
-      // Очищаем системную информацию из сообщения
-      const sanitizedMessage =
-        typeof rawErrorMessage === 'string'
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при удалении пользователя';
-
-      showError(
-        sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-          ? sanitizedMessage
-          : 'Ошибка при удалении пользователя'
-      );
+      console.error('[UsersTab] Failed to delete user:', error);
       setDeleteModal({ isOpen: false, user: null });
     }
   };

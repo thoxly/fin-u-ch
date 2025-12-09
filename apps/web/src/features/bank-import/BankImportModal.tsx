@@ -135,7 +135,6 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         }
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Сохраняем состояние в localStorage только когда модальное окно открыто

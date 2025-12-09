@@ -296,8 +296,6 @@ export const AuditLogsPage = () => {
     },
   ];
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
-
   return (
     <AdminLayout>
       <div className="space-y-4 md:space-y-6">

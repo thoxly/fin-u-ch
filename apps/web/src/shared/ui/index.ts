@@ -14,3 +14,7 @@ export { IncomeExpenseChart } from './IncomeExpenseChart';
 export { WeeklyFlowChart } from './WeeklyFlowChart';
 export { AccountBalancesChart } from './AccountBalancesChart';
 export { RecentOperationsTable } from './RecentOperationsTable';
+export { FeatureBlocker, withFeatureAccess } from './FeatureBlocker';
+export { PlanBadge } from './PlanBadge';
+export { UserLimitIndicator } from './UserLimitIndicator';
+export { PricingCard } from './PricingCard';
