@@ -5,6 +5,7 @@ import { Card } from '../shared/ui/Card';
 import { FeatureBlocker } from '../shared/ui/FeatureBlocker';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { useAppSelector } from '../shared/hooks/useRedux';
+import { RootState } from '../store/store';
 import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
 import { AuditLogsTab } from './admin/AuditLogsTab';
@@ -48,7 +49,9 @@ const adminTabs: AdminTab[] = [
 
 export const AdminPage = () => {
   const { hasPermission } = usePermissions();
-  const subscriptionData = useAppSelector((state) => state.subscription.data);
+  const subscriptionData = useAppSelector(
+    (state: RootState) => state.subscription?.data ?? null
+  );
 
   // Фильтруем табы по правам доступа и плану
   const availableTabs = adminTabs.filter((tab) => {
@@ -297,7 +300,9 @@ function ApiTab() {
  * Обёртка для RolesTab с проверкой доступа к фиче "roles" (требует TEAM+)
  */
 function RolesTabWithFeatureCheck() {
-  const subscriptionData = useAppSelector((state) => state.subscription.data);
+  const subscriptionData = useAppSelector(
+    (state: RootState) => state.subscription?.data ?? null
+  );
   const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
   const requiredLevel = planHierarchy['TEAM'];
   const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;

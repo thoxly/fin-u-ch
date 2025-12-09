@@ -22,6 +22,7 @@ import { formatDate } from '../shared/lib/date';
 import type { Budget } from '@fin-u-ch/shared';
 import { useNotification } from '../shared/hooks/useNotification';
 import { useAppSelector } from '../shared/hooks/useRedux';
+import { RootState } from '../store/store';
 
 export const BudgetsPage = () => {
   const navigate = useNavigate();
@@ -292,7 +293,10 @@ export const BudgetsPage = () => {
   ];
 
   // Проверяем доступ к фиче "planning" (требует TEAM+)
-  const subscriptionData = useAppSelector((state) => state.subscription.data);
+
+  const subscriptionData = useAppSelector(
+    (state: RootState) => state.subscription?.data ?? null
+  );
   const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
   const requiredLevel = planHierarchy['TEAM'];
   const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;

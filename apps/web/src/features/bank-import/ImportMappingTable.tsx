@@ -196,7 +196,6 @@ export const ImportMappingTable = ({
   const { data: company } = useGetCompanyQuery();
   const { data: totalImportedData } = useGetTotalImportedOperationsCountQuery();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bulkUpdate] = useBulkUpdateImportedOperationsMutation();
   const [importOperations, { isLoading: isImporting }] =
     useImportOperationsMutation();

@@ -1,22 +1,10 @@
 import { AlertCircle } from 'lucide-react';
 import { useAppSelector } from '../hooks/useRedux';
+import { RootState } from '../../store/store';
 
 interface UserLimitIndicatorProps {
   showLabel?: boolean;
   showTooltip?: boolean;
-}
-
-interface RootState {
-  subscription: {
-    data: {
-      userLimit: {
-        current: number;
-        max: number;
-        remaining: number;
-        isUnlimited: boolean;
-      } | null;
-    } | null;
-  };
 }
 
 /**
@@ -28,7 +16,7 @@ export const UserLimitIndicator = ({
   showTooltip = true,
 }: UserLimitIndicatorProps) => {
   const subscriptionData = useAppSelector(
-    (state: RootState) => state.subscription.data
+    (state: RootState) => state.subscription?.data ?? null
   );
 
   if (!subscriptionData || !subscriptionData.userLimit) {

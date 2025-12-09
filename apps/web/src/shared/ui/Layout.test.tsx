@@ -3,7 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { Layout } from './Layout';
+import { apiSlice } from '../../store/api/apiSlice';
+import subscriptionReducer from '../../store/slices/subscriptionSlice';
 
 // Mock CatalogFormRenderer
 jest.mock('./CatalogFormRenderer', () => ({
@@ -19,6 +20,11 @@ jest.mock('./CatalogFormRenderer', () => ({
       <button onClick={onClose}>Close Form</button>
     </div>
   ),
+}));
+
+// Mock PlanBadge to avoid dependency on subscription slice shape in tests
+jest.mock('./PlanBadge', () => ({
+  PlanBadge: () => <div data-testid="plan-badge" />,
 }));
 
 // Mock navigation icons hook
@@ -96,7 +102,9 @@ jest.mock('../../store/api/companiesApi', () => ({
   ],
 }));
 
-import { apiSlice } from '../../store/api/apiSlice';
+// Require Layout after mocks so PlanBadge mock is applied
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { Layout } = require('./Layout');
 
 // Create a mock store
 const createMockStore = () => {
@@ -105,6 +113,24 @@ const createMockStore = () => {
       [apiSlice.reducerPath]: apiSlice.reducer,
       auth: (state = { user: null, token: null }) => state,
       notification: (state = { notifications: [] }) => state,
+      subscription: subscriptionReducer,
+    },
+    preloadedState: {
+      subscription: {
+        data: {
+          plan: 'START',
+          status: 'active',
+          startDate: '',
+          endDate: null,
+          trialEndsAt: null,
+          promoCode: null,
+          limits: { maxUsers: 1, features: [] },
+          userLimit: { current: 1, max: 1, remaining: 0, isUnlimited: false },
+        },
+        loading: false,
+        error: null,
+        activatingPromo: false,
+      },
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({

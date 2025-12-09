@@ -67,27 +67,7 @@ export const requireFeature = (
         feature,
       });
 
-      // Проверяем минимальный требуемый план
-      const planHierarchy: Record<SubscriptionPlan, number> = {
-        START: 1,
-        TEAM: 2,
-        BUSINESS: 3,
-      };
-
-      // if (planHierarchy[currentPlan] < planHierarchy[minPlan]) {
-      //   logger.warn('Subscription plan insufficient', {
-      //     companyId: req.companyId,
-      //     currentPlan,
-      //     requiredPlan: minPlan,
-      //     feature,
-      //     path: req.path,
-      //     method: req.method,
-      //   });
-      //   throw new AppError(
-      //     `Для использования этой функции требуется тарифный план ${minPlan} или выше. Ваш текущий тарифный план равен ${currentPlan}. Пожалуйста, обновите подписку.`,
-      //     403
-      //   );
-      // }
+      // Проверяем минимальный требуемый план (логика вынесена в enforceFeatureAccess)
 
       // Проверяем доступ к конкретной фиче
       enforceFeatureAccess(currentPlan, feature);

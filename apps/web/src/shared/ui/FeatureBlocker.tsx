@@ -4,6 +4,7 @@ import { Card } from './Card';
 import { Button } from './Button';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useRedux';
+import { RootState } from '../../store/store';
 
 interface FeatureBlockerProps {
   feature: string;
@@ -95,11 +96,7 @@ export const FeatureBlocker = ({
 /**
  * HOC для обёртывания компонента с проверкой доступа к фиче
  */
-interface RootState {
-  subscription: {
-    data: { plan: 'START' | 'TEAM' | 'BUSINESS' } | null;
-  };
-}
+// RootState imported from store; keep file exporting only components/HOC
 
 export function withFeatureAccess<P extends object>(
   Component: React.ComponentType<P>,
@@ -107,9 +104,9 @@ export function withFeatureAccess<P extends object>(
   requiredPlan: 'TEAM' | 'BUSINESS'
 ) {
   return function WrappedComponent(props: P) {
-    // Используем hook для получения подписки
+    // Используем tolerant selector — в тестах стор может быть без subscription
     const subscriptionData = useAppSelector(
-      (state: RootState) => state.subscription.data
+      (state: RootState) => state.subscription?.data ?? null
     );
 
     // Если подписка не загружена, показываем лоадер

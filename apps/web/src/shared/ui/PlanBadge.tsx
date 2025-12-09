@@ -1,13 +1,8 @@
 import { useAppSelector } from '../hooks/useRedux';
+import { RootState } from '../../store/store';
 
 interface PlanBadgeProps {
   compact?: boolean;
-}
-
-interface RootState {
-  subscription: {
-    data: { plan: string } | null;
-  };
 }
 
 const planConfig = {
@@ -34,11 +29,12 @@ const planConfig = {
  * Показывает в хедере/сайдбаре текущий план подписки
  */
 export const PlanBadge = ({ compact = false }: PlanBadgeProps) => {
+  // use a tolerant selector so tests / mock stores without `subscription` key don't crash
   const subscriptionData = useAppSelector(
-    (state: RootState) => state.subscription.data
+    (state: RootState) => state.subscription?.data ?? null
   );
 
-  if (!subscriptionData) {
+  if (!subscriptionData || !subscriptionData.plan) {
     return null;
   }
 

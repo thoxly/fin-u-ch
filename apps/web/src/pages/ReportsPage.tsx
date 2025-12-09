@@ -22,6 +22,7 @@ import {
 } from '../shared/lib/period';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppSelector } from '@/shared/hooks/useRedux';
+import { RootState } from '../store/store';
 import { FeatureBlocker } from '@/shared/ui/FeatureBlocker';
 
 type ReportType = 'cashflow';
@@ -82,7 +83,9 @@ export const ReportsPage = () => {
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
   const articleFilterRef = useRef<HTMLDivElement>(null);
-  const subscriptionData = useAppSelector((state) => state.subscription.data);
+  const subscriptionData = useAppSelector(
+    (state: RootState) => state?.subscription?.data ?? null
+  );
   const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
   const requiredLevel = planHierarchy['TEAM'];
   const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;

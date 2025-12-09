@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Trash2, X, Copy, Check, FileUp } from 'lucide-react';
 
@@ -48,6 +47,7 @@ import {
   useDisconnectOzonIntegrationMutation,
   useGetOzonIntegrationQuery,
 } from '../store/api/integrationsApi';
+import { useAppSelector } from '../shared/hooks/useRedux';
 
 import { usePermissions } from '../shared/hooks/usePermissions';
 
@@ -86,9 +86,13 @@ export const OperationsPage = () => {
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Загружаем данные интеграции Ozon
+  const plan =
+    useAppSelector((state) => state.subscription?.data?.plan) || 'START';
+  const canUseIntegrations = plan === 'BUSINESS';
+
+  // Загружаем данные интеграции Ozon только для разрешённых тарифов
   const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
-    useGetOzonIntegrationQuery();
+    useGetOzonIntegrationQuery(undefined, { skip: !canUseIntegrations });
   const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
   const { showSuccess, showError } = useNotification();
 
@@ -205,6 +209,10 @@ export const OperationsPage = () => {
 
   // Обновляем состояние интеграций при загрузке данных
   useEffect(() => {
+    if (!canUseIntegrations) {
+      return;
+    }
+
     if (ozonIntegrationData?.success && ozonIntegrationData.data) {
       setIntegrations((prev) =>
         prev.map((integration) =>
@@ -218,7 +226,7 @@ export const OperationsPage = () => {
         )
       );
     }
-  }, [ozonIntegrationData]);
+  }, [canUseIntegrations, ozonIntegrationData]);
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -348,7 +356,7 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     const {
       id: _id,
       createdAt: _createdAt,
@@ -600,7 +608,6 @@ export const OperationsPage = () => {
           : 'Не подтверждена',
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedItems]);
 
   const handleClearFilters = () => {
@@ -838,12 +845,14 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-            <IntegrationsDropdown
-              integrations={integrations}
-              onIntegrationUpdate={handleIntegrationUpdate}
-              onIntegrationDisconnect={handleIntegrationDisconnect}
-              isLoading={isLoadingOzonIntegration}
-            />
+            {canUseIntegrations && (
+              <IntegrationsDropdown
+                integrations={integrations}
+                onIntegrationUpdate={handleIntegrationUpdate}
+                onIntegrationDisconnect={handleIntegrationDisconnect}
+                isLoading={isLoadingOzonIntegration}
+              />
+            )}
             {canUpdate('operations') && (
               <>
                 <RecurringOperations onEdit={handleEdit} />

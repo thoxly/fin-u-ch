@@ -14,7 +14,7 @@ export const PrivateRoute = ({ children }: PrivateRouteProps) => {
     (state: RootState) => state.auth.isAuthenticated
   );
   const subscriptionData = useSelector(
-    (state: RootState) => state.subscription.data
+    (state: RootState) => state.subscription?.data ?? null
   );
 
   /**
