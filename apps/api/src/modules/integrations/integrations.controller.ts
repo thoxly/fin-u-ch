@@ -1,5 +1,6 @@
 // apps/api/src/modules/integrations/integrations.controller.ts
 import { Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 import { TenantRequest } from '../../middlewares/tenant';
 import integrationsService from './integrations.service';
 import ozonOperationService from './ozon/ozon-operation.service';
@@ -78,7 +79,7 @@ export class IntegrationsController {
             action: 'update',
             entity: 'integration',
             entityId: result.data.id,
-            changes: { new: result.data },
+            changes: { new: result.data as unknown as Prisma.InputJsonObject },
             metadata: { type: 'ozon' },
           });
         }
@@ -246,7 +247,7 @@ export class IntegrationsController {
             action: 'update',
             entity: 'integration',
             entityId: result.data.id,
-            changes: { new: result.data },
+            changes: { new: result.data as unknown as Prisma.InputJsonObject },
             metadata: { disconnected: true, type: 'ozon' },
           });
         }
