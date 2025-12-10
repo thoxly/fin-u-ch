@@ -37,10 +37,13 @@ import redis from './config/redis';
 import demoUserService from './modules/demo/demo.service';
 
 const PORT = env.PORT;
+// Use 0.0.0.0 for Docker (allows container access), 127.0.0.1 for local dev
+const HOST =
+  process.env.HOST ||
+  (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 
-// Bind explicitly to IPv4 to avoid Windows EACCES on ::1
-const server = app.listen(PORT, '127.0.0.1', async () => {
-  logger.info(`API server running on port ${PORT}`);
+const server = app.listen(PORT, HOST, async () => {
+  logger.info(`API server running on ${HOST}:${PORT}`);
   logger.info(`Environment: ${env.NODE_ENV}`);
   logger.info(`Health check: http://localhost:${PORT}/api/health`);
 
