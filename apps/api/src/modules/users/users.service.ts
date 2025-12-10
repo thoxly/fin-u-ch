@@ -354,13 +354,12 @@ export class UsersService {
       throw new AppError('User does not belong to this company', 403);
     }
 
-    // Нельзя удалить супер-администратора
+    // Нельзя удалить супер-администратора (через админку)
     if (user.isSuperAdmin) {
       throw new AppError('Cannot delete super administrator', 403);
     }
 
     // Удаляем пользователя (soft delete)
-    // Изменяем email, добавляя timestamp, чтобы освободить его для повторного использования
     const deletedEmail = `${user.email}.deleted.${Date.now()}`;
 
     await prisma.user.update({
@@ -376,6 +375,79 @@ export class UsersService {
       companyId,
       originalEmail: user.email,
       deletedEmail,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Удалить свой аккаунт (включая удаление из БД)
+   */
+  async deleteMyAccount(userId: string, companyId: string) {
+    logger.warn('[UsersService.deleteMyAccount] Удаление своего аккаунта', {
+      userId,
+      companyId,
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        companyId: true,
+        isSuperAdmin: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Выполняем полное удаление пользователя и связанных данных в транзакции
+    await prisma.$transaction(async (tx) => {
+      // 1. Удаляем логи аудита пользователя
+      await tx.auditLog.deleteMany({
+        where: { userId },
+      });
+
+      // 2. Удаляем правила маппинга, созданные пользователем
+      await tx.mappingRule.deleteMany({
+        where: { userId },
+      });
+
+      // 3. Удаляем сессии импорта пользователя
+      // Сначала удаляем операции импорта, связанные с сессиями
+      const userSessions = await tx.importSession.findMany({
+        where: { userId },
+        select: { id: true },
+      });
+
+      if (userSessions.length > 0) {
+        const sessionIds = userSessions.map((s) => s.id);
+        await tx.importedOperation.deleteMany({
+          where: { importSessionId: { in: sessionIds } },
+        });
+
+        await tx.importSession.deleteMany({
+          where: { userId },
+        });
+      }
+
+      // 4. Удаляем самого пользователя
+      // Связанные UserRole и EmailToken удалятся автоматически благодаря onDelete: Cascade
+      await tx.user.delete({
+        where: { id: userId },
+      });
+    });
+
+    logger.warn('[UsersService.deleteMyAccount] Аккаунт полностью удалён', {
+      userId,
+      companyId,
+      email: user.email,
     });
 
     return { success: true };

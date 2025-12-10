@@ -28,14 +28,13 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
 import { NotificationContainer } from './components/Notification';
 import { ThemeProvider } from './components/ThemeProvider';
-import { DevTools } from './shared/ui/DevTools/DevTools';
 
 function App() {
   return (
     <>
       <ThemeProvider />
       <NotificationContainer />
-      <DevTools />
+
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
