@@ -37,9 +37,10 @@ import redis from './config/redis';
 import demoUserService from './modules/demo/demo.service';
 
 const PORT = env.PORT;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for Docker
 
-const server = app.listen(PORT, async () => {
-  logger.info(`API server running on port ${PORT}`);
+const server = app.listen(PORT, HOST, async () => {
+  logger.info(`API server running on ${HOST}:${PORT}`);
   logger.info(`Environment: ${env.NODE_ENV}`);
   logger.info(`Health check: http://localhost:${PORT}/api/health`);
 
