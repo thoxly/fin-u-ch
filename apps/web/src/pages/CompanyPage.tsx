@@ -293,19 +293,19 @@ export const CompanyPage = () => {
           )}
 
           {activeTab === 'tariff' && (
-            <div className="space-y-8">
+            <div className="space-y-6 sm:space-y-8">
               {/* Заголовок */}
               <div className="text-center space-y-2">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                   Выберите тариф
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                   Расширьте возможности вашей компании
                 </p>
               </div>
 
               {/* Карточки тарифов */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                 {Object.entries(PLANS).map(([planKey, plan]) => (
                   <PricingCard
                     key={planKey}
@@ -324,13 +324,13 @@ export const CompanyPage = () => {
 
               {/* Форма ввода промокода */}
               {selectedPlanForPromo && currentPlan !== selectedPlanForPromo && (
-                <div id="promo-form-tariff">
-                  <Card className="mt-8 p-8 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900">
+                <div id="promo-form-tariff" className="px-4 sm:px-0">
+                  <Card className="mt-6 sm:mt-8 p-6 sm:p-8 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900">
                     <div className="max-w-2xl mx-auto">
-                      <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                      <h3 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
                         Активировать промокод для {selectedPlanForPromo}
                       </h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6">
                         Введите ваш промокод для получения доступа к тарифу{' '}
                         <strong>{selectedPlanForPromo}</strong>
                       </p>
@@ -340,7 +340,7 @@ export const CompanyPage = () => {
                         className="space-y-4"
                       >
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Промокод
                           </label>
                           <Input
@@ -355,7 +355,7 @@ export const CompanyPage = () => {
                           />
                         </div>
 
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
                           <Button
                             type="submit"
                             disabled={isActivatingPromo || !promoCode.trim()}
@@ -373,6 +373,7 @@ export const CompanyPage = () => {
                               setPromoCode('');
                             }}
                             disabled={isActivatingPromo}
+                            className="sm:w-auto"
                           >
                             Отмена
                           </Button>
