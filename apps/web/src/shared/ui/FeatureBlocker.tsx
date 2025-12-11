@@ -64,7 +64,8 @@ export const FeatureBlocker = ({
   const displayDescription = description || metadata.description;
 
   const handleUpgrade = () => {
-    navigate('/company?tab=billing');
+    // Перейти на страницу тарифов компании
+    navigate('/company/tarif');
   };
 
   return (

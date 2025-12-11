@@ -856,7 +856,7 @@ export const OperationsPage = () => {
             {canUpdate('operations') && (
               <>
                 <RecurringOperations onEdit={handleEdit} />
-                <MappingRules />
+                {plan !== 'START' && <MappingRules />}
               </>
             )}
 
@@ -865,7 +865,7 @@ export const OperationsPage = () => {
               buildRows={buildExportRows}
               columns={exportColumns}
             />
-            {canUpdate('operations') && (
+            {canUpdate('operations') && plan !== 'START' && (
               <button
                 onClick={handleImportClick}
                 className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
