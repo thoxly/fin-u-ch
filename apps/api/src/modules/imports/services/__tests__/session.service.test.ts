@@ -16,6 +16,16 @@ jest.mock('../../../../config/env', () => ({
   },
 }));
 
+// Mock logger
+jest.mock('../../../../config/logger', () => ({
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+  debug: jest.fn(),
+}));
+
+// Mock Prisma client
+
 // Mock Prisma client
 jest.mock('../../../../config/db', () => ({
   __esModule: true,
