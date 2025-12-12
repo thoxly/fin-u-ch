@@ -124,8 +124,9 @@ export const AdminPage = () => {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+
+        <Card>
+          <div className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
             {availableTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -133,11 +134,11 @@ export const AdminPage = () => {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`
-                    flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
+                    flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition-colors whitespace-nowrap
                     ${
                       activeTab === tab.id
-                        ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                        ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                        : 'border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300'
                     }
                   `}
                 >
@@ -146,8 +147,8 @@ export const AdminPage = () => {
                 </button>
               );
             })}
-          </nav>
-        </div>
+          </div>
+        </Card>
 
         {/* Tab Content */}
         <div>
@@ -172,8 +173,8 @@ function ApiTab() {
           API Документация
         </h2>
         <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Получайте доступ к мощному REST API для интеграции ваших систем с
-          fin-u-ch.
+          Получайте доступ к мощному REST API для интеграции внешних сервисов с
+          системой финансового учета.
         </p>
       </div>
 

@@ -10,7 +10,10 @@ import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
-import { sendVerificationEmail } from '../../services/mail/mail.service';
+import {
+  sendVerificationEmail,
+  sendBetaPromoCodeEmail,
+} from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
 // import subscriptionService from '../subscription/subscription.service';
 import promoCodeService from '../subscription/promo-code.service';
@@ -257,6 +260,34 @@ export class AuthService {
           stack: error instanceof Error ? error.stack : undefined,
         });
         // Не блокируем регистрацию, если письмо не отправилось
+      }
+
+      // Отправляем письмо с промокодом
+      if (result.personalPromoCode) {
+        try {
+          logger.info('Sending beta promo code email', {
+            userId: result.user.id,
+            email: result.user.email,
+            promoCode: result.personalPromoCode,
+          });
+
+          await sendBetaPromoCodeEmail(
+            result.user.email,
+            result.personalPromoCode
+          );
+
+          logger.info('Beta promo code email sent successfully', {
+            userId: result.user.id,
+            email: result.user.email,
+          });
+        } catch (error) {
+          logger.error('Failed to send beta promo code email', {
+            userId: result.user.id,
+            email: result.user.email,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Не блокируем регистрацию
+        }
       }
 
       logger.info('[AuthService.register] Регистрация успешна', {

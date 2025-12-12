@@ -44,7 +44,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
 }) => {
   return (
     <div
-      className={`relative rounded-lg border-2 p-6 transition-all duration-300 hover:shadow-xl ${
+      className={`relative rounded-lg border-2 p-4 sm:p-6 transition-all duration-300 hover:shadow-xl ${
         planColors[plan]
       } ${isCurrentPlan ? planBgHighlight[plan] : 'bg-white dark:bg-gray-800'}`}
     >
@@ -70,21 +70,21 @@ export const PricingCard: React.FC<PricingCardProps> = ({
 
       {/* Заголовок */}
       <div className="mb-4">
-        <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+        <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
           {plan}
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
           {description}
         </p>
       </div>
 
       {/* Цена */}
       {price && (
-        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+        <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="text-2xl sm:text-4xl font-bold text-gray-900 dark:text-gray-100">
             {price}
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
             {plan === 'START' && 'Бесплатно'}
             {plan === 'TEAM' && 'Доступ по промокоду'}
             {plan === 'BUSINESS' && 'Доступ по промокоду'}
@@ -92,8 +92,8 @@ export const PricingCard: React.FC<PricingCardProps> = ({
         </div>
       )}
       {!price && (
-        <div className="mb-6 pb-6 border-b border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-gray-200 dark:border-gray-700">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             {plan === 'START' && 'Бесплатно'}
             {plan === 'TEAM' && 'Доступ по промокоду'}
             {plan === 'BUSINESS' && 'Доступ по промокоду'}
@@ -102,11 +102,11 @@ export const PricingCard: React.FC<PricingCardProps> = ({
       )}
 
       {/* Количество пользователей */}
-      <div className="mb-6">
-        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <div className="mb-4 sm:mb-6">
+        <div className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Пользователи
         </div>
-        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <div className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
           {maxUsers === Infinity
             ? 'Неограниченно'
             : `до ${maxUsers} пользователей`}
@@ -117,7 +117,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
       {!isCurrentPlan && (
         <Button
           onClick={() => onSelectPlan(plan)}
-          className="w-full mb-6"
+          className="w-full mb-4 sm:mb-6"
           variant={isMostPopular ? 'primary' : 'secondary'}
         >
           {plan === 'START' ? 'Уже включен' : 'Активировать промокод'}
@@ -125,21 +125,21 @@ export const PricingCard: React.FC<PricingCardProps> = ({
       )}
 
       {isCurrentPlan && (
-        <div className="w-full mb-6 py-2 px-4 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-center text-sm font-medium">
+        <div className="w-full mb-4 sm:mb-6 py-2 px-4 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-center text-xs sm:text-sm font-medium">
           Текущий тариф
         </div>
       )}
 
       {/* Особенности */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        <h4 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
           Включённые возможности:
         </h4>
-        <ul className="space-y-3">
+        <ul className="space-y-2 sm:space-y-3">
           {features.map((feature, idx) => (
-            <li key={idx} className="flex items-start gap-3">
-              <Check className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-              <span className="text-sm text-gray-700 dark:text-gray-300">
+            <li key={idx} className="flex items-start gap-2 sm:gap-3">
+              <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300">
                 {feature}
               </span>
             </li>

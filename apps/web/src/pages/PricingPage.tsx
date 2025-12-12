@@ -99,19 +99,19 @@ export const PricingPage = () => {
   };
 
   return (
-    <div className="space-y-8 max-w-7xl">
+    <div className="space-y-6 sm:space-y-8 max-w-7xl px-4 sm:px-0">
       {/* Заголовок */}
       <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100">
           Выберите тариф
         </h1>
-        <p className="text-lg text-gray-600 dark:text-gray-400">
+        <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-400">
           Расширьте возможности вашей компании
         </p>
       </div>
 
       {/* Карточки тарифов */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         {Object.entries(PLANS).map(([planKey, plan]) => (
           <PricingCard
             key={planKey}
@@ -128,20 +128,20 @@ export const PricingPage = () => {
 
       {/* Форма ввода промокода */}
       {selectedPlanForPromo && currentPlan !== selectedPlanForPromo && (
-        <div id="promo-form">
-          <Card className="mt-8 p-8 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900">
+        <div id="promo-form" className="px-4 sm:px-0">
+          <Card className="mt-6 sm:mt-8 p-6 sm:p-8 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900">
             <div className="max-w-2xl mx-auto">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
                 Активировать промокод для {selectedPlanForPromo}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mb-6">
                 Введите ваш промокод для получения доступа к тарифу{' '}
                 <strong>{selectedPlanForPromo}</strong>
               </p>
 
               <form onSubmit={handleActivatePromo} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Промокод
                   </label>
                   <Input
@@ -154,7 +154,7 @@ export const PricingPage = () => {
                   />
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     type="submit"
                     disabled={isActivating || !promoCode.trim()}
@@ -170,14 +170,15 @@ export const PricingPage = () => {
                       setPromoCode('');
                     }}
                     disabled={isActivating}
+                    className="sm:w-auto"
                   >
                     Отмена
                   </Button>
                 </div>
               </form>
 
-              <div className="mt-6 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="mt-6 p-3 sm:p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                   <strong>💡 Совет:</strong> Если у вас нет промокода, посетите
                   страницу{' '}
                   <a
@@ -195,11 +196,11 @@ export const PricingPage = () => {
       )}
 
       {/* Информационный блок */}
-      <Card className="p-6 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">
+      <Card className="p-6 sm:p-8 mx-4 sm:mx-0 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">
+        <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
           ❓ Часто задаваемые вопросы
         </h3>
-        <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        <div className="space-y-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300">
           <p>
             <strong>Когда я могу обновить свой тариф?</strong> Вы можете
             обновить свой тариф в любой момент, используя промокод.

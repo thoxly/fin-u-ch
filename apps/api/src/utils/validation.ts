@@ -92,8 +92,23 @@ export const validateEmail = (email: string): void => {
 };
 
 export const validatePassword = (password: string): void => {
-  if (password.length < 6) {
-    throw new AppError('Password must be at least 6 characters long', 400);
+  if (password.length < 12) {
+    throw new AppError('Password must be at least 12 characters long', 400);
+  }
+  if (!/[A-Z]/.test(password)) {
+    throw new AppError(
+      'Password must contain at least one uppercase letter',
+      400
+    );
+  }
+  if (!/[a-z]/.test(password)) {
+    throw new AppError(
+      'Password must contain at least one lowercase letter',
+      400
+    );
+  }
+  if (!/\d/.test(password)) {
+    throw new AppError('Password must contain at least one digit', 400);
   }
 };
 

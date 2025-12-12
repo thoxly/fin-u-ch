@@ -49,24 +49,36 @@ describe('Validation Utils', () => {
   });
 
   describe('validatePassword', () => {
-    it('should accept password with 6 or more characters', () => {
-      expect(() => validatePassword('123456')).not.toThrow();
-      expect(() => validatePassword('longpassword')).not.toThrow();
+    it('should accept valid password with 12+ characters, uppercase, lowercase, and digit', () => {
+      expect(() => validatePassword('ValidPass123')).not.toThrow();
+      expect(() => validatePassword('LongPasswordWith1Digit')).not.toThrow();
     });
 
-    it('should reject password with less than 6 characters', () => {
-      expect(() => validatePassword('12345')).toThrow(AppError);
-      expect(() => validatePassword('abc')).toThrow(AppError);
-      expect(() => validatePassword('')).toThrow(AppError);
+    it('should reject password with less than 12 characters', () => {
+      expect(() => validatePassword('Short1P')).toThrow(AppError);
+      expect(() => validatePassword('ABC123abc')).toThrow(AppError);
+      expect(() => validatePassword('Pass1')).toThrow(AppError);
     });
 
-    it('should throw error with correct message', () => {
+    it('should reject password without uppercase letter', () => {
+      expect(() => validatePassword('validpass123')).toThrow(AppError);
+    });
+
+    it('should reject password without lowercase letter', () => {
+      expect(() => validatePassword('VALIDPASS123')).toThrow(AppError);
+    });
+
+    it('should reject password without digit', () => {
+      expect(() => validatePassword('ValidPassword')).toThrow(AppError);
+    });
+
+    it('should throw error with correct message for length', () => {
       try {
-        validatePassword('123');
+        validatePassword('Short1P');
       } catch (error) {
         expect(error).toBeInstanceOf(AppError);
         expect((error as AppError).message).toBe(
-          'Password must be at least 6 characters long'
+          'Password must be at least 12 characters long'
         );
         expect((error as AppError).statusCode).toBe(400);
       }

@@ -82,6 +82,32 @@ export class UsersController {
     }
   }
 
+  async deleteMe(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      logger.warn('Delete current user account request', {
+        userId: req.userId,
+        companyId: req.companyId,
+        ip: req.ip,
+      });
+
+      await usersService.deleteMyAccount(req.userId!, req.companyId!);
+
+      logger.warn('Current user account deleted successfully', {
+        userId: req.userId,
+        companyId: req.companyId,
+      });
+
+      res.status(200).json({ success: true, message: 'Account deleted' });
+    } catch (error) {
+      logger.error('Failed to delete current user account', {
+        userId: req.userId,
+        companyId: req.companyId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      next(error);
+    }
+  }
+
   /**
    * Изменить пароль пользователя
    * POST /api/users/change-password

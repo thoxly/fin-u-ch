@@ -35,6 +35,7 @@ import logger from './config/logger';
 import prisma from './config/db';
 import redis from './config/redis';
 import demoUserService from './modules/demo/demo.service';
+import { execSync } from 'child_process';
 
 const PORT = env.PORT;
 // Use 0.0.0.0 for Docker (allows container access), 127.0.0.1 for local dev
@@ -42,28 +43,57 @@ const HOST =
   process.env.HOST ||
   (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 
-const server = app.listen(PORT, HOST, async () => {
-  logger.info(`API server running on ${HOST}:${PORT}`);
-  logger.info(`Environment: ${env.NODE_ENV}`);
-  logger.info(`Health check: http://localhost:${PORT}/api/health`);
-
-  // Автоматически создаем демо-пользователя при первом запуске
+// Применяем миграции перед запуском сервера
+async function applyMigrations() {
   try {
-    const exists = await demoUserService.exists();
-    if (!exists) {
-      logger.info('Demo user not found, creating...');
-      const demoUser = await demoUserService.create();
-      logger.info(`Demo user created: ${demoUser.user.email}`);
-      logger.info(
-        `Demo data: ${demoUser.operationsCount} operations, ${demoUser.accountsCount} accounts`
-      );
-    } else {
-      logger.info('Demo user already exists');
-    }
+    logger.info('Applying database migrations...');
+    execSync('npx prisma migrate deploy', {
+      stdio: 'inherit',
+      cwd: path.resolve(apiRoot),
+    });
+    logger.info('Database migrations applied successfully');
   } catch (error) {
-    logger.error('Failed to setup demo user:', error);
+    logger.error('Failed to apply database migrations:', error);
+    // В production не продолжаем без миграций
+    if (env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
   }
-});
+}
+
+// Функция запуска сервера
+async function startServer() {
+  // Применяем миграции перед запуском
+  await applyMigrations();
+
+  const server = app.listen(PORT, HOST, async () => {
+    logger.info(`API server running on ${HOST}:${PORT}`);
+    logger.info(`Environment: ${env.NODE_ENV}`);
+    logger.info(`Health check: http://localhost:${PORT}/api/health`);
+
+    // Автоматически создаем демо-пользователя при первом запуске
+    try {
+      const exists = await demoUserService.exists();
+      if (!exists) {
+        logger.info('Demo user not found, creating...');
+        const demoUser = await demoUserService.create();
+        logger.info(`Demo user created: ${demoUser.user.email}`);
+        logger.info(
+          `Demo data: ${demoUser.operationsCount} operations, ${demoUser.accountsCount} accounts`
+        );
+      } else {
+        logger.info('Demo user already exists');
+      }
+    } catch (error) {
+      logger.error('Failed to setup demo user:', error);
+    }
+  });
+
+  return server;
+}
+
+// Запускаем сервер
+const server = await startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

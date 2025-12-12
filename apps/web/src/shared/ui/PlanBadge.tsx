@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../hooks/useRedux';
 import { RootState } from '../../store/store';
 
@@ -29,6 +30,7 @@ const planConfig = {
  * Показывает в хедере/сайдбаре текущий план подписки
  */
 export const PlanBadge = ({ compact = false }: PlanBadgeProps) => {
+  const navigate = useNavigate();
   // use a tolerant selector so tests / mock stores without `subscription` key don't crash
   const subscriptionData = useAppSelector(
     (state: RootState) => state.subscription?.data ?? null
@@ -41,10 +43,15 @@ export const PlanBadge = ({ compact = false }: PlanBadgeProps) => {
   const plan = subscriptionData.plan as 'START' | 'TEAM' | 'BUSINESS';
   const config = planConfig[plan];
 
+  const handleClick = () => {
+    navigate('/company/tarif');
+  };
+
   if (compact) {
     return (
       <div
-        className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${config.color}`}
+        onClick={handleClick}
+        className={`inline-flex items-center px-2 py-1 rounded text-xs font-semibold ${config.color} cursor-pointer hover:opacity-80 transition-opacity`}
         title={`Тариф: ${config.label}`}
       >
         <span className="mr-1">{config.icon}</span>
@@ -55,7 +62,8 @@ export const PlanBadge = ({ compact = false }: PlanBadgeProps) => {
 
   return (
     <div
-      className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${config.color}`}
+      onClick={handleClick}
+      className={`inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium ${config.color} cursor-pointer hover:opacity-80 transition-opacity`}
     >
       <span className="mr-2">{config.icon}</span>
       <span>{config.label}</span>

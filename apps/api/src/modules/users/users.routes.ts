@@ -41,6 +41,20 @@ router.patch('/me', usersController.updateMe);
 
 /**
  * @swagger
+ * /api/users/me:
+ *   delete:
+ *     summary: Delete current user account (hard delete)
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deleted successfully
+ */
+router.delete('/me', usersController.deleteMe);
+
+/**
+ * @swagger
  * /api/users/me/change-password:
  *   post:
  *     summary: Change password
