@@ -162,7 +162,47 @@ export class DemoUserService {
     }
 
     await prisma.$transaction(async (tx) => {
-      // Удаляем все связанные данные
+      // 0. Удаляем всех пользователей компании (включая неактивных/приглашённых)
+      const companyUsers = await tx.user.findMany({
+        where: { companyId: user.companyId },
+        select: { id: true },
+      });
+
+      for (const companyUser of companyUsers) {
+        // Удаляем логи аудита каждого пользователя
+        await tx.auditLog.deleteMany({
+          where: { userId: companyUser.id },
+        });
+
+        // Удаляем правила маппинга каждого пользователя
+        await tx.mappingRule.deleteMany({
+          where: { userId: companyUser.id },
+        });
+
+        // Удаляем сессии импорта
+        const userSessions = await tx.importSession.findMany({
+          where: { userId: companyUser.id },
+          select: { id: true },
+        });
+
+        if (userSessions.length > 0) {
+          const sessionIds = userSessions.map((s) => s.id);
+          await tx.importedOperation.deleteMany({
+            where: { importSessionId: { in: sessionIds } },
+          });
+
+          await tx.importSession.deleteMany({
+            where: { userId: companyUser.id },
+          });
+        }
+
+        // Удаляем самого пользователя (UserRole и EmailToken удалятся автоматически)
+        await tx.user.delete({
+          where: { id: companyUser.id },
+        });
+      }
+
+      // 1. Удаляем все связанные данные компании
       await tx.operation.deleteMany({ where: { companyId: user.companyId } });
       await tx.salary.deleteMany({ where: { companyId: user.companyId } });
       await tx.account.deleteMany({ where: { companyId: user.companyId } });
@@ -173,8 +213,7 @@ export class DemoUserService {
       await tx.deal.deleteMany({ where: { companyId: user.companyId } });
       await tx.department.deleteMany({ where: { companyId: user.companyId } });
 
-      // Удаляем пользователя и компанию
-      await tx.user.delete({ where: { id: user.id } });
+      // 2. Удаляем саму компанию
       await tx.company.delete({ where: { id: user.companyId } });
     });
 

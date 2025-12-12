@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, Trash2, Shield, Plus } from 'lucide-react';
-import { AdminLayout } from '../../shared/ui/AdminLayout';
+import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -504,7 +504,7 @@ export const RolesPage = () => {
 
   if (!canManageRoles()) {
     return (
-      <AdminLayout>
+      <Layout>
         <Card className="p-8 text-center max-w-md mx-auto">
           <Shield size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -514,30 +514,15 @@ export const RolesPage = () => {
             У вас нет прав для управления ролями
           </p>
         </Card>
-      </AdminLayout>
+      </Layout>
     );
   }
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Роли и права
-            </h1>
-            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              Управление ролями и настройка прав доступа
-            </p>
-          </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Button
-              onClick={() => navigate('/admin')}
-              variant="outline"
-              className="w-full sm:w-auto"
-            >
-              Назад
-            </Button>
             <ProtectedAction entity="users" action="manage_roles">
               <Button
                 onClick={handleCreateRole}
@@ -747,6 +732,6 @@ export const RolesPage = () => {
           )}
         </Modal>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 };

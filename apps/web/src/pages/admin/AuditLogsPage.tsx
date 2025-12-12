@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AdminLayout } from '../../shared/ui/AdminLayout';
+import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
 import { Table } from '../../shared/ui/Table';
 import { Input } from '../../shared/ui/Input';
@@ -200,18 +200,13 @@ export const AuditLogsPage = () => {
 
   if (!canRead('audit')) {
     return (
-      <AdminLayout>
-        <div className="space-y-6">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Журнал действий
-          </h1>
-          <Card>
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <p>У вас нет прав для просмотра журнала действий</p>
-            </div>
-          </Card>
-        </div>
-      </AdminLayout>
+      <Layout>
+        <Card>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <p>У вас нет прав для просмотра журнала действий</p>
+          </div>
+        </Card>
+      </Layout>
     );
   }
 
@@ -297,19 +292,8 @@ export const AuditLogsPage = () => {
   ];
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Журнал действий
-            </h1>
-            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
-              История всех действий пользователей в системе
-            </p>
-          </div>
-        </div>
-
         {/* Фильтры */}
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="space-y-4">
@@ -501,6 +485,6 @@ export const AuditLogsPage = () => {
           )}
         </Card>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 };

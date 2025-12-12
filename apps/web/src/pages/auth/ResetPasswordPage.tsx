@@ -1,8 +1,27 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useResetPasswordMutation } from '../../store/api/authApi';
-import { Input } from '../../shared/ui/Input';
-import { Button } from '../../shared/ui/Button';
+import {
+  PasswordInput,
+  Button,
+  PasswordValidationError,
+} from '../../shared/ui';
+
+const PASSWORD_REQUIREMENTS = {
+  minLength: 12,
+  hasLowercase: /[a-z]/,
+  hasUppercase: /[A-Z]/,
+  hasDigit: /\d/,
+};
+
+const validatePassword = (password: string): boolean => {
+  return (
+    password.length >= PASSWORD_REQUIREMENTS.minLength &&
+    PASSWORD_REQUIREMENTS.hasLowercase.test(password) &&
+    PASSWORD_REQUIREMENTS.hasUppercase.test(password) &&
+    PASSWORD_REQUIREMENTS.hasDigit.test(password)
+  );
+};
 
 export const ResetPasswordPage = () => {
   const [searchParams] = useSearchParams();
@@ -12,6 +31,8 @@ export const ResetPasswordPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showPasswordError, setShowPasswordError] = useState(false);
+  const [isPasswordValid, setIsPasswordValid] = useState(true);
   const [resetPassword, { isLoading }] = useResetPasswordMutation();
 
   useEffect(() => {
@@ -29,8 +50,8 @@ export const ResetPasswordPage = () => {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Пароль должен быть не менее 6 символов');
+    if (!validatePassword(password)) {
+      setShowPasswordError(true);
       return;
     }
 
@@ -96,14 +117,15 @@ export const ResetPasswordPage = () => {
           )}
 
           <div className="space-y-4">
-            <Input
+            <PasswordInput
               label="Новый пароль"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
-              placeholder="Минимум 6 символов"
+              placeholder="Минимум 12 символов"
+              showValidation={true}
+              onValidationChange={setIsPasswordValid}
             />
 
             <Input
@@ -117,7 +139,11 @@ export const ResetPasswordPage = () => {
             />
           </div>
 
-          <Button type="submit" fullWidth disabled={isLoading || !token}>
+          <Button
+            type="submit"
+            fullWidth
+            disabled={isLoading || !token || !isPasswordValid}
+          >
             {isLoading ? 'Изменение...' : 'Изменить пароль'}
           </Button>
 
@@ -130,6 +156,11 @@ export const ResetPasswordPage = () => {
             </Link>
           </div>
         </form>
+
+        <PasswordValidationError
+          isOpen={showPasswordError}
+          onClose={() => setShowPasswordError(false)}
+        />
       </div>
     </div>
   );

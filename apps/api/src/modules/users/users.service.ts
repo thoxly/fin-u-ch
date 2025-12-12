@@ -354,13 +354,12 @@ export class UsersService {
       throw new AppError('User does not belong to this company', 403);
     }
 
-    // Нельзя удалить супер-администратора
+    // Нельзя удалить супер-администратора (через админку)
     if (user.isSuperAdmin) {
       throw new AppError('Cannot delete super administrator', 403);
     }
 
     // Удаляем пользователя (soft delete)
-    // Изменяем email, добавляя timestamp, чтобы освободить его для повторного использования
     const deletedEmail = `${user.email}.deleted.${Date.now()}`;
 
     await prisma.user.update({
@@ -382,6 +381,106 @@ export class UsersService {
   }
 
   /**
+   * Удалить свой аккаунт (включая удаление из БД и всей компании)
+   * Удаляет все пользователи компании (включая неактивных/приглашённых),
+   * все данные компании и саму компанию
+   */
+  async deleteMyAccount(userId: string, companyId: string) {
+    logger.warn(
+      '[UsersService.deleteMyAccount] Удаление своего аккаунта и компании',
+      {
+        userId,
+        companyId,
+      }
+    );
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        companyId: true,
+        isSuperAdmin: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Выполняем полное удаление компании и всех связанных данных в транзакции
+    await prisma.$transaction(async (tx) => {
+      logger.debug('[UsersService.deleteMyAccount] Удаление данных компании', {
+        companyId,
+      });
+
+      // 1. Сначала удаляем записи из таблиц, которые ссылаются на другие таблицы (чтобы избежать FK ошибок)
+      // ImportedOperation ссылается на многое, удаляем первой
+      await tx.importedOperation.deleteMany({ where: { companyId } });
+
+      // Удаляем сессии импорта
+      await tx.importSession.deleteMany({ where: { companyId } });
+
+      // Удаляем правила маппинга
+      await tx.mappingRule.deleteMany({ where: { companyId } });
+
+      // Удаляем логи аудита (ссылаются на User и Company)
+      await tx.auditLog.deleteMany({ where: { companyId } });
+
+      // Удаляем операции
+      await tx.operation.deleteMany({ where: { companyId } });
+
+      // Удаляем элементы плана
+      await tx.planItem.deleteMany({ where: { companyId } });
+
+      // Удаляем зарплаты
+      await tx.salary.deleteMany({ where: { companyId } });
+
+      // Удаляем интеграции
+      await tx.integration.deleteMany({ where: { companyId } });
+
+      // 2. Удаляем основные сущности
+      await tx.budget.deleteMany({ where: { companyId } });
+      await tx.deal.deleteMany({ where: { companyId } });
+      await tx.article.deleteMany({ where: { companyId } }); // Article может ссылаться на себя (parentId), но deleteMany обычно справляется
+      await tx.account.deleteMany({ where: { companyId } });
+      await tx.counterparty.deleteMany({ where: { companyId } });
+      await tx.department.deleteMany({ where: { companyId } });
+      await tx.subscription.deleteMany({ where: { companyId } });
+
+      // Удаляем роли (и связанные RolePermission удалятся каскадно)
+      await tx.role.deleteMany({ where: { companyId } });
+
+      // 3. Удаляем всех пользователей компании
+      // Сначала удаляем токены email, хотя они удалятся каскадно, но на всякий случай
+      // await tx.emailToken.deleteMany({ where: { user: { companyId } } });
+
+      // Удаляем пользователей
+      await tx.user.deleteMany({
+        where: { companyId },
+      });
+
+      // 4. Удаляем саму компанию
+      await tx.company.delete({ where: { id: companyId } });
+    });
+
+    logger.warn(
+      '[UsersService.deleteMyAccount] Аккаунт и компания полностью удалены',
+      {
+        userId,
+        companyId,
+        email: user.email,
+      }
+    );
+
+    return { success: true };
+  }
+
+  /**
    * Пригласить пользователя по email
    */
   async inviteUser(
@@ -398,23 +497,43 @@ export class UsersService {
     });
 
     // Проверка, не существует ли уже пользователь с таким email
-    const existingUser = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, companyId: true },
+      select: {
+        id: true,
+        companyId: true,
+        isActive: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isSuperAdmin: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
-    if (existingUser) {
-      if (existingUser.companyId === companyId) {
-        throw new AppError(
-          'Пользователь с таким email уже существует в вашей компании',
-          409
-        );
-      } else {
+    if (user) {
+      // Если пользователь существует, проверяем компанию
+      if (user.companyId !== companyId) {
         throw new AppError(
           'Пользователь с таким email уже существует в другой компании',
           409
         );
       }
+
+      // Если пользователь активен, нельзя приглашать повторно (он уже в системе)
+      if (user.isActive) {
+        throw new AppError(
+          'Пользователь с таким email уже активен в вашей компании',
+          409
+        );
+      }
+
+      // Если пользователь существует но неактивен, считаем это повторным приглашением
+      logger.info(
+        '[UsersService.inviteUser] Повторное приглашение неактивного пользователя',
+        { userId: user.id }
+      );
     }
 
     // Проверка ролей
@@ -443,41 +562,36 @@ export class UsersService {
       throw new AppError('Company not found', 404);
     }
 
-    // Генерируем временный пароль (будет заменен при принятии приглашения)
-    const tempPassword = `temp_${Math.random().toString(36).slice(2)}`;
-    const passwordHash = await hashPassword(tempPassword);
+    if (!user) {
+      // Создаем нового пользователя, если не найден
+      const tempPassword = `temp_${Math.random().toString(36).slice(2)}`;
+      const passwordHash = await hashPassword(tempPassword);
 
-    // Создаём пользователя с isActive: false - он не сможет войти до принятия приглашения
-    const newUser = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
-        companyId,
-        isActive: false, // Пользователь неактивен до принятия приглашения
-        isEmailVerified: false, // Email не подтвержден до принятия приглашения
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        companyId: true,
-        isActive: true,
-        isSuperAdmin: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    // Назначаем роли, если указаны (сохраняем в metadata токена для применения после принятия)
-    if (roleIds.length > 0) {
-      // Роли будут назначены после принятия приглашения
-      // Сохраняем их в metadata токена
+      user = await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          companyId,
+          isActive: false, // Пользователь неактивен до принятия приглашения
+          isEmailVerified: false,
+        },
+        select: {
+          id: true,
+          email: true,
+          companyId: true,
+          isActive: true,
+          firstName: true,
+          lastName: true,
+          isSuperAdmin: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
     }
 
-    // Создаём токен приглашения
+    // Создаём токен приглашения (нового или повторного)
     const invitationToken = await tokenService.createToken({
-      userId: newUser.id,
+      userId: user.id,
       type: 'user_invitation',
       metadata: {
         roleIds,
@@ -490,32 +604,38 @@ export class UsersService {
     try {
       await sendInvitationEmail(email, invitationToken, company.name);
       logger.info('Invitation email sent successfully', {
-        userId: newUser.id,
+        userId: user.id,
         email,
         companyId,
       });
     } catch (error) {
       logger.error('Failed to send invitation email', {
-        userId: newUser.id,
+        userId: user.id,
         email,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-      // Не блокируем создание пользователя, если письмо не отправилось
-      // Администратор может отправить приглашение повторно
+
+      // ВАЖНО: Если это НОВЫЙ пользователь и письмо не ушло, имеет смысл откатить создание?
+      // Или просто выбросить ошибку, чтобы фронтенд знал.
+      // Сейчас мы выбросим ошибку, чтобы админ видел проблему.
+
+      // Если это повторное приглашение, пользователь уже был в базе, ничего страшного (просто письмо не ушло).
+
+      throw new AppError(
+        'Не удалось отправить письмо с приглашением. Проверьте настройки SMTP.',
+        500
+      );
     }
 
     logger.debug('[UsersService.inviteUser] Пользователь успешно приглашён', {
-      userId: newUser.id,
+      userId: user.id,
       email,
       roleIds,
       invitedBy,
     });
 
-    // Возвращаем пользователя без временного пароля (теперь используется токен)
-    return {
-      ...newUser,
-    };
+    return user;
   }
 
   async updateMe(

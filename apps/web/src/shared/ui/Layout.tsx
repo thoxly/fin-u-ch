@@ -15,7 +15,7 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-interface NavigationItem {
+export interface NavigationItem {
   name: string;
   href?: string;
   children?: NavigationItem[];
@@ -44,6 +44,10 @@ const getEntityForMenuItem = (
     Сделки: { entity: 'deals', action: 'read' },
     Зарплаты: { entity: 'salaries', action: 'read' },
     Администрирование: { entity: 'users', action: 'read' },
+    Пользователи: { entity: 'users', action: 'read' },
+    Роли: { entity: 'users', action: 'manage_roles' },
+    'Журнал действий': { entity: 'audit', action: 'read' },
+    'Настройки компании': { entity: 'users', action: 'read' }, // TODO: Clarify entity for company settings
   };
 
   return mapping[name] || null;
@@ -124,7 +128,15 @@ const getBaseNavigation = (): NavigationItem[] => {
   ];
 };
 
-export const Layout = ({ children }: LayoutProps): JSX.Element => {
+interface LayoutProps {
+  children: ReactNode;
+  navigationItems?: NavigationItem[];
+}
+
+export const Layout = ({
+  children,
+  navigationItems,
+}: LayoutProps): JSX.Element => {
   const location = useLocation();
   const { getIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
@@ -136,8 +148,8 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
 
   // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
   const baseNavigation = useMemo(() => {
-    return getBaseNavigation();
-  }, []);
+    return navigationItems || getBaseNavigation();
+  }, [navigationItems]);
 
   // Фильтруем навигацию по правам
   const navigation = useMemo(() => {

@@ -327,7 +327,7 @@ export class PromoCodeService {
       const promoCode = await prisma.promoCode.create({
         data: {
           code,
-          plan: SubscriptionPlan.TEAM,
+          plan: SubscriptionPlan.BUSINESS,
           durationDays: 14, // Пробный период 14 дней на TEAM
           maxUsages: 1, // Одноразовый
           isActive: true,

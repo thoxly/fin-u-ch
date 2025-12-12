@@ -6,8 +6,28 @@ import {
   useResendVerificationMutation,
 } from '../../store/api/authApi';
 import { setCredentials } from '../../store/slices/authSlice';
+import {
+  PasswordInput,
+  Button,
+  PasswordValidationError,
+} from '../../shared/ui';
 import { Input } from '../../shared/ui/Input';
-import { Button } from '../../shared/ui/Button';
+
+const PASSWORD_REQUIREMENTS = {
+  minLength: 12,
+  hasLowercase: /[a-z]/,
+  hasUppercase: /[A-Z]/,
+  hasDigit: /\d/,
+};
+
+const validatePassword = (password: string): boolean => {
+  return (
+    password.length >= PASSWORD_REQUIREMENTS.minLength &&
+    PASSWORD_REQUIREMENTS.hasLowercase.test(password) &&
+    PASSWORD_REQUIREMENTS.hasUppercase.test(password) &&
+    PASSWORD_REQUIREMENTS.hasDigit.test(password)
+  );
+};
 
 export const RegisterPage = () => {
   const [email, setEmail] = useState('');
@@ -15,6 +35,8 @@ export const RegisterPage = () => {
   const [companyName, setCompanyName] = useState('');
   const [error, setError] = useState('');
   const [showVerificationMessage, setShowVerificationMessage] = useState(false);
+  const [showPasswordError, setShowPasswordError] = useState(false);
+  const [isPasswordValid, setIsPasswordValid] = useState(true);
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -26,8 +48,8 @@ export const RegisterPage = () => {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Пароль должен быть не менее 6 символов');
+    if (!validatePassword(password)) {
+      setShowPasswordError(true);
       return;
     }
 
@@ -187,22 +209,22 @@ export const RegisterPage = () => {
                 className="transition-all"
               />
 
-              <Input
+              <PasswordInput
                 label="Пароль"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="new-password"
-                placeholder="Минимум 6 символов"
-                className="transition-all"
+                placeholder="Минимум 12 символов"
+                showValidation={true}
+                onValidationChange={setIsPasswordValid}
               />
             </div>
 
             <Button
               type="submit"
               fullWidth
-              disabled={isLoading}
+              disabled={isLoading || !isPasswordValid}
               className="mt-8 py-3 text-base font-semibold"
             >
               {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}

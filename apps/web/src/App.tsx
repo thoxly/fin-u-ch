@@ -19,23 +19,35 @@ import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
 import { SalariesPage } from './pages/catalogs/SalariesPage';
-import { ProfilePage } from './pages/ProfilePage';
-import { CompanyPage } from './pages/CompanyPage';
+import { ProfilePage as ProfilePageOld } from './pages/ProfilePage';
+import { CompanyPage as CompanyPageOld } from './pages/CompanyPage';
 import { PricingPage } from './pages/PricingPage';
-import { AdminPage } from './pages/AdminPage';
+import { AdminPage as AdminPageOld } from './pages/AdminPage';
+// Profile pages
+import { ProfilePage } from './pages/profile/ProfilePage';
+import { SecurityPage } from './pages/profile/SecurityPage';
+import { SettingsPage as ProfileSettingsPage } from './pages/profile/SettingsPage';
+// Company pages
+import { CompanySettingsPage } from './pages/company/SettingsPage';
+import { CurrencyPage } from './pages/company/CurrencyPage';
+import { TariffPage } from './pages/company/TariffPage';
+import { IntegrationsPage } from './pages/company/IntegrationsPage';
+// Admin pages
+import { UsersPage } from './pages/admin/UsersPage';
+import { RolesPage } from './pages/admin/RolesPage';
+import { AuditLogsPage } from './pages/admin/AuditLogsPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
 import { NotificationContainer } from './components/Notification';
 import { ThemeProvider } from './components/ThemeProvider';
-import { DevTools } from './shared/ui/DevTools/DevTools';
 
 function App() {
   return (
     <>
       <ThemeProvider />
       <NotificationContainer />
-      <DevTools />
+
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
@@ -176,7 +188,7 @@ function App() {
           }
         />
 
-        {/* Profile and Company routes - accessible to all authenticated users */}
+        {/* Profile routes - separate pages for profile sections */}
         <Route
           path="/profile"
           element={
@@ -186,10 +198,52 @@ function App() {
           }
         />
         <Route
+          path="/profile/security"
+          element={
+            <PrivateRoute>
+              <SecurityPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/profile/settings"
+          element={
+            <PrivateRoute>
+              <ProfileSettingsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Company routes - separate pages for company sections */}
+        <Route
           path="/company"
           element={
             <PrivateRoute>
-              <CompanyPage />
+              <CompanySettingsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/currency"
+          element={
+            <PrivateRoute>
+              <CurrencyPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/tarif"
+          element={
+            <PrivateRoute>
+              <TariffPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/integrations"
+          element={
+            <PrivateRoute>
+              <IntegrationsPage />
             </PrivateRoute>
           }
         />
@@ -204,12 +258,12 @@ function App() {
           }
         />
 
-        {/* Admin route - single page with tabs */}
+        {/* Admin route - single tabbed admin page (legacy) */}
         <Route
           path="/admin"
           element={
             <PrivateRoute>
-              <AdminPage />
+              <AdminPageOld />
             </PrivateRoute>
           }
         />
