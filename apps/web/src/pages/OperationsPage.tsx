@@ -88,7 +88,7 @@ export const OperationsPage = () => {
 
   const plan =
     useAppSelector((state) => state.subscription?.data?.plan) || 'START';
-  const canUseIntegrations = plan === 'BUSINESS';
+  const canUseIntegrations = plan === 'TEAM' || plan === 'BUSINESS';
 
   // Загружаем данные интеграции Ozon только для разрешённых тарифов
   const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
