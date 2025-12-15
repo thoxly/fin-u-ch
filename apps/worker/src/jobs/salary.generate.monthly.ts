@@ -35,7 +35,7 @@ export async function generateSalaryOperations(
     const targetDate = new Date(year, monthNum - 1, 1);
 
     // Получаем активные записи зарплат
-    const salaries = await prisma.salary.findMany({
+    const salaries = await (prisma as any).salary.findMany({
       where: {
         ...(companyId && { companyId }),
         effectiveFrom: { lte: targetDate },
