@@ -80,5 +80,8 @@ if (
     async text() {
       return '';
     }
+    clone() {
+      return this;
+    }
   } as unknown;
 }

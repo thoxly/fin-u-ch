@@ -61,7 +61,7 @@ async function deleteUser(userId: string): Promise<void> {
     await tx.role.deleteMany({ where: { companyId: cid } });
 
     // Подписка
-    await tx.subscription.deleteMany({ where: { companyId: cid } });
+    await (tx as any).subscription.deleteMany({ where: { companyId: cid } });
 
     // 2. Компания
     await tx.company.delete({ where: { id: cid } });

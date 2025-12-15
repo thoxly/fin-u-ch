@@ -440,7 +440,7 @@ export class UsersService {
       // Удаляем зарплаты
 
       // Удаляем интеграции
-      await tx.integration.deleteMany({ where: { companyId } });
+      await (tx as any).integration.deleteMany({ where: { companyId } });
 
       // 2. Удаляем основные сущности
       await tx.budget.deleteMany({ where: { companyId } });
@@ -449,7 +449,7 @@ export class UsersService {
       await tx.account.deleteMany({ where: { companyId } });
       await tx.counterparty.deleteMany({ where: { companyId } });
       await tx.department.deleteMany({ where: { companyId } });
-      await tx.subscription.deleteMany({ where: { companyId } });
+      await (tx as any).subscription.deleteMany({ where: { companyId } });
 
       // Удаляем роли (и связанные RolePermission удалятся каскадно)
       await tx.role.deleteMany({ where: { companyId } });

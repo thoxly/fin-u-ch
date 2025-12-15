@@ -26,7 +26,7 @@ export class OzonDirectService {
    * Получает все активные интеграции Ozon
    */
   async getActiveIntegrations() {
-    return prisma.integration.findMany({
+    return (prisma as any).integration.findMany({
       where: {
         type: 'ozon',
         isActive: true,

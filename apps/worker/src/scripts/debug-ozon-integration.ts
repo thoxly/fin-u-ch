@@ -241,7 +241,7 @@ class OzonIntegrationDebugger {
   private async checkIntegrationDirect(): Promise<void> {
     console.log('    Проверяем интеграцию в базе данных...');
 
-    const integration = await prisma.integration.findFirst({
+    const integration = await (prisma as any).integration.findFirst({
       where: {
         id: this.integrationId,
         type: 'ozon',
