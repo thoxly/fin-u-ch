@@ -13,7 +13,12 @@ import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
 import { CashflowTable } from '../widgets/CashflowTable';
 import { useArticleTree } from '../shared/hooks/useArticleTree';
-import type { Budget, CashflowReport, BDDSReport } from '@fin-u-ch/shared';
+import type {
+  Budget,
+  CashflowReport,
+  BDDSReport,
+  CashflowBreakdown,
+} from '@fin-u-ch/shared';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
@@ -21,9 +26,6 @@ import {
   getPreviousPeriod,
 } from '../shared/lib/period';
 import { skipToken } from '@reduxjs/toolkit/query';
-import { useAppSelector } from '@/shared/hooks/useRedux';
-import { RootState } from '../store/store';
-import { FeatureBlocker } from '@/shared/ui/FeatureBlocker';
 
 type ReportType = 'cashflow';
 
@@ -79,16 +81,18 @@ export const ReportsPage = () => {
   const [showArticleFilter, setShowArticleFilter] = useState(false);
   const [selectedParentArticleId] = useState<string | null>(null);
   const [articleSearchQuery, setArticleSearchQuery] = useState<string>('');
+  const [breakdown, setBreakdown] = useState<CashflowBreakdown>('activity');
   const planButtonRef = useRef<HTMLButtonElement>(null);
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
   const articleFilterRef = useRef<HTMLDivElement>(null);
-  const subscriptionData = useAppSelector(
-    (state: RootState) => state?.subscription?.data ?? null
-  );
-  const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
-  const requiredLevel = planHierarchy['TEAM'];
-  const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
+  // Проверка подписки для отчетов убрана - отчеты доступны в базовой подписке
+  // const subscriptionData = useAppSelector(
+  //   (state: RootState) => state?.subscription?.data ?? null
+  // );
+  // const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
+  // const requiredLevel = planHierarchy['TEAM'];
+  // const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
@@ -107,6 +111,7 @@ export const ReportsPage = () => {
     skip: !canRead('reports'),
   });
 
+  // Проверка подписки для отчетов убрана - отчеты доступны в базовой подписке
   // if (currentLevel < requiredLevel) {
   //   return (
   //     <Layout>
@@ -315,14 +320,14 @@ export const ReportsPage = () => {
     );
   }
 
-  // Проверка тарифа
-  if (currentLevel < requiredLevel) {
-    return (
-      <Layout>
-        <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
-      </Layout>
-    );
-  }
+  // Проверка тарифа убрана - отчеты доступны в базовой подписке
+  // if (currentLevel < requiredLevel) {
+  //   return (
+  //     <Layout>
+  //       <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
+  //     </Layout>
+  //   );
+  // }
 
   return (
     <Layout>
@@ -527,6 +532,26 @@ export const ReportsPage = () => {
             </>
           )}
 
+          {/* Селектор разреза */}
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400">
+              Разрез:
+            </span>
+            <select
+              value={breakdown}
+              onChange={(e) =>
+                setBreakdown(e.target.value as CashflowBreakdown)
+              }
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="activity">По видам деятельности</option>
+              <option value="deal">По сделкам</option>
+              <option value="account">По счетам</option>
+              <option value="department">По подразделениям</option>
+              <option value="counterparty">По контрагентам</option>
+            </select>
+          </div>
+
           {/* Поле поиска статей */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1 max-w-xs">
@@ -572,6 +597,7 @@ export const ReportsPage = () => {
           selectedBudget={selectedBudget}
           selectedParentArticleId={selectedParentArticleId}
           articleSearchQuery={articleSearchQuery}
+          breakdown={breakdown}
         />
       </div>
     </Layout>
@@ -587,6 +613,7 @@ const CashflowTab = ({
   selectedBudget,
   selectedParentArticleId,
   articleSearchQuery,
+  breakdown,
 }: {
   periodFrom: string;
   periodTo: string;
@@ -595,6 +622,7 @@ const CashflowTab = ({
   selectedBudget: Budget | null;
   selectedParentArticleId: string | null;
   articleSearchQuery: string;
+  breakdown: CashflowBreakdown;
 }) => {
   const { canRead } = usePermissions();
 
@@ -607,6 +635,7 @@ const CashflowTab = ({
           periodFrom,
           periodTo,
           parentArticleId: selectedParentArticleId || undefined,
+          breakdown,
         }
       : skipToken
   );
@@ -716,6 +745,7 @@ const CashflowTab = ({
       periodFrom={periodFrom}
       periodTo={periodTo}
       articleSearchQuery={articleSearchQuery}
+      breakdown={breakdown}
     />
   );
 };
