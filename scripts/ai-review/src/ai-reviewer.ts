@@ -146,6 +146,8 @@ export class AiReviewer {
         }
 
         const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
+        // Extract reasoning_content if present (for DeepSeek reasoning mode)
+        const reasoningContent = (message as any).reasoning_content;
 
         if (toolCalls && toolCalls.length > 0) {
           totalToolCalls += toolCalls.length;
@@ -198,11 +200,15 @@ export class AiReviewer {
                 : JSON.stringify(result).substring(0, 200);
             console.log(`    ← ${resultPreview}`);
 
-            messages.push({
+            // Build assistant message with reasoning_content (required for DeepSeek reasoning mode)
+            const assistantMessage: any = {
               role: 'assistant',
               content: null,
               tool_calls: [toolCall] as any,
-            } as any);
+            };
+            // Always include reasoning_content for DeepSeek reasoning mode, even if empty
+            assistantMessage.reasoning_content = reasoningContent || null;
+            messages.push(assistantMessage);
 
             messages.push({
               role: 'tool',
@@ -397,6 +403,8 @@ IMPORTANT:
       }
 
       const toolCalls = (message as any).tool_calls as ToolCall[] | undefined;
+      // Extract reasoning_content if present (for DeepSeek reasoning mode)
+      const reasoningContent = (message as any).reasoning_content;
 
       if (toolCalls && toolCalls.length > 0) {
         totalToolCalls += toolCalls.length;
@@ -446,11 +454,15 @@ IMPORTANT:
               : JSON.stringify(result).substring(0, 200);
           console.log(`    ← verifier result: ${resultPreview}`);
 
-          messages.push({
+          // Build assistant message with reasoning_content (required for DeepSeek reasoning mode)
+          const assistantMessage: any = {
             role: 'assistant',
             content: null,
             tool_calls: [toolCall] as any,
-          } as any);
+          };
+          // Always include reasoning_content for DeepSeek reasoning mode, even if empty
+          assistantMessage.reasoning_content = reasoningContent || null;
+          messages.push(assistantMessage);
 
           messages.push({
             role: 'tool',
