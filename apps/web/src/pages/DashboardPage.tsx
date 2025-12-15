@@ -68,6 +68,7 @@ export const DashboardPage = () => {
   // Проверяем права на просмотр различных виджетов
   const canViewOperations = canRead('operations');
   const canViewReports = canRead('reports');
+  const canViewDashboard = canRead('dashboard');
   const canViewAccounts = canRead('accounts');
 
   // Получаем данные дашборда из API (только если есть права на просмотр)
@@ -168,7 +169,7 @@ export const DashboardPage = () => {
       periodFormat: periodFilters.format, // Передаем формат периода
     },
     {
-      skip: !canViewOperations && !canViewReports,
+      skip: !canViewOperations && !canViewReports && !canViewDashboard,
       refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
     }
   );
@@ -183,7 +184,7 @@ export const DashboardPage = () => {
         periodFormat: periodFilters.format,
       },
       {
-        skip: !canViewOperations && !canViewReports,
+        skip: !canViewOperations && !canViewReports && !canViewDashboard,
         refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
       }
     );
@@ -428,7 +429,7 @@ export const DashboardPage = () => {
         {dashboardData && (
           <>
             {/* Графики и таблицы */}
-            {canViewReports && (
+            {(canViewDashboard || canViewReports || canViewOperations) && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* График поступлений/списаний/чистого потока */}
                 <IncomeExpenseChart data={incomeExpenseData} />
