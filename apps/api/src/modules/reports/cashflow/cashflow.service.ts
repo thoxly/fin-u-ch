@@ -1,13 +1,9 @@
 import prisma from '../../../config/db';
-import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
-
-// Import CashflowBreakdown type - it's exported from shared package
-type CashflowBreakdown =
-  | 'activity'
-  | 'deal'
-  | 'account'
-  | 'department'
-  | 'counterparty';
+import {
+  getMonthKey,
+  getMonthsBetween,
+  CashflowBreakdown,
+} from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import articlesService from '../../catalogs/articles/articles.service';
 import logger from '../../../config/logger';
@@ -181,19 +177,36 @@ export class CashflowService {
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
     // Фильтруем операции по активности, если указана
-    const filteredOperations = params.activity
-      ? operations.filter((op) => {
-          const article = op.article as unknown as { activity?: string } | null;
-          return article?.activity === params.activity;
-        })
-      : operations;
+    // Явно типизируем как массив операций, чтобы TypeScript правильно определил тип
+    // Проблема: TypeScript может неправильно вывести тип из-за сложного типа Prisma
+    // Используем двойное приведение типов для обхода проблемы
+    type OperationType = {
+      id: string;
+      article: {
+        id: string;
+        name: string;
+        activity: string | null;
+        type: string;
+      } | null;
+      deal?: { id: string; name: string } | null;
+      account?: { id: string; name: string } | null;
+      department?: { id: string; name: string } | null;
+      counterparty?: { id: string; name: string } | null;
+      [key: string]: any;
+    };
+    const filteredOperations = (
+      params.activity
+        ? (operations as unknown as OperationType[]).filter((op) => {
+            return op.article?.activity === params.activity;
+          })
+        : (operations as unknown as OperationType[])
+    ) as OperationType[];
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
     const articlesWithOperations = new Set<string>();
     for (const op of filteredOperations) {
-      const article = op.article as unknown as { id: string } | null;
-      if (article) {
-        articlesWithOperations.add(article.id);
+      if (op.article) {
+        articlesWithOperations.add(op.article.id);
       }
     }
 
@@ -248,10 +261,9 @@ export class CashflowService {
     const operationsByArticle = new Map<string, CashflowRow>();
 
     for (const op of filteredOperations) {
-      const article = op.article as unknown as { id: string } | null;
-      if (!article) continue;
+      if (!op.article) continue;
 
-      const articleId = article.id;
+      const articleId = op.article.id;
 
       if (!operationsByArticle.has(articleId)) {
         const articleData = articleDataMap.get(articleId);
@@ -425,50 +437,35 @@ export class CashflowService {
       // Сначала группируем операции по выбранному разрезу
       const operationsByBreakdown = new Map<
         string,
-        { id: string; name: string; operations: typeof operations }
+        { id: string; name: string; operations: typeof filteredOperations }
       >();
 
       for (const op of filteredOperations) {
-        const article = op.article as unknown as { id: string } | null;
-        if (!article) continue;
+        if (!op.article) continue;
 
         let breakdownKey: string | null = null;
         let breakdownName: string | null = null;
 
-        const deal = op.deal as unknown as { name: string } | null | undefined;
-        const account = op.account as unknown as
-          | { name: string }
-          | null
-          | undefined;
-        const department = op.department as unknown as
-          | { name: string }
-          | null
-          | undefined;
-        const counterparty = op.counterparty as unknown as
-          | { name: string }
-          | null
-          | undefined;
-
-        if (breakdown === 'deal' && op.dealId && deal) {
+        if (breakdown === 'deal' && op.dealId && op.deal) {
           breakdownKey = op.dealId;
-          breakdownName = deal.name;
-        } else if (breakdown === 'account' && op.accountId && account) {
+          breakdownName = op.deal.name;
+        } else if (breakdown === 'account' && op.accountId && op.account) {
           breakdownKey = op.accountId;
-          breakdownName = account.name;
+          breakdownName = op.account.name;
         } else if (
           breakdown === 'department' &&
           op.departmentId &&
-          department
+          op.department
         ) {
           breakdownKey = op.departmentId;
-          breakdownName = department.name;
+          breakdownName = op.department.name;
         } else if (
           breakdown === 'counterparty' &&
           op.counterpartyId &&
-          counterparty
+          op.counterparty
         ) {
           breakdownKey = op.counterpartyId;
-          breakdownName = counterparty.name;
+          breakdownName = op.counterparty.name;
         }
 
         if (!breakdownKey || !breakdownName) continue;
@@ -490,10 +487,9 @@ export class CashflowService {
         const breakdownOperationsByArticle = new Map<string, CashflowRow>();
 
         for (const op of breakdownData.operations) {
-          const article = op.article as unknown as { id: string } | null;
-          if (!article) continue;
+          if (!op.article) continue;
 
-          const articleId = article.id;
+          const articleId = op.article.id;
           const articleData = articleDataMap.get(articleId);
           if (!articleData) continue;
 
