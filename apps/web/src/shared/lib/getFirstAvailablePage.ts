@@ -37,7 +37,6 @@ export const getFirstAvailablePage = (
       action: 'read',
     },
     { path: '/catalogs/deals', entity: 'deals', action: 'read' },
-    { path: '/catalogs/salaries', entity: 'salaries', action: 'read' },
     { path: '/admin', entity: 'users', action: 'read' },
   ];
 

@@ -119,7 +119,6 @@ async function getStatistics() {
     safeCount(prisma.counterparty),
     safeCount(prisma.deal),
     safeCount(prisma.department),
-    safeCount(prisma.salary),
     safeCount(prisma.budget),
     safeCount(prisma.role),
     safeCount(prisma.auditLog),
@@ -208,9 +207,6 @@ async function deleteAllUsers(): Promise<void> {
 
   // 6. Удаляем операции
   await safeDeleteMany(prisma.operation, 'операций');
-
-  // 7. Удаляем зарплаты
-  await safeDeleteMany(prisma.salary, 'зарплат');
 
   // 8. Удаляем интеграции
   await safeDeleteMany(prisma.integration, 'интеграций');
