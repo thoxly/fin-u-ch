@@ -13,6 +13,7 @@ import {
   getNextRunInfo,
   ozonOperationService,
 } from './jobs/ozon.generate.operations';
+import { cleanupExpiredDemoUsers } from './jobs/cleanup-demo-users.job';
 import { prisma } from './config/prisma';
 
 logger.info(`⏰ Текущее время: ${new Date().toLocaleString('ru-RU')}`);
@@ -130,6 +131,32 @@ const ozonOperationsTask = cron.schedule(
       ).toFixed(2);
       logger.error(`⏱️  Время до ошибки: ${duration} сек`);
       logger.error('Ошибка:', error);
+    }
+  },
+  {
+    scheduled: true,
+    timezone: 'Europe/Moscow',
+  }
+);
+
+/**
+ * Задача очистки старых демо-пользователей
+ * Запускается каждый час в 15 минут
+ */
+const cleanupDemoUsersTask = cron.schedule(
+  '15 * * * *',
+  async () => {
+    logger.info('🔄 Running scheduled demo user cleanup task...');
+
+    try {
+      const deletedCount = await cleanupExpiredDemoUsers(24); // Удаляем аккаунты старше 24 часов
+      if (deletedCount > 0) {
+        logger.info(`✅ Cleanup completed. Deleted ${deletedCount} users.`);
+      } else {
+        logger.info('✅ Cleanup check completed. No expired users found.');
+      }
+    } catch (error) {
+      logger.error('❌ Demo user cleanup task failed:', error);
     }
   },
   {
@@ -303,6 +330,7 @@ const shutdown = async (signal: string) => {
   salaryGenerationTask.stop();
   recurringOperationsTask.stop();
   ozonOperationsTask.stop();
+  cleanupDemoUsersTask.stop();
 
   // Закрываем Prisma соединение
   await prisma.$disconnect();
@@ -362,6 +390,9 @@ prisma
     logger.info(
       '      Следующий запуск: ' + nextRunDate.toLocaleString('ru-RU')
     );
+    logger.info('');
+    logger.info('   4. ✅ Очистка демо-пользователей');
+    logger.info('      Расписание: Каждый час в 15 минут');
     logger.info('═══════════════════════════════════════════════════════');
     logger.info('👷 WORKER РАБОТАЕТ И ОЖИДАЕТ ЗАПЛАНИРОВАННЫХ ЗАДАЧ');
     logger.info('═══════════════════════════════════════════════════════');

@@ -212,7 +212,6 @@ export class DemoDataGeneratorService {
         employeeCounterpartyId: employee.id,
         departmentId: department?.id,
         baseWage: Math.floor(Math.random() * 100000) + 50000,
-        currency: 'RUB',
         effectiveFrom: new Date(2025, 0, 1),
         effectiveTo: new Date(2025, 11, 31),
       });
