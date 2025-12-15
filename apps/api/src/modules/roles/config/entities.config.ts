@@ -105,6 +105,14 @@ export const ENTITIES_CONFIG: Record<string, EntityConfig> = {
     requiresReadAccess: ['counterparties', 'departments'],
   },
 
+  salaries: {
+    name: 'salaries',
+    displayName: 'Зарплаты',
+    category: 'Справочники',
+    actions: ['create', 'read', 'update', 'delete'],
+    description: 'Шаблоны зарплат сотрудников',
+  },
+
   // ========== АДМИНИСТРИРОВАНИЕ ==========
   users: {
     name: 'users',

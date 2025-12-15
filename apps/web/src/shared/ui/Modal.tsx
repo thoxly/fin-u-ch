@@ -63,20 +63,20 @@ export const Modal = ({
   return (
     <div
       className={classNames(
-        'fixed inset-0 z-50 flex items-center justify-center pointer-events-none',
+        'fixed inset-0 z-50 flex items-center justify-center',
         size === 'full' ? 'p-1' : 'p-4'
       )}
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity pointer-events-auto"
+        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div
         className={classNames(
-          'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 flex flex-col pointer-events-auto',
+          'relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full mx-4 flex flex-col',
           modalSizeClass,
           size === 'full' ? 'max-h-[95vh] h-[95vh]' : 'max-h-[90vh]'
         )}
@@ -135,7 +135,7 @@ export const Modal = ({
         {/* Content */}
         <div
           className={classNames(
-            'overflow-y-auto flex-1 min-h-0',
+            'px-6 py-4 overflow-y-auto flex-1 min-h-0',
             size === 'viewport'
               ? 'max-h-[calc(100vh-80px)]'
               : 'max-h-[calc(100vh-200px)]'

@@ -20,6 +20,7 @@ interface RecurringOperationsProps {
 export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { showSuccess, showError } = useNotification();
   const isMobile = useIsMobile();
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;

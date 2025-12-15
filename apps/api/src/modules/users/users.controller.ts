@@ -3,107 +3,35 @@ import { TenantRequest } from '../../middlewares/tenant';
 import usersService from './users.service';
 import permissionsService from '../roles/permissions.service';
 import auditLogService from '../audit/audit.service';
-import logger from '../../config/logger';
 
 export class UsersController {
   async getMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.debug('Get current user request', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
       const result = await usersService.getMe(req.userId!, req.companyId!);
       res.json(result);
     } catch (error) {
-      logger.error('Failed to get current user', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
 
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.debug('Get all users request', {
-        companyId: req.companyId,
-        requestedBy: req.userId,
-      });
-
       const result = await usersService.getAll(req.companyId!);
-
-      logger.debug('Users retrieved successfully', {
-        companyId: req.companyId,
-        usersCount: result.length,
-      });
-
       res.json(result);
     } catch (error) {
-      logger.error('Failed to get users', {
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
 
   async updateMe(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Update current user request', {
-        userId: req.userId,
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
       const result = await usersService.updateMe(
         req.userId!,
         req.companyId!,
         req.body
       );
-
-      logger.info('Current user updated successfully', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
       res.json(result);
     } catch (error) {
-      logger.error('Failed to update current user', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      next(error);
-    }
-  }
-
-  async deleteMe(req: TenantRequest, res: Response, next: NextFunction) {
-    try {
-      logger.warn('Delete current user account request', {
-        userId: req.userId,
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
-      await usersService.deleteMyAccount(req.userId!, req.companyId!);
-
-      logger.warn('Current user account deleted successfully', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
-      res.status(200).json({ success: true, message: 'Account deleted' });
-    } catch (error) {
-      logger.error('Failed to delete current user account', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-      });
       next(error);
     }
   }
@@ -114,12 +42,6 @@ export class UsersController {
    */
   async changePassword(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Change password request', {
-        userId: req.userId,
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
       const { currentPassword, newPassword } = req.body;
       await usersService.changePassword(
         req.userId!,
@@ -127,21 +49,8 @@ export class UsersController {
         currentPassword,
         newPassword
       );
-
-      logger.info('Password changed successfully', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
       res.json({ message: 'Password changed successfully' });
     } catch (error) {
-      logger.error('Failed to change password', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        ip: req.ip,
-      });
       next(error);
     }
   }
@@ -152,32 +61,21 @@ export class UsersController {
    */
   async getUserRoles(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Get user roles request', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        requestedBy: req.userId,
-        ip: req.ip,
-      });
+      console.log(
+        '[UsersController.getUserRoles] Получение ролей пользователя',
+        {
+          userId: req.params.id,
+          companyId: req.companyId,
+          requestedBy: req.userId,
+        }
+      );
 
       const roles = await usersService.getUserRoles(
         req.params.id,
         req.companyId!
       );
-
-      logger.debug('User roles retrieved successfully', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        rolesCount: roles.length,
-      });
-
       res.json(roles);
     } catch (error) {
-      logger.error('Failed to get user roles', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
@@ -188,12 +86,11 @@ export class UsersController {
    */
   async assignRole(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Assign role to user request', {
+      console.log('[UsersController.assignRole] Назначение роли пользователю', {
         userId: req.params.id,
         roleId: req.body.roleId,
         companyId: req.companyId,
         assignedBy: req.userId,
-        ip: req.ip,
       });
 
       const { roleId } = req.body;
@@ -211,14 +108,6 @@ export class UsersController {
         req.companyId!,
         req.userId!
       );
-
-      logger.info('Role assigned to user successfully', {
-        userId: req.params.id,
-        roleId,
-        userRoleId: userRole.id,
-        companyId: req.companyId,
-        assignedBy: req.userId,
-      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -248,12 +137,11 @@ export class UsersController {
    */
   async removeRole(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Remove role from user request', {
+      console.log('[UsersController.removeRole] Снятие роли с пользователя', {
         userId: req.params.id,
         roleId: req.params.roleId,
         companyId: req.companyId,
         requestedBy: req.userId,
-        ip: req.ip,
       });
 
       const result = await usersService.removeRole(
@@ -261,13 +149,6 @@ export class UsersController {
         req.params.roleId,
         req.companyId!
       );
-
-      logger.info('Role removed from user successfully', {
-        userId: req.params.id,
-        roleId: req.params.roleId,
-        companyId: req.companyId,
-        removedBy: req.userId,
-      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -297,11 +178,11 @@ export class UsersController {
    */
   async updateUser(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Update user request', {
+      console.log('[UsersController.updateUser] Обновление пользователя', {
         userId: req.params.id,
         companyId: req.companyId,
         updatedBy: req.userId,
-        ip: req.ip,
+        data: req.body,
       });
 
       // Получаем старую версию для логирования
@@ -313,12 +194,6 @@ export class UsersController {
         req.companyId!,
         req.body
       );
-
-      logger.info('User updated successfully', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        updatedBy: req.userId,
-      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -347,12 +222,10 @@ export class UsersController {
    */
   async inviteUser(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Invite user request', {
+      console.log('[UsersController.inviteUser] Приглашение пользователя', {
         companyId: req.companyId,
         invitedBy: req.userId,
-        email: req.body.email,
-        roleIds: req.body.roleIds,
-        ip: req.ip,
+        data: req.body,
       });
 
       const { email, roleIds = [] } = req.body;
@@ -370,13 +243,6 @@ export class UsersController {
         roleIds,
         req.userId!
       );
-
-      logger.info('User invited successfully', {
-        userId: result.id,
-        email: result.email,
-        companyId: req.companyId,
-        invitedBy: req.userId,
-      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -410,12 +276,14 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      logger.info('Get user permissions request', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        requestedBy: req.userId,
-        ip: req.ip,
-      });
+      console.log(
+        '[UsersController.getUserPermissions] Получение прав пользователя',
+        {
+          userId: req.params.id,
+          companyId: req.companyId,
+          requestedBy: req.userId,
+        }
+      );
 
       // Пользователь может получить свои права, или администратор может получить права любого пользователя
       const targetUserId = req.params.id;
@@ -435,20 +303,13 @@ export class UsersController {
    */
   async deleteUser(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.info('Delete user request', {
+      console.log('[UsersController.deleteUser] Удаление пользователя', {
         userId: req.params.id,
         companyId: req.companyId,
         deletedBy: req.userId,
-        ip: req.ip,
       });
 
       await usersService.deleteUser(req.params.id, req.companyId!, req.userId!);
-
-      logger.info('User deleted successfully', {
-        userId: req.params.id,
-        companyId: req.companyId,
-        deletedBy: req.userId,
-      });
 
       // Логируем действие
       await auditLogService.logAction({
@@ -481,36 +342,16 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      logger.info('Request email change', {
-        userId: req.userId,
-        companyId: req.companyId,
-        newEmail: req.body.newEmail,
-        ip: req.ip,
-      });
-
       const { newEmail } = req.body;
       await usersService.requestEmailChange(
         req.userId!,
         req.companyId!,
         newEmail
       );
-
-      logger.info('Email change request sent', {
-        userId: req.userId,
-        companyId: req.companyId,
-        newEmail,
-      });
-
       res.json({
         message: 'Verification email sent to your current email address',
       });
     } catch (error) {
-      logger.error('Failed to request email change', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
@@ -525,28 +366,13 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      logger.info('Confirm old email for change', {
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
       const { token } = req.body;
       await usersService.confirmOldEmailForChange(token, req.companyId!);
-
-      logger.info('Old email confirmed for change', {
-        companyId: req.companyId,
-      });
-
       res.json({
         message:
           'Old email confirmed. Verification email sent to new email address',
       });
     } catch (error) {
-      logger.error('Failed to confirm old email for change', {
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
@@ -561,48 +387,22 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      logger.info('Confirm email change', {
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
       const { token } = req.body;
       await usersService.confirmEmailChangeWithEmail(token, req.companyId!);
-
-      logger.info('Email changed successfully', {
-        companyId: req.companyId,
-      });
-
       res.json({ message: 'Email changed successfully' });
     } catch (error) {
-      logger.error('Failed to confirm email change', {
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
 
   async getPreferences(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      logger.debug('Get user preferences request', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
       const result = await usersService.getPreferences(
         req.userId!,
         req.companyId!
       );
       res.json(result);
     } catch (error) {
-      logger.error('Failed to get user preferences', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }
@@ -613,31 +413,13 @@ export class UsersController {
     next: NextFunction
   ) {
     try {
-      logger.info('Update user preferences request', {
-        userId: req.userId,
-        companyId: req.companyId,
-        ip: req.ip,
-      });
-
       const result = await usersService.updatePreferences(
         req.userId!,
         req.companyId!,
         req.body
       );
-
-      logger.info('User preferences updated successfully', {
-        userId: req.userId,
-        companyId: req.companyId,
-      });
-
       res.json(result);
     } catch (error) {
-      logger.error('Failed to update user preferences', {
-        userId: req.userId,
-        companyId: req.companyId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
       next(error);
     }
   }

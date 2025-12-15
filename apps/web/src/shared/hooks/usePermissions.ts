@@ -35,6 +35,7 @@ export const usePermissions = () => {
         'departments',
         'counterparties',
         'deals',
+        'salaries',
         'operations',
         'budgets',
         'reports',

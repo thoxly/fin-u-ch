@@ -5,7 +5,6 @@ interface Column<T> {
   header: string | ReactNode;
   render?: (item: T) => ReactNode;
   width?: string;
-  sortable?: boolean;
 }
 
 interface TableProps<T> {
@@ -16,9 +15,6 @@ interface TableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   rowClassName?: (item: T) => string;
-  onSort?: (key: string) => void;
-  sortKey?: string;
-  sortDirection?: 'asc' | 'desc';
 }
 
 export function Table<T>({
@@ -29,9 +25,6 @@ export function Table<T>({
   loading,
   emptyMessage = 'Нет данных',
   rowClassName,
-  onSort,
-  sortKey,
-  sortDirection,
 }: TableProps<T>) {
   if (loading) {
     return (
@@ -60,26 +53,14 @@ export function Table<T>({
                 <th
                   key={column.key}
                   style={column.width ? { width: column.width } : undefined}
-                  className={`overflow-visible ${isRulesColumn ? '!text-center' : ''} ${
-                    column.sortable
-                      ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                      : ''
-                  }`}
-                  onClick={() => column.sortable && onSort?.(column.key)}
+                  className={`overflow-visible ${isRulesColumn ? '!text-center' : ''}`}
                 >
                   {isRulesColumn ? (
                     <div className="flex justify-center items-center">
                       {column.header}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-1">
-                      {column.header}
-                      {sortKey === column.key && (
-                        <span className="text-xs">
-                          {sortDirection === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
+                    column.header
                   )}
                 </th>
               );

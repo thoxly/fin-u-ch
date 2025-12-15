@@ -224,7 +224,7 @@ describe('PasswordResetService', () => {
 
     it('should throw error if new password is same as current', async () => {
       const token = 'reset-token-123';
-      const newPassword = 'ValidNewPass123';
+      const newPassword = 'samePassword';
 
       (mockedTokenService.validateToken as jest.Mock).mockResolvedValue({
         valid: true,

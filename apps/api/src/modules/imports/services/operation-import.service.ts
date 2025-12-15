@@ -49,7 +49,7 @@ export class OperationImportService {
       where.id = { in: operationIds };
     } else {
       // Если не указаны конкретные ID, пропускаем дубликаты по умолчанию
-      (where as any).isDuplicate = false;
+      where.isDuplicate = false;
     }
 
     const operations = await prisma.importedOperation.findMany({
@@ -243,7 +243,7 @@ export class OperationImportService {
                 isTemplate: false,
                 isConfirmed: true,
                 sourceHash,
-              } as any,
+              },
             });
 
             // Помечаем как обработанную
@@ -529,25 +529,25 @@ export class OperationImportService {
             };
 
             if (isFullyMatched && matchingResult.matchedRuleId) {
-              (updateData as any).mapping_rule = {
+              updateData.mapping_rule = {
                 connect: { id: matchingResult.matchedRuleId },
               };
             } else {
-              (updateData as any).mapping_rule = { disconnect: true };
+              updateData.mapping_rule = { disconnect: true };
             }
 
             if (matchingResult.matchedArticleId) {
-              (updateData as any).article = {
+              updateData.article = {
                 connect: { id: matchingResult.matchedArticleId },
               };
             }
             if (matchingResult.matchedCounterpartyId) {
-              (updateData as any).counterparty = {
+              updateData.counterparty = {
                 connect: { id: matchingResult.matchedCounterpartyId },
               };
             }
             if (matchingResult.matchedAccountId) {
-              (updateData as any).account = {
+              updateData.account = {
                 connect: { id: matchingResult.matchedAccountId },
               };
             }

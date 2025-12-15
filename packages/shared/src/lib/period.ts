@@ -244,8 +244,7 @@ export const createIntervals = (
         (1000 * 60 * 60 * 24)
     ) + 1;
 
-  // Определяем оптимальное количество интервалов для визуализации
-  // Учитываем periodFormat для правильного создания интервалов
+  // Определяем оптимальное количество интервалов для визуализации (5-12 точек)
   let targetIntervals: number;
 
   // Если periodFormat = 'day' или 'week', создаем интервалы по дням
@@ -253,10 +252,10 @@ export const createIntervals = (
   if (periodFormat === 'day' || periodFormat === 'week') {
     if (totalDays > 31) {
       // Для больших периодов используем месячные интервалы (5-12 интервалов)
-      const startMonth = fromDate.getMonth();
-      const endMonth = toDate.getMonth();
-      const startYear = fromDate.getFullYear();
-      const endYear = toDate.getFullYear();
+      const startMonth = fromDateNormalized.getUTCMonth();
+      const endMonth = toDateNormalized.getUTCMonth();
+      const startYear = fromDateNormalized.getUTCFullYear();
+      const endYear = toDateNormalized.getUTCFullYear();
       const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
       targetIntervals = Math.max(5, Math.min(12, months));
     } else {
@@ -266,14 +265,14 @@ export const createIntervals = (
     // Меньше недели - каждый день
     targetIntervals = totalDays;
   } else if (totalDays <= 31) {
-    // До месяца - каждый день (даже если periodFormat = 'month', для графика нужны дневные интервалы)
+    // До месяца - каждый день
     targetIntervals = totalDays;
   } else if (totalDays <= 90) {
     // До квартала - показываем месяцы
-    const startMonth = fromDate.getMonth();
-    const endMonth = toDate.getMonth();
-    const startYear = fromDate.getFullYear();
-    const endYear = toDate.getFullYear();
+    const startMonth = fromDateNormalized.getUTCMonth();
+    const endMonth = toDateNormalized.getUTCMonth();
+    const startYear = fromDateNormalized.getUTCFullYear();
+    const endYear = toDateNormalized.getUTCFullYear();
 
     // Считаем количество месяцев
     const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
@@ -281,10 +280,10 @@ export const createIntervals = (
   } else if (totalDays <= 365) {
     // До года - показываем каждый месяц попадающий в диапазон
     // Это обеспечит уникальные лейблы "апр 2025", "май 2025", "июн 2025"
-    const startMonth = fromDate.getMonth();
-    const endMonth = toDate.getMonth();
-    const startYear = fromDate.getFullYear();
-    const endYear = toDate.getFullYear();
+    const startMonth = fromDateNormalized.getUTCMonth();
+    const endMonth = toDateNormalized.getUTCMonth();
+    const startYear = fromDateNormalized.getUTCFullYear();
+    const endYear = toDateNormalized.getUTCFullYear();
 
     // Считаем количество месяцев
     const months = (endYear - startYear) * 12 + (endMonth - startMonth) + 1;
@@ -460,34 +459,6 @@ export const createIntervals = (
       current = new Date(end);
       current.setUTCDate(current.getUTCDate() + 1);
       intervalCount++;
-    }
-  }
-
-  // Убеждаемся, что последний интервал охватывает toDate
-  // НО только если мы не создали дневные интервалы (для них все уже покрыто)
-  if (intervals.length > 0 && !(stepDays === 1 || totalDays <= 31)) {
-    const lastInterval = intervals[intervals.length - 1];
-    // Нормализуем toDate для сравнения (только дата, без времени)
-    const toDateNormalized = new Date(
-      toDate.getFullYear(),
-      toDate.getMonth(),
-      toDate.getDate()
-    );
-    const lastEndNormalized = new Date(
-      lastInterval.end.getFullYear(),
-      lastInterval.end.getMonth(),
-      lastInterval.end.getDate()
-    );
-    if (lastEndNormalized < toDateNormalized) {
-      intervals.push({
-        start: new Date(lastInterval.end.getTime() + 1),
-        end: new Date(toDate),
-        label: formatIntervalLabel(
-          new Date(lastInterval.end.getTime() + 1),
-          toDate,
-          'day'
-        ),
-      });
     }
   }
 

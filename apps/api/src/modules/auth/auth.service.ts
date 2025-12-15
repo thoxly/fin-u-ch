@@ -10,20 +10,13 @@ import { AppError } from '../../middlewares/error';
 import { seedInitialData } from './seed-initial-data';
 import logger from '../../config/logger';
 import rolesService from '../roles/roles.service';
-import {
-  sendVerificationEmail,
-  sendBetaPromoCodeEmail,
-} from '../../services/mail/mail.service';
+import { sendVerificationEmail } from '../../services/mail/mail.service';
 import tokenService from '../../services/mail/token.service';
-// import subscriptionService from '../subscription/subscription.service';
-import promoCodeService from '../subscription/promo-code.service';
-import { SubscriptionPlan, SubscriptionStatus } from '@prisma/client';
 
 export interface RegisterDTO {
   email: string;
   password: string;
   companyName: string;
-  promoCode?: string; // Опциональный промокод для Beta-доступа
 }
 
 export interface LoginDTO {
@@ -130,61 +123,8 @@ export class AuthService {
           throw new AppError('Failed to initialize company data', 500);
         }
 
-        // Создаем подписку START по умолчанию
-        await tx.subscription.create({
-          data: {
-            companyId: company.id,
-            plan: SubscriptionPlan.START,
-            status: SubscriptionStatus.ACTIVE,
-            promoCode: null,
-          },
-        });
-
-        logger.info('Default START subscription created', {
-          companyId: company.id,
-        });
-
-        // Генерируем персональный промокод для пользователя (для бета-программы)
-        const personalPromoCode =
-          await promoCodeService.generatePersonalPromoCode(user.id);
-        logger.info('Personal promo code generated for user', {
-          userId: user.id,
-          promoCode: personalPromoCode,
-        });
-
-        return { user, company, personalPromoCode };
+        return { user, company };
       });
-
-      // Применяем промокод, если он указан
-      let appliedPromoCode: string | null = null;
-      if (data.promoCode) {
-        try {
-          logger.info('Applying promo code during registration', {
-            companyId: result.company.id,
-            promoCode: data.promoCode,
-          });
-
-          const promoResult = await promoCodeService.applyPromoCode(
-            result.company.id,
-            data.promoCode
-          );
-
-          appliedPromoCode = promoResult.promoCode.code;
-          logger.info('Promo code applied successfully during registration', {
-            companyId: result.company.id,
-            promoCode: appliedPromoCode,
-            plan: promoResult.subscription.plan,
-          });
-        } catch (error) {
-          logger.warn('Failed to apply promo code during registration', {
-            companyId: result.company.id,
-            promoCode: data.promoCode,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Не прерываем регистрацию, если промокод невалиден
-          // Просто логируем предупреждение
-        }
-      }
 
       // Получаем активные роли компании после регистрации
       try {
@@ -262,34 +202,6 @@ export class AuthService {
         // Не блокируем регистрацию, если письмо не отправилось
       }
 
-      // Отправляем письмо с промокодом
-      if (result.personalPromoCode) {
-        try {
-          logger.info('Sending beta promo code email', {
-            userId: result.user.id,
-            email: result.user.email,
-            promoCode: result.personalPromoCode,
-          });
-
-          await sendBetaPromoCodeEmail(
-            result.user.email,
-            result.personalPromoCode
-          );
-
-          logger.info('Beta promo code email sent successfully', {
-            userId: result.user.id,
-            email: result.user.email,
-          });
-        } catch (error) {
-          logger.error('Failed to send beta promo code email', {
-            userId: result.user.id,
-            email: result.user.email,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          // Не блокируем регистрацию
-        }
-      }
-
       logger.info('[AuthService.register] Регистрация успешна', {
         userId: result.user.id,
         email: result.user.email,
@@ -304,7 +216,7 @@ export class AuthService {
         },
       };
     } catch (error) {
-      console.error('[AuthService.register] ОШИБКА при регистрации:', {
+      logger.error('[AuthService.register] ОШИБКА при регистрации:', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
         email: data.email,
@@ -484,122 +396,6 @@ export class AuthService {
       });
       throw new AppError('Failed to send verification email', 500);
     }
-  }
-
-  async acceptInvitation(
-    token: string,
-    password: string
-  ): Promise<TokensResponse> {
-    validateRequired({ token, password });
-    validatePassword(password);
-
-    const validation = await tokenService.validateToken(
-      token,
-      'user_invitation'
-    );
-
-    if (!validation.valid || !validation.userId) {
-      logger.warn(
-        'Invitation acceptance attempted with invalid or expired token',
-        {
-          error: validation.error,
-        }
-      );
-      throw new AppError(validation.error || 'Invalid or expired token', 400);
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: validation.userId },
-      select: {
-        id: true,
-        email: true,
-        companyId: true,
-        isActive: true,
-      },
-    });
-
-    if (!user) {
-      throw new AppError('User not found', 404);
-    }
-
-    if (user.isActive) {
-      throw new AppError('Invitation already accepted', 400);
-    }
-
-    const roleIds: string[] = (validation.metadata?.roleIds as string[]) || [];
-    const companyId = validation.metadata?.companyId as string | undefined;
-    const invitedBy = validation.metadata?.invitedBy as string | undefined;
-
-    // Проверяем, что компания из токена совпадает с компанией пользователя
-    if (companyId && companyId !== user.companyId) {
-      logger.warn('Company mismatch in invitation token', {
-        userId: user.id,
-        tokenCompanyId: companyId,
-        userCompanyId: user.companyId,
-      });
-      throw new AppError('Invalid invitation token', 400);
-    }
-
-    const passwordHash = await hashPassword(password);
-
-    await prisma.$transaction(async (tx) => {
-      // Обновляем пароль, активируем пользователя и подтверждаем email
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          passwordHash,
-          isActive: true,
-          isEmailVerified: true,
-        },
-      });
-
-      // Назначаем роли, если они были указаны в приглашении
-      if (roleIds.length > 0) {
-        // Удаляем старые роли (если есть)
-        await tx.userRole.deleteMany({
-          where: { userId: user.id },
-        });
-
-        // Создаём новые роли
-        await tx.userRole.createMany({
-          data: roleIds.map((roleId) => ({
-            userId: user.id,
-            roleId,
-            assignedBy: invitedBy || user.id, // Используем ID пригласившего, если есть
-          })),
-        });
-      }
-
-      // Помечаем токен как использованный
-      await tokenService.markTokenAsUsed(token);
-    });
-
-    logger.info('Invitation accepted successfully', {
-      userId: user.id,
-      email: user.email,
-      roleIds,
-    });
-
-    // Генерируем токены для автоматического входа
-    const accessToken = generateAccessToken({
-      userId: user.id,
-      email: user.email,
-    });
-
-    const refreshToken = generateRefreshToken({
-      userId: user.id,
-      email: user.email,
-    });
-
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        companyId: user.companyId,
-      },
-    };
   }
 }
 

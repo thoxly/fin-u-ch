@@ -77,11 +77,6 @@ interface ConfirmEmailChangeRequest {
   token: string;
 }
 
-interface AcceptInvitationRequest {
-  token: string;
-  password: string;
-}
-
 export interface UserPreferences {
   theme?: 'light' | 'dark' | 'system';
   navigationIcons?: Record<string, string>;
@@ -183,7 +178,7 @@ export const authApi = apiSlice.injectEndpoints({
       ConfirmOldEmailForChangeRequest
     >({
       query: (data) => ({
-        url: '/auth/confirm-email-change-old',
+        url: '/users/me/confirm-email-change-old',
         method: 'POST',
         body: data,
       }),
@@ -193,15 +188,7 @@ export const authApi = apiSlice.injectEndpoints({
       ConfirmEmailChangeRequest
     >({
       query: (data) => ({
-        url: '/auth/confirm-email-change',
-        method: 'POST',
-        body: data,
-      }),
-      invalidatesTags: ['User'],
-    }),
-    acceptInvitation: builder.mutation<AuthResponse, AcceptInvitationRequest>({
-      query: (data) => ({
-        url: '/auth/accept-invitation',
+        url: '/users/me/confirm-email-change',
         method: 'POST',
         body: data,
       }),
@@ -218,17 +205,6 @@ export const authApi = apiSlice.injectEndpoints({
         body: preferences,
       }),
       invalidatesTags: ['User'],
-    }),
-    deleteMyAccount: builder.mutation<void, void>({
-      query: () => ({
-        url: '/users/me',
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['User'],
-    }),
-    logout: builder.mutation<void, void>({
-      queryFn: () => ({ data: undefined }),
-      invalidatesTags: ['User', 'AuditLog', 'Role', 'Permission'],
     }),
   }),
 });
@@ -247,9 +223,6 @@ export const {
   useRequestEmailChangeMutation,
   useConfirmOldEmailForChangeMutation,
   useConfirmEmailChangeMutation,
-  useAcceptInvitationMutation,
   useGetPreferencesQuery,
   useUpdatePreferencesMutation,
-  useDeleteMyAccountMutation,
-  useLogoutMutation,
 } = authApi;

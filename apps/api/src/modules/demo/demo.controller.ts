@@ -149,14 +149,16 @@ export class DemoController {
 
   /**
    * @swagger
-   * /api/demo/start-session:
+   * /api/demo/create:
    *   post:
-   *     summary: Start a dynamic demo session
-   *     description: Creates a temporary demo user and returns authentication tokens
+   *     summary: Create demo user
+   *     description: Creates a new demo user with full mock data
    *     tags: [Demo]
+   *     security:
+   *       - bearerAuth: []
    *     responses:
    *       201:
-   *         description: Session started successfully
+   *         description: Demo user created successfully
    *         content:
    *           application/json:
    *             schema:
@@ -166,21 +168,34 @@ export class DemoController {
    *                   type: boolean
    *                   example: true
    *                 data:
-   *                   $ref: '#/components/schemas/TokensResponse'
+   *                   $ref: '#/components/schemas/DemoUserData'
+   *       409:
+   *         description: Demo user already exists
+   *       500:
+   *         description: Failed to create demo user
    */
-  async startSession(
-    req: Request,
+  async create(
+    req: TenantRequest,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const tokens = await demoUserService.createDynamicUser();
+      const exists = await demoUserService.exists();
+      if (exists) {
+        res.status(409).json({
+          success: false,
+          error: 'Demo user already exists',
+        });
+        return;
+      }
+
+      const demoUser = await demoUserService.create();
       res.status(201).json({
         success: true,
-        data: tokens,
+        data: demoUser,
       });
     } catch (error) {
-      logger.error('Failed to start demo session', { error });
+      logger.error('Failed to create demo user', { error });
       next(error);
     }
   }
