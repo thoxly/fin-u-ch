@@ -35,11 +35,11 @@ const featureDescriptions: Record<
   integrations: {
     title: 'Интеграции',
     description:
-      'Подключение интеграций (Ozon и др.) доступно только на тарифе BUSINESS.',
+      'Подключение интеграций (Ozon и др.) доступно на тарифах TEAM и BUSINESS.',
   },
   reports_odds: {
     title: 'Отчёты ОДДС',
-    description: 'Расширенные отчёты доступны только на тарифе TEAM и выше.',
+    description: 'Отчёты доступны в базовой подписке.',
   },
 };
 
