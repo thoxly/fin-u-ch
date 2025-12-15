@@ -72,21 +72,22 @@ async function startServer() {
     logger.info(`Health check: http://localhost:${PORT}/api/health`);
 
     // Автоматически создаем демо-пользователя при первом запуске
+    // Автоматически создаем демо-пользователя при первом запуске
+    // DEPRECATED: We are moving to dynamic demo users
+    /*
     try {
       const exists = await demoUserService.exists();
       if (!exists) {
         logger.info('Demo user not found, creating...');
-        const demoUser = await demoUserService.create();
-        logger.info(`Demo user created: ${demoUser.user.email}`);
-        logger.info(
-          `Demo data: ${demoUser.operationsCount} operations, ${demoUser.accountsCount} accounts`
-        );
+        // const demoUser = await demoUserService.create();
+        // logger.info(`Demo user created: ${demoUser.user.email}`);
       } else {
         logger.info('Demo user already exists');
       }
     } catch (error) {
       logger.error('Failed to setup demo user:', error);
     }
+    */
   });
 
   return server;

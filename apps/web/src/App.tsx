@@ -18,7 +18,6 @@ import { AccountsPage } from './pages/catalogs/AccountsPage';
 import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
-import { SalariesPage } from './pages/catalogs/SalariesPage';
 import { ProfilePage as ProfilePageOld } from './pages/ProfilePage';
 import { CompanyPage as CompanyPageOld } from './pages/CompanyPage';
 import { PricingPage } from './pages/PricingPage';
@@ -173,16 +172,6 @@ function App() {
             <PrivateRoute>
               <ProtectedRoute entity="deals" action="read">
                 <DealsPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/catalogs/salaries"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="salaries" action="read">
-                <SalariesPage />
               </ProtectedRoute>
             </PrivateRoute>
           }

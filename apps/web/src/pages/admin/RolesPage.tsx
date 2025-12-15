@@ -30,7 +30,6 @@ const ENTITIES = [
   { name: 'departments', label: 'Подразделения' },
   { name: 'counterparties', label: 'Контрагенты' },
   { name: 'deals', label: 'Сделки' },
-  { name: 'salaries', label: 'Зарплаты' },
   { name: 'operations', label: 'Операции' },
   { name: 'budgets', label: 'Бюджеты' },
   { name: 'reports', label: 'Отчёты' },

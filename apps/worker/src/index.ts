@@ -2,10 +2,6 @@
 import cron from 'node-cron';
 import { logger } from './config/logger';
 import { env } from './config/env';
-import {
-  generateSalaryOperations,
-  getCurrentMonth,
-} from './jobs/salary.generate.monthly';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
 import {
   generateOzonOperations,
@@ -13,6 +9,7 @@ import {
   getNextRunInfo,
   ozonOperationService,
 } from './jobs/ozon.generate.operations';
+import { cleanupExpiredDemoUsers } from './jobs/cleanup-demo-users.job';
 import { prisma } from './config/prisma';
 
 logger.info(`⏰ Текущее время: ${new Date().toLocaleString('ru-RU')}`);
@@ -22,29 +19,6 @@ const nextRunInfo = getNextRunInfo();
 const nextRunDate = new Date(nextRunInfo.nextRunDate);
 logger.info(`⏰ Дата и время: ${nextRunDate.toLocaleString('ru-RU')}`);
 logger.info(`📊 Дней до запуска: ${nextRunInfo.daysUntilNextRun}`);
-
-/**
- * Задача генерации зарплатных операций
- * Запускается каждое 1-е число месяца в 00:00
- */
-const salaryGenerationTask = cron.schedule(
-  '0 0 1 * *',
-  async () => {
-    logger.info('🔄 Running scheduled salary generation task...');
-
-    try {
-      const currentMonth = getCurrentMonth();
-      await generateSalaryOperations({ month: currentMonth });
-      logger.info('✅ Salary generation task completed successfully');
-    } catch (error) {
-      logger.error('❌ Salary generation task failed:', error);
-    }
-  },
-  {
-    scheduled: true,
-    timezone: 'Europe/Moscow',
-  }
-);
 
 /**
  * Задача генерации периодических операций
@@ -138,22 +112,33 @@ const ozonOperationsTask = cron.schedule(
   }
 );
 
-// Функции для ручного запуска задач
-export async function runSalaryGenerationManually(
-  month?: string
-): Promise<void> {
-  logger.info('🔧 Manual salary generation triggered');
+/**
+ * Задача очистки старых демо-пользователей
+ * Запускается каждый час в 15 минут
+ */
+const cleanupDemoUsersTask = cron.schedule(
+  '15 * * * *',
+  async () => {
+    logger.info('🔄 Running scheduled demo user cleanup task...');
 
-  try {
-    const targetMonth = month || getCurrentMonth();
-    await generateSalaryOperations({ month: targetMonth });
-    logger.info('✅ Manual salary generation completed successfully');
-  } catch (error) {
-    logger.error('❌ Manual salary generation failed:', error);
-    throw error;
+    try {
+      const deletedCount = await cleanupExpiredDemoUsers(24); // Удаляем аккаунты старше 24 часов
+      if (deletedCount > 0) {
+        logger.info(`✅ Cleanup completed. Deleted ${deletedCount} users.`);
+      } else {
+        logger.info('✅ Cleanup check completed. No expired users found.');
+      }
+    } catch (error) {
+      logger.error('❌ Demo user cleanup task failed:', error);
+    }
+  },
+  {
+    scheduled: true,
+    timezone: 'Europe/Moscow',
   }
-}
+);
 
+// Функции для ручного запуска задач
 export async function runRecurringOperationsManually(
   targetDate?: Date
 ): Promise<void> {
@@ -295,14 +280,48 @@ if (process.argv[2] === 'check-ozon-status') {
     });
 }
 
+// Команда для немедленного запуска генерации повторяющихся операций
+if (process.argv[2] === 'run-recurring-now') {
+  logger.info('═══════════════════════════════════════════════════════');
+  logger.info('🚀 РУЧНОЙ ЗАПУСК ЗАДАЧИ ГЕНЕРАЦИИ ПОВТОРЯЮЩИХСЯ ОПЕРАЦИЙ');
+  logger.info('═══════════════════════════════════════════════════════');
+
+  prisma
+    .$connect()
+    .then(async () => {
+      logger.info('✅ Подключение к БД установлено');
+
+      try {
+        await generateRecurringOperations();
+
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info('📊 РЕЗУЛЬТАТЫ РУЧНОГО ЗАПУСКА');
+        logger.info('═══════════════════════════════════════════════════════');
+        logger.info('✅ Генерация повторяющихся операций завершена успешно');
+        logger.info('═══════════════════════════════════════════════════════');
+
+        await prisma.$disconnect();
+        process.exit(0);
+      } catch (error: any) {
+        logger.error('❌ Ошибка при выполнении задачи:', error);
+        await prisma.$disconnect();
+        process.exit(1);
+      }
+    })
+    .catch((error: any) => {
+      logger.error('❌ Ошибка подключения к БД:', error);
+      process.exit(1);
+    });
+}
+
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully...`);
 
   // Останавливаем cron задачи
-  salaryGenerationTask.stop();
   recurringOperationsTask.stop();
   ozonOperationsTask.stop();
+  cleanupDemoUsersTask.stop();
 
   // Закрываем Prisma соединение
   await prisma.$disconnect();
@@ -349,19 +368,19 @@ prisma
     logger.info('✅ ВСЕ ЗАДАЧИ НАСТРОЕНЫ И ГОТОВЫ К РАБОТЕ');
     logger.info('═══════════════════════════════════════════════════════');
     logger.info('📋 Настроенные задачи:');
-    logger.info('   1. ✅ Генерация зарплатных операций');
-    logger.info('      Расписание: 1-е число каждого месяца в 00:00');
-    logger.info('');
-    logger.info('   2. ✅ Генерация периодических операций');
+    logger.info('   1. ✅ Генерация периодических операций');
     logger.info('      Расписание: Каждый день в 00:01');
     logger.info('');
-    logger.info('   3. ✅ Генерация операций Ozon');
+    logger.info('   2. ✅ Генерация операций Ozon');
     logger.info(
       '      Расписание: Каждый день в 00:01 (выполняется только по средам)'
     );
     logger.info(
       '      Следующий запуск: ' + nextRunDate.toLocaleString('ru-RU')
     );
+    logger.info('');
+    logger.info('   3. ✅ Очистка демо-пользователей');
+    logger.info('      Расписание: Каждый час в 15 минут');
     logger.info('═══════════════════════════════════════════════════════');
     logger.info('👷 WORKER РАБОТАЕТ И ОЖИДАЕТ ЗАПЛАНИРОВАННЫХ ЗАДАЧ');
     logger.info('═══════════════════════════════════════════════════════');
