@@ -223,7 +223,6 @@ export async function migrateExistingUsers(): Promise<void> {
           'counterparties',
           'departments',
           'deals',
-          'salaries',
         ];
         for (const entityName of catalogEntities) {
           operationsEditorPermissions.push({

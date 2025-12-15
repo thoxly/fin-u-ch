@@ -56,31 +56,36 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
 
   // Обрабатываем данные: обрываем линию на текущей дате
   // Ось X должна показывать весь период, но линия должна обрываться
-  const filteredData = data?.map((point) => {
-    const pointDate = new Date(point.date);
-    pointDate.setHours(0, 0, 0, 0);
+  const filteredData = data
+    ?.map((point) => {
+      const pointDate = new Date(point.date);
+      pointDate.setHours(0, 0, 0, 0);
 
-    // Если точка находится в будущем (после сегодня), устанавливаем null для всех значений
-    if (pointDate > today) {
-      return {
-        ...point,
-        cumulativeIncome: null,
-        cumulativeExpense: null,
-        cumulativeNetCashFlow: null,
-      };
-    }
+      // Если точка находится в будущем (после сегодня), устанавливаем null для всех значений
+      if (pointDate > today) {
+        return {
+          ...point,
+          cumulativeIncome: null,
+          cumulativeExpense: null,
+          cumulativeNetCashFlow: null,
+        };
+      }
 
-    return point;
-  });
+      return point;
+    })
+    ?.filter((point) => {
+      // Фильтруем точки с null значениями (будущие даты), но оставляем их для отображения оси X
+      // Не фильтруем полностью, чтобы ось X показывала весь период
+      return true;
+    });
 
   // Вычисляем оптимальный размер шрифта для оси Y на основе максимального значения
   const yAxisFontSize = useMemo(() => {
     if (!filteredData || filteredData.length === 0) return 12;
-    const maxValue = findMaxValue(filteredData, [
-      'cumulativeIncome',
-      'cumulativeExpense',
-      'cumulativeNetCashFlow',
-    ]);
+    const maxValue = findMaxValue(
+      filteredData as unknown as Record<string, unknown>[],
+      ['cumulativeIncome', 'cumulativeExpense', 'cumulativeNetCashFlow']
+    );
     return calculateYAxisFontSize(maxValue);
   }, [filteredData]);
 
@@ -110,12 +115,16 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   };
 
   // Проверяем, есть ли данные для отображения
-  // Проверяем не только наличие массива, но и наличие реальных ненулевых значений
-  const hasData =
-    filteredData &&
-    filteredData.length > 0 &&
-    filteredData.some(
-      (point) =>
+  // Упрощенная проверка: если есть данные и хотя бы одна точка с операциями или ненулевыми значениями
+  const hasData = useMemo(() => {
+    if (!data || data.length === 0) {
+      return false;
+    }
+
+    // Проверяем исходные данные (до фильтрации), чтобы не потерять точки из-за фильтрации по датам
+    return data.some((point) => {
+      // Проверяем наличие ненулевых значений
+      const hasNonZeroValues =
         (point.cumulativeIncome !== null &&
           point.cumulativeIncome !== undefined &&
           point.cumulativeIncome !== 0) ||
@@ -124,8 +133,16 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
           point.cumulativeExpense !== 0) ||
         (point.cumulativeNetCashFlow !== null &&
           point.cumulativeNetCashFlow !== undefined &&
-          point.cumulativeNetCashFlow !== 0)
-    );
+          point.cumulativeNetCashFlow !== 0);
+
+      // Проверяем наличие операций
+      const hasOps =
+        point.hasOperations ||
+        (point.operations && point.operations.length > 0);
+
+      return hasNonZeroValues || hasOps;
+    });
+  }, [data]);
 
   // Если нет данных, показываем график без линий, но с сообщением
   if (!filteredData || filteredData.length === 0 || !hasData) {

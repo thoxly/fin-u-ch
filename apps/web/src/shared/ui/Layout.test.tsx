@@ -74,7 +74,6 @@ jest.mock('../hooks/usePermissions', () => ({
         departments: ['read', 'create', 'update', 'delete'],
         counterparties: ['read', 'create', 'update', 'delete'],
         deals: ['read', 'create', 'update', 'delete'],
-        salaries: ['read', 'create', 'update', 'delete'],
         operations: ['read', 'create', 'update', 'delete'],
         plans: ['read', 'create', 'update', 'delete'],
         budgets: ['read', 'create', 'update', 'delete'],

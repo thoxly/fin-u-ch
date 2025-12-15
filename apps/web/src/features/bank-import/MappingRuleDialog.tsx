@@ -216,20 +216,20 @@ export const MappingRuleDialog = ({
     switch (targetType) {
       case 'article':
         return [
-          { value: '__create__', label: '+ Создать новую статью' },
           { value: '', label: 'Не выбрано' },
+          { value: '__create__', label: '+ Создать статью' },
           ...articles.map((a) => ({ value: a.id, label: a.name })),
         ];
       case 'counterparty':
         return [
-          { value: '__create__', label: '+ Создать нового контрагента' },
           { value: '', label: 'Не выбрано' },
+          { value: '__create__', label: '+ Создать контрагента' },
           ...counterparties.map((c) => ({ value: c.id, label: c.name })),
         ];
       case 'account':
         return [
-          { value: '__create__', label: '+ Создать новый счет' },
           { value: '', label: 'Не выбрано' },
+          { value: '__create__', label: '+ Создать счет' },
           ...accounts
             .filter((a) => a.isActive)
             .map((a) => ({ value: a.id, label: a.name })),
@@ -304,24 +304,24 @@ export const MappingRuleDialog = ({
       {/* Блок УСЛОВИЕ */}
       <div className="mb-8">
         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-          Условие
+          Если
         </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Где искать
+              Поле
             </label>
             <Select
               value={sourceField}
-              onChange={(e) =>
+              onChange={(value) =>
                 setSourceField(
-                  e.target.value as 'description' | 'receiver' | 'payer' | 'inn'
+                  value as 'description' | 'receiver' | 'payer' | 'inn'
                 )
               }
               options={[
                 { value: 'description', label: 'Назначение платежа' },
-                { value: 'receiver', label: 'Имя получателя' },
-                { value: 'payer', label: 'Имя плательщика' },
+                { value: 'receiver', label: 'Получатель' },
+                { value: 'payer', label: 'Плательщик' },
                 { value: 'inn', label: 'ИНН' },
               ]}
               fullWidth
@@ -331,20 +331,16 @@ export const MappingRuleDialog = ({
 
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Тип поиска
+              Условие
             </label>
             <Select
               value={ruleType}
-              onChange={(e) =>
-                setRuleType(
-                  e.target.value as 'contains' | 'equals' | 'regex' | 'alias'
-                )
+              onChange={(value) =>
+                setRuleType(value as 'contains' | 'equals' | 'regex' | 'alias')
               }
               options={[
                 { value: 'contains', label: 'Содержит' },
-                { value: 'equals', label: 'Совпадает' },
-                { value: 'regex', label: 'Регулярное выражение' },
-                { value: 'alias', label: 'Псевдоним' },
+                { value: 'equals', label: 'Равно' },
               ]}
               fullWidth
               disabled={readOnly}
@@ -353,12 +349,12 @@ export const MappingRuleDialog = ({
 
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Текст для поиска *
+              Значение *
             </label>
             <Input
               value={pattern}
               onChange={(e) => setPattern(e.target.value)}
-              placeholder="Введите текст или регулярное выражение"
+              placeholder="Например: Аренда, Сбербанк"
               fullWidth
               required
               error={patternError}
@@ -369,8 +365,7 @@ export const MappingRuleDialog = ({
               disabled={readOnly}
             />
             <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Можно вводить часть слова или использовать регулярные выражения
-              (например, Аренда офиса, Сбербанк, и проч. )
+              Текст для поиска в выбранном поле
             </p>
             {matchCount !== null && pattern.trim() && (
               <p className="mt-1.5 text-sm text-primary-600 dark:text-primary-400 font-medium">
@@ -389,18 +384,18 @@ export const MappingRuleDialog = ({
       {/* Блок ДЕЙСТВИЕ */}
       <div className="mb-6">
         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-          Действие
+          Тогда
         </h3>
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Сопоставить с
+              Назначить
             </label>
             <Select
               value={targetType}
-              onChange={(e) =>
+              onChange={(value) =>
                 setTargetType(
-                  e.target.value as
+                  value as
                     | 'article'
                     | 'counterparty'
                     | 'account'
@@ -408,23 +403,19 @@ export const MappingRuleDialog = ({
                 )
               }
               options={[
-                { value: 'article', label: 'Статья' },
-                { value: 'counterparty', label: 'Контрагент' },
+                { value: 'article', label: 'Статью' },
+                { value: 'counterparty', label: 'Контрагента' },
                 { value: 'account', label: 'Счет' },
-                { value: 'operationType', label: 'Тип операции' },
               ]}
               fullWidth
               disabled={readOnly}
             />
-            <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-              Какое поле будет заполнено автоматически при совпадении
-            </p>
           </div>
 
           {targetType !== 'operationType' && (
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Значение
+                Выбрать
               </label>
               <Select
                 value={targetId}

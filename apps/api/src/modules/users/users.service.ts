@@ -438,7 +438,6 @@ export class UsersService {
       await tx.planItem.deleteMany({ where: { companyId } });
 
       // Удаляем зарплаты
-      await tx.salary.deleteMany({ where: { companyId } });
 
       // Удаляем интеграции
       await tx.integration.deleteMany({ where: { companyId } });

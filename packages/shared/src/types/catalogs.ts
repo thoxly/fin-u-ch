@@ -83,24 +83,3 @@ export interface Article {
   parent?: { id: string; name: string };
   counterparty?: { id: string; name: string };
 }
-
-export interface Salary {
-  id: string;
-  companyId: string;
-  employeeCounterpartyId: string;
-  departmentId?: string | null;
-  baseWage: number;
-  contributionsPct: number;
-  incomeTaxPct: number;
-  periodicity: 'monthly';
-  effectiveFrom: Date;
-  effectiveTo?: Date | null;
-}
-
-export interface GeneratedSalaryOperation {
-  id: string;
-  salaryId: string;
-  month: string;
-  createdOperationId: string;
-  breakdown: Record<string, unknown>;
-}

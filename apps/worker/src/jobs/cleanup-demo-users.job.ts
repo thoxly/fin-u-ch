@@ -51,7 +51,6 @@ async function deleteUser(userId: string): Promise<void> {
     // 1. Связанные данные компании
     const cid = user.companyId;
     await tx.operation.deleteMany({ where: { companyId: cid } });
-    await tx.salary.deleteMany({ where: { companyId: cid } });
     await tx.account.deleteMany({ where: { companyId: cid } });
     await tx.article.deleteMany({ where: { companyId: cid } });
     await tx.counterparty.deleteMany({ where: { companyId: cid } });
