@@ -38,6 +38,7 @@ async function createDemoUser() {
     // 4. Создаем дополнительные данные за 2025 год
     await createSampleOperations(prisma, company.id);
     await createSamplePlans(prisma, company.id);
+    await createSampleSalaries(prisma, company.id);
 
     // 5. Создаем планы на 2026 год
     await createSamplePlans2026(prisma, company.id);
@@ -1326,6 +1327,38 @@ async function createSamplePlans(prisma: PrismaClient, companyId: string) {
   }
 
   // Created sample plans
+}
+
+async function createSampleSalaries(prisma: PrismaClient, companyId: string) {
+  // Creating sample salary rules
+
+  const counterparties = await prisma.counterparty.findMany({
+    where: { companyId },
+  });
+  const departments = await prisma.department.findMany({
+    where: { companyId },
+  });
+
+  const employee = counterparties.find(
+    (c) => c.name === 'Иванов Иван Иванович'
+  )!;
+  const salesDept = departments.find((d) => d.name === 'Отдел продаж')!;
+
+  await prisma.salary.create({
+    data: {
+      companyId,
+      employeeCounterpartyId: employee.id,
+      departmentId: salesDept.id,
+      baseWage: 50000,
+      contributionsPct: 30,
+      incomeTaxPct: 13,
+      periodicity: 'monthly',
+      effectiveFrom: new Date('2025-01-01'),
+      effectiveTo: new Date('2025-12-31'),
+    },
+  });
+
+  // Created sample salary rule
 }
 
 async function createSamplePlans2026(prisma: PrismaClient, companyId: string) {

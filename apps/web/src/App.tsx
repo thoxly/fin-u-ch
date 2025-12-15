@@ -3,9 +3,6 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
-import { VerifyEmailChangeOldPage } from './pages/auth/VerifyEmailChangeOldPage';
-import { VerifyEmailChangePage } from './pages/auth/VerifyEmailChangePage';
-import { AcceptInvitationPage } from './pages/auth/AcceptInvitationPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -18,23 +15,10 @@ import { AccountsPage } from './pages/catalogs/AccountsPage';
 import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
-import { ProfilePage as ProfilePageOld } from './pages/ProfilePage';
-import { CompanyPage as CompanyPageOld } from './pages/CompanyPage';
-import { PricingPage } from './pages/PricingPage';
-import { AdminPage as AdminPageOld } from './pages/AdminPage';
-// Profile pages
-import { ProfilePage } from './pages/profile/ProfilePage';
-import { SecurityPage } from './pages/profile/SecurityPage';
-import { SettingsPage as ProfileSettingsPage } from './pages/profile/SettingsPage';
-// Company pages
-import { CompanySettingsPage } from './pages/company/SettingsPage';
-import { CurrencyPage } from './pages/company/CurrencyPage';
-import { TariffPage } from './pages/company/TariffPage';
-import { IntegrationsPage } from './pages/company/IntegrationsPage';
-// Admin pages
-import { UsersPage } from './pages/admin/UsersPage';
-import { RolesPage } from './pages/admin/RolesPage';
-import { AuditLogsPage } from './pages/admin/AuditLogsPage';
+import { SalariesPage } from './pages/catalogs/SalariesPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { CompanyPage } from './pages/CompanyPage';
+import { AdminPage } from './pages/AdminPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
@@ -46,22 +30,12 @@ function App() {
     <>
       <ThemeProvider />
       <NotificationContainer />
-
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route
-          path="/verify-email-change-old"
-          element={<VerifyEmailChangeOldPage />}
-        />
-        <Route
-          path="/verify-email-change"
-          element={<VerifyEmailChangePage />}
-        />
-        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -176,8 +150,18 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/catalogs/salaries"
+          element={
+            <PrivateRoute>
+              <ProtectedRoute entity="salaries" action="read">
+                <SalariesPage />
+              </ProtectedRoute>
+            </PrivateRoute>
+          }
+        />
 
-        {/* Profile routes - separate pages for profile sections */}
+        {/* Profile and Company routes - accessible to all authenticated users */}
         <Route
           path="/profile"
           element={
@@ -187,72 +171,20 @@ function App() {
           }
         />
         <Route
-          path="/profile/security"
-          element={
-            <PrivateRoute>
-              <SecurityPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/profile/settings"
-          element={
-            <PrivateRoute>
-              <ProfileSettingsPage />
-            </PrivateRoute>
-          }
-        />
-
-        {/* Company routes - separate pages for company sections */}
-        <Route
           path="/company"
           element={
             <PrivateRoute>
-              <CompanySettingsPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/company/currency"
-          element={
-            <PrivateRoute>
-              <CurrencyPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/company/tarif"
-          element={
-            <PrivateRoute>
-              <TariffPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/company/integrations"
-          element={
-            <PrivateRoute>
-              <IntegrationsPage />
+              <CompanyPage />
             </PrivateRoute>
           }
         />
 
-        {/* Pricing page - for selecting and upgrading tariffs */}
-        <Route
-          path="/pricing"
-          element={
-            <PrivateRoute>
-              <PricingPage />
-            </PrivateRoute>
-          }
-        />
-
-        {/* Admin route - single tabbed admin page (legacy) */}
+        {/* Admin route - single page with tabs */}
         <Route
           path="/admin"
           element={
             <PrivateRoute>
-              <AdminPageOld />
+              <AdminPage />
             </PrivateRoute>
           }
         />

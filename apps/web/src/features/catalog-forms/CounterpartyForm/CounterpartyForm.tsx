@@ -5,8 +5,6 @@ import {
 } from '@/store/api/catalogsApi';
 import { Counterparty } from '@shared/types/catalogs';
 import { useState, useEffect } from 'react';
-import { useNotification } from '@/shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '@/constants/notificationMessages';
 
 interface CounterpartyFormProps {
   counterparty: Counterparty | null;
@@ -30,7 +28,6 @@ export const CounterpartyForm = ({
   const [category, setCategory] = useState(counterparty?.category || 'other');
   const [create, { isLoading: isCreating }] = useCreateCounterpartyMutation();
   const [update, { isLoading: isUpdating }] = useUpdateCounterpartyMutation();
-  const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     setName(counterparty?.name || initialName);
@@ -46,47 +43,19 @@ export const CounterpartyForm = ({
           id: counterparty.id,
           data: { name, inn, category },
         }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.COUNTERPARTY.UPDATE_SUCCESS);
-        onClose();
       } else {
         const result = await create({ name, inn, category }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.COUNTERPARTY.CREATE_SUCCESS);
         if (onSuccess && result.id) {
           onSuccess(result.id);
         } else {
           onClose();
         }
       }
+      if (counterparty) {
+        onClose();
+      }
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : counterparty
-          ? NOTIFICATION_MESSAGES.COUNTERPARTY.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.COUNTERPARTY.CREATE_ERROR;
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : counterparty
-            ? NOTIFICATION_MESSAGES.COUNTERPARTY.UPDATE_ERROR
-            : NOTIFICATION_MESSAGES.COUNTERPARTY.CREATE_ERROR
-      );
+      console.error('Failed to save counterparty:', error);
     }
   };
 

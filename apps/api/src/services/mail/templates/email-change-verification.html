@@ -5,46 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Подтвердите новый email</title>
 </head>
-<body style="margin:0; padding:0; background:#fafafa; font-family: Arial, sans-serif;">
-
-  <div style="max-width:600px; margin:40px auto; background:#ffffff; border-radius:12px; padding:32px; box-shadow:0 4px 16px rgba(0,0,0,0.06); color:#333;">
-
-    <h1 style="font-size:24px; margin:0 0 16px; color:#1f2d3d; font-weight:600;">
-      Подтвердите новый email
-    </h1>
-
-    <p style="margin:0 0 16px; font-size:15px; color:#444;">
-      Вы запросили изменение email-адреса для вашего аккаунта в <strong>Vecta — Финучёт</strong>.
-    </p>
-
-    <div style="margin:24px 0; padding:18px 20px; background:#e8f7fa; border-left:4px solid #0c5460; border-radius:8px; font-size:14px; color:#214e57;">
-      <strong>Финальный шаг:</strong> старый email уже подтверждён. Теперь подтвердите новый адрес, чтобы завершить процесс смены.
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f4f4f4; padding: 20px; border-radius: 5px;">
+    <h1 style="color: #2c3e50;">Подтвердите новый email</h1>
+    <p>Вы запросили изменение email адреса для вашего аккаунта в Vecta — Финучёт.</p>
+    <p>Для завершения смены email, пожалуйста, подтвердите новый адрес, перейдя по ссылке ниже:</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="{{verificationUrl}}" style="background-color: #27ae60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Подтвердить новый email</a>
     </div>
-
-    <p style="margin:0 0 28px; font-size:15px; color:#444;">
-      Для завершения подтвердите новый email по ссылке ниже:
-    </p>
-
-    <div style="text-align:center; margin:32px 0;">
-      <a href="{{verificationUrl}}"
-         style="display:inline-block; background:#27ae60; padding:14px 36px; color:#fff; text-decoration:none; border-radius:8px; font-size:16px; font-weight:bold;">
-        Подтвердить новый email
-      </a>
-    </div>
-
-    <p style="margin:0 0 8px; font-size:14px; color:#555;">
-      Если кнопка не работает, используйте ссылку:
-    </p>
-
-    <p style="word-break:break-all; margin:0 0 24px; font-size:13px; color:#88909a;">
-      {{verificationUrl}}
-    </p>
-
-    <p style="margin-top:24px; font-size:12px; color:#a0a7b0;">
-      Если вы не запрашивали смену email — проигнорируйте письмо. Текущий адрес останется активным.
-    </p>
-
+    <p>Или скопируйте и вставьте эту ссылку в браузер:</p>
+    <p style="word-break: break-all; color: #7f8c8d;">{{verificationUrl}}</p>
+    <p style="margin-top: 30px; font-size: 12px; color: #7f8c8d;">Если вы не запрашивали изменение email, просто проигнорируйте это письмо. Ваш текущий email останется активным.</p>
   </div>
-
 </body>
 </html>
+

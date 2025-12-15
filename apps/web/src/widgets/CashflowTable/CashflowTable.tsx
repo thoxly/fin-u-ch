@@ -1,15 +1,12 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import type {
   CashflowReport,
   BDDSReport,
   ActivityGroup,
-  CashflowBreakdown,
 } from '@fin-u-ch/shared';
 import { formatNumber } from '../../shared/lib/money';
 import { ExportMenu } from '../../shared/ui/ExportMenu';
 import { type ExportRow } from '../../shared/lib/exportData';
-import { useArticleTree } from '../../shared/hooks/useArticleTree';
-import { findArticleInTree, flattenTree } from '../../shared/lib/articleTree';
 
 interface CashflowTableProps {
   data: CashflowReport | BDDSReport;
@@ -18,8 +15,6 @@ interface CashflowTableProps {
   periodFrom: string;
   periodTo: string;
   title?: string;
-  articleSearchQuery?: string;
-  breakdown?: CashflowBreakdown;
 }
 
 interface ExpandedSections {
@@ -50,192 +45,18 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   periodFrom,
   periodTo,
   title,
-  articleSearchQuery = '',
-  breakdown = 'activity',
 }) => {
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>(
     {}
   );
-  const [expandedArticles, setExpandedArticles] = useState<Set<string>>(
-    new Set()
-  );
-  const [showDelta, setShowDelta] = useState(false);
-
-  // Загружаем дерево статей для определения родительских связей
-  const { tree: articleTree } = useArticleTree({ isActive: true });
-
-  // Создаем плоский список статей с Map для быстрого поиска
-  const articleMap = useMemo(() => {
-    const flatArticles = flattenTree(articleTree);
-    const map = new Map<
-      string,
-      { id: string; name: string; parentId?: string | null }
-    >();
-    flatArticles.forEach((article) => {
-      map.set(article.id, {
-        id: article.id,
-        name: article.name,
-        parentId: article.parentId,
-      });
-    });
-    return map;
-  }, [articleTree]);
-
-  // Находим статьи, соответствующие поисковому запросу
-  const matchedArticleIds = useMemo(() => {
-    if (!articleSearchQuery.trim()) {
-      return new Set<string>();
-    }
-
-    const query = articleSearchQuery.toLowerCase().trim();
-    const matched = new Set<string>();
-
-    // Ищем в данных отчета
-    const activitiesToSearch = data.activities || [];
-    for (const activity of activitiesToSearch) {
-      // Ищем в группах доходов
-      for (const group of activity.incomeGroups || []) {
-        if (group.articleName.toLowerCase().includes(query)) {
-          matched.add(group.articleId);
-        }
-      }
-      // Ищем в группах расходов
-      for (const group of activity.expenseGroups || []) {
-        if (group.articleName.toLowerCase().includes(query)) {
-          matched.add(group.articleId);
-        }
-      }
-    }
-
-    // Также ищем в плановых данных
-    if (planData?.activities) {
-      for (const activity of planData.activities) {
-        for (const group of activity.incomeGroups || []) {
-          if (group.articleName.toLowerCase().includes(query)) {
-            matched.add(group.articleId);
-          }
-        }
-        for (const group of activity.expenseGroups || []) {
-          if (group.articleName.toLowerCase().includes(query)) {
-            matched.add(group.articleId);
-          }
-        }
-      }
-    }
-
-    return matched;
-  }, [articleSearchQuery, data.activities, planData]);
-
-  // Определяем, какие группы нужно развернуть
-  // Если найдена дочерняя статья, разворачиваем группу, чтобы она была видна
-  const getSectionKey = (activity: ActivityGroup): string => {
-    // Для разрезов отличных от activity используем key, для activity - activity.activity
-    if (breakdown !== 'activity' && activity.key) {
-      return activity.key;
-    }
-    return activity.activity;
-  };
-
-  const activitiesToExpand = useMemo(() => {
-    if (matchedArticleIds.size === 0) {
-      return new Set<string>();
-    }
-
-    const activities = new Set<string>();
-    const activitiesToSearch = data.activities || [];
-
-    for (const activity of activitiesToSearch) {
-      // Проверяем доходы
-      for (const group of activity.incomeGroups || []) {
-        if (matchedArticleIds.has(group.articleId)) {
-          activities.add(getSectionKey(activity));
-        }
-      }
-      // Проверяем расходы
-      for (const group of activity.expenseGroups || []) {
-        if (matchedArticleIds.has(group.articleId)) {
-          activities.add(getSectionKey(activity));
-        }
-      }
-    }
-
-    // Также проверяем плановые данные
-    if (planData?.activities) {
-      for (const activity of planData.activities) {
-        for (const group of activity.incomeGroups || []) {
-          if (matchedArticleIds.has(group.articleId)) {
-            activities.add(getSectionKey(activity));
-          }
-        }
-        for (const group of activity.expenseGroups || []) {
-          if (matchedArticleIds.has(group.articleId)) {
-            activities.add(getSectionKey(activity));
-          }
-        }
-      }
-    }
-
-    return activities;
-  }, [matchedArticleIds, data.activities, planData, breakdown]);
-
-  // Автоматически разворачиваем активности с найденными статьями
-  useEffect(() => {
-    if (activitiesToExpand.size > 0) {
-      setExpandedSections((prev) => {
-        const updated = { ...prev };
-        activitiesToExpand.forEach((activity) => {
-          updated[activity] = true;
-        });
-        return updated;
-      });
-    }
-  }, [activitiesToExpand]);
-
-  // Автоматически разворачиваем родительские статьи для найденных дочерних статей
-  useEffect(() => {
-    if (matchedArticleIds.size > 0) {
-      setExpandedArticles((prev) => {
-        const newSet = new Set(prev);
-
-        // Для каждой найденной статьи находим всех её родителей и разворачиваем их
-        matchedArticleIds.forEach((articleId) => {
-          const article = articleMap.get(articleId);
-          if (article?.parentId) {
-            // Находим всех родителей рекурсивно
-            let currentParentId = article.parentId;
-            while (currentParentId) {
-              newSet.add(currentParentId);
-              const parentArticle = articleMap.get(currentParentId);
-              currentParentId = parentArticle?.parentId || null;
-            }
-          }
-        });
-
-        return newSet;
-      });
-    }
-  }, [matchedArticleIds, articleMap]);
 
   const hasFactData = data.activities.length > 0;
 
-  const toggleSection = (activity: ActivityGroup) => {
-    const key = getSectionKey(activity);
+  const toggleSection = (activity: string) => {
     setExpandedSections((prev) => ({
       ...prev,
-      [key]: !prev[key],
+      [activity]: !prev[activity],
     }));
-  };
-
-  const toggleArticle = (articleId: string) => {
-    setExpandedArticles((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(articleId)) {
-        newSet.delete(articleId);
-      } else {
-        newSet.add(articleId);
-      }
-      return newSet;
-    });
   };
 
   const allMonths = useMemo(() => {
@@ -415,31 +236,14 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       .toLocaleDateString('ru-RU', MONTH_LABEL_OPTIONS)
       .replace('.', '');
 
-  const getActivityDisplayName = (activity: ActivityGroup) => {
-    // Для разрезов отличных от activity используем поле name
-    if (breakdown !== 'activity' && activity.name) {
-      return activity.name;
-    }
-
-    // Для activity используем стандартные названия
+  const getActivityDisplayName = (activity: string) => {
     const names: Record<string, string> = {
       operating: 'Операционная деятельность',
       investing: 'Инвестиционная деятельность',
       financing: 'Финансовая деятельность',
       unknown: 'Прочие операции',
     };
-    return names[activity.activity] || activity.activity;
-  };
-
-  const getBreakdownLabel = () => {
-    const labels: Record<CashflowBreakdown, string> = {
-      activity: 'Вид деятельности',
-      deal: 'Сделка',
-      account: 'Счет',
-      department: 'Подразделение',
-      counterparty: 'Контрагент',
-    };
-    return labels[breakdown] || 'Группа';
+    return names[activity] || activity;
   };
 
   // Функция для построения данных экспорта
@@ -448,9 +252,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       const rows: ExportRow[] = [];
 
       for (const activity of activitiesToRender) {
-        // Добавляем строку с итогом по группе
+        // Добавляем строку с итогом по деятельности
         const activityRow: ExportRow = {
-          [getBreakdownLabel()]: getActivityDisplayName(activity),
+          'Вид деятельности': getActivityDisplayName(activity.activity),
           Тип: 'Итого',
         };
         for (const month of allMonths) {
@@ -482,7 +286,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
         for (const group of activity.incomeGroups) {
           const articleName = group.articleName;
           const groupRow: ExportRow = {
-            [getBreakdownLabel()]: getActivityDisplayName(activity),
+            'Вид деятельности': getActivityDisplayName(activity.activity),
             Тип: 'Поступления',
             Статья: articleName,
           };
@@ -509,7 +313,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
         for (const group of activity.expenseGroups) {
           const articleName = group.articleName;
           const groupRow: ExportRow = {
-            [getBreakdownLabel()]: getActivityDisplayName(activity),
+            'Вид деятельности': getActivityDisplayName(activity.activity),
             Тип: 'Списания',
             Статья: articleName,
           };
@@ -543,314 +347,25 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     planData,
     getPlanAmount,
     getPlanActivityNet,
-    breakdown,
-    getBreakdownLabel,
   ]);
-  const getActivityColor = (activity: ActivityGroup) => {
-    // Для разрезов отличных от activity используем единый цвет
-    if (breakdown !== 'activity') {
-      return 'bg-purple-50 dark:bg-[#1F1F1F]';
-    }
+  const getActivityColor = (activity: string) => {
     const colors: Record<string, string> = {
       operating: 'bg-blue-50 dark:bg-[#1F1F1F]',
       investing: 'bg-emerald-50 dark:bg-[#1F1F1F]',
       financing: 'bg-amber-50 dark:bg-[#1F1F1F]',
       unknown: 'bg-gray-50 dark:bg-[#1F1F1F]',
     };
-    return colors[activity.activity] || 'bg-gray-50 dark:bg-[#1F1F1F]';
+    return colors[activity] || 'bg-gray-50 dark:bg-[#1F1F1F]';
   };
 
-  const getActivityBorderColor = (activity: ActivityGroup) => {
-    // Для разрезов отличных от activity используем единый цвет
-    if (breakdown !== 'activity') {
-      return '#9333EA'; // purple-600
-    }
+  const getActivityBorderColor = (activity: string) => {
     const colors: Record<string, string> = {
       operating: '#2563EB', // blue-600
       investing: '#047857', // emerald-700
       financing: '#B45309', // amber-600
       unknown: '#6B7280', // gray-500
     };
-    return colors[activity.activity] || '#6B7280';
-  };
-
-  // Рекурсивная функция для рендеринга статьи и её дочерних статей
-  const renderArticleRow = (
-    group: (typeof data.activities)[0]['incomeGroups'][0],
-    activity: string,
-    type: 'income' | 'expense',
-    depth: number = 0,
-    planGroupMap?: Map<string, (typeof data.activities)[0]['incomeGroups'][0]>
-  ): React.ReactNode[] => {
-    const planGroup =
-      planGroupMap?.get(group.articleId) || (!hasFactData ? group : undefined);
-    const articleName = planGroup?.articleName || group.articleName;
-    const isMatched = matchedArticleIds.has(group.articleId);
-    const hasChildren = group.children && group.children.length > 0;
-    const isExpanded = expandedArticles.has(group.articleId);
-    const paddingLeft = 10 + depth * 20; // Отступ для вложенности
-
-    const rows: React.ReactNode[] = [];
-
-    // Рендерим саму статью
-    rows.push(
-      <tr
-        key={`${activity}-${type}-${group.articleId}`}
-        className={`bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100 ${
-          isMatched
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-700'
-            : ''
-        }`}
-      >
-        <td
-          className={`px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)] ${
-            isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20 font-semibold' : ''
-          } ${hasChildren ? 'cursor-pointer' : ''}`}
-          style={{
-            width: `${columnWidths.article}px`,
-            paddingLeft: `${paddingLeft}px`,
-          }}
-          onClick={
-            hasChildren ? () => toggleArticle(group.articleId) : undefined
-          }
-        >
-          <div className="flex items-center gap-2">
-            {hasChildren && (
-              <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
-                {isExpanded ? '▾' : '▸'}
-              </span>
-            )}
-            {!hasChildren && depth > 0 && (
-              <span className="text-gray-400 dark:text-gray-600 w-4">•</span>
-            )}
-            <span
-              className={
-                group.hasOperations ? 'font-semibold' : 'font-normal opacity-75'
-              }
-            >
-              {articleName}
-            </span>
-          </div>
-        </td>
-        {allMonths.map((month) => {
-          const factAmount = hasFactData
-            ? group.months.find((m) => m.month === month)?.amount || 0
-            : 0;
-          const planAmount = getPlanAmount(group.articleId, month);
-
-          if (showPlan) {
-            return (
-              <React.Fragment
-                key={`${activity}-${type}-${group.articleId}-${month}`}
-              >
-                <td
-                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
-                    isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                  }`}
-                  style={{
-                    minWidth: `${subColumnWidth}px`,
-                  }}
-                >
-                  <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                    <div>
-                      {planAmount !== 0 && type === 'income' && (
-                        <span className="text-green-600 dark:text-green-400 mr-1">
-                          ▲
-                        </span>
-                      )}
-                      {planAmount !== 0 && type === 'expense' && (
-                        <span className="text-red-600 dark:text-red-400 mr-1">
-                          ▼
-                        </span>
-                      )}
-                      {formatNumber(planAmount)}
-                    </div>
-                    {showDelta && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 opacity-0">
-                        &nbsp;
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td
-                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
-                    isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                  }`}
-                  style={{
-                    minWidth: `${subColumnWidth}px`,
-                  }}
-                >
-                  <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                    <div>
-                      {factAmount !== 0 && type === 'income' && (
-                        <span className="text-green-600 dark:text-green-400 mr-1">
-                          ▲
-                        </span>
-                      )}
-                      {factAmount !== 0 && type === 'expense' && (
-                        <span className="text-red-600 dark:text-red-400 mr-1">
-                          ▼
-                        </span>
-                      )}
-                      {formatNumber(factAmount)}
-                    </div>
-                    {showDelta && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                        {(() => {
-                          const delta = factAmount - planAmount;
-                          if (delta === 0) return null;
-                          const sign = delta > 0 ? '+' : '';
-                          return `${sign}${formatNumber(delta)}`;
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </td>
-              </React.Fragment>
-            );
-          }
-
-          return (
-            <td
-              key={`${activity}-${type}-${group.articleId}-${month}`}
-              className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
-                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-              }`}
-              style={{
-                minWidth: `${columnWidths.month}px`,
-              }}
-            >
-              {factAmount !== 0 && type === 'income' && (
-                <span className="text-green-600 dark:text-green-400 mr-1">
-                  ▲
-                </span>
-              )}
-              {factAmount !== 0 && type === 'expense' && (
-                <span className="text-red-600 dark:text-red-400 mr-1">▼</span>
-              )}
-              {formatNumber(factAmount)}
-            </td>
-          );
-        })}
-        {showPlan ? (
-          <>
-            <td
-              className={`px-4 py-2 text-right text-[13px] font-normal text-gray-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
-                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-              }`}
-              style={{
-                minWidth: `${subColumnWidth}px`,
-              }}
-            >
-              {(() => {
-                const planTotal = planGroup?.total || 0;
-                return (
-                  <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                    <div>
-                      {planTotal !== 0 && type === 'income' && (
-                        <span className="text-green-600 dark:text-green-400 mr-1">
-                          ▲
-                        </span>
-                      )}
-                      {planTotal !== 0 && type === 'expense' && (
-                        <span className="text-red-600 dark:text-red-400 mr-1">
-                          ▼
-                        </span>
-                      )}
-                      {formatNumber(planTotal)}
-                    </div>
-                    {showDelta && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 opacity-0">
-                        &nbsp;
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </td>
-            <td
-              className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums ${
-                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-              }`}
-              style={{
-                minWidth: `${subColumnWidth}px`,
-              }}
-            >
-              {(() => {
-                const factTotal = hasFactData ? group.total : 0;
-                const planTotal = planGroup?.total || 0;
-                return (
-                  <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                    <div>
-                      {factTotal !== 0 && type === 'income' && (
-                        <span className="text-green-600 dark:text-green-400 mr-1">
-                          ▲
-                        </span>
-                      )}
-                      {factTotal !== 0 && type === 'expense' && (
-                        <span className="text-red-600 dark:text-red-400 mr-1">
-                          ▼
-                        </span>
-                      )}
-                      {formatNumber(factTotal)}
-                    </div>
-                    {showDelta && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                        {(() => {
-                          const delta = factTotal - planTotal;
-                          if (delta === 0) return null;
-                          const sign = delta > 0 ? '+' : '';
-                          return `${sign}${formatNumber(delta)}`;
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </td>
-          </>
-        ) : (
-          <td
-            className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums ${
-              isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-            }`}
-            style={{
-              minWidth: `${columnWidths.total}px`,
-            }}
-          >
-            {(() => {
-              const total = hasFactData ? group.total : planGroup?.total || 0;
-              return (
-                <>
-                  {total !== 0 && type === 'income' && (
-                    <span className="text-green-600 dark:text-green-400 mr-1">
-                      ▲
-                    </span>
-                  )}
-                  {total !== 0 && type === 'expense' && (
-                    <span className="text-red-600 dark:text-red-400 mr-1">
-                      ▼
-                    </span>
-                  )}
-                  {formatNumber(total)}
-                </>
-              );
-            })()}
-          </td>
-        )}
-      </tr>
-    );
-
-    // Рекурсивно рендерим дочерние статьи, если статья развернута
-    if (hasChildren && isExpanded && group.children) {
-      for (const child of group.children) {
-        rows.push(
-          ...renderArticleRow(child, activity, type, depth + 1, planGroupMap)
-        );
-      }
-    }
-
-    return rows;
+    return colors[activity] || '#6B7280';
   };
 
   const renderMonthlyCells = (
@@ -872,32 +387,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
             style={{ minWidth: `${subColumnWidth}px` }}
           >
-            <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-              <div>{formatNumber(planValue)}</div>
-              {showDelta && (
-                <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 opacity-0">
-                  &nbsp;
-                </div>
-              )}
-            </div>
+            {formatNumber(planValue)}
           </td>
           <td
             className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
             style={{ minWidth: `${subColumnWidth}px` }}
           >
-            <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-              <div>{formatNumber(factValue)}</div>
-              {showDelta && (
-                <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                  {(() => {
-                    const delta = factValue - planValue;
-                    if (delta === 0) return null;
-                    const sign = delta > 0 ? '+' : '';
-                    return `${sign}${formatNumber(delta)}`;
-                  })()}
-                </div>
-              )}
-            </div>
+            {formatNumber(factValue)}
           </td>
         </React.Fragment>
       );
@@ -922,41 +418,11 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
           {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
           {new Date(periodTo).toLocaleDateString('ru-RU')}
         </div>
-        <div className="flex items-center gap-3">
-          {showPlan && (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                Отобразить отклонение
-              </span>
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={showDelta}
-                  onChange={(e) => setShowDelta(e.target.checked)}
-                  className="sr-only"
-                />
-                <div
-                  className={`w-11 h-6 rounded-full transition-colors ${
-                    showDelta
-                      ? 'bg-primary-600 dark:bg-primary-500'
-                      : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform mt-0.5 ${
-                      showDelta ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
-            </label>
-          )}
-          <ExportMenu
-            filenameBase={`cashflow_${periodFrom}_${periodTo}`}
-            buildRows={buildExportRows}
-            entity="reports"
-          />
-        </div>
+        <ExportMenu
+          filenameBase={`cashflow_${periodFrom}_${periodTo}`}
+          buildRows={buildExportRows}
+          entity="reports"
+        />
       </div>
 
       <div className="w-full overflow-x-auto overflow-y-visible max-h-[calc(100vh-380px)] md:max-h-[80vh]">
@@ -1023,20 +489,17 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
           </thead>
           <tbody className="text-sm bg-zinc-50 dark:bg-zinc-900">
             {activitiesToRender.map((activity) => {
-              // Для плановых данных используем activity.activity для поиска (даже для других разрезов)
-              // так как BDDS группируется только по activity
               const planActivity = planActivityMap.get(activity.activity);
               const planSource: ActivityGroup | undefined =
                 planActivity || (!hasFactData ? activity : undefined);
 
-              const activityColor = getActivityColor(activity);
-              const borderColor = getActivityBorderColor(activity);
-              const sectionKey = getSectionKey(activity);
+              const activityColor = getActivityColor(activity.activity);
+              const borderColor = getActivityBorderColor(activity.activity);
               return (
-                <React.Fragment key={sectionKey}>
+                <React.Fragment key={activity.activity}>
                   <tr
                     className={`${activityColor} cursor-pointer border-b border-gray-200 dark:border-gray-700 border-t border-gray-200 dark:border-t dark:border-white/5 transition-all duration-150 hover:outline hover:outline-1 hover:outline-white/5`}
-                    onClick={() => toggleSection(activity)}
+                    onClick={() => toggleSection(activity.activity)}
                     style={{ borderLeft: `3px solid ${borderColor}` }}
                   >
                     <td
@@ -1047,12 +510,10 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                     >
                       <div className="flex items-center space-x-3">
                         <span className="text-gray-600 dark:text-gray-400 font-bold text-base">
-                          {expandedSections[getSectionKey(activity)]
-                            ? '▾'
-                            : '▸'}
+                          {expandedSections[activity.activity] ? '▾' : '▸'}
                         </span>
                         <span className="font-semibold">
-                          {getActivityDisplayName(activity)}
+                          {getActivityDisplayName(activity.activity)}
                         </span>
                       </div>
                     </td>
@@ -1093,78 +554,21 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         `${activity.activity}-summary-${month}`
                       );
                     })}
-                    {showPlan ? (
-                      <>
-                        <td
-                          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-500 dark:text-zinc-400 ${activityColor} border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums`}
-                          style={{
-                            minWidth: `${subColumnWidth}px`,
-                          }}
-                        >
-                          <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                            <div>
-                              {formatNumber(
-                                planSource?.netCashflow ?? activity.netCashflow
-                              )}
-                            </div>
-                            {showDelta && (
-                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5 opacity-0">
-                                &nbsp;
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td
-                          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
-                          style={{
-                            minWidth: `${subColumnWidth}px`,
-                          }}
-                        >
-                          <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                            <div>
-                              {formatNumber(
-                                hasFactData
-                                  ? activity.netCashflow
-                                  : (planSource?.netCashflow ??
-                                      activity.netCashflow)
-                              )}
-                            </div>
-                            {showDelta && (
-                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                {(() => {
-                                  const factNet = hasFactData
-                                    ? activity.netCashflow
-                                    : 0;
-                                  const planNet =
-                                    planSource?.netCashflow ??
-                                    activity.netCashflow;
-                                  const delta = factNet - planNet;
-                                  if (delta === 0) return null;
-                                  const sign = delta > 0 ? '+' : '';
-                                  return `${sign}${formatNumber(delta)}`;
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <td
-                        className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
-                        style={{
-                          minWidth: `${columnWidths.total}px`,
-                        }}
-                      >
-                        {formatNumber(
-                          hasFactData
-                            ? activity.netCashflow
-                            : (planSource?.netCashflow ?? activity.netCashflow)
-                        )}
-                      </td>
-                    )}
+                    <td
+                      className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
+                      style={{
+                        minWidth: `${columnWidths.total}px`,
+                      }}
+                    >
+                      {formatNumber(
+                        hasFactData
+                          ? activity.netCashflow
+                          : (planSource?.netCashflow ?? activity.netCashflow)
+                      )}
+                    </td>
                   </tr>
 
-                  {expandedSections[getSectionKey(activity)] && (
+                  {expandedSections[activity.activity] && (
                     <>
                       {(() => {
                         const incomePlanGroups = planSource?.incomeGroups ?? [];
@@ -1179,16 +583,113 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : incomePlanGroups;
 
                         return incomeGroupsToRender
+                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            return renderArticleRow(
-                              group,
-                              activity.activity,
-                              'income',
-                              0,
-                              incomePlanMap
+                            const planGroup =
+                              incomePlanMap.get(group.articleId) ||
+                              (!hasFactData ? group : undefined);
+                            const articleName =
+                              planGroup?.articleName || group.articleName;
+
+                            return (
+                              <tr
+                                key={`${activity.activity}-income-${group.articleId}`}
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
+                              >
+                                <td
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  style={{ width: `${columnWidths.article}px` }}
+                                >
+                                  {articleName}
+                                </td>
+                                {allMonths.map((month) => {
+                                  const factAmount = hasFactData
+                                    ? group.months.find(
+                                        (m) => m.month === month
+                                      )?.amount || 0
+                                    : 0;
+                                  const planAmount = getPlanAmount(
+                                    group.articleId,
+                                    month
+                                  );
+
+                                  if (showPlan) {
+                                    return (
+                                      <React.Fragment
+                                        key={`${activity.activity}-income-${group.articleId}-${month}`}
+                                      >
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {planAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
+                                          {formatNumber(planAmount)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {factAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
+                                          {formatNumber(factAmount)}
+                                        </td>
+                                      </React.Fragment>
+                                    );
+                                  }
+
+                                  return (
+                                    <td
+                                      key={`${activity.activity}-income-${group.articleId}-${month}`}
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                      style={{
+                                        minWidth: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {factAmount !== 0 && (
+                                        <span className="text-green-600 dark:text-green-400 mr-1">
+                                          ▲
+                                        </span>
+                                      )}
+                                      {formatNumber(factAmount)}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                                  style={{
+                                    minWidth: `${columnWidths.total}px`,
+                                  }}
+                                >
+                                  {(() => {
+                                    const total = hasFactData
+                                      ? group.total
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-green-600 dark:text-green-400 mr-1">
+                                            ▲
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
                             );
-                          })
-                          .flat();
+                          });
                       })()}
 
                       {(() => {
@@ -1205,16 +706,113 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : expensePlanGroups;
 
                         return expenseGroupsToRender
+                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            return renderArticleRow(
-                              group,
-                              activity.activity,
-                              'expense',
-                              0,
-                              expensePlanMap
+                            const planGroup =
+                              expensePlanMap.get(group.articleId) ||
+                              (!hasFactData ? group : undefined);
+                            const articleName =
+                              planGroup?.articleName || group.articleName;
+
+                            return (
+                              <tr
+                                key={`${activity.activity}-expense-${group.articleId}`}
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
+                              >
+                                <td
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  style={{ width: `${columnWidths.article}px` }}
+                                >
+                                  {articleName}
+                                </td>
+                                {allMonths.map((month) => {
+                                  const factAmount = hasFactData
+                                    ? group.months.find(
+                                        (m) => m.month === month
+                                      )?.amount || 0
+                                    : 0;
+                                  const planAmount = getPlanAmount(
+                                    group.articleId,
+                                    month
+                                  );
+
+                                  if (showPlan) {
+                                    return (
+                                      <React.Fragment
+                                        key={`${activity.activity}-expense-${group.articleId}-${month}`}
+                                      >
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {planAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
+                                          {formatNumber(planAmount)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {factAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
+                                          {formatNumber(factAmount)}
+                                        </td>
+                                      </React.Fragment>
+                                    );
+                                  }
+
+                                  return (
+                                    <td
+                                      key={`${activity.activity}-expense-${group.articleId}-${month}`}
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                      style={{
+                                        minWidth: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {factAmount !== 0 && (
+                                        <span className="text-red-600 dark:text-red-400 mr-1">
+                                          ▼
+                                        </span>
+                                      )}
+                                      {formatNumber(factAmount)}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                                  style={{
+                                    minWidth: `${columnWidths.total}px`,
+                                  }}
+                                >
+                                  {(() => {
+                                    const total = hasFactData
+                                      ? group.total
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-red-600 dark:text-red-400 mr-1">
+                                            ▼
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
                             );
-                          })
-                          .flat();
+                          });
                       })()}
                     </>
                   )}
@@ -1261,32 +859,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        <div className="flex flex-col items-end justify-center min-h-[3rem]">
-                          <div>{formatNumber(planTotal)}</div>
-                          {showDelta && (
-                            <div className="text-[10px] text-indigo-400 dark:text-indigo-300 mt-0.5 opacity-0">
-                              &nbsp;
-                            </div>
-                          )}
-                        </div>
+                        {formatNumber(planTotal)}
                       </td>
                       <td
                         className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        <div className="flex flex-col items-end justify-center min-h-[3rem]">
-                          <div>{formatNumber(factTotal)}</div>
-                          {showDelta && (
-                            <div className="text-[10px] text-indigo-400 dark:text-indigo-300 mt-0.5">
-                              {(() => {
-                                const delta = factTotal - planTotal;
-                                if (delta === 0) return null;
-                                const sign = delta > 0 ? '+' : '';
-                                return `${sign}${formatNumber(delta)}`;
-                              })()}
-                            </div>
-                          )}
-                        </div>
+                        {formatNumber(factTotal)}
                       </td>
                     </React.Fragment>
                   );
@@ -1302,71 +881,18 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   </td>
                 );
               })}
-              {showPlan ? (
-                <>
-                  <td
-                    className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums"
-                    style={{
-                      minWidth: `${subColumnWidth}px`,
-                    }}
-                  >
-                    <div className="flex flex-col items-end justify-center min-h-[3rem]">
-                      <div>
-                        {formatNumber(planTotalNetCashflow ?? totalNetCashflow)}
-                      </div>
-                      {showDelta && (
-                        <div className="text-[10px] text-indigo-400 dark:text-indigo-300 mt-0.5 opacity-0">
-                          &nbsp;
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
-                    style={{
-                      minWidth: `${subColumnWidth}px`,
-                    }}
-                  >
-                    <div className="flex flex-col items-end justify-center min-h-[3rem]">
-                      <div>
-                        {formatNumber(
-                          hasFactData
-                            ? totalNetCashflow
-                            : (planTotalNetCashflow ?? totalNetCashflow)
-                        )}
-                      </div>
-                      {showDelta && (
-                        <div className="text-[10px] text-indigo-400 dark:text-indigo-300 mt-0.5">
-                          {(() => {
-                            const factTotal = hasFactData
-                              ? totalNetCashflow
-                              : 0;
-                            const planTotal =
-                              planTotalNetCashflow ?? totalNetCashflow;
-                            const delta = factTotal - planTotal;
-                            if (delta === 0) return null;
-                            const sign = delta > 0 ? '+' : '';
-                            return `${sign}${formatNumber(delta)}`;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </>
-              ) : (
-                <td
-                  className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
-                  style={{
-                    minWidth: `${columnWidths.total}px`,
-                  }}
-                >
-                  {formatNumber(
-                    hasFactData
-                      ? totalNetCashflow
-                      : (planTotalNetCashflow ?? totalNetCashflow)
-                  )}
-                </td>
-              )}
+              <td
+                className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                style={{
+                  minWidth: `${columnWidths.total}px`,
+                }}
+              >
+                {formatNumber(
+                  hasFactData
+                    ? totalNetCashflow
+                    : (planTotalNetCashflow ?? totalNetCashflow)
+                )}
+              </td>
             </tr>
 
             <tr className="bg-zinc-50 dark:bg-[#202020] border-t border-gray-300 dark:border-t dark:border-white/8 sticky bottom-0 z-20">
@@ -1390,32 +916,13 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         className="px-3 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020]"
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                          <div>{formatNumber(planBalance)}</div>
-                          {showDelta && (
-                            <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5 opacity-0">
-                              &nbsp;
-                            </div>
-                          )}
-                        </div>
+                        {formatNumber(planBalance)}
                       </td>
                       <td
                         className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                          <div>{formatNumber(balance)}</div>
-                          {showDelta && (
-                            <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5">
-                              {(() => {
-                                const delta = balance - planBalance;
-                                if (delta === 0) return null;
-                                const sign = delta > 0 ? '+' : '';
-                                return `${sign}${formatNumber(delta)}`;
-                              })()}
-                            </div>
-                          )}
-                        </div>
+                        {formatNumber(balance)}
                       </td>
                     </React.Fragment>
                   );
@@ -1431,89 +938,23 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   </td>
                 );
               })}
-              {showPlan ? (
-                <>
-                  <td
-                    className="px-4 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020]"
-                    style={{ minWidth: `${subColumnWidth}px` }}
-                  >
-                    <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                      <div>
-                        {formatNumber(
-                          planCumulativeBalances[
-                            planCumulativeBalances.length - 1
-                          ]?.balance || 0
-                        )}
-                      </div>
-                      {showDelta && (
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5 opacity-0">
-                          &nbsp;
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className={`px-4 py-2 text-right text-[13px] font-normal border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${
-                      (cumulativeBalances[cumulativeBalances.length - 1]
-                        ?.balance || 0) >= 0
-                        ? 'text-zinc-400 dark:text-zinc-400'
-                        : 'text-red-700 dark:text-red-400'
-                    }`}
-                    style={{ minWidth: `${subColumnWidth}px` }}
-                  >
-                    <div className="flex flex-col items-end justify-center min-h-[2.5rem]">
-                      <div>
-                        {formatNumber(
-                          hasFactData
-                            ? cumulativeBalances[cumulativeBalances.length - 1]
-                                ?.balance || 0
-                            : planCumulativeBalances[
-                                planCumulativeBalances.length - 1
-                              ]?.balance || 0
-                        )}
-                      </div>
-                      {showDelta && (
-                        <div className="text-[10px] text-zinc-500 dark:text-zinc-500 mt-0.5">
-                          {(() => {
-                            const factBalance = hasFactData
-                              ? cumulativeBalances[
-                                  cumulativeBalances.length - 1
-                                ]?.balance || 0
-                              : 0;
-                            const planBalance =
-                              planCumulativeBalances[
-                                planCumulativeBalances.length - 1
-                              ]?.balance || 0;
-                            const delta = factBalance - planBalance;
-                            if (delta === 0) return null;
-                            const sign = delta > 0 ? '+' : '';
-                            return `${sign}${formatNumber(delta)}`;
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </>
-              ) : (
-                <td
-                  className={`px-4 py-2 text-right text-[13px] font-normal border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${
-                    (cumulativeBalances[cumulativeBalances.length - 1]
-                      ?.balance || 0) >= 0
-                      ? 'text-zinc-400 dark:text-zinc-400'
-                      : 'text-red-700 dark:text-red-400'
-                  }`}
-                  style={{ minWidth: `${columnWidths.total}px` }}
-                >
-                  {formatNumber(
-                    hasFactData
-                      ? cumulativeBalances[cumulativeBalances.length - 1]
-                          ?.balance || 0
-                      : planCumulativeBalances[
-                          planCumulativeBalances.length - 1
-                        ]?.balance || 0
-                  )}
-                </td>
-              )}
+              <td
+                className={`px-4 py-2 text-right text-[13px] font-normal border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${
+                  (cumulativeBalances[cumulativeBalances.length - 1]?.balance ||
+                    0) >= 0
+                    ? 'text-zinc-400 dark:text-zinc-400'
+                    : 'text-red-700 dark:text-red-400'
+                }`}
+                style={{ minWidth: `${columnWidths.total}px` }}
+              >
+                {formatNumber(
+                  hasFactData
+                    ? cumulativeBalances[cumulativeBalances.length - 1]
+                        ?.balance || 0
+                    : planCumulativeBalances[planCumulativeBalances.length - 1]
+                        ?.balance || 0
+                )}
+              </td>
             </tr>
           </tbody>
         </table>

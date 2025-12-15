@@ -59,7 +59,7 @@ export const MappingRules = () => {
 
   const handleDelete = async (rule: MappingRule, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Удалить правило?')) {
+    if (window.confirm('Удалить правило маппинга?')) {
       try {
         await deleteRule({ id: rule.id }).unwrap();
         showSuccess('Правило удалено');
@@ -86,7 +86,7 @@ export const MappingRules = () => {
   const getRuleTypeLabel = (ruleType: string) => {
     const labels: Record<string, string> = {
       contains: 'Содержит',
-      equals: 'Равно',
+      equals: 'Совпадает',
       regex: 'Регулярное выражение',
       alias: 'Псевдоним',
     };
@@ -96,8 +96,8 @@ export const MappingRules = () => {
   const getSourceFieldLabel = (sourceField: string) => {
     const labels: Record<string, string> = {
       description: 'Назначение платежа',
-      receiver: 'Получатель',
-      payer: 'Плательщик',
+      receiver: 'Имя получателя',
+      payer: 'Имя плательщика',
       inn: 'ИНН',
     };
     return labels[sourceField] || sourceField;
@@ -119,7 +119,7 @@ export const MappingRules = () => {
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
-          title="Правила автоматизации"
+          title="Правила маппинга"
         >
           <Settings
             size={18}
@@ -151,7 +151,7 @@ export const MappingRules = () => {
                   {/* Заголовок с кнопкой закрытия */}
                   <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      Правила автоматизации
+                      Правила маппинга
                     </h3>
                     <div className="flex items-center gap-2">
                       {canEditRules && (
@@ -185,11 +185,17 @@ export const MappingRules = () => {
                           className="mx-auto mb-4 text-gray-400 dark:text-gray-500"
                         />
                         <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                          Нет правил
+                          Нет правил маппинга
                         </h4>
                         <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                          Создайте правила для автоматического заполнения статей
-                          и контрагентов при импорте банковских выписок
+                          Правила маппинга автоматически заполняют операции при
+                          импорте банковских выписок на основе текста в
+                          назначении платежа, имени получателя или ИНН.
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-500 mb-4">
+                          Например, можно создать правило: если назначение
+                          платежа содержит "Аренда", то автоматически выбирать
+                          статью "Аренда" и контрагента "Арендодатель".
                         </p>
                         {canEditRules && (
                           <button
@@ -279,11 +285,17 @@ export const MappingRules = () => {
                         className="mx-auto mb-3 text-gray-400 dark:text-gray-500"
                       />
                       <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                        Нет правил
+                        Нет правил маппинга
                       </h4>
                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                        Создайте правила для автоматического заполнения статей и
-                        контрагентов при импорте банковских выписок
+                        Правила маппинга автоматически заполняют операции при
+                        импорте банковских выписок на основе текста в назначении
+                        платежа, имени получателя или ИНН.
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mb-3">
+                        Например, можно создать правило: если назначение платежа
+                        содержит "Аренда", то автоматически выбирать статью
+                        "Аренда" и контрагента "Арендодатель".
                       </p>
                     </div>
                   ) : (

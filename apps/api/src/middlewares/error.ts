@@ -23,14 +23,6 @@ export const errorHandler = (
     logger.error(`AppError: ${err.message}`, {
       statusCode: err.statusCode,
       path: req.path,
-      method: req.method,
-      userId: (req as any).userId,
-      companyId: (req as any).companyId,
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-      query: req.query,
-      body:
-        req.body && Object.keys(req.body).length > 0 ? '[REDACTED]' : undefined,
     });
     return res.status(err.statusCode).json({
       status: 'error',
@@ -45,13 +37,7 @@ export const errorHandler = (
     name: err.name,
     path: req.path,
     method: req.method,
-    userId: (req as any).userId,
-    companyId: (req as any).companyId,
-    ip: req.ip,
-    userAgent: req.get('user-agent'),
-    query: req.query,
-    body:
-      req.body && Object.keys(req.body).length > 0 ? '[REDACTED]' : undefined,
+    body: req.body,
   });
   return res.status(500).json({
     status: 'error',

@@ -11,11 +11,6 @@ export declare class AiReviewer {
     private openai;
     constructor();
     /**
-     * Truncate tool results to prevent context overflow.
-     * Different tools have different size limits based on their typical output sizes.
-     */
-    private truncateToolResult;
-    /**
      * Retry wrapper for API calls with exponential backoff
      */
     private retryApiCall;

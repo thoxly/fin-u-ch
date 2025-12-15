@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Layout } from '../../shared/ui/Layout';
+import { AdminLayout } from '../../shared/ui/AdminLayout';
 import { Card } from '../../shared/ui/Card';
 import { Table } from '../../shared/ui/Table';
 import { Input } from '../../shared/ui/Input';
@@ -29,6 +29,7 @@ const ENTITY_OPTIONS = [
   { value: 'department', label: 'Подразделения' },
   { value: 'counterparty', label: 'Контрагенты' },
   { value: 'deal', label: 'Сделки' },
+  { value: 'salary', label: 'Зарплаты' },
   { value: 'role', label: 'Роли' },
   { value: 'user', label: 'Пользователи' },
 ];
@@ -104,6 +105,7 @@ const getEntityBadgeClasses = (entity: string): string => {
     counterparty:
       'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
     deal: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    salary: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     role: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
     user: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
   };
@@ -198,13 +200,18 @@ export const AuditLogsPage = () => {
 
   if (!canRead('audit')) {
     return (
-      <Layout>
-        <Card>
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>У вас нет прав для просмотра журнала действий</p>
-          </div>
-        </Card>
-      </Layout>
+      <AdminLayout>
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+            Журнал действий
+          </h1>
+          <Card>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <p>У вас нет прав для просмотра журнала действий</p>
+            </div>
+          </Card>
+        </div>
+      </AdminLayout>
     );
   }
 
@@ -289,9 +296,22 @@ export const AuditLogsPage = () => {
     },
   ];
 
+  const totalPages = data ? Math.ceil(data.total / limit) : 0;
+
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+              Журнал действий
+            </h1>
+            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+              История всех действий пользователей в системе
+            </p>
+          </div>
+        </div>
+
         {/* Фильтры */}
         <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
           <div className="space-y-4">
@@ -483,6 +503,6 @@ export const AuditLogsPage = () => {
           )}
         </Card>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };

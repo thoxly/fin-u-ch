@@ -125,43 +125,10 @@ export const BudgetDetailsPage = () => {
   const handleArchive = async () => {
     if (!budget) return;
     const newStatus = budget.status === 'active' ? 'archived' : 'active';
-    try {
-      await updateBudget({
-        id: budget.id,
-        data: { status: newStatus },
-      }).unwrap();
-      showSuccess(
-        newStatus === 'archived'
-          ? 'Бюджет успешно архивирован'
-          : 'Бюджет успешно восстановлен'
-      );
-    } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при изменении статуса бюджета';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при изменении статуса бюджета'
-      );
-    }
+    await updateBudget({
+      id: budget.id,
+      data: { status: newStatus },
+    });
   };
 
   const getTypeLabel = (type: string) => {

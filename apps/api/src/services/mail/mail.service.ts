@@ -5,32 +5,23 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-// Создаем transporter на основе переменных окружения
-function createTransporter() {
-  const smtpConfig = {
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT,
-    secure: env.SMTP_SECURE,
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
-  };
-
-  return nodemailer.createTransport(smtpConfig);
-}
+const transporter = nodemailer.createTransport({
+  host: env.SMTP_HOST,
+  port: env.SMTP_PORT,
+  secure: env.SMTP_SECURE, // true для 465 (SSL/TLS), false для 587 (STARTTLS)
+  requireTLS: !env.SMTP_SECURE, // Требовать TLS для порта 587 (STARTTLS)
+  auth: {
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS,
+  },
+});
 
 export type EmailTemplate =
   | 'email-verification'
   | 'password-reset'
   | 'password-changed'
   | 'email-change-old-verification'
-  | 'email-change-verification'
-  | 'user-invitation'
-  | 'beta-promo-code';
+  | 'email-change-verification';
 
 export interface EmailOptions {
   to: string;
@@ -64,21 +55,25 @@ function replaceVariables(
 }
 
 export async function sendEmail(options: EmailOptions): Promise<void> {
+  // Проверяем настройки SMTP
   if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) {
-    logger.warn(
-      'SMTP configuration is missing. Emails will not be sent. Check .env file.'
+    const missingConfig = [];
+    if (!env.SMTP_HOST) missingConfig.push('SMTP_HOST');
+    if (!env.SMTP_USER) missingConfig.push('SMTP_USER');
+    if (!env.SMTP_PASS) missingConfig.push('SMTP_PASS');
+
+    logger.error('SMTP configuration is missing', {
+      missing: missingConfig,
+      smtpHost: env.SMTP_HOST || 'not set',
+      smtpUser: env.SMTP_USER || 'not set',
+      smtpPass: env.SMTP_PASS ? '***' : 'not set',
+    });
+    throw new Error(
+      `SMTP configuration is incomplete. Missing: ${missingConfig.join(', ')}`
     );
-    // Optional: return or throw, but often it's better to just log if it's optional
-    // However if the user thinks it is critical, maybe we should not fail the app startup but fail the sending.
-    // For now I will just log and let it fail at connection attempt if vars are empty strings,
-    // or check if I should return.
-    // The original code had it commented out. I'll make it a warning logging.
   }
 
   try {
-    const transporter = createTransporter();
-    const fromAddress = env.SMTP_FROM || 'no-reply@vect-a.ru';
-
     logger.info('Attempting to send email', {
       to: options.to,
       template: options.template,
@@ -91,7 +86,7 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     const html = replaceVariables(template, options.variables);
 
     const result = await transporter.sendMail({
-      from: `"Vecta — Финучёт" <${fromAddress}>`,
+      from: `"Vecta — Финучёт" <${env.SMTP_FROM}>`,
       to: options.to,
       subject: options.subject,
       html,
@@ -178,38 +173,6 @@ export async function sendEmailChangeVerificationEmail(
     template: 'email-change-verification',
     variables: {
       verificationUrl,
-    },
-  });
-}
-
-export async function sendInvitationEmail(
-  email: string,
-  token: string,
-  companyName: string
-): Promise<void> {
-  const invitationUrl = `${env.FRONTEND_URL}/accept-invitation?token=${token}`;
-  await sendEmail({
-    to: email,
-    subject: 'Приглашение в компанию',
-    template: 'user-invitation',
-    variables: {
-      invitationUrl,
-      companyName,
-    },
-  });
-}
-
-export async function sendBetaPromoCodeEmail(
-  email: string,
-  promoCode: string
-): Promise<void> {
-  await sendEmail({
-    to: email,
-    subject: 'Добро пожаловать в Beta! Ваш код доступа',
-    template: 'beta-promo-code',
-    variables: {
-      promoCode,
-      frontendUrl: env.FRONTEND_URL,
     },
   });
 }

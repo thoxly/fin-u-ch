@@ -6,9 +6,6 @@ import {
 } from '@/store/api/catalogsApi';
 import { Article } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
-import { ArticleParentSelect } from '@/features/articles';
-import { useNotification } from '@/shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '@/constants/notificationMessages';
 
 interface ArticleFormProps {
   article: Article | null;
@@ -16,7 +13,6 @@ interface ArticleFormProps {
   onSuccess?: (createdId: string) => void;
   initialName?: string;
   initialType?: 'income' | 'expense' | 'transfer';
-  initialParentId?: string;
 }
 
 export const ArticleForm = ({
@@ -25,14 +21,10 @@ export const ArticleForm = ({
   onSuccess,
   initialName = '',
   initialType = 'expense',
-  initialParentId,
 }: ArticleFormProps) => {
   const [name, setName] = useState(article?.name || initialName);
   const [type, setType] = useState(article?.type || initialType);
   const [activity, setActivity] = useState(article?.activity || 'operating');
-  const [parentId, setParentId] = useState(
-    article?.parentId || initialParentId || ''
-  );
   const [counterpartyId, setCounterpartyId] = useState(
     article?.counterpartyId || ''
   );
@@ -40,22 +32,19 @@ export const ArticleForm = ({
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
   const [create, { isLoading: isCreating }] = useCreateArticleMutation();
   const [update, { isLoading: isUpdating }] = useUpdateArticleMutation();
-  const { showSuccess, showError } = useNotification();
   useEffect(() => {
     if (article) {
       setName(article.name || '');
       setType(article.type || 'expense');
       setActivity(article.activity || 'operating');
-      setParentId(article.parentId || '');
       setCounterpartyId(article.counterpartyId || '');
     } else {
       setName(initialName);
       setType(initialType);
       setActivity('operating');
-      setParentId(initialParentId || '');
       setCounterpartyId('');
     }
-  }, [article, initialName, initialType, initialParentId]);
+  }, [article, initialName, initialType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,58 +56,28 @@ export const ArticleForm = ({
             name,
             type,
             activity,
-            parentId: parentId || undefined,
             counterpartyId: counterpartyId || undefined,
           },
         }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.ARTICLE.UPDATE_SUCCESS);
-        onClose();
       } else {
         const result = await create({
           name,
           type,
           activity,
-          parentId: parentId || undefined,
           isActive: true,
           counterpartyId: counterpartyId || undefined,
         }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.ARTICLE.CREATE_SUCCESS);
         if (onSuccess && result.id) {
           onSuccess(result.id);
         } else {
           onClose();
         }
       }
+      if (article) {
+        onClose();
+      }
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : article
-          ? NOTIFICATION_MESSAGES.ARTICLE.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.ARTICLE.CREATE_ERROR;
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : article
-            ? NOTIFICATION_MESSAGES.ARTICLE.UPDATE_ERROR
-            : NOTIFICATION_MESSAGES.ARTICLE.CREATE_ERROR
-      );
+      console.error('Failed to save article:', error);
     }
   };
 
@@ -151,14 +110,6 @@ export const ArticleForm = ({
           { value: 'financing', label: 'Финансовая' },
         ]}
         required
-      />
-      <ArticleParentSelect
-        label="Родительская статья"
-        value={parentId}
-        onChange={(value) => setParentId(value)}
-        articleType={type}
-        excludeArticleId={article?.id}
-        placeholder="Корневая статья (без родителя)"
       />
       <Select
         label="Контрагент"
