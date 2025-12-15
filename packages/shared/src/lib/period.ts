@@ -227,18 +227,35 @@ export const createIntervals = (
   const intervals: Interval[] = [];
 
   // Вычисляем общее количество дней в периоде
+  // ВАЖНО: Нормализуем даты для корректного вычисления
+  const fromDateNormalized = new Date(
+    fromDate.getFullYear(),
+    fromDate.getMonth(),
+    fromDate.getDate()
+  );
+  const toDateNormalized = new Date(
+    toDate.getFullYear(),
+    toDate.getMonth(),
+    toDate.getDate()
+  );
   const totalDays =
-    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
-    1;
+    Math.ceil(
+      (toDateNormalized.getTime() - fromDateNormalized.getTime()) /
+        (1000 * 60 * 60 * 24)
+    ) + 1;
 
-  // Определяем оптимальное количество интервалов для визуализации (5-12 точек)
+  // Определяем оптимальное количество интервалов для визуализации
+  // Учитываем periodFormat для правильного создания интервалов
   let targetIntervals: number;
 
-  if (totalDays <= 7) {
+  // Если periodFormat = 'day' или 'week', всегда создаем интервалы по дням
+  if (periodFormat === 'day' || periodFormat === 'week') {
+    targetIntervals = totalDays;
+  } else if (totalDays <= 7) {
     // Меньше недели - каждый день
     targetIntervals = totalDays;
   } else if (totalDays <= 31) {
-    // До месяца - каждый день
+    // До месяца - каждый день (даже если periodFormat = 'month', для графика нужны дневные интервалы)
     targetIntervals = totalDays;
   } else if (totalDays <= 90) {
     // До квартала - показываем месяцы
@@ -273,7 +290,8 @@ export const createIntervals = (
   let intervalCount = 0;
 
   // Для периода 90-365 дней делим по месяцам
-  if (totalDays >= 90 && totalDays <= 365) {
+  // ВАЖНО: Проверяем строго больше 31, чтобы для 31 дня создавались дневные интервалы
+  if (totalDays > 31 && totalDays >= 90 && totalDays <= 365) {
     const monthDate = new Date(fromDate);
 
     while (monthDate <= toDate && intervalCount < targetIntervals) {
@@ -304,47 +322,108 @@ export const createIntervals = (
   }
 
   // Для остальных периодов создаем интервалы для ВСЕГО календарного периода
-  while (current <= toDate && intervalCount < targetIntervals) {
-    const start = new Date(current);
-    let end = new Date(current);
+  // Специальная обработка для дневных интервалов (stepDays = 1 или totalDays <= 31)
+  if (stepDays === 1 || totalDays <= 31) {
+    // Создаем интервал для каждого дня
+    // ВАЖНО: Используем нормализованные даты
+    const dayDate = new Date(fromDateNormalized);
+    const toDateEnd = new Date(
+      toDateNormalized.getFullYear(),
+      toDateNormalized.getMonth(),
+      toDateNormalized.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
 
-    // Для последнего интервала берем toDate
-    if (intervalCount === targetIntervals - 1) {
-      end = new Date(toDate);
-    } else {
-      end.setDate(end.getDate() + stepDays - 1);
-      if (end > toDate) {
-        end = new Date(toDate);
+    // Создаем интервалы для каждого дня в периоде
+    // ВАЖНО: Создаем ровно totalDays интервалов
+    for (let dayCount = 0; dayCount < totalDays; dayCount++) {
+      const start = new Date(
+        dayDate.getFullYear(),
+        dayDate.getMonth(),
+        dayDate.getDate(),
+        0,
+        0,
+        0,
+        0
+      );
+      const end = new Date(
+        dayDate.getFullYear(),
+        dayDate.getMonth(),
+        dayDate.getDate(),
+        23,
+        59,
+        59,
+        999
+      );
+
+      // Если это последний день, используем toDate
+      if (end > toDateEnd) {
+        end.setTime(toDateEnd.getTime());
       }
+
+      intervals.push({
+        start,
+        end,
+        label: formatIntervalLabel(start, end, 'day'),
+      });
+
+      // Переходим к следующему дню
+      dayDate.setDate(dayDate.getDate() + 1);
     }
+  } else {
+    // Для интервалов больше одного дня
+    while (current <= toDate && intervalCount < targetIntervals) {
+      const start = new Date(current);
+      start.setHours(0, 0, 0, 0);
+      let end = new Date(current);
 
-    // Определяем формат для лейбла в зависимости от размера интервала
-    const intervalDays =
-      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    let labelFormat: PeriodFormat = 'day';
+      // Для последнего интервала берем toDate
+      if (intervalCount === targetIntervals - 1) {
+        end = new Date(toDate);
+        end.setHours(23, 59, 59, 999);
+      } else {
+        // Устанавливаем конец интервала: если stepDays = 1, то это конец текущего дня
+        // Если stepDays > 1, то это конец последнего дня в интервале
+        end.setDate(end.getDate() + stepDays - 1);
+        end.setHours(23, 59, 59, 999);
+        if (end > toDate) {
+          end = new Date(toDate);
+          end.setHours(23, 59, 59, 999);
+        }
+      }
 
-    if (intervalDays <= 3) {
-      labelFormat = 'day';
-    } else if (intervalDays <= 14) {
-      labelFormat = 'week';
-    } else if (intervalDays <= 45) {
-      labelFormat = 'month';
-    } else if (intervalDays <= 120) {
-      labelFormat = 'quarter';
-    } else {
-      labelFormat = 'year';
+      // Определяем формат для лейбла в зависимости от размера интервала
+      const intervalDays =
+        Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+        1;
+      let labelFormat: PeriodFormat = 'day';
+
+      if (intervalDays <= 3) {
+        labelFormat = 'day';
+      } else if (intervalDays <= 14) {
+        labelFormat = 'week';
+      } else if (intervalDays <= 45) {
+        labelFormat = 'month';
+      } else if (intervalDays <= 120) {
+        labelFormat = 'quarter';
+      } else {
+        labelFormat = 'year';
+      }
+
+      intervals.push({
+        start,
+        end,
+        label: formatIntervalLabel(start, end, labelFormat),
+      });
+
+      // Переходим к следующему интервалу
+      current = new Date(end);
+      current.setDate(current.getDate() + 1);
+      intervalCount++;
     }
-
-    intervals.push({
-      start,
-      end,
-      label: formatIntervalLabel(start, end, labelFormat),
-    });
-
-    // Переходим к следующему интервалу
-    current = new Date(end);
-    current.setDate(current.getDate() + 1);
-    intervalCount++;
   }
 
   // Убеждаемся, что последний интервал охватывает toDate
