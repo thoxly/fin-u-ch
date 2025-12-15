@@ -257,7 +257,7 @@ export class OperationsService {
             repeat: 'none', // Дочерняя операция не повторяется
             recurrenceParentId: template.id,
             recurrenceEndDate: null,
-            isConfirmed: false, // Требует подтверждения
+            isConfirmed: true, // Первая операция сразу подтверждается (создана пользователем)
             isTemplate: false, // Реальная операция
           },
         });
