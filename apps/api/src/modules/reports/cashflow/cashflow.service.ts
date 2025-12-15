@@ -1,9 +1,13 @@
 import prisma from '../../../config/db';
-import {
-  getMonthKey,
-  getMonthsBetween,
-  CashflowBreakdown,
-} from '@fin-u-ch/shared';
+import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
+
+// Import CashflowBreakdown type - it's exported from shared package
+type CashflowBreakdown =
+  | 'activity'
+  | 'deal'
+  | 'account'
+  | 'department'
+  | 'counterparty';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import articlesService from '../../catalogs/articles/articles.service';
 import logger from '../../../config/logger';
@@ -178,17 +182,18 @@ export class CashflowService {
 
     // Фильтруем операции по активности, если указана
     const filteredOperations = params.activity
-      ? operations.filter(
-          (op: (typeof operations)[0]) =>
-            op.article?.activity === params.activity
-        )
+      ? operations.filter((op) => {
+          const article = op.article as unknown as { activity?: string } | null;
+          return article?.activity === params.activity;
+        })
       : operations;
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
     const articlesWithOperations = new Set<string>();
     for (const op of filteredOperations) {
-      if (op.article) {
-        articlesWithOperations.add(op.article.id);
+      const article = op.article as unknown as { id: string } | null;
+      if (article) {
+        articlesWithOperations.add(article.id);
       }
     }
 
@@ -243,9 +248,10 @@ export class CashflowService {
     const operationsByArticle = new Map<string, CashflowRow>();
 
     for (const op of filteredOperations) {
-      if (!op.article) continue;
+      const article = op.article as unknown as { id: string } | null;
+      if (!article) continue;
 
-      const articleId = op.article.id;
+      const articleId = article.id;
 
       if (!operationsByArticle.has(articleId)) {
         const articleData = articleDataMap.get(articleId);
@@ -419,35 +425,50 @@ export class CashflowService {
       // Сначала группируем операции по выбранному разрезу
       const operationsByBreakdown = new Map<
         string,
-        { id: string; name: string; operations: typeof filteredOperations }
+        { id: string; name: string; operations: typeof operations }
       >();
 
       for (const op of filteredOperations) {
-        if (!op.article) continue;
+        const article = op.article as unknown as { id: string } | null;
+        if (!article) continue;
 
         let breakdownKey: string | null = null;
         let breakdownName: string | null = null;
 
-        if (breakdown === 'deal' && op.dealId && op.deal) {
+        const deal = op.deal as unknown as { name: string } | null | undefined;
+        const account = op.account as unknown as
+          | { name: string }
+          | null
+          | undefined;
+        const department = op.department as unknown as
+          | { name: string }
+          | null
+          | undefined;
+        const counterparty = op.counterparty as unknown as
+          | { name: string }
+          | null
+          | undefined;
+
+        if (breakdown === 'deal' && op.dealId && deal) {
           breakdownKey = op.dealId;
-          breakdownName = op.deal.name;
-        } else if (breakdown === 'account' && op.accountId && op.account) {
+          breakdownName = deal.name;
+        } else if (breakdown === 'account' && op.accountId && account) {
           breakdownKey = op.accountId;
-          breakdownName = op.account.name;
+          breakdownName = account.name;
         } else if (
           breakdown === 'department' &&
           op.departmentId &&
-          op.department
+          department
         ) {
           breakdownKey = op.departmentId;
-          breakdownName = op.department.name;
+          breakdownName = department.name;
         } else if (
           breakdown === 'counterparty' &&
           op.counterpartyId &&
-          op.counterparty
+          counterparty
         ) {
           breakdownKey = op.counterpartyId;
-          breakdownName = op.counterparty.name;
+          breakdownName = counterparty.name;
         }
 
         if (!breakdownKey || !breakdownName) continue;
@@ -469,9 +490,10 @@ export class CashflowService {
         const breakdownOperationsByArticle = new Map<string, CashflowRow>();
 
         for (const op of breakdownData.operations) {
-          if (!op.article) continue;
+          const article = op.article as unknown as { id: string } | null;
+          if (!article) continue;
 
-          const articleId = op.article.id;
+          const articleId = article.id;
           const articleData = articleDataMap.get(articleId);
           if (!articleData) continue;
 
