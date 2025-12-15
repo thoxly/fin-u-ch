@@ -278,6 +278,12 @@ jobs:
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
             fi
+            # Resolve removed subscription migration (marked as rolled back since it was removed from code)
+            REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
+            if npx prisma migrate status 2>&1 | grep -q "$REMOVED_MIGRATION"; then
+              echo "Resolving removed migration: $REMOVED_MIGRATION (marked as rolled back)"
+              npx prisma migrate resolve --rolled-back "$REMOVED_MIGRATION" || echo "Could not resolve migration"
+            fi
           else
             echo "✅ No failed migrations found"
           fi
@@ -445,6 +451,12 @@ jobs:
             if npx prisma migrate status 2>&1 | grep -q "$FAILED_MIGRATION"; then
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
+            fi
+            # Resolve removed subscription migration (marked as rolled back since it was removed from code)
+            REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
+            if npx prisma migrate status 2>&1 | grep -q "$REMOVED_MIGRATION"; then
+              echo "Resolving removed migration: $REMOVED_MIGRATION (marked as rolled back)"
+              npx prisma migrate resolve --rolled-back "$REMOVED_MIGRATION" || echo "Could not resolve migration"
             fi
           else
             echo "✅ No failed migrations found"
