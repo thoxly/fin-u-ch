@@ -23,8 +23,10 @@ interface SelectOption {
   label: string;
 }
 
-interface SelectProps
-  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
+interface SelectProps extends Omit<
+  SelectHTMLAttributes<HTMLSelectElement>,
+  'onChange'
+> {
   label?: string;
   error?: string;
   options?: SelectOption[];
