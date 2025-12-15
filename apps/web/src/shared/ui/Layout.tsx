@@ -9,7 +9,6 @@ import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
-import { PlanBadge } from './PlanBadge';
 
 interface LayoutProps {
   children: ReactNode;
@@ -42,7 +41,6 @@ const getEntityForMenuItem = (
     Подразделения: { entity: 'departments', action: 'read' },
     Контрагенты: { entity: 'counterparties', action: 'read' },
     Сделки: { entity: 'deals', action: 'read' },
-    Зарплаты: { entity: 'salaries', action: 'read' },
     Администрирование: { entity: 'users', action: 'read' },
     Пользователи: { entity: 'users', action: 'read' },
     Роли: { entity: 'users', action: 'manage_roles' },
@@ -115,12 +113,6 @@ const getBaseNavigation = (): NavigationItem[] => {
           name: 'Сделки',
           href: '/catalogs/deals',
           entity: 'deals',
-          action: 'read',
-        },
-        {
-          name: 'Зарплаты',
-          href: '/catalogs/salaries',
-          entity: 'salaries',
           action: 'read',
         },
       ],
@@ -371,7 +363,6 @@ export const Layout = ({
               </Link>
             </div>
             <div className="flex items-center gap-4">
-              <PlanBadge compact={true} />
               <UserMenu userEmail={user?.email} />
             </div>
           </div>
