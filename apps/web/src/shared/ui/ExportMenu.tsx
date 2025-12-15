@@ -55,25 +55,30 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center rounded-md p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700"
+        className="inline-flex items-center justify-center p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         aria-label="Экспорт"
         title="Экспорт"
       >
-        <Download size={14} />
+        <Download
+          size={18}
+          className="text-primary-600 dark:text-primary-400"
+        />
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 z-50">
+        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
           <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
             onClick={handleCsv}
           >
-            Экспорт CSV
+            <Download size={16} className="text-gray-500 dark:text-gray-400" />
+            Экспорт в CSV
           </button>
           <button
-            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="w-full text-left px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
             onClick={handleXlsx}
           >
-            Экспорт Excel
+            <Download size={16} className="text-gray-500 dark:text-gray-400" />
+            Экспорт в Excel
           </button>
         </div>
       )}
