@@ -177,12 +177,30 @@ export class CashflowService {
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
     // Фильтруем операции по активности, если указана
-    const filteredOperations = params.activity
-      ? operations.filter(
-          (op: (typeof operations)[0]) =>
-            op.article?.activity === params.activity
-        )
-      : operations;
+    // Явно типизируем как массив операций, чтобы TypeScript правильно определил тип
+    // Проблема: TypeScript может неправильно вывести тип из-за сложного типа Prisma
+    // Используем двойное приведение типов для обхода проблемы
+    type OperationType = {
+      id: string;
+      article: {
+        id: string;
+        name: string;
+        activity: string | null;
+        type: string;
+      } | null;
+      deal?: { id: string; name: string } | null;
+      account?: { id: string; name: string } | null;
+      department?: { id: string; name: string } | null;
+      counterparty?: { id: string; name: string } | null;
+      [key: string]: any;
+    };
+    const filteredOperations = (
+      params.activity
+        ? (operations as unknown as OperationType[]).filter((op) => {
+            return op.article?.activity === params.activity;
+          })
+        : (operations as unknown as OperationType[])
+    ) as OperationType[];
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
     const articlesWithOperations = new Set<string>();
