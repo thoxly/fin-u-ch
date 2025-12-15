@@ -2,14 +2,26 @@
 /* eslint-disable no-console */
 
 import demoUserService from '../apps/api/src/modules/demo/demo.service';
+import prisma from '../apps/api/src/config/db';
 
 /**
  * Создает демо-пользователя для продакшена с полными моковыми данными
  * Этот скрипт должен запускаться автоматически при деплое
+ *
+ * Использование:
+ *   npx tsx scripts/setup-production-demo.ts          - создает, если не существует
+ *   npx tsx scripts/setup-production-demo.ts --force  - пересоздает принудительно
  */
 async function setupProductionDemo(): Promise<void> {
   try {
+    const forceRecreate = process.argv.includes('--force');
+
     console.log('🚀 Setting up production demo user...');
+    if (forceRecreate) {
+      console.log(
+        '⚠️  Force recreate mode: existing demo user will be deleted'
+      );
+    }
 
     // Проверяем, существует ли уже демо-пользователь
     const exists = await demoUserService.exists();
@@ -26,7 +38,11 @@ async function setupProductionDemo(): Promise<void> {
         console.log('   Articles:', info.articlesCount);
         console.log('   Counterparties:', info.counterpartiesCount);
 
-        if (info.operationsCount > 0) {
+        if (forceRecreate) {
+          console.log('🗑️  Deleting existing demo user...');
+          await demoUserService.delete();
+          console.log('✅ Demo user deleted');
+        } else if (info.operationsCount > 0) {
           console.log('✅ Demo user has sample data');
           return;
         } else {
@@ -51,11 +67,20 @@ async function setupProductionDemo(): Promise<void> {
     console.log('   Accounts:', demoUser.accountsCount);
     console.log('   Articles:', demoUser.articlesCount);
     console.log('   Counterparties:', demoUser.counterpartiesCount);
+
+    // Получаем информацию о бюджетах
+    const budgetsCount = await prisma.budget.count({
+      where: { companyId: demoUser.company.id },
+    });
+    console.log('   Budgets:', budgetsCount);
+
     console.log('');
     console.log('🎉 Demo user setup completed!');
   } catch (error) {
     console.error('❌ Failed to setup production demo user:', error);
     throw error;
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
