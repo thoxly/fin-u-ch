@@ -186,12 +186,17 @@ export const UsersTab = () => {
         setInviteRoleId('');
       }
     } catch (error) {
-      // Ошибка уже обработана в apiSlice baseQuery (глобальный обработчик 403)
-      // Здесь только логируем для отладки
-      console.error('[UsersTab] Failed to invite user:', error);
-      setIsInviteModalOpen(false);
-      setInviteEmail('');
-      setInviteRoleId('');
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : 'Ошибка при приглашении пользователя';
+      showError(errorMessage);
     }
   };
 
@@ -248,7 +253,17 @@ export const UsersTab = () => {
       setIsEditModalOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      console.error('[UsersTab] Failed to update user:', error);
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : 'Ошибка при обновлении пользователя';
+      showError(errorMessage);
     }
   };
 
@@ -267,7 +282,17 @@ export const UsersTab = () => {
       }).unwrap();
       showSuccess('Роль успешно назначена');
     } catch (error) {
-      console.error('[UsersTab] Failed to assign role:', error);
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : 'Ошибка при назначении роли';
+      showError(errorMessage);
     }
   };
 
@@ -284,7 +309,17 @@ export const UsersTab = () => {
         }).unwrap();
         showSuccess('Роль успешно снята');
       } catch (error) {
-        console.error('[UsersTab] Failed to remove role:', error);
+        const errorMessage =
+          error &&
+          typeof error === 'object' &&
+          'data' in error &&
+          error.data &&
+          typeof error.data === 'object' &&
+          'message' in error.data &&
+          typeof error.data.message === 'string'
+            ? error.data.message
+            : 'Ошибка при снятии роли';
+        showError(errorMessage);
       }
     }
   };
@@ -309,7 +344,17 @@ export const UsersTab = () => {
       showSuccess('Пользователь успешно удалён');
       setDeleteModal({ isOpen: false, user: null });
     } catch (error) {
-      console.error('[UsersTab] Failed to delete user:', error);
+      const errorMessage =
+        error &&
+        typeof error === 'object' &&
+        'data' in error &&
+        error.data &&
+        typeof error.data === 'object' &&
+        'message' in error.data &&
+        typeof error.data.message === 'string'
+          ? error.data.message
+          : 'Ошибка при удалении пользователя';
+      showError(errorMessage);
       setDeleteModal({ isOpen: false, user: null });
     }
   };

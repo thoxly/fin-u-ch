@@ -219,7 +219,7 @@ export class SessionService {
     }
 
     if (filters?.duplicate !== undefined) {
-      (where as any).isDuplicate = filters.duplicate;
+      where.isDuplicate = filters.duplicate;
     }
 
     if (filters?.processed !== undefined) {
@@ -252,7 +252,7 @@ export class SessionService {
     });
 
     const duplicatesCount = await prisma.importedOperation.count({
-      where: { ...baseWhere, isDuplicate: true } as any,
+      where: { ...baseWhere, isDuplicate: true },
     });
 
     return {
@@ -261,7 +261,7 @@ export class SessionService {
       confirmed: confirmedCount,
       unmatched: unmatchedCount,
       duplicates: duplicatesCount,
-      companyAccountNumber: (session as any).companyAccountNumber || undefined,
+      companyAccountNumber: session.companyAccountNumber || undefined,
     };
   }
 
@@ -291,7 +291,7 @@ export class SessionService {
         account: { select: { id: true, name: true } },
         deal: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      } as any,
+      },
       orderBy: { date: 'desc' },
     });
 
@@ -327,31 +327,31 @@ export class SessionService {
     const updateData: Prisma.ImportedOperationUpdateInput = {};
 
     if (data.matchedArticleId !== undefined) {
-      (updateData as any).article = data.matchedArticleId
+      updateData.article = data.matchedArticleId
         ? { connect: { id: data.matchedArticleId } }
         : { disconnect: true };
     }
 
     if (data.matchedCounterpartyId !== undefined) {
-      (updateData as any).counterparty = data.matchedCounterpartyId
+      updateData.counterparty = data.matchedCounterpartyId
         ? { connect: { id: data.matchedCounterpartyId } }
         : { disconnect: true };
     }
 
     if (data.matchedAccountId !== undefined) {
-      (updateData as any).account = data.matchedAccountId
+      updateData.account = data.matchedAccountId
         ? { connect: { id: data.matchedAccountId } }
         : { disconnect: true };
     }
 
     if (data.matchedDealId !== undefined) {
-      (updateData as any).deal = data.matchedDealId
+      updateData.deal = data.matchedDealId
         ? { connect: { id: data.matchedDealId } }
         : { disconnect: true };
     }
 
     if (data.matchedDepartmentId !== undefined) {
-      (updateData as any).department = data.matchedDepartmentId
+      updateData.department = data.matchedDepartmentId
         ? { connect: { id: data.matchedDepartmentId } }
         : { disconnect: true };
     }
@@ -382,7 +382,7 @@ export class SessionService {
         account: { select: { id: true, name: true } },
         deal: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-      } as any,
+      },
     });
 
     // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
@@ -460,13 +460,13 @@ export class SessionService {
         id: true,
         processed: true,
         lockedFields: true,
-      } as any,
+      },
     });
 
     if (!operations || operations.length !== operationIds.length) {
       // Находим отсутствующие ID для более информативной ошибки
-      const foundIds = new Set<string>(operations?.map((op) => op.id) || []);
-      const missingIds = operationIds.filter((id: string) => !foundIds.has(id));
+      const foundIds = new Set(operations?.map((op) => op.id) || []);
+      const missingIds = operationIds.filter((id) => !foundIds.has(id));
 
       logger.error('Bulk update failed: some operations not found', {
         sessionId,
@@ -501,8 +501,8 @@ export class SessionService {
       // Парсим заблокированные поля
       let lockedFields: string[] = [];
       try {
-        lockedFields = (operation as any).lockedFields
-          ? JSON.parse((operation as any).lockedFields)
+        lockedFields = operation.lockedFields
+          ? JSON.parse(operation.lockedFields)
           : [];
       } catch {
         lockedFields = [];
@@ -515,7 +515,7 @@ export class SessionService {
         data.matchedArticleId !== undefined &&
         !lockedFields.includes('matchedArticleId')
       ) {
-        (updateData as any).article = data.matchedArticleId
+        updateData.article = data.matchedArticleId
           ? { connect: { id: data.matchedArticleId } }
           : { disconnect: true };
         updateData.matchedBy = data.matchedArticleId ? 'manual' : null;
@@ -525,7 +525,7 @@ export class SessionService {
         data.matchedCounterpartyId !== undefined &&
         !lockedFields.includes('matchedCounterpartyId')
       ) {
-        (updateData as any).counterparty = data.matchedCounterpartyId
+        updateData.counterparty = data.matchedCounterpartyId
           ? { connect: { id: data.matchedCounterpartyId } }
           : { disconnect: true };
         if (!updateData.matchedBy) {
@@ -537,7 +537,7 @@ export class SessionService {
         data.matchedAccountId !== undefined &&
         !lockedFields.includes('matchedAccountId')
       ) {
-        (updateData as any).account = data.matchedAccountId
+        updateData.account = data.matchedAccountId
           ? { connect: { id: data.matchedAccountId } }
           : { disconnect: true };
       }
@@ -546,7 +546,7 @@ export class SessionService {
         data.matchedDealId !== undefined &&
         !lockedFields.includes('matchedDealId')
       ) {
-        (updateData as any).deal = data.matchedDealId
+        updateData.deal = data.matchedDealId
           ? { connect: { id: data.matchedDealId } }
           : { disconnect: true };
       }
@@ -555,7 +555,7 @@ export class SessionService {
         data.matchedDepartmentId !== undefined &&
         !lockedFields.includes('matchedDepartmentId')
       ) {
-        (updateData as any).department = data.matchedDepartmentId
+        updateData.department = data.matchedDepartmentId
           ? { connect: { id: data.matchedDepartmentId } }
           : { disconnect: true };
       }

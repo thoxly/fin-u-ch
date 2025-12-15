@@ -10,32 +10,11 @@ export interface Finding {
 export declare class AiReviewer {
     private openai;
     constructor();
-    /**
-     * Truncate tool results to prevent context overflow.
-     * Different tools have different size limits based on their typical output sizes.
-     */
-    private truncateToolResult;
-    /**
-     * Retry wrapper for API calls with exponential backoff
-     */
-    private retryApiCall;
     reviewCode(files: PullRequestFile[], diff: string, distilledContext: string): Promise<{
         comments: ReviewComment[];
         issues: Finding[];
         issuesWithoutInline: Finding[];
     }>;
-    /**
-     * Second-pass verifier.
-     *
-     * Takes the raw issues produced by the first model pass and asks the model
-     * (with full tool access) to strictly verify each one against the real code.
-     *
-     * Rules for the verifier:
-     * - MUST NOT invent new issues.
-     * - MAY drop any issue that cannot be clearly confirmed from the code.
-     * - SHOULD prefer dropping/downgrading over keeping uncertain issues.
-     */
-    private verifyFindings;
     private buildPrompt;
     private buildTools;
     private callTool;

@@ -7,8 +7,6 @@ import {
 import { Account } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
-import { useNotification } from '../../../shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '../../../constants/notificationMessages';
 
 export const AccountForm = ({
   account,
@@ -32,7 +30,6 @@ export const AccountForm = ({
   const [create, { isLoading: isCreating }] = useCreateAccountMutation();
   const [update, { isLoading: isUpdating }] = useUpdateAccountMutation();
   const { canCreate, canUpdate } = usePermissions();
-  const { showSuccess, showError } = useNotification();
 
   // Определяем, можем ли редактировать форму
   const isEditing = !!account;
@@ -66,11 +63,9 @@ export const AccountForm = ({
     try {
       if (account) {
         await update({ id: account.id, data }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.ACCOUNT.UPDATE_SUCCESS);
         onClose();
       } else {
         const result = await create(data).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.ACCOUNT.CREATE_SUCCESS);
         if (onSuccess && result.id) {
           onSuccess(result.id);
         } else {
@@ -78,35 +73,7 @@ export const AccountForm = ({
         }
       }
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : account
-          ? NOTIFICATION_MESSAGES.ACCOUNT.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.ACCOUNT.CREATE_ERROR;
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : account
-            ? NOTIFICATION_MESSAGES.ACCOUNT.UPDATE_ERROR
-            : NOTIFICATION_MESSAGES.ACCOUNT.CREATE_ERROR
-      );
+      console.error('Failed to save account:', error);
     }
   };
 

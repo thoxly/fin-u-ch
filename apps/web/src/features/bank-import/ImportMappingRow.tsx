@@ -1,11 +1,11 @@
 import { useState, memo, useEffect } from 'react';
 import {
   useGetCounterpartiesQuery,
+  useGetArticlesQuery,
   useGetAccountsQuery,
   useGetDealsQuery,
   useGetDepartmentsQuery,
 } from '../../store/api/catalogsApi';
-import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import { useUpdateImportedOperationMutation } from '../../store/api/importsApi';
 import { Select } from '../../shared/ui/Select';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -105,8 +105,7 @@ const ImportMappingRowComponent = ({
   }, [isModalOpen]);
 
   const { data: counterparties = [] } = useGetCounterpartiesQuery();
-  // Используем только листья (статьи без дочерних) для операций
-  const { leafArticles: articles = [] } = useLeafArticles({ isActive: true });
+  const { data: articles = [] } = useGetArticlesQuery({ isActive: true });
   const { data: accounts = [] } = useGetAccountsQuery();
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
@@ -326,9 +325,6 @@ const ImportMappingRowComponent = ({
         // Проверяем наличие похожих операций
         // Результат игнорируем, так как операция уже обновлена
         await onFieldUpdate(operation, field, value, updateData, lastClickRect);
-      } else {
-        // Если не показываем popover, показываем успешное уведомление
-        showSuccess('Операция обновлена');
       }
     } catch (error) {
       showError('Ошибка при обновлении');

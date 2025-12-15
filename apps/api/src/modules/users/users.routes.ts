@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
-import { checkUserLimit } from '../../middlewares/user-limit.guard';
 import usersController from './users.controller';
 
 const router: Router = Router();
@@ -38,20 +37,6 @@ router.get('/me', usersController.getMe);
  *         description: User updated
  */
 router.patch('/me', usersController.updateMe);
-
-/**
- * @swagger
- * /api/users/me:
- *   delete:
- *     summary: Delete current user account (hard delete)
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Account deleted successfully
- */
-router.delete('/me', usersController.deleteMe);
 
 /**
  * @swagger
@@ -253,7 +238,6 @@ router.get('/', requirePermission('users', 'read'), usersController.getAll);
 router.post(
   '/invite',
   requirePermission('users', 'create'),
-  checkUserLimit,
   usersController.inviteUser
 );
 

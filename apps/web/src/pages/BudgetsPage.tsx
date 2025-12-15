@@ -9,7 +9,6 @@ import { Table } from '../shared/ui/Table';
 import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Input } from '../shared/ui/Input';
-import { FeatureBlocker } from '../shared/ui/FeatureBlocker';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { ProtectedAction } from '../shared/components/ProtectedAction';
 import {
@@ -20,9 +19,6 @@ import {
 } from '../store/api/budgetsApi';
 import { formatDate } from '../shared/lib/date';
 import type { Budget } from '@fin-u-ch/shared';
-import { useNotification } from '../shared/hooks/useNotification';
-import { useAppSelector } from '../shared/hooks/useRedux';
-import { RootState } from '../store/store';
 
 export const BudgetsPage = () => {
   const navigate = useNavigate();
@@ -44,7 +40,6 @@ export const BudgetsPage = () => {
   const [createBudget, { isLoading: isCreating }] = useCreateBudgetMutation();
   const [updateBudget] = useUpdateBudgetMutation();
   const [deleteBudget] = useDeleteBudgetMutation();
-  const { showSuccess, showError } = useNotification();
 
   const handleCreate = () => {
     setFormData({ name: '', startDate: '', endDate: '' });
@@ -61,77 +56,19 @@ export const BudgetsPage = () => {
         startDate: formData.startDate,
         endDate: formData.endDate || undefined,
       }).unwrap();
-      showSuccess('Бюджет успешно создан');
       setIsFormOpen(false);
       setFormData({ name: '', startDate: '', endDate: '' });
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при создании бюджета';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при создании бюджета'
-      );
+      console.error('Failed to create budget:', error);
     }
   };
 
   const handleArchive = async (budget: Budget) => {
     const newStatus = budget.status === 'active' ? 'archived' : 'active';
-    try {
-      await updateBudget({
-        id: budget.id,
-        data: { status: newStatus },
-      }).unwrap();
-      showSuccess(
-        newStatus === 'archived'
-          ? 'Бюджет успешно архивирован'
-          : 'Бюджет успешно восстановлен'
-      );
-    } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при изменении статуса бюджета';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при изменении статуса бюджета'
-      );
-    }
+    await updateBudget({
+      id: budget.id,
+      data: { status: newStatus },
+    });
   };
 
   const [deleteModal, setDeleteModal] = useState<{
@@ -150,33 +87,10 @@ export const BudgetsPage = () => {
     if (!deleteModal.id) return;
     try {
       await deleteBudget(deleteModal.id).unwrap();
-      showSuccess('Бюджет успешно удален');
       setDeleteModal({ isOpen: false, id: null });
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
+      alert(
+        'Не удалось удалить бюджет. Возможно, у него есть плановые записи. Используйте архивирование.'
       );
       setDeleteModal({ isOpen: false, id: null });
     }
@@ -291,23 +205,6 @@ export const BudgetsPage = () => {
       width: '120px',
     },
   ];
-
-  // Проверяем доступ к фиче "planning" (требует TEAM+)
-
-  const subscriptionData = useAppSelector(
-    (state: RootState) => state.subscription?.data ?? null
-  );
-  const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
-  const requiredLevel = planHierarchy['TEAM'];
-  const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
-
-  if (currentLevel < requiredLevel) {
-    return (
-      <Layout>
-        <FeatureBlocker feature="planning" requiredPlan="TEAM" />
-      </Layout>
-    );
-  }
 
   return (
     <Layout>

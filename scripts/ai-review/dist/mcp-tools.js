@@ -118,11 +118,7 @@ export async function readFileRangeTool(params) {
     const content = await readFileTool({ path: params.path });
     const lines = content.split('\n');
     const start = Math.max(0, params.start - 1);
-    // If `end` is not provided or invalid, default to a 80-line window or to the file end.
-    const rawEnd = typeof params.end === 'number' && Number.isFinite(params.end)
-        ? params.end
-        : params.start + 79;
-    const end = Math.min(lines.length, rawEnd);
+    const end = Math.min(lines.length, params.end);
     return lines.slice(start, end).join('\n');
 }
 export async function listFilesTool(params) {
@@ -141,10 +137,7 @@ export async function listFilesTool(params) {
     return files;
 }
 export async function searchTool(params) {
-    // IMPORTANT: include not only TS/JS, but also schema and migration files,
-    // because a lot of critical project logic (Prisma schema, SQL migrations)
-    // lives there and the reviewer often searches for fields/enums there.
-    const files = await fg('**/*.{ts,tsx,js,jsx,json,md,prisma,sql}', {
+    const files = await fg('**/*.{ts,tsx,js,jsx,json,md}', {
         cwd: projectRoot,
         dot: false,
         onlyFiles: true,

@@ -28,6 +28,7 @@ const ENTITY_OPTIONS = [
   { value: 'department', label: 'Подразделения' },
   { value: 'counterparty', label: 'Контрагенты' },
   { value: 'deal', label: 'Сделки' },
+  { value: 'salary', label: 'Зарплаты' },
   { value: 'role', label: 'Роли' },
   { value: 'user', label: 'Пользователи' },
 ];
@@ -103,6 +104,7 @@ const getEntityBadgeClasses = (entity: string): string => {
     counterparty:
       'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
     deal: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300',
+    salary: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
     role: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300',
     user: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
   };

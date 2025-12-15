@@ -166,8 +166,7 @@ async function main() {
         console.log(`Analyzing ${relevantFiles.length} files (${files.length - relevantFiles.length} skipped)\n`);
         if (relevantFiles.length === 0) {
             console.log('No relevant files to review. Exiting.');
-            // Явно завершаем процесс, чтобы GitHub Actions/job не "залипали"
-            process.exit(0);
+            return;
         }
         // Get AI review in batches to avoid context limits on large PRs
         const maxPerBatch = CONFIG.review.maxFilesPerBatch || 10;
@@ -203,9 +202,7 @@ async function main() {
             const event = isGitHubActions ? 'COMMENT' : 'APPROVE';
             console.log(isGitHubActions ? 'Leaving comment...' : 'Approving PR...');
             await githubClient.createReview(prNumber, commitId, [], event, '✅ AI Code Review: No Critical or High severity issues found. Code looks good!');
-            // Успешное завершение без Critical/High — явно выходим с кодом 0,
-            // чтобы GitHub Actions/job корректно завершались
-            process.exit(0);
+            return;
         }
         // Analyze severity (only Critical and High are tracked now)
         const criticalIssues = issues.filter((c) => c.severity === 'critical');
@@ -318,10 +315,6 @@ No Critical or High severity issues found.${reportNote}`;
     }
     catch (error) {
         console.error('\n❌ Error during review:', error);
-        if (error instanceof Error) {
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
-        }
         process.exit(1);
     }
 }

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   BarChart,
   Bar,
@@ -17,7 +17,6 @@ import { ExportMenu } from './ExportMenu';
 import { InfoHint } from './InfoHint';
 import { CustomTooltip } from './CustomTooltip';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
-import { calculateYAxisFontSize, findMaxValue } from '../lib/chartUtils';
 
 interface WeeklyFlowChartProps {
   data: AggregatedDataPoint[];
@@ -33,13 +32,6 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
 
   // Показываем все данные
   const filteredData = data;
-
-  // Вычисляем оптимальный размер шрифта для оси Y на основе максимального значения
-  const yAxisFontSize = useMemo(() => {
-    if (!filteredData || filteredData.length === 0) return 12;
-    const maxValue = findMaxValue(filteredData, ['income', 'expense']);
-    return calculateYAxisFontSize(maxValue);
-  }, [filteredData]);
 
   // Проверяем, есть ли данные для отображения
   // Проверяем не только наличие массива, но и наличие реальных ненулевых значений
@@ -113,7 +105,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data || []}
-              margin={{ top: 5, right: 30, left: 5, bottom: 48 }}
+              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -126,10 +118,8 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={yAxisFontSize}
-                tick={{ fontSize: yAxisFontSize }}
+                fontSize={12}
                 tickFormatter={(value) => formatMoney(value)}
-                width={80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -197,7 +187,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 5, bottom: 28 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -214,10 +204,8 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={yAxisFontSize}
-              tick={{ fontSize: yAxisFontSize }}
+              fontSize={12}
               tickFormatter={(value) => formatMoney(value)}
-              width={80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),

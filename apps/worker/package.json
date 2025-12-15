@@ -10,11 +10,7 @@
     "build": "tsc && node scripts/add-js-extensions.js",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "prisma:generate": "prisma generate",
-    "ozon-test": "tsx src/index.ts run-ozon-test",
-    "ozon-now": "tsx src/index.ts run-ozon-now",
-    "recurring-now": "tsx src/index.ts run-recurring-now",
-    "debug-ozon": "tsx src/scripts/debug-ozon-integration.ts"
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
