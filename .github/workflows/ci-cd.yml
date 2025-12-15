@@ -278,6 +278,12 @@ jobs:
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
             fi
+            # Resolve removed subscription migration (marked as rolled back since it was removed from code)
+            REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
+            if npx prisma migrate status 2>&1 | grep -q "$REMOVED_MIGRATION"; then
+              echo "Resolving removed migration: $REMOVED_MIGRATION (marked as rolled back)"
+              npx prisma migrate resolve --rolled-back "$REMOVED_MIGRATION" || echo "Could not resolve migration"
+            fi
           else
             echo "✅ No failed migrations found"
           fi
@@ -445,6 +451,12 @@ jobs:
             if npx prisma migrate status 2>&1 | grep -q "$FAILED_MIGRATION"; then
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
+            fi
+            # Resolve removed subscription migration (marked as rolled back since it was removed from code)
+            REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
+            if npx prisma migrate status 2>&1 | grep -q "$REMOVED_MIGRATION"; then
+              echo "Resolving removed migration: $REMOVED_MIGRATION (marked as rolled back)"
+              npx prisma migrate resolve --rolled-back "$REMOVED_MIGRATION" || echo "Could not resolve migration"
             fi
           else
             echo "✅ No failed migrations found"
@@ -815,6 +827,22 @@ jobs:
           # Check available images
           echo "=== Available images ==="
           docker images --format "table {{.Repository}}:{{.Tag}}\t{{.ID}}\t{{.CreatedAt}}" | grep fin-u-ch | head -n 10
+
+          # Check for failed migrations and resolve if needed
+          echo "=== Checking for failed migrations ==="
+          docker compose -f docker-compose.prod.yml run --rm api sh -c "
+            if npx prisma migrate status 2>&1 | grep -q 'failed migration'; then
+              echo '⚠️  Found failed migrations, attempting to resolve...'
+              # Resolve known failed migrations that were removed from code
+              FAILED_MIGRATION='20251215074023_add_subscriptions_and_promo_codes'
+              if npx prisma migrate status 2>&1 | grep -q \"\$FAILED_MIGRATION\"; then
+                echo \"Resolving failed migration: \$FAILED_MIGRATION (marked as rolled back)\"
+                npx prisma migrate resolve --rolled-back \"\$FAILED_MIGRATION\" || echo \"Could not resolve migration\"
+              fi
+            else
+              echo '✅ No failed migrations found'
+            fi
+          "
 
           # Apply database migrations
           echo "=== Applying database migrations ==="

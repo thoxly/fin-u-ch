@@ -175,7 +175,7 @@ describe('Layout - MenuPopover Integration', () => {
       expect(screen.getByText('Счета')).toBeInTheDocument();
       expect(screen.getByText('Контрагенты')).toBeInTheDocument();
       expect(screen.getByText('Сделки')).toBeInTheDocument();
-      expect(screen.getByText('Зарплаты')).toBeInTheDocument();
+      // Зарплаты были удалены из функциональности
     });
   });
 
