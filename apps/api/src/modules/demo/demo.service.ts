@@ -27,6 +27,7 @@ export interface DemoUserData {
   accountsCount: number;
   articlesCount: number;
   counterpartiesCount: number;
+  plansCount: number;
 }
 
 /**
@@ -73,13 +74,19 @@ export class DemoUserService {
       return null;
     }
 
-    const [operationsCount, accountsCount, articlesCount, counterpartiesCount] =
-      await Promise.all([
-        prisma.operation.count({ where: { companyId: user.companyId } }),
-        prisma.account.count({ where: { companyId: user.companyId } }),
-        prisma.article.count({ where: { companyId: user.companyId } }),
-        prisma.counterparty.count({ where: { companyId: user.companyId } }),
-      ]);
+    const [
+      operationsCount,
+      accountsCount,
+      articlesCount,
+      counterpartiesCount,
+      plansCount,
+    ] = await Promise.all([
+      prisma.operation.count({ where: { companyId: user.companyId } }),
+      prisma.account.count({ where: { companyId: user.companyId } }),
+      prisma.article.count({ where: { companyId: user.companyId } }),
+      prisma.counterparty.count({ where: { companyId: user.companyId } }),
+      prisma.planItem.count({ where: { companyId: user.companyId } }),
+    ]);
 
     return {
       user: {
@@ -95,7 +102,162 @@ export class DemoUserService {
       accountsCount,
       articlesCount,
       counterpartiesCount,
+      plansCount,
     };
+  }
+
+  /**
+   * Создает основного демо-пользователя с полными данными
+   */
+  async create(): Promise<DemoUserData> {
+    // Проверяем, существует ли уже демо-пользователь
+    const existing = await this.exists();
+    if (existing) {
+      const info = await this.getInfo();
+      if (info) {
+        return info;
+      }
+    }
+
+    // Создаем все в одной транзакции
+    const result = await prisma.$transaction(async (tx) => {
+      // Создаем компанию
+      const company = await tx.company.create({
+        data: {
+          name: DemoUserService.DEMO_COMPANY_NAME,
+          currencyBase: 'RUB',
+        },
+      });
+
+      // Создаем пользователя
+      const passwordHash = await bcrypt.hash(DemoUserService.DEMO_PASSWORD, 10);
+      const user = await tx.user.create({
+        data: {
+          email: DemoUserService.DEMO_EMAIL,
+          passwordHash,
+          companyId: company.id,
+          isActive: true,
+          isSuperAdmin: true,
+          isEmailVerified: true,
+        },
+      });
+
+      // Создаем роль администратора
+      const adminRole = await tx.role.create({
+        data: {
+          companyId: company.id,
+          name: 'Администратор',
+          description: 'Полный доступ ко всем разделам системы',
+          category: 'admin',
+          isSystem: true,
+          isActive: true,
+        },
+      });
+
+      // Добавляем разрешения
+      const permissions = [
+        // Operations
+        { entity: 'operations', action: 'create' },
+        { entity: 'operations', action: 'read' },
+        { entity: 'operations', action: 'update' },
+        { entity: 'operations', action: 'delete' },
+        { entity: 'operations', action: 'confirm' },
+        // Articles
+        { entity: 'articles', action: 'create' },
+        { entity: 'articles', action: 'read' },
+        { entity: 'articles', action: 'update' },
+        { entity: 'articles', action: 'delete' },
+        // Accounts
+        { entity: 'accounts', action: 'create' },
+        { entity: 'accounts', action: 'read' },
+        { entity: 'accounts', action: 'update' },
+        { entity: 'accounts', action: 'delete' },
+        // Counterparties
+        { entity: 'counterparties', action: 'create' },
+        { entity: 'counterparties', action: 'read' },
+        { entity: 'counterparties', action: 'update' },
+        { entity: 'counterparties', action: 'delete' },
+        // Budgets
+        { entity: 'budgets', action: 'create' },
+        { entity: 'budgets', action: 'read' },
+        { entity: 'budgets', action: 'update' },
+        { entity: 'budgets', action: 'delete' },
+        // Deals
+        { entity: 'deals', action: 'create' },
+        { entity: 'deals', action: 'read' },
+        { entity: 'deals', action: 'update' },
+        { entity: 'deals', action: 'delete' },
+        // Departments
+        { entity: 'departments', action: 'create' },
+        { entity: 'departments', action: 'read' },
+        { entity: 'departments', action: 'update' },
+        { entity: 'departments', action: 'delete' },
+        // Roles
+        { entity: 'roles', action: 'create' },
+        { entity: 'roles', action: 'read' },
+        { entity: 'roles', action: 'update' },
+        { entity: 'roles', action: 'delete' },
+        // Users
+        { entity: 'users', action: 'create' },
+        { entity: 'users', action: 'read' },
+        { entity: 'users', action: 'update' },
+        { entity: 'users', action: 'delete' },
+        // Import
+        { entity: 'import', action: 'create' },
+        { entity: 'import', action: 'read' },
+        { entity: 'import', action: 'confirm' },
+        // Settings
+        { entity: 'settings', action: 'read' },
+        { entity: 'settings', action: 'update' },
+      ];
+
+      await tx.rolePermission.createMany({
+        data: permissions.map((perm) => ({
+          roleId: adminRole.id,
+          entity: perm.entity,
+          action: perm.action,
+          allowed: true,
+        })),
+      });
+
+      // Назначаем роль
+      await tx.userRole.create({
+        data: {
+          userId: user.id,
+          roleId: adminRole.id,
+        },
+      });
+
+      // Создаем подписку TEAM
+      await tx.subscription.create({
+        data: {
+          companyId: company.id,
+          plan: 'TEAM',
+          status: 'ACTIVE',
+          startDate: new Date(),
+        },
+      });
+
+      return { company, user };
+    });
+
+    logger.info('Demo user created', {
+      companyId: result.company.id,
+      userId: result.user.id,
+      email: result.user.email,
+    });
+
+    // Создаем данные
+    await demoCatalogsService.createInitialCatalogs(result.company.id);
+    await demoDataGeneratorService.createSampleData(result.company.id);
+
+    // Получаем финальную информацию
+    const info = await this.getInfo();
+    if (!info) {
+      throw new Error('Failed to get demo user info after creation');
+    }
+
+    return info;
   }
 
   /**
@@ -181,11 +343,6 @@ export class DemoUserService {
         { entity: 'departments', action: 'read' },
         { entity: 'departments', action: 'update' },
         { entity: 'departments', action: 'delete' },
-        // Salaries
-        { entity: 'salaries', action: 'create' },
-        { entity: 'salaries', action: 'read' },
-        { entity: 'salaries', action: 'update' },
-        { entity: 'salaries', action: 'delete' },
         // Roles
         { entity: 'roles', action: 'create' },
         { entity: 'roles', action: 'read' },
@@ -316,7 +473,8 @@ export class DemoUserService {
       // 1. Связанные данные компании
       const cid = user.companyId;
       await tx.operation.deleteMany({ where: { companyId: cid } });
-      await tx.salary.deleteMany({ where: { companyId: cid } });
+      await tx.planItem.deleteMany({ where: { companyId: cid } });
+      await tx.budget.deleteMany({ where: { companyId: cid } });
       await tx.account.deleteMany({ where: { companyId: cid } });
       await tx.article.deleteMany({ where: { companyId: cid } });
       await tx.counterparty.deleteMany({ where: { companyId: cid } });

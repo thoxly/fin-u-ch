@@ -11,7 +11,6 @@ export class DemoDataGeneratorService {
   async createSampleData(companyId: string): Promise<void> {
     await this.generateSampleOperations(companyId);
     await this.createSamplePlans(companyId);
-    await this.createSampleSalaries(companyId);
   }
 
   /**
@@ -25,70 +24,286 @@ export class DemoDataGeneratorService {
       prisma.deal.findMany({ where: { companyId } }),
     ]);
 
+    const mainAccount = accounts.find(
+      (a) => a.name === 'Расчетный счет в банке'
+    );
+    const cashAccount = accounts.find((a) => a.name === 'Касса');
+
+    if (!mainAccount) {
+      logger.warn('Main account not found, skipping operations generation');
+      return;
+    }
+
     const operations = [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
 
-    // Генерируем доходы
-    for (let i = 0; i < 20; i++) {
-      const date = new Date(2025, 0, 1);
-      date.setDate(date.getDate() + i * 15);
-      const revenueArticle = articles.find((a) => a.name === 'Выручка');
-      const revenueAccount = accounts.find((a) => a.name === 'Выручка');
-      const client = counterparties.find((c) => c.category === 'customer');
-      const deal = deals[Math.floor(Math.random() * deals.length)];
+    // Генерируем операции за последние 6 месяцев
+    for (let monthOffset = 5; monthOffset >= 0; monthOffset--) {
+      const month = currentMonth - monthOffset;
+      const year = currentYear + Math.floor(month / 12);
+      const actualMonth = ((month % 12) + 12) % 12;
 
-      if (revenueArticle && revenueAccount && client) {
-        operations.push({
-          companyId,
-          accountId: revenueAccount.id,
-          articleId: revenueArticle.id,
-          counterpartyId: client.id,
-          dealId: deal?.id,
-          amount: Math.floor(Math.random() * 500000) + 100000,
-          operationDate: date,
-          type: 'income',
-          description: `Продажа товаров/услуг ${i + 1}`,
-        });
+      // Доходы (2-3 в месяц)
+      const revenueArticle = articles.find(
+        (a) => a.name === 'Выручка от продаж'
+      );
+      const customers = counterparties.filter((c) => c.category === 'customer');
+      const mainDeal = deals.find((d) => d.name === 'Проект А');
+
+      for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+        const day = 5 + Math.floor(Math.random() * 20);
+        const date = new Date(year, actualMonth, day);
+        const customer =
+          customers[Math.floor(Math.random() * customers.length)];
+
+        if (revenueArticle && customer) {
+          const baseAmount = 150000 + monthOffset * 20000; // Растущий доход
+          const amount = baseAmount + Math.floor(Math.random() * 100000);
+
+          operations.push({
+            companyId,
+            accountId: mainAccount.id,
+            articleId: revenueArticle.id,
+            counterpartyId: customer.id,
+            dealId: mainDeal?.id,
+            amount,
+            operationDate: date,
+            type: 'income',
+            currency: 'RUB',
+            description: `Оплата за товары/услуги от ${customer.name}`,
+          });
+        }
       }
-    }
 
-    // Генерируем расходы
-    for (let i = 0; i < 15; i++) {
-      const date = new Date(2025, 0, 5);
-      date.setDate(date.getDate() + i * 20);
-      const expenseArticle = articles.find((a) => a.name === 'Расходы');
-      const expenseAccount = accounts.find((a) => a.name === 'Расходы');
-      const supplier = counterparties.find((c) => c.category === 'supplier');
+      // Зарплата (ежемесячно, 5-е число)
+      const salaryArticle = articles.find((a) => a.name === 'Зарплата');
+      const employees = counterparties.filter((c) => c.category === 'employee');
 
-      if (expenseArticle && expenseAccount && supplier) {
+      if (salaryArticle && employees.length > 0) {
+        const salaryDate = new Date(year, actualMonth, 5);
+        const totalSalary = employees.length * 50000;
+
         operations.push({
           companyId,
-          accountId: expenseAccount.id,
-          articleId: expenseArticle.id,
-          counterpartyId: supplier.id,
-          amount: Math.floor(Math.random() * 200000) + 50000,
-          operationDate: date,
+          accountId: mainAccount.id,
+          articleId: salaryArticle.id,
+          counterpartyId: employees[0].id,
+          amount: totalSalary,
+          operationDate: salaryDate,
           type: 'expense',
-          description: `Закупка материалов ${i + 1}`,
+          currency: 'RUB',
+          description: 'Выплата заработной платы сотрудникам',
         });
       }
-    }
 
-    // Генерируем переводы
-    for (let i = 0; i < 5; i++) {
-      const date = new Date(2025, 0, 10);
-      date.setDate(date.getDate() + i * 30);
-      const cashAccount = accounts.find((a) => a.name === 'Касса');
-      const bankAccount = accounts.find((a) => a.name === 'Расчетный счет');
+      // Аренда офиса (ежемесячно, 10-е число)
+      const rentArticle = articles.find((a) => a.name === 'Аренда офиса');
+      const suppliers = counterparties.filter((c) => c.category === 'supplier');
 
-      if (cashAccount && bankAccount) {
+      if (rentArticle && suppliers.length > 0) {
+        const rentDate = new Date(year, actualMonth, 10);
+        const supplier = suppliers[0];
+
         operations.push({
           companyId,
-          accountId: bankAccount.id,
-          amount: Math.floor(Math.random() * 100000) + 20000,
-          operationDate: date,
-          type: 'transfer',
-          description: `Перевод в кассу ${i + 1}`,
+          accountId: mainAccount.id,
+          articleId: rentArticle.id,
+          counterpartyId: supplier.id,
+          amount: 25000,
+          operationDate: rentDate,
+          type: 'expense',
+          currency: 'RUB',
+          description: 'Арендная плата за офисное помещение',
         });
+      }
+
+      // Коммунальные услуги (ежемесячно, 12-е число)
+      const utilitiesArticle = articles.find(
+        (a) => a.name === 'Коммунальные услуги'
+      );
+
+      if (utilitiesArticle && suppliers.length > 0) {
+        const utilitiesDate = new Date(year, actualMonth, 12);
+        const amount = 8000 + Math.floor(Math.random() * 4000);
+
+        operations.push({
+          companyId,
+          accountId: mainAccount.id,
+          articleId: utilitiesArticle.id,
+          counterpartyId: suppliers[0].id,
+          amount,
+          operationDate: utilitiesDate,
+          type: 'expense',
+          currency: 'RUB',
+          description: 'Оплата коммунальных услуг',
+        });
+      }
+
+      // Маркетинг (1-2 раза в месяц)
+      const marketingArticle = articles.find(
+        (a) => a.name === 'Реклама и маркетинг'
+      );
+
+      if (marketingArticle && suppliers.length > 0) {
+        const count = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+          const day = 15 + Math.floor(Math.random() * 10);
+          const date = new Date(year, actualMonth, day);
+          const amount = 15000 + Math.floor(Math.random() * 20000);
+
+          operations.push({
+            companyId,
+            accountId: mainAccount.id,
+            articleId: marketingArticle.id,
+            counterpartyId: suppliers[0].id,
+            amount,
+            operationDate: date,
+            type: 'expense',
+            currency: 'RUB',
+            description: 'Расходы на рекламу и маркетинг',
+          });
+        }
+      }
+
+      // Закупка товаров (2-3 раза в месяц)
+      const cogsArticle = articles.find((a) => a.name === 'Закупка товаров');
+
+      if (cogsArticle && suppliers.length > 0) {
+        const count = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+          const day = 5 + Math.floor(Math.random() * 20);
+          const date = new Date(year, actualMonth, day);
+          const baseAmount = 30000 + monthOffset * 5000;
+          const amount = baseAmount + Math.floor(Math.random() * 30000);
+          const supplier =
+            suppliers[Math.floor(Math.random() * suppliers.length)];
+
+          operations.push({
+            companyId,
+            accountId: mainAccount.id,
+            articleId: cogsArticle.id,
+            counterpartyId: supplier.id,
+            amount,
+            operationDate: date,
+            type: 'expense',
+            currency: 'RUB',
+            description: `Закупка товаров у ${supplier.name}`,
+          });
+        }
+      }
+
+      // Налоги (ежемесячно, 28-е число)
+      const taxArticle = articles.find((a) => a.name === 'Налог на прибыль');
+      const gov = counterparties.find((c) => c.name === 'ФНС России');
+
+      if (taxArticle && gov) {
+        const taxDate = new Date(year, actualMonth, 28);
+        const baseTax = 12000 + monthOffset * 2000;
+        const amount = baseTax + Math.floor(Math.random() * 5000);
+
+        operations.push({
+          companyId,
+          accountId: mainAccount.id,
+          articleId: taxArticle.id,
+          counterpartyId: gov.id,
+          amount,
+          operationDate: taxDate,
+          type: 'expense',
+          currency: 'RUB',
+          description: 'Уплата налога на прибыль',
+        });
+      }
+
+      // Квартальные налоги (каждый 3-й месяц, 15-е число)
+      if (actualMonth % 3 === 2) {
+        const ndflArticle = articles.find((a) => a.name === 'НДФЛ');
+
+        if (ndflArticle && gov) {
+          const ndflDate = new Date(year, actualMonth, 15);
+          const amount = 15000 + Math.floor(Math.random() * 10000);
+
+          operations.push({
+            companyId,
+            accountId: mainAccount.id,
+            articleId: ndflArticle.id,
+            counterpartyId: gov.id,
+            amount,
+            operationDate: ndflDate,
+            type: 'expense',
+            currency: 'RUB',
+            description: 'Уплата НДФЛ',
+          });
+        }
+      }
+
+      // Проценты по кредитам (ежемесячно, 15-е число)
+      const loanArticle = articles.find(
+        (a) => a.name === 'Проценты по кредитам'
+      );
+      const bank = counterparties.find((c) => c.name === 'ООО "Банк"');
+
+      if (loanArticle && bank) {
+        const loanDate = new Date(year, actualMonth, 15);
+
+        operations.push({
+          companyId,
+          accountId: mainAccount.id,
+          articleId: loanArticle.id,
+          counterpartyId: bank.id,
+          amount: 15000,
+          operationDate: loanDate,
+          type: 'expense',
+          currency: 'RUB',
+          description: 'Проценты по банковскому кредиту',
+        });
+      }
+
+      // Инвестиции (раз в 2-3 месяца)
+      if (monthOffset % 2 === 0 || Math.random() > 0.5) {
+        const equipmentArticle = articles.find(
+          (a) => a.name === 'Покупка оборудования'
+        );
+
+        if (equipmentArticle && suppliers.length > 0) {
+          const day = 10 + Math.floor(Math.random() * 10);
+          const date = new Date(year, actualMonth, day);
+          const amount = 80000 + Math.floor(Math.random() * 70000);
+
+          operations.push({
+            companyId,
+            accountId: mainAccount.id,
+            articleId: equipmentArticle.id,
+            counterpartyId: suppliers[0].id,
+            amount,
+            operationDate: date,
+            type: 'expense',
+            currency: 'RUB',
+            description: 'Покупка оборудования',
+          });
+        }
+      }
+
+      // Переводы в кассу (1-2 раза в месяц)
+      if (cashAccount) {
+        const count = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < count; i++) {
+          const day = 5 + Math.floor(Math.random() * 20);
+          const date = new Date(year, actualMonth, day);
+          const amount = 10000 + Math.floor(Math.random() * 20000);
+
+          operations.push({
+            companyId,
+            sourceAccountId: mainAccount.id,
+            targetAccountId: cashAccount.id,
+            amount,
+            operationDate: date,
+            type: 'transfer',
+            currency: 'RUB',
+            description: 'Снятие наличных в кассу',
+          });
+        }
       }
     }
 
@@ -111,119 +326,234 @@ export class DemoDataGeneratorService {
       prisma.counterparty.findMany({ where: { companyId } }),
     ]);
 
-    const plans = [];
-
-    // План доходов
-    const revenueArticle = articles.find((a) => a.name === 'Выручка');
-    const revenueAccount = accounts.find((a) => a.name === 'Выручка');
-    const client = counterparties.find((c) => c.category === 'customer');
-
-    if (revenueArticle && revenueAccount && client) {
-      plans.push({
-        companyId,
-        name: 'План доходов на 2025',
-        description: 'Планируемые доходы на год',
-        startDate: new Date(2025, 0, 1),
-        endDate: new Date(2025, 11, 31),
-        items: {
-          create: [
-            {
-              companyId,
-              accountId: revenueAccount.id,
-              articleId: revenueArticle.id,
-              counterpartyId: client.id,
-              amount: 5000000,
-              type: 'income',
-            },
-          ],
-        },
-      });
+    const mainAccount = accounts.find(
+      (a) => a.name === 'Расчетный счет в банке'
+    );
+    if (!mainAccount) {
+      logger.warn('Main account not found, skipping plans generation');
+      return;
     }
 
-    // План расходов
-    const expenseArticle = articles.find((a) => a.name === 'Расходы');
-    const expenseAccount = accounts.find((a) => a.name === 'Расходы');
-    const supplier = counterparties.find((c) => c.category === 'supplier');
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const startDate = new Date(currentYear, 0, 1);
+    const endDate = new Date(currentYear, 11, 31);
 
-    if (expenseArticle && expenseAccount && supplier) {
-      plans.push({
+    // Создаем бюджет на текущий год
+    const budget = await prisma.budget.create({
+      data: {
         companyId,
-        name: 'План расходов на 2025',
-        description: 'Планируемые расходы на год',
-        startDate: new Date(2025, 0, 1),
-        endDate: new Date(2025, 11, 31),
-        items: {
-          create: [
-            {
-              companyId,
-              accountId: expenseAccount.id,
-              articleId: expenseArticle.id,
-              counterpartyId: supplier.id,
-              amount: 3000000,
-              type: 'expense',
-            },
-          ],
-        },
-      });
-    }
-
-    // Plans are not supported in current schema, skip for now
-    // for (const plan of plans) {
-    //   await prisma.plan.create({
-    //     data: {
-    //       companyId: plan.companyId,
-    //       name: plan.name,
-    //       description: plan.description,
-    //       startDate: plan.startDate,
-    //       endDate: plan.endDate,
-    //       items: plan.items,
-    //     },
-    //   });
-    // }
-
-    logger.info('Demo plans created', { count: plans.length, companyId });
-  }
-
-  /**
-   * Создает демо-зарплаты
-   */
-  private async createSampleSalaries(companyId: string): Promise<void> {
-    const departments = await prisma.department.findMany({
-      where: { companyId },
+        name: `Бюджет ${currentYear} года`,
+        startDate,
+        endDate,
+        status: 'active',
+      },
     });
 
-    const salaries = [];
+    logger.info('Demo budget created', {
+      budgetId: budget.id,
+      companyId,
+      name: budget.name,
+    });
 
-    for (let i = 0; i < 10; i++) {
-      const department =
-        departments[Math.floor(Math.random() * departments.length)];
+    const plans = [];
 
-      // Создаем сотрудника как контрагента
-      const employee = await prisma.counterparty.create({
+    // План доходов (ежемесячно)
+    const revenueArticle = articles.find((a) => a.name === 'Выручка от продаж');
+    const customer = counterparties.find((c) => c.category === 'customer');
+
+    if (revenueArticle && customer) {
+      plans.push({
+        companyId,
+        type: 'income',
+        startDate,
+        endDate,
+        amount: 400000,
+        currency: 'RUB',
+        articleId: revenueArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Плановая ежемесячная выручка',
+      });
+    }
+
+    // План зарплаты (ежемесячно)
+    const salaryArticle = articles.find((a) => a.name === 'Зарплата');
+    const employee = counterparties.find((c) => c.category === 'employee');
+
+    if (salaryArticle && employee) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 150000,
+        currency: 'RUB',
+        articleId: salaryArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячная выплата заработной платы',
+      });
+    }
+
+    // План аренды (ежемесячно)
+    const rentArticle = articles.find((a) => a.name === 'Аренда офиса');
+    const supplier = counterparties.find((c) => c.category === 'supplier');
+
+    if (rentArticle && supplier) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 25000,
+        currency: 'RUB',
+        articleId: rentArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячная арендная плата',
+      });
+    }
+
+    // План коммунальных услуг (ежемесячно)
+    const utilitiesArticle = articles.find(
+      (a) => a.name === 'Коммунальные услуги'
+    );
+
+    if (utilitiesArticle) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 10000,
+        currency: 'RUB',
+        articleId: utilitiesArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячные коммунальные услуги',
+      });
+    }
+
+    // План маркетинга (ежемесячно)
+    const marketingArticle = articles.find(
+      (a) => a.name === 'Реклама и маркетинг'
+    );
+
+    if (marketingArticle) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 30000,
+        currency: 'RUB',
+        articleId: marketingArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячные расходы на маркетинг',
+      });
+    }
+
+    // План закупок (ежемесячно)
+    const cogsArticle = articles.find((a) => a.name === 'Закупка товаров');
+
+    if (cogsArticle) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 50000,
+        currency: 'RUB',
+        articleId: cogsArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячные закупки товаров',
+      });
+    }
+
+    // План налогов (ежемесячно)
+    const taxArticle = articles.find((a) => a.name === 'Налог на прибыль');
+    const gov = counterparties.find((c) => c.name === 'ФНС России');
+
+    if (taxArticle && gov) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 20000,
+        currency: 'RUB',
+        articleId: taxArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'monthly',
+        status: 'active',
+        description: 'Ежемесячные налоги',
+      });
+    }
+
+    // Квартальные налоги
+    const ndflArticle = articles.find((a) => a.name === 'НДФЛ');
+
+    if (ndflArticle && gov) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 50000,
+        currency: 'RUB',
+        articleId: ndflArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'quarterly',
+        status: 'active',
+        description: 'Квартальный НДФЛ',
+      });
+    }
+
+    // Годовые инвестиции
+    const equipmentArticle = articles.find(
+      (a) => a.name === 'Покупка оборудования'
+    );
+
+    if (equipmentArticle && supplier) {
+      plans.push({
+        companyId,
+        type: 'expense',
+        startDate,
+        endDate,
+        amount: 500000,
+        currency: 'RUB',
+        articleId: equipmentArticle.id,
+        accountId: mainAccount.id,
+        repeat: 'annual',
+        status: 'active',
+        description: 'Годовые инвестиции в оборудование',
+      });
+    }
+
+    // Создаем планы и связываем их с бюджетом
+    for (const plan of plans) {
+      await prisma.planItem.create({
         data: {
-          companyId,
-          name: `Сотрудник ${i + 1}`,
-          category: 'employee',
+          ...plan,
+          budgetId: budget.id,
         },
       });
-
-      salaries.push({
-        companyId,
-        employeeCounterpartyId: employee.id,
-        departmentId: department?.id,
-        baseWage: Math.floor(Math.random() * 100000) + 50000,
-        effectiveFrom: new Date(2025, 0, 1),
-        effectiveTo: new Date(2025, 11, 31),
-      });
     }
 
-    if (salaries.length > 0) {
-      await prisma.salary.createMany({ data: salaries });
-      logger.info('Demo salaries created', {
-        count: salaries.length,
-        companyId,
-      });
-    }
+    logger.info('Demo plans created', {
+      count: plans.length,
+      companyId,
+      budgetId: budget.id,
+    });
   }
 }
 
