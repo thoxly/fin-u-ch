@@ -1,5 +1,9 @@
 import prisma from '../../../config/db';
-import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
+import {
+  getMonthKey,
+  getMonthsBetween,
+  CashflowBreakdown,
+} from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import articlesService from '../../catalogs/articles/articles.service';
 import logger from '../../../config/logger';
@@ -10,6 +14,7 @@ export interface CashflowParams {
   activity?: string;
   rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
   parentArticleId?: string; // ID родительской статьи для суммирования по потомкам
+  breakdown?: CashflowBreakdown; // Разрез отчета: по видам деятельности, сделкам, счетам, подразделениям, контрагентам
 }
 
 // Internal aggregation row
@@ -41,6 +46,8 @@ interface ArticleGroup {
 
 interface ActivityGroup {
   activity: 'operating' | 'investing' | 'financing' | 'unknown';
+  key?: string; // ID сделки/счета/подразделения/контрагента
+  name?: string; // Название сделки/счета/подразделения/контрагента
   incomeGroups: ArticleGroup[];
   expenseGroups: ArticleGroup[];
   totalIncome: number;
@@ -51,6 +58,7 @@ interface ActivityGroup {
 interface CashflowReport {
   periodFrom: string;
   periodTo: string;
+  breakdown?: CashflowBreakdown;
   activities: ActivityGroup[];
 }
 
@@ -60,6 +68,7 @@ export class CashflowService {
     params: CashflowParams
   ): Promise<CashflowReport> {
     const startTime = Date.now();
+    const breakdown = params.breakdown || 'activity';
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
 
     logger.debug('Cashflow report generation started', {
@@ -70,6 +79,7 @@ export class CashflowService {
         activity: params.activity,
         rounding: params.rounding,
         parentArticleId: params.parentArticleId,
+        breakdown,
       },
     });
 
@@ -99,28 +109,64 @@ export class CashflowService {
       periodFrom: params.periodFrom.toISOString(),
       periodTo: params.periodTo.toISOString(),
       articleIdsFilter: articleIdsFilter?.length || 0,
+      breakdown,
     });
 
+    // Определяем, какие связи нужно включить в зависимости от разреза
+    const includeRelations: any = {
+      article: {
+        select: { id: true, name: true, activity: true, type: true },
+      },
+    };
+
+    if (breakdown === 'deal') {
+      includeRelations.deal = {
+        select: { id: true, name: true },
+      };
+    } else if (breakdown === 'account') {
+      includeRelations.account = {
+        select: { id: true, name: true },
+      };
+    } else if (breakdown === 'department') {
+      includeRelations.department = {
+        select: { id: true, name: true },
+      };
+    } else if (breakdown === 'counterparty') {
+      includeRelations.counterparty = {
+        select: { id: true, name: true },
+      };
+    }
+
+    // Формируем фильтр для операций в зависимости от разреза
+    const whereClause: any = {
+      companyId,
+      operationDate: {
+        gte: params.periodFrom,
+        lte: params.periodTo,
+      },
+      type: { in: ['income', 'expense'] },
+      isConfirmed: true,
+      isTemplate: false,
+      // Если указан parentArticleId, фильтруем по статье и её потомкам
+      ...(articleIdsFilter && {
+        articleId: { in: articleIdsFilter },
+      }),
+    };
+
+    // Фильтруем операции по наличию нужного атрибута для разрезов
+    if (breakdown === 'deal') {
+      whereClause.dealId = { not: null };
+    } else if (breakdown === 'account') {
+      whereClause.accountId = { not: null };
+    } else if (breakdown === 'department') {
+      whereClause.departmentId = { not: null };
+    } else if (breakdown === 'counterparty') {
+      whereClause.counterpartyId = { not: null };
+    }
+
     const operations = await prisma.operation.findMany({
-      where: {
-        companyId,
-        operationDate: {
-          gte: params.periodFrom,
-          lte: params.periodTo,
-        },
-        type: { in: ['income', 'expense'] },
-        isConfirmed: true,
-        isTemplate: false,
-        // Если указан parentArticleId, фильтруем по статье и её потомкам
-        ...(articleIdsFilter && {
-          articleId: { in: articleIdsFilter },
-        }),
-      },
-      include: {
-        article: {
-          select: { id: true, name: true, activity: true, type: true },
-        },
-      },
+      where: whereClause,
+      include: includeRelations,
     });
 
     logger.debug('Operations fetched for cashflow report', {
@@ -323,62 +369,233 @@ export class CashflowService {
 
     const sortedRootArticles = sortArticles(rootArticles);
 
-    // Группируем по активностям
-    // В incomeGroups/expenseGroups попадают только корневые статьи (без родителей)
-    const byActivity: Map<string, ActivityGroup> = new Map();
+    // Группируем по выбранному разрезу
+    const byBreakdown: Map<string, ActivityGroup> = new Map();
 
-    for (const rootArticle of sortedRootArticles) {
-      const articleData = articleDataMap.get(rootArticle.articleId);
-      if (!articleData) continue;
+    if (breakdown === 'activity') {
+      // Текущая логика группировки по активностям
+      for (const rootArticle of sortedRootArticles) {
+        const articleData = articleDataMap.get(rootArticle.articleId);
+        if (!articleData) continue;
 
-      const activity = (articleData.activity ||
-        'unknown') as ActivityGroup['activity'];
+        const activity = (articleData.activity ||
+          'unknown') as ActivityGroup['activity'];
 
-      // Если указан фильтр по активности, пропускаем статьи с другой активностью
-      // Но включаем их, если они являются родителями или потомками статей с нужной активностью
-      // (это уже учтено при фильтрации операций выше)
-      if (params.activity && articleData.activity !== params.activity) {
-        // Проверяем, есть ли у этой статьи операции (hasOperations)
-        // Если нет операций, значит это родительская/дочерняя статья, и мы её включаем
-        // Если есть операции, но активность не совпадает, пропускаем
-        if (rootArticle.hasOperations) {
-          continue;
+        // Если указан фильтр по активности, пропускаем статьи с другой активностью
+        // Но включаем их, если они являются родителями или потомками статей с нужной активностью
+        // (это уже учтено при фильтрации операций выше)
+        if (params.activity && articleData.activity !== params.activity) {
+          // Проверяем, есть ли у этой статьи операции (hasOperations)
+          // Если нет операций, значит это родительская/дочерняя статья, и мы её включаем
+          // Если есть операции, но активность не совпадает, пропускаем
+          if (rootArticle.hasOperations) {
+            continue;
+          }
+        }
+
+        if (!byBreakdown.has(activity)) {
+          byBreakdown.set(activity, {
+            activity,
+            incomeGroups: [],
+            expenseGroups: [],
+            totalIncome: 0,
+            totalExpense: 0,
+            netCashflow: 0,
+          });
+        }
+
+        const group = byBreakdown.get(activity)!;
+
+        if (rootArticle.type === 'income') {
+          group.incomeGroups.push(rootArticle);
+          group.totalIncome += rootArticle.total;
+        } else if (rootArticle.type === 'expense') {
+          group.expenseGroups.push(rootArticle);
+          group.totalExpense += rootArticle.total;
         }
       }
+    } else {
+      // Группировка по другим разрезам (deal, account, department, counterparty)
+      // Сначала группируем операции по выбранному разрезу
+      const operationsByBreakdown = new Map<
+        string,
+        { id: string; name: string; operations: typeof filteredOperations }
+      >();
 
-      if (!byActivity.has(activity)) {
-        byActivity.set(activity, {
-          activity,
-          incomeGroups: [],
-          expenseGroups: [],
-          totalIncome: 0,
-          totalExpense: 0,
-          netCashflow: 0,
-        });
+      for (const op of filteredOperations) {
+        if (!op.article) continue;
+
+        let breakdownKey: string | null = null;
+        let breakdownName: string | null = null;
+
+        if (breakdown === 'deal' && op.dealId && op.deal) {
+          breakdownKey = op.dealId;
+          breakdownName = op.deal.name;
+        } else if (breakdown === 'account' && op.accountId && op.account) {
+          breakdownKey = op.accountId;
+          breakdownName = op.account.name;
+        } else if (
+          breakdown === 'department' &&
+          op.departmentId &&
+          op.department
+        ) {
+          breakdownKey = op.departmentId;
+          breakdownName = op.department.name;
+        } else if (
+          breakdown === 'counterparty' &&
+          op.counterpartyId &&
+          op.counterparty
+        ) {
+          breakdownKey = op.counterpartyId;
+          breakdownName = op.counterparty.name;
+        }
+
+        if (!breakdownKey || !breakdownName) continue;
+
+        if (!operationsByBreakdown.has(breakdownKey)) {
+          operationsByBreakdown.set(breakdownKey, {
+            id: breakdownKey,
+            name: breakdownName,
+            operations: [],
+          });
+        }
+
+        operationsByBreakdown.get(breakdownKey)!.operations.push(op);
       }
 
-      const group = byActivity.get(activity)!;
+      // Для каждого значения разреза создаем группу и агрегируем статьи
+      for (const [breakdownKey, breakdownData] of operationsByBreakdown) {
+        // Агрегируем операции по статьям для этого разреза
+        const breakdownOperationsByArticle = new Map<string, CashflowRow>();
 
-      if (rootArticle.type === 'income') {
-        group.incomeGroups.push(rootArticle);
-        group.totalIncome += rootArticle.total;
-      } else if (rootArticle.type === 'expense') {
-        group.expenseGroups.push(rootArticle);
-        group.totalExpense += rootArticle.total;
+        for (const op of breakdownData.operations) {
+          if (!op.article) continue;
+
+          const articleId = op.article.id;
+          const articleData = articleDataMap.get(articleId);
+          if (!articleData) continue;
+
+          if (!breakdownOperationsByArticle.has(articleId)) {
+            breakdownOperationsByArticle.set(articleId, {
+              articleId: articleData.id,
+              articleName: articleData.name,
+              activity: articleData.activity || 'unknown',
+              type: articleData.type,
+              months: Object.fromEntries(months.map((m) => [m, 0])),
+              total: 0,
+            });
+          }
+
+          const row = breakdownOperationsByArticle.get(articleId)!;
+          const month = getMonthKey(new Date(op.operationDate));
+          if (row.months[month] !== undefined) {
+            row.months[month] += op.amount;
+            row.total += op.amount;
+          }
+        }
+
+        // Создаем ArticleGroup для этого разреза, используя уже полученные allArticles
+        const breakdownArticleGroupMap = new Map<string, ArticleGroup>();
+
+        for (const articleData of allArticles) {
+          const operationsData = breakdownOperationsByArticle.get(
+            articleData.id
+          );
+          const hasOps = operationsData !== undefined;
+
+          const monthsData: MonthlyData[] = months.map((m) => ({
+            month: m,
+            amount: applyRounding(operationsData?.months[m] || 0),
+          }));
+
+          breakdownArticleGroupMap.set(articleData.id, {
+            articleId: articleData.id,
+            articleName: articleData.name,
+            type: articleData.type as 'income' | 'expense',
+            months: monthsData,
+            total: applyRounding(operationsData?.total || 0),
+            parentId: articleData.parentId,
+            hasOperations: hasOps,
+            children: [],
+          });
+        }
+
+        // Строим иерархию
+        const breakdownRootArticles: ArticleGroup[] = [];
+
+        for (const articleGroup of breakdownArticleGroupMap.values()) {
+          if (
+            articleGroup.parentId &&
+            breakdownArticleGroupMap.has(articleGroup.parentId)
+          ) {
+            const parent = breakdownArticleGroupMap.get(articleGroup.parentId)!;
+            if (!parent.children) {
+              parent.children = [];
+            }
+            parent.children.push(articleGroup);
+          } else {
+            breakdownRootArticles.push(articleGroup);
+          }
+        }
+
+        // Агрегируем от детей к родителям
+        for (const rootArticle of breakdownRootArticles) {
+          aggregateFromChildren(rootArticle);
+        }
+
+        // Сортируем статьи
+        const sortedBreakdownArticles = sortArticles(breakdownRootArticles);
+
+        // Разделяем на доходы и расходы
+        const incomeGroups: ArticleGroup[] = [];
+        const expenseGroups: ArticleGroup[] = [];
+        let totalIncome = 0;
+        let totalExpense = 0;
+
+        for (const article of sortedBreakdownArticles) {
+          if (article.type === 'income') {
+            incomeGroups.push(article);
+            totalIncome += article.total;
+          } else if (article.type === 'expense') {
+            expenseGroups.push(article);
+            totalExpense += article.total;
+          }
+        }
+
+        byBreakdown.set(breakdownKey, {
+          activity: 'unknown', // Для не-activity разрезов используем 'unknown'
+          key: breakdownData.id,
+          name: breakdownData.name,
+          incomeGroups,
+          expenseGroups,
+          totalIncome: applyRounding(totalIncome),
+          totalExpense: applyRounding(totalExpense),
+          netCashflow: applyRounding(totalIncome - totalExpense),
+        });
       }
     }
 
     // Finalize net values and optional rounding for totals
-    const activities = Array.from(byActivity.values()).map((g) => ({
+    const activities = Array.from(byBreakdown.values()).map((g) => ({
       ...g,
       totalIncome: applyRounding(g.totalIncome),
       totalExpense: applyRounding(g.totalExpense),
       netCashflow: applyRounding(g.totalIncome - g.totalExpense),
     }));
 
+    // Сортируем группы по имени для не-activity разрезов
+    if (breakdown !== 'activity') {
+      activities.sort((a, b) => {
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB);
+      });
+    }
+
     const response: CashflowReport = {
       periodFrom: params.periodFrom.toISOString().slice(0, 10),
       periodTo: params.periodTo.toISOString().slice(0, 10),
+      breakdown,
       activities,
     };
 
