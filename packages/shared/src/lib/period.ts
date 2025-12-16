@@ -227,18 +227,6 @@ export const createIntervals = (
   const intervals: Interval[] = [];
 
   // Вычисляем общее количество дней в периоде
-<<<<<<< HEAD
-  // ВАЖНО: Нормализуем даты для корректного вычисления
-  const fromDateNormalized = new Date(
-    fromDate.getFullYear(),
-    fromDate.getMonth(),
-    fromDate.getDate()
-  );
-  const toDateNormalized = new Date(
-    toDate.getFullYear(),
-    toDate.getMonth(),
-    toDate.getDate()
-=======
   // ВАЖНО: Нормализуем даты для корректного вычисления (используем UTC для согласованности)
   const fromDateNormalized = new Date(
     Date.UTC(
@@ -249,7 +237,6 @@ export const createIntervals = (
   );
   const toDateNormalized = new Date(
     Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), toDate.getUTCDate())
->>>>>>> 1af8208
   );
   const totalDays =
     Math.ceil(
@@ -257,15 +244,9 @@ export const createIntervals = (
         (1000 * 60 * 60 * 24)
     ) + 1;
 
-  // Определяем оптимальное количество интервалов для визуализации
-  // Учитываем periodFormat для правильного создания интервалов
+  // Определяем оптимальное количество интервалов для визуализации (5-12 точек)
   let targetIntervals: number;
 
-<<<<<<< HEAD
-  // Если periodFormat = 'day' или 'week', всегда создаем интервалы по дням
-  if (periodFormat === 'day' || periodFormat === 'week') {
-    targetIntervals = totalDays;
-=======
   // Если periodFormat = 'day' или 'week', создаем интервалы по дням
   // НО если период слишком большой (>31 день), автоматически переключаемся на месячные интервалы
   if (periodFormat === 'day' || periodFormat === 'week') {
@@ -280,12 +261,11 @@ export const createIntervals = (
     } else {
       targetIntervals = totalDays;
     }
->>>>>>> 1af8208
   } else if (totalDays <= 7) {
     // Меньше недели - каждый день
     targetIntervals = totalDays;
   } else if (totalDays <= 31) {
-    // До месяца - каждый день (даже если periodFormat = 'month', для графика нужны дневные интервалы)
+    // До месяца - каждый день
     targetIntervals = totalDays;
   } else if (totalDays <= 90) {
     // До квартала - показываем месяцы
@@ -322,11 +302,7 @@ export const createIntervals = (
   // Для периода 90-365 дней делим по месяцам
   // ВАЖНО: Проверяем строго больше 31, чтобы для 31 дня создавались дневные интервалы
   if (totalDays > 31 && totalDays >= 90 && totalDays <= 365) {
-<<<<<<< HEAD
-    const monthDate = new Date(fromDate);
-=======
     const monthDate = new Date(fromDateNormalized);
->>>>>>> 1af8208
 
     while (monthDate <= toDateNormalized && intervalCount < targetIntervals) {
       // Начало месяца (используем UTC для согласованности)
@@ -373,111 +349,6 @@ export const createIntervals = (
     // Создаем интервал для каждого дня
     // ВАЖНО: Используем нормализованные даты
     const dayDate = new Date(fromDateNormalized);
-<<<<<<< HEAD
-    const toDateEnd = new Date(
-      toDateNormalized.getFullYear(),
-      toDateNormalized.getMonth(),
-      toDateNormalized.getDate(),
-      23,
-      59,
-      59,
-      999
-    );
-
-    // Создаем интервалы для каждого дня в периоде
-    // ВАЖНО: Создаем ровно totalDays интервалов
-    for (let dayCount = 0; dayCount < totalDays; dayCount++) {
-      const start = new Date(
-        dayDate.getFullYear(),
-        dayDate.getMonth(),
-        dayDate.getDate(),
-        0,
-        0,
-        0,
-        0
-      );
-      const end = new Date(
-        dayDate.getFullYear(),
-        dayDate.getMonth(),
-        dayDate.getDate(),
-        23,
-        59,
-        59,
-        999
-      );
-
-      // Если это последний день, используем toDate
-      if (end > toDateEnd) {
-        end.setTime(toDateEnd.getTime());
-      }
-
-      intervals.push({
-        start,
-        end,
-        label: formatIntervalLabel(start, end, 'day'),
-      });
-
-      // Переходим к следующему дню
-      dayDate.setDate(dayDate.getDate() + 1);
-    }
-  } else {
-    // Для интервалов больше одного дня
-    while (current <= toDate && intervalCount < targetIntervals) {
-      const start = new Date(current);
-      start.setHours(0, 0, 0, 0);
-      let end = new Date(current);
-
-      // Для последнего интервала берем toDate
-      if (intervalCount === targetIntervals - 1) {
-        end = new Date(toDate);
-        end.setHours(23, 59, 59, 999);
-      } else {
-        // Устанавливаем конец интервала: если stepDays = 1, то это конец текущего дня
-        // Если stepDays > 1, то это конец последнего дня в интервале
-        end.setDate(end.getDate() + stepDays - 1);
-        end.setHours(23, 59, 59, 999);
-        if (end > toDate) {
-          end = new Date(toDate);
-          end.setHours(23, 59, 59, 999);
-        }
-      }
-
-      // Определяем формат для лейбла в зависимости от размера интервала
-      const intervalDays =
-        Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
-        1;
-      let labelFormat: PeriodFormat = 'day';
-
-      if (intervalDays <= 3) {
-        labelFormat = 'day';
-      } else if (intervalDays <= 14) {
-        labelFormat = 'week';
-      } else if (intervalDays <= 45) {
-        labelFormat = 'month';
-      } else if (intervalDays <= 120) {
-        labelFormat = 'quarter';
-      } else {
-        labelFormat = 'year';
-      }
-
-      intervals.push({
-        start,
-        end,
-        label: formatIntervalLabel(start, end, labelFormat),
-      });
-
-      // Переходим к следующему интервалу
-      current = new Date(end);
-      current.setDate(current.getDate() + 1);
-      intervalCount++;
-    }
-  }
-
-  // Убеждаемся, что последний интервал охватывает toDate
-  if (intervals.length > 0) {
-    const lastInterval = intervals[intervals.length - 1];
-    if (lastInterval.end < toDate) {
-=======
 
     // Создаем интервалы для каждого дня в периоде
     // ВАЖНО: Создаем ровно totalDays интервалов
@@ -508,7 +379,6 @@ export const createIntervals = (
         )
       );
 
->>>>>>> 1af8208
       intervals.push({
         start,
         end,
