@@ -132,6 +132,22 @@ model Company {
   @@map("companies")
 }
 
+model PromoCode {
+  id           String           @id @default(uuid())
+  code         String           @unique
+  plan         SubscriptionPlan
+  durationDays Int? // Длительность триала/подписки (null = вечно)
+  maxUsages    Int? // Лимит использования (null = безлимит)
+  usedCount    Int              @default(0)
+  isActive     Boolean          @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([code])
+  @@index([isActive, expiresAt])
+  @@map("promo_codes")
+}
+
 model Subscription {
   id          String             @id @default(uuid())
   companyId   String             @unique

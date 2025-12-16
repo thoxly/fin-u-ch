@@ -438,10 +438,10 @@ export class UsersService {
       // Удаляем элементы плана
       await tx.planItem.deleteMany({ where: { companyId } });
 
-      // Удаляем зарплаты
+      // Удаляем зарплаты - DEPRECATED
 
-      // Удаляем интеграции
-      await tx.integration.deleteMany({ where: { companyId } });
+      // Удаляем интеграции - DEPRECATED (Integration model removed)
+      // await tx.integration.deleteMany({ where: { companyId } });
 
       // 2. Удаляем основные сущности
       await tx.budget.deleteMany({ where: { companyId } });
