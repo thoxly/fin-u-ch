@@ -3,6 +3,7 @@ name: CI/CD with AI Review
 on:
   pull_request:
     branches: [dev, main]
+    types: [opened, synchronize, reopened, closed]
   push:
     branches: [main]
     paths-ignore:
@@ -663,8 +664,9 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() &&
-      github.ref == 'refs/heads/main' && 
-      (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)) &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main') ||
+      github.event_name == 'workflow_dispatch'
       needs.build-and-test.result == 'success'
     needs: [build-and-test]
     timeout-minutes: 25
@@ -733,8 +735,9 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() &&
-      github.ref == 'refs/heads/main' && 
-      (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)) &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main') ||
+       github.event_name == 'workflow_dispatch') &&
       needs.docker-build.result == 'success'
     needs: [docker-build]
     timeout-minutes: 10
