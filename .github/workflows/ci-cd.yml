@@ -183,7 +183,8 @@ jobs:
     needs: [quick-checks]
     if: |
       always() && 
-      (needs.quick-checks.result == 'success' || needs.quick-checks.result == 'skipped')
+      (needs.quick-checks.result == 'success' || needs.quick-checks.result == 'skipped') &&
+      (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch')
     timeout-minutes: 15
     services:
       postgres:
@@ -663,7 +664,7 @@ jobs:
     if: |
       always() &&
       github.ref == 'refs/heads/main' && 
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)) &&
       needs.build-and-test.result == 'success'
     needs: [build-and-test]
     timeout-minutes: 25
@@ -733,7 +734,7 @@ jobs:
     if: |
       always() &&
       github.ref == 'refs/heads/main' && 
-      github.event_name == 'push' &&
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)) &&
       needs.docker-build.result == 'success'
     needs: [docker-build]
     timeout-minutes: 10
