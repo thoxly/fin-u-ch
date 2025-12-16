@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import type {
   CashflowReport,
   BDDSReport,
@@ -8,8 +8,6 @@ import type {
 import { formatNumber } from '../../shared/lib/money';
 import { ExportMenu } from '../../shared/ui/ExportMenu';
 import { type ExportRow } from '../../shared/lib/exportData';
-import { useArticleTree } from '../../shared/hooks/useArticleTree';
-import { findArticleInTree, flattenTree } from '../../shared/lib/articleTree';
 
 interface CashflowTableProps {
   data: CashflowReport | BDDSReport;
@@ -18,8 +16,11 @@ interface CashflowTableProps {
   periodFrom: string;
   periodTo: string;
   title?: string;
+<<<<<<< HEAD
   articleSearchQuery?: string;
   breakdown?: CashflowBreakdown;
+=======
+>>>>>>> 1af8208
 }
 
 interface ExpandedSections {
@@ -50,12 +51,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   periodFrom,
   periodTo,
   title,
+<<<<<<< HEAD
   articleSearchQuery = '',
   breakdown = 'activity',
+=======
+>>>>>>> 1af8208
 }) => {
   const [expandedSections, setExpandedSections] = useState<ExpandedSections>(
     {}
   );
+<<<<<<< HEAD
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(
     new Set()
   );
@@ -215,6 +220,8 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       });
     }
   }, [matchedArticleIds, articleMap]);
+=======
+>>>>>>> 1af8208
 
   const hasFactData = data.activities.length > 0;
 
@@ -224,18 +231,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
       ...prev,
       [key]: !prev[key],
     }));
-  };
-
-  const toggleArticle = (articleId: string) => {
-    setExpandedArticles((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(articleId)) {
-        newSet.delete(articleId);
-      } else {
-        newSet.add(articleId);
-      }
-      return newSet;
-    });
   };
 
   const allMonths = useMemo(() => {
@@ -574,6 +569,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return colors[activity.activity] || '#6B7280';
   };
 
+<<<<<<< HEAD
   // Рекурсивная функция для рендеринга статьи и её дочерних статей
   const renderArticleRow = (
     group: (typeof data.activities)[0]['incomeGroups'][0],
@@ -853,6 +849,8 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return rows;
   };
 
+=======
+>>>>>>> 1af8208
   const renderMonthlyCells = (
     params: {
       month: string;
@@ -1179,16 +1177,113 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : incomePlanGroups;
 
                         return incomeGroupsToRender
+                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            return renderArticleRow(
-                              group,
-                              activity.activity,
-                              'income',
-                              0,
-                              incomePlanMap
+                            const planGroup =
+                              incomePlanMap.get(group.articleId) ||
+                              (!hasFactData ? group : undefined);
+                            const articleName =
+                              planGroup?.articleName || group.articleName;
+
+                            return (
+                              <tr
+                                key={`${activity.activity}-income-${group.articleId}`}
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
+                              >
+                                <td
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  style={{ width: `${columnWidths.article}px` }}
+                                >
+                                  {articleName}
+                                </td>
+                                {allMonths.map((month) => {
+                                  const factAmount = hasFactData
+                                    ? group.months.find(
+                                        (m) => m.month === month
+                                      )?.amount || 0
+                                    : 0;
+                                  const planAmount = getPlanAmount(
+                                    group.articleId,
+                                    month
+                                  );
+
+                                  if (showPlan) {
+                                    return (
+                                      <React.Fragment
+                                        key={`${activity.activity}-income-${group.articleId}-${month}`}
+                                      >
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {planAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
+                                          {formatNumber(planAmount)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {factAmount !== 0 && (
+                                            <span className="text-green-600 dark:text-green-400 mr-1">
+                                              ▲
+                                            </span>
+                                          )}
+                                          {formatNumber(factAmount)}
+                                        </td>
+                                      </React.Fragment>
+                                    );
+                                  }
+
+                                  return (
+                                    <td
+                                      key={`${activity.activity}-income-${group.articleId}-${month}`}
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                      style={{
+                                        minWidth: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {factAmount !== 0 && (
+                                        <span className="text-green-600 dark:text-green-400 mr-1">
+                                          ▲
+                                        </span>
+                                      )}
+                                      {formatNumber(factAmount)}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                                  style={{
+                                    minWidth: `${columnWidths.total}px`,
+                                  }}
+                                >
+                                  {(() => {
+                                    const total = hasFactData
+                                      ? group.total
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-green-600 dark:text-green-400 mr-1">
+                                            ▲
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
                             );
-                          })
-                          .flat();
+                          });
                       })()}
 
                       {(() => {
@@ -1205,16 +1300,113 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                           : expensePlanGroups;
 
                         return expenseGroupsToRender
+                          .filter((group) => group.months.length > 0)
                           .map((group) => {
-                            return renderArticleRow(
-                              group,
-                              activity.activity,
-                              'expense',
-                              0,
-                              expensePlanMap
+                            const planGroup =
+                              expensePlanMap.get(group.articleId) ||
+                              (!hasFactData ? group : undefined);
+                            const articleName =
+                              planGroup?.articleName || group.articleName;
+
+                            return (
+                              <tr
+                                key={`${activity.activity}-expense-${group.articleId}`}
+                                className="bg-zinc-50 dark:bg-zinc-900 hover:outline hover:outline-1 hover:outline-white/5 border-b border-gray-200 dark:border-gray-700 transition-all duration-100"
+                              >
+                                <td
+                                  className="px-4 py-2 pl-10 text-sm font-medium text-gray-700 dark:text-zinc-300 sticky left-0 bg-zinc-50 dark:bg-zinc-900 z-10 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
+                                  style={{ width: `${columnWidths.article}px` }}
+                                >
+                                  {articleName}
+                                </td>
+                                {allMonths.map((month) => {
+                                  const factAmount = hasFactData
+                                    ? group.months.find(
+                                        (m) => m.month === month
+                                      )?.amount || 0
+                                    : 0;
+                                  const planAmount = getPlanAmount(
+                                    group.articleId,
+                                    month
+                                  );
+
+                                  if (showPlan) {
+                                    return (
+                                      <React.Fragment
+                                        key={`${activity.activity}-expense-${group.articleId}-${month}`}
+                                      >
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {planAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
+                                          {formatNumber(planAmount)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                          style={{
+                                            minWidth: `${subColumnWidth}px`,
+                                          }}
+                                        >
+                                          {factAmount !== 0 && (
+                                            <span className="text-red-600 dark:text-red-400 mr-1">
+                                              ▼
+                                            </span>
+                                          )}
+                                          {formatNumber(factAmount)}
+                                        </td>
+                                      </React.Fragment>
+                                    );
+                                  }
+
+                                  return (
+                                    <td
+                                      key={`${activity.activity}-expense-${group.articleId}-${month}`}
+                                      className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+                                      style={{
+                                        minWidth: `${columnWidths.month}px`,
+                                      }}
+                                    >
+                                      {factAmount !== 0 && (
+                                        <span className="text-red-600 dark:text-red-400 mr-1">
+                                          ▼
+                                        </span>
+                                      )}
+                                      {formatNumber(factAmount)}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className="px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                                  style={{
+                                    minWidth: `${columnWidths.total}px`,
+                                  }}
+                                >
+                                  {(() => {
+                                    const total = hasFactData
+                                      ? group.total
+                                      : planGroup?.total || 0;
+                                    return (
+                                      <>
+                                        {total !== 0 && (
+                                          <span className="text-red-600 dark:text-red-400 mr-1">
+                                            ▼
+                                          </span>
+                                        )}
+                                        {formatNumber(total)}
+                                      </>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
                             );
-                          })
-                          .flat();
+                          });
                       })()}
                     </>
                   )}

@@ -5,16 +5,17 @@ import {
   CashflowBreakdown,
 } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
-import articlesService from '../../catalogs/articles/articles.service';
-import logger from '../../../config/logger';
 
 export interface CashflowParams {
   periodFrom: Date;
   periodTo: Date;
   activity?: string;
   rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
+<<<<<<< HEAD
   parentArticleId?: string; // ID родительской статьи для суммирования по потомкам
   breakdown?: CashflowBreakdown; // Разрез отчета: по видам деятельности, сделкам, счетам, подразделениям, контрагентам
+=======
+>>>>>>> 1af8208
 }
 
 // Internal aggregation row
@@ -39,9 +40,6 @@ interface ArticleGroup {
   type: 'income' | 'expense';
   months: MonthlyData[];
   total: number;
-  parentId?: string | null;
-  hasOperations?: boolean;
-  children?: ArticleGroup[];
 }
 
 interface ActivityGroup {
@@ -67,6 +65,7 @@ export class CashflowService {
     companyId: string,
     params: CashflowParams
   ): Promise<CashflowReport> {
+<<<<<<< HEAD
     const startTime = Date.now();
     const breakdown = params.breakdown || 'activity';
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
@@ -111,6 +110,11 @@ export class CashflowService {
       articleIdsFilter: articleIdsFilter?.length || 0,
       breakdown,
     });
+=======
+    const cacheKey = generateCacheKey(companyId, 'cashflow', params);
+    const cached = await getCachedReport(cacheKey);
+    if (cached) return cached as CashflowReport;
+>>>>>>> 1af8208
 
     // Определяем, какие связи нужно включить в зависимости от разреза
     const includeRelations: any = {
@@ -165,17 +169,32 @@ export class CashflowService {
     }
 
     const operations = await prisma.operation.findMany({
+<<<<<<< HEAD
       where: whereClause,
       include: includeRelations,
-    });
-
-    logger.debug('Operations fetched for cashflow report', {
-      companyId,
-      operationsCount: operations.length,
+=======
+      where: {
+        companyId,
+        operationDate: {
+          gte: params.periodFrom,
+          lte: params.periodTo,
+        },
+        type: { in: ['income', 'expense'] },
+        isConfirmed: true,
+        isTemplate: false,
+      },
+      include: {
+        article: {
+          select: { id: true, name: true, activity: true, type: true },
+        },
+      },
+>>>>>>> 1af8208
     });
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
+    const articleMap = new Map<string, CashflowRow>();
 
+<<<<<<< HEAD
     // Фильтруем операции по активности, если указана
     // Явно типизируем как массив операций, чтобы TypeScript правильно определил тип
     // Проблема: TypeScript может неправильно вывести тип из-за сложного типа Prisma
@@ -261,25 +280,25 @@ export class CashflowService {
     const operationsByArticle = new Map<string, CashflowRow>();
 
     for (const op of filteredOperations) {
+=======
+    for (const op of operations) {
+>>>>>>> 1af8208
       if (!op.article) continue;
+      if (params.activity && op.article.activity !== params.activity) continue;
 
-      const articleId = op.article.id;
-
-      if (!operationsByArticle.has(articleId)) {
-        const articleData = articleDataMap.get(articleId);
-        if (!articleData) continue;
-
-        operationsByArticle.set(articleId, {
-          articleId: articleData.id,
-          articleName: articleData.name,
-          activity: articleData.activity || 'unknown',
-          type: articleData.type,
+      const key = op.article.id;
+      if (!articleMap.has(key)) {
+        articleMap.set(key, {
+          articleId: op.article.id,
+          articleName: op.article.name,
+          activity: op.article.activity || 'unknown',
+          type: op.article.type,
           months: Object.fromEntries(months.map((m) => [m, 0])),
           total: 0,
         });
       }
 
-      const row = operationsByArticle.get(articleId)!;
+      const row = articleMap.get(key)!;
       const month = getMonthKey(new Date(op.operationDate));
       if (row.months[month] !== undefined) {
         row.months[month] += op.amount;
@@ -294,6 +313,7 @@ export class CashflowService {
       return Math.round(value / unit) * unit;
     };
 
+<<<<<<< HEAD
     // Создаем иерархическую структуру статей
     // Сначала создаем плоский список всех ArticleGroup
     const articleGroupMap = new Map<string, ArticleGroup>();
@@ -590,6 +610,51 @@ export class CashflowService {
           totalExpense: applyRounding(totalExpense),
           netCashflow: applyRounding(totalIncome - totalExpense),
         });
+=======
+    // Transform to activities with income/expense groups
+    const byActivity: Map<string, ActivityGroup> = new Map();
+
+    const sortedRows = Array.from(articleMap.values()).sort(
+      (a, b) =>
+        a.activity.localeCompare(b.activity) ||
+        a.type.localeCompare(b.type) ||
+        a.articleName.localeCompare(b.articleName)
+    );
+
+    for (const row of sortedRows) {
+      const activity = (row.activity || 'unknown') as ActivityGroup['activity'];
+      if (!byActivity.has(activity)) {
+        byActivity.set(activity, {
+          activity,
+          incomeGroups: [],
+          expenseGroups: [],
+          totalIncome: 0,
+          totalExpense: 0,
+          netCashflow: 0,
+        });
+      }
+
+      const group = byActivity.get(activity)!;
+      const monthsArray: MonthlyData[] = months.map((m) => ({
+        month: m,
+        amount: applyRounding(row.months[m] || 0),
+      }));
+
+      const articleGroup: ArticleGroup = {
+        articleId: row.articleId,
+        articleName: row.articleName,
+        type: row.type as 'income' | 'expense',
+        months: monthsArray,
+        total: applyRounding(row.total),
+      };
+
+      if (row.type === 'income') {
+        group.incomeGroups.push(articleGroup);
+        group.totalIncome += articleGroup.total;
+      } else if (row.type === 'expense') {
+        group.expenseGroups.push(articleGroup);
+        group.totalExpense += articleGroup.total;
+>>>>>>> 1af8208
       }
     }
 
@@ -618,15 +683,6 @@ export class CashflowService {
     };
 
     await cacheReport(cacheKey, response);
-
-    const duration = Date.now() - startTime;
-    logger.info('Cashflow report generated successfully', {
-      companyId,
-      duration: `${duration}ms`,
-      activitiesCount: response.activities.length,
-      operationsCount: operations.length,
-    });
-
     return response;
   }
 }

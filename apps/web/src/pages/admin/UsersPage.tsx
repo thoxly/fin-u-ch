@@ -18,7 +18,6 @@ import { Table } from '../../shared/ui/Table';
 import { Modal } from '../../shared/ui/Modal';
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
-import { UserLimitIndicator } from '../../shared/ui/UserLimitIndicator';
 import {
   useGetUsersQuery,
   useGetUserRolesQuery,
@@ -28,7 +27,6 @@ import {
   useUpdateUserMutation,
   useDeleteUserMutation,
 } from '../../store/api/usersApi';
-import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 import { useGetRolesQuery } from '../../store/api/rolesApi';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { ProtectedAction } from '../../shared/components/ProtectedAction';
@@ -153,9 +151,6 @@ export const UsersPage = () => {
   const [assignRole] = useAssignRoleMutation();
   const [removeRole] = useRemoveRoleMutation();
   const [inviteUser] = useInviteUserMutation();
-  const { data: subscription } = useGetSubscriptionQuery(undefined, {
-    skip: false,
-  });
   const [updateUser] = useUpdateUserMutation();
   const [deleteUser] = useDeleteUserMutation();
 
@@ -192,7 +187,7 @@ export const UsersPage = () => {
         setInviteRoleId('');
       }
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -201,22 +196,8 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при приглашении пользователя';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при приглашении пользователя'
-      );
+          : 'Ошибка при приглашении пользователя';
+      showError(errorMessage);
     }
   };
 
@@ -260,7 +241,7 @@ export const UsersPage = () => {
       setIsEditModalOpen(false);
       setSelectedUser(null);
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -269,22 +250,8 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при обновлении пользователя';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при обновлении пользователя'
-      );
+          : 'Ошибка при обновлении пользователя';
+      showError(errorMessage);
     }
   };
 
@@ -303,7 +270,7 @@ export const UsersPage = () => {
       }).unwrap();
       showSuccess('Роль успешно назначена');
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -312,22 +279,8 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при назначении роли';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при назначении роли'
-      );
+          : 'Ошибка при назначении роли';
+      showError(errorMessage);
     }
   };
 
@@ -344,7 +297,7 @@ export const UsersPage = () => {
         }).unwrap();
         showSuccess('Роль успешно снята');
       } catch (error) {
-        const rawErrorMessage =
+        const errorMessage =
           error &&
           typeof error === 'object' &&
           'data' in error &&
@@ -353,22 +306,8 @@ export const UsersPage = () => {
           'message' in error.data &&
           typeof error.data.message === 'string'
             ? error.data.message
-            : undefined;
-
-        const errorMessage = rawErrorMessage
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при снятии роли';
-
-        showError(
-          errorMessage &&
-            errorMessage.length > 5 &&
-            !errorMessage.match(/^[A-Z_]+$/)
-            ? errorMessage
-            : 'Ошибка при снятии роли'
-        );
+            : 'Ошибка при снятии роли';
+        showError(errorMessage);
       }
     }
   };
@@ -393,7 +332,7 @@ export const UsersPage = () => {
       showSuccess('Пользователь успешно удалён');
       setDeleteModal({ isOpen: false, user: null });
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -402,22 +341,8 @@ export const UsersPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при удалении пользователя';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при удалении пользователя'
-      );
+          : 'Ошибка при удалении пользователя';
+      showError(errorMessage);
       setDeleteModal({ isOpen: false, user: null });
     }
   };
@@ -551,29 +476,14 @@ export const UsersPage = () => {
                 onClick={handleInviteUser}
                 icon={<UserPlus size={20} />}
                 className="w-full sm:w-auto"
-                disabled={
-                  !!subscription &&
-                  subscription.userLimit &&
-                  (subscription.userLimit.remaining === 0 ||
-                    (subscription.userLimit.remaining !== null &&
-                      subscription.userLimit.remaining <= 0))
-                }
               >
-                {subscription &&
-                subscription.userLimit &&
-                subscription.userLimit.remaining !== null &&
-                subscription.userLimit.remaining <= 0
-                  ? 'Лимит пользователей исчерпан'
-                  : 'Пригласить пользователя'}
+                Пригласить пользователя
               </Button>
             </ProtectedAction>
           </div>
         </div>
 
-        {/* Индикатор лимита пользователей */}
-        <Card>
-          <UserLimitIndicator showLabel={true} showTooltip={true} />
-        </Card>
+        {/* Фильтры и поиск */}
         <Card>
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1 w-full sm:w-auto">

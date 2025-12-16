@@ -262,7 +262,7 @@ export async function migrateExistingUsers(): Promise<void> {
           user_roles: {
             none: {},
           },
-        } as any,
+        },
         orderBy: {
           createdAt: 'asc', // Сортируем по дате создания, чтобы первый пользователь был первым
         },

@@ -172,6 +172,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   // Сохраняем состояние в localStorage только когда модальное окно открыто
@@ -258,8 +259,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
       } catch (error: unknown) {
         // RTK Query возвращает ошибку в формате { error: { status, data } }
         // где data это ответ сервера { status: 'error', message: '...' }
-        let rawErrorMessage =
-          'Ошибка при загрузке файла. Проверьте формат файла.';
+        let errorMessage = 'Ошибка при загрузке файла. Проверьте формат файла.';
 
         if (error && typeof error === 'object') {
           if ('data' in error) {
@@ -270,28 +270,28 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                 'message' in errorData &&
                 typeof errorData.message === 'string'
               ) {
-                rawErrorMessage = errorData.message;
+                errorMessage = errorData.message;
               } else if (
                 'error' in errorData &&
                 typeof errorData.error === 'string'
               ) {
-                rawErrorMessage = errorData.error;
+                errorMessage = errorData.error;
               }
             } else if (typeof errorData === 'string') {
-              rawErrorMessage = errorData;
+              errorMessage = errorData;
             }
           } else if ('error' in error) {
             const nestedError = (
               error as { error?: { data?: { message?: string } } }
             ).error;
             if (nestedError?.data?.message) {
-              rawErrorMessage = nestedError.data.message;
+              errorMessage = nestedError.data.message;
             }
           } else if (
             'message' in error &&
             typeof (error as { message: unknown }).message === 'string'
           ) {
-            rawErrorMessage = (error as { message: string }).message;
+            errorMessage = (error as { message: string }).message;
           }
         }
 
@@ -301,23 +301,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
           data: (error as { data?: unknown })?.data,
           fullError: JSON.stringify(error, null, 2),
         });
-
-        // Очищаем системную информацию из сообщения
-        const sanitizedMessage = rawErrorMessage
-          .replace(/Операция\s+[\w-]+:\s*/gi, '')
-          .replace(/^[^:]+:\s*/i, '')
-          .trim();
-
-        // Показываем только если сообщение содержит полезную информацию для пользователя
-        if (
-          sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-        ) {
-          showError(sanitizedMessage);
-        } else {
-          showError('Ошибка при загрузке файла. Проверьте формат файла.');
-        }
+        showError(errorMessage);
       }
     },
     [uploadStatement, showSuccess, showError]

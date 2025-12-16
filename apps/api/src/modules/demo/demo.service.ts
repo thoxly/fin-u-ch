@@ -439,6 +439,7 @@ export class DemoUserService {
     }
 
     await prisma.$transaction(async (tx) => {
+<<<<<<< HEAD
       // 0. Удаляем всех пользователей компании
       const companyUsers = await tx.user.findMany({
         where: { companyId: user.companyId },
@@ -493,6 +494,22 @@ export class DemoUserService {
 
       // 2. Компания
       await tx.company.delete({ where: { id: cid } });
+=======
+      // Удаляем все связанные данные
+      await tx.operation.deleteMany({ where: { companyId: user.companyId } });
+      await tx.salary.deleteMany({ where: { companyId: user.companyId } });
+      await tx.account.deleteMany({ where: { companyId: user.companyId } });
+      await tx.article.deleteMany({ where: { companyId: user.companyId } });
+      await tx.counterparty.deleteMany({
+        where: { companyId: user.companyId },
+      });
+      await tx.deal.deleteMany({ where: { companyId: user.companyId } });
+      await tx.department.deleteMany({ where: { companyId: user.companyId } });
+
+      // Удаляем пользователя и компанию
+      await tx.user.delete({ where: { id: user.id } });
+      await tx.company.delete({ where: { id: user.companyId } });
+>>>>>>> 1af8208
     });
 
     logger.info('Demo user deleted', { userId: user.id, email: user.email });

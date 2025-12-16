@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   LineChart,
   Line,
@@ -16,7 +16,6 @@ import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { InfoHint } from './InfoHint';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
-import { calculateYAxisFontSize, findMaxValue } from '../lib/chartUtils';
 
 interface Operation {
   id: string;
@@ -79,6 +78,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
       return true;
     });
 
+<<<<<<< HEAD
   // Вычисляем оптимальный размер шрифта для оси Y на основе максимального значения
   const yAxisFontSize = useMemo(() => {
     if (!filteredData || filteredData.length === 0) return 12;
@@ -89,6 +89,8 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
     return calculateYAxisFontSize(maxValue);
   }, [filteredData]);
 
+=======
+>>>>>>> 1af8208
   const buildExportRows = (): ExportRow[] => {
     const rows: ExportRow[] = [];
     (filteredData || []).forEach((p) => {
@@ -158,7 +160,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={filteredData || []}
-              margin={{ top: 5, right: 30, left: 5, bottom: 48 }}
+              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -171,10 +173,8 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={yAxisFontSize}
-                tick={{ fontSize: yAxisFontSize }}
+                fontSize={12}
                 tickFormatter={(value) => formatMoney(value)}
-                width={80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -248,7 +248,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 5, bottom: 28 }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -265,10 +265,8 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={yAxisFontSize}
-              tick={{ fontSize: yAxisFontSize }}
+              fontSize={12}
               tickFormatter={(value) => formatMoney(value)}
-              width={80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),

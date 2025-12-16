@@ -9,10 +9,10 @@ import {
   useGetImportedOperationsQuery,
 } from '../../store/api/importsApi';
 import {
+  useGetArticlesQuery,
   useGetCounterpartiesQuery,
   useGetAccountsQuery,
 } from '../../store/api/catalogsApi';
-import { useLeafArticles } from '../../shared/hooks/useArticleTree';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
 import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
@@ -51,9 +51,9 @@ export const MappingRuleDialog = ({
   >(rule?.sourceField || 'description');
   const [patternError, setPatternError] = useState<string>('');
 
-  // Используем только листья (статьи без дочерних) для операций
-  const { leafArticles: articles = [], refetch: refetchArticles } =
-    useLeafArticles({ isActive: true });
+  const { data: articles = [], refetch: refetchArticles } = useGetArticlesQuery(
+    { isActive: true }
+  );
   const { data: counterparties = [], refetch: refetchCounterparties } =
     useGetCounterpartiesQuery();
   const { data: accounts = [], refetch: refetchAccounts } =
@@ -182,7 +182,7 @@ export const MappingRuleDialog = ({
 
       onClose();
     } catch (error: unknown) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -192,23 +192,7 @@ export const MappingRuleDialog = ({
         typeof error.data.error === 'string'
           ? error.data.error
           : 'Ошибка при сохранении правила';
-
-      // Очищаем системную информацию из сообщения
-      const sanitizedMessage =
-        typeof rawErrorMessage === 'string'
-          ? rawErrorMessage
-              .replace(/Операция\s+[\w-]+:\s*/gi, '')
-              .replace(/^[^:]+:\s*/i, '')
-              .trim()
-          : 'Ошибка при сохранении правила';
-
-      showError(
-        sanitizedMessage &&
-          sanitizedMessage.length > 5 &&
-          !sanitizedMessage.match(/^[A-Z_]+$/)
-          ? sanitizedMessage
-          : 'Ошибка при сохранении правила'
-      );
+      showError(errorMessage);
     }
   };
 
@@ -271,9 +255,8 @@ export const MappingRuleDialog = ({
 
     // Обновляем списки и находим созданный элемент
     if (createModal.field === 'article') {
-      const result = await refetchArticles();
-      const updatedArticles = result.data || [];
-      const createdArticle = updatedArticles.find((a) => a.id === createdId);
+      const { data: updatedArticles } = await refetchArticles();
+      const createdArticle = updatedArticles?.find((a) => a.id === createdId);
       if (createdArticle) {
         setTargetId(createdId);
         setTargetName(createdArticle.name);

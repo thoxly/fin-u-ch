@@ -1,8 +1,8 @@
-// apps/worker/src/index.ts
 import cron from 'node-cron';
 import { logger } from './config/logger';
 import { env } from './config/env';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
+<<<<<<< HEAD
 import {
   generateOzonOperations,
   shouldRunOzonTaskToday,
@@ -10,19 +10,44 @@ import {
   ozonOperationService,
 } from './jobs/ozon.generate.operations';
 import { cleanupExpiredDemoUsers } from './jobs/cleanup-demo-users.job';
+=======
+>>>>>>> 1af8208
 import { prisma } from './config/prisma';
 
-logger.info(`⏰ Текущее время: ${new Date().toLocaleString('ru-RU')}`);
-
-// Выводим информацию о следующем запуске Ozon задачи
-const nextRunInfo = getNextRunInfo();
-const nextRunDate = new Date(nextRunInfo.nextRunDate);
-logger.info(`⏰ Дата и время: ${nextRunDate.toLocaleString('ru-RU')}`);
-logger.info(`📊 Дней до запуска: ${nextRunInfo.daysUntilNextRun}`);
+logger.info('🚀 Worker starting...');
+logger.info(`Environment: ${env.NODE_ENV}`);
 
 /**
+<<<<<<< HEAD
+=======
+ * Задача генерации зарплатных операций
+ * Запускается каждое 1-е число месяца в 00:00
+ * Cron pattern: '0 0 1 * *' (минута час день месяц день_недели)
+ */
+const salaryGenerationTask = cron.schedule(
+  '0 0 1 * *',
+  async () => {
+    logger.info('🔄 Running scheduled salary generation task...');
+
+    try {
+      const currentMonth = getCurrentMonth();
+      await generateSalaryOperations({ month: currentMonth });
+      logger.info('✅ Salary generation task completed successfully');
+    } catch (error) {
+      logger.error('❌ Salary generation task failed:', error);
+    }
+  },
+  {
+    scheduled: true,
+    timezone: 'Europe/Moscow', // Можно изменить на нужную таймзону
+  }
+);
+
+/**
+>>>>>>> 1af8208
  * Задача генерации периодических операций
  * Запускается каждый день в 00:01
+ * Cron pattern: '1 0 * * *' (минута час день месяц день_недели)
  */
 const recurringOperationsTask = cron.schedule(
   '1 0 * * *',
@@ -44,6 +69,7 @@ const recurringOperationsTask = cron.schedule(
   }
 );
 
+<<<<<<< HEAD
 const ozonOperationsTask = cron.schedule(
   '1 0 * * *',
   async () => {
@@ -120,6 +146,13 @@ const cleanupDemoUsersTask = cron.schedule(
   '15 * * * *',
   async () => {
     logger.info('🔄 Running scheduled demo user cleanup task...');
+=======
+// Функция для ручного запуска задачи (для тестирования)
+export async function runSalaryGenerationManually(
+  month?: string
+): Promise<void> {
+  logger.info('🔧 Manual salary generation triggered');
+>>>>>>> 1af8208
 
     try {
       const deletedCount = await cleanupExpiredDemoUsers(24); // Удаляем аккаунты старше 24 часов
@@ -138,7 +171,11 @@ const cleanupDemoUsersTask = cron.schedule(
   }
 );
 
+<<<<<<< HEAD
 // Функции для ручного запуска задач
+=======
+// Функция для ручного запуска генерации периодических операций (для тестирования)
+>>>>>>> 1af8208
 export async function runRecurringOperationsManually(
   targetDate?: Date
 ): Promise<void> {
@@ -155,6 +192,7 @@ export async function runRecurringOperationsManually(
   }
 }
 
+<<<<<<< HEAD
 export async function runOzonOperationsManually(
   testIntegrationId?: string
 ): Promise<{ created: number; errors: string[] }> {
@@ -314,14 +352,19 @@ if (process.argv[2] === 'run-recurring-now') {
     });
 }
 
+=======
+>>>>>>> 1af8208
 // Graceful shutdown
 const shutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully...`);
 
   // Останавливаем cron задачи
   recurringOperationsTask.stop();
+<<<<<<< HEAD
   ozonOperationsTask.stop();
   cleanupDemoUsersTask.stop();
+=======
+>>>>>>> 1af8208
 
   // Закрываем Prisma соединение
   await prisma.$disconnect();
@@ -333,11 +376,12 @@ const shutdown = async (signal: string) => {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-// Проверка подключения к БД и API
+// Проверка подключения к БД
 prisma
   .$connect()
-  .then(async () => {
+  .then(() => {
     logger.info('✅ Database connection established');
+<<<<<<< HEAD
 
     // Проверяем доступность API (не критично для работы worker)
     try {
@@ -372,9 +416,12 @@ prisma
     logger.info('      Расписание: Каждый день в 00:01');
     logger.info('');
     logger.info('   2. ✅ Генерация операций Ozon');
+=======
+>>>>>>> 1af8208
     logger.info(
-      '      Расписание: Каждый день в 00:01 (выполняется только по средам)'
+      '✅ Salary generation task scheduled (runs on 1st of each month at 00:00)'
     );
+<<<<<<< HEAD
     logger.info(
       '      Следующий запуск: ' + nextRunDate.toLocaleString('ru-RU')
     );
@@ -390,6 +437,10 @@ prisma
     );
     logger.info('💡 Задачи будут выполняться автоматически по расписанию');
     logger.info('');
+=======
+    logger.info('✅ Recurring operations task scheduled (runs daily at 00:01)');
+    logger.info('👷 Worker is running and waiting for scheduled tasks...');
+>>>>>>> 1af8208
   })
   .catch((error: unknown) => {
     logger.error('❌ Failed to connect to database:', error);

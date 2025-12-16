@@ -12,6 +12,7 @@ import {
 import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
 import { CashflowTable } from '../widgets/CashflowTable';
+<<<<<<< HEAD
 import { useArticleTree } from '../shared/hooks/useArticleTree';
 import type {
   Budget,
@@ -19,6 +20,9 @@ import type {
   BDDSReport,
   CashflowBreakdown,
 } from '@fin-u-ch/shared';
+=======
+import type { Budget, CashflowReport, BDDSReport } from '@fin-u-ch/shared';
+>>>>>>> 1af8208
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
@@ -35,11 +39,6 @@ type ReportMode = 'fact' | 'plan' | 'both';
 const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
-
-  // Нормализуем даты (убираем время для корректного сравнения)
-  fromDate.setHours(0, 0, 0, 0);
-  toDate.setHours(0, 0, 0, 0);
-
   const daysDiff =
     Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
     1;
@@ -78,6 +77,7 @@ export const ReportsPage = () => {
   const [reportMode, setReportMode] = useState<ReportMode>('fact');
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
+<<<<<<< HEAD
   const [showArticleFilter, setShowArticleFilter] = useState(false);
   const [selectedParentArticleId] = useState<string | null>(null);
   const [articleSearchQuery, setArticleSearchQuery] = useState<string>('');
@@ -93,12 +93,14 @@ export const ReportsPage = () => {
   // const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
   // const requiredLevel = planHierarchy['TEAM'];
   // const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
+=======
+  const planButtonRef = useRef<HTMLButtonElement>(null);
+  const bothButtonRef = useRef<HTMLButtonElement>(null);
+  const budgetMenuRef = useRef<HTMLDivElement>(null);
+>>>>>>> 1af8208
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
-
-  // Загружаем дерево статей для фильтра
-  const { tree: _articleTree = [] } = useArticleTree({ isActive: true });
 
   // Загружаем активные бюджеты (только если есть права на просмотр отчётов)
   const { data: budgets = [] } = useGetBudgetsQuery(
@@ -110,6 +112,7 @@ export const ReportsPage = () => {
   const { data: plans = [] } = useGetPlansQuery(undefined, {
     skip: !canRead('reports'),
   });
+<<<<<<< HEAD
 
   // Проверка подписки для отчетов убрана - отчеты доступны в базовой подписке
   // if (currentLevel < requiredLevel) {
@@ -119,6 +122,8 @@ export const ReportsPage = () => {
   //     </Layout>
   //   );
   // }
+=======
+>>>>>>> 1af8208
   const hasPlans = plans.length > 0;
 
   // Если планов нет, принудительно устанавливаем режим "Факт"
@@ -170,22 +175,12 @@ export const ReportsPage = () => {
 
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
-
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getPreviousPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getPreviousPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -193,22 +188,12 @@ export const ReportsPage = () => {
   };
 
   const handleNextPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
-
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getNextPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getNextPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -216,36 +201,12 @@ export const ReportsPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    // Нормализуем даты (убираем время для корректного сравнения)
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    // Вычисляем разницу в днях для определения формата
-    const daysDiff =
-      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    // Определяем формат на основе разницы дней
-    let format: PeriodFormat = 'day';
-    if (daysDiff === 1) {
-      format = 'day';
-    } else if (daysDiff <= 7) {
-      format = 'week';
-    } else if (daysDiff <= 31) {
-      format = 'month';
-    } else if (daysDiff <= 93) {
-      format = 'quarter';
-    } else {
-      format = 'year';
-    }
-
     // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
     const newRange = {
-      from: start.toISOString(),
-      to: end.toISOString(),
+      from: startDate.toISOString(),
+      to: endDate.toISOString(),
     };
-
+    const format = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format,
       range: newRange,
@@ -288,19 +249,11 @@ export const ReportsPage = () => {
       ) {
         setShowBudgetMenu(false);
       }
-      // Закрываем фильтр статей если клик вне
-      if (
-        showArticleFilter &&
-        articleFilterRef.current &&
-        !articleFilterRef.current.contains(target)
-      ) {
-        setShowArticleFilter(false);
-      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showBudgetMenu, showArticleFilter]);
+  }, [showBudgetMenu]);
 
   // Если нет прав на просмотр, показываем сообщение
   if (!canRead('reports')) {
@@ -320,6 +273,7 @@ export const ReportsPage = () => {
     );
   }
 
+<<<<<<< HEAD
   // Проверка тарифа убрана - отчеты доступны в базовой подписке
   // if (currentLevel < requiredLevel) {
   //   return (
@@ -329,6 +283,8 @@ export const ReportsPage = () => {
   //   );
   // }
 
+=======
+>>>>>>> 1af8208
   return (
     <Layout>
       <div className="space-y-6">
@@ -531,6 +487,7 @@ export const ReportsPage = () => {
               </div>
             </>
           )}
+<<<<<<< HEAD
 
           {/* Селектор разреза */}
           <div className="flex items-center gap-2">
@@ -586,6 +543,8 @@ export const ReportsPage = () => {
               )}
             </div>
           </div>
+=======
+>>>>>>> 1af8208
         </Card>
 
         {/* Контент отчетов */}
@@ -595,9 +554,12 @@ export const ReportsPage = () => {
           periodFormat={periodFilters.format}
           reportMode={reportMode}
           selectedBudget={selectedBudget}
+<<<<<<< HEAD
           selectedParentArticleId={selectedParentArticleId}
           articleSearchQuery={articleSearchQuery}
           breakdown={breakdown}
+=======
+>>>>>>> 1af8208
         />
       </div>
     </Layout>
@@ -611,18 +573,24 @@ const CashflowTab = ({
   periodFormat: _periodFormat,
   reportMode,
   selectedBudget,
+<<<<<<< HEAD
   selectedParentArticleId,
   articleSearchQuery,
   breakdown,
+=======
+>>>>>>> 1af8208
 }: {
   periodFrom: string;
   periodTo: string;
   periodFormat: 'day' | 'week' | 'month' | 'quarter' | 'year';
   reportMode: ReportMode;
   selectedBudget: Budget | null;
+<<<<<<< HEAD
   selectedParentArticleId: string | null;
   articleSearchQuery: string;
   breakdown: CashflowBreakdown;
+=======
+>>>>>>> 1af8208
 }) => {
   const { canRead } = usePermissions();
 
@@ -634,8 +602,11 @@ const CashflowTab = ({
       ? {
           periodFrom,
           periodTo,
+<<<<<<< HEAD
           parentArticleId: selectedParentArticleId || undefined,
           breakdown,
+=======
+>>>>>>> 1af8208
         }
       : skipToken
   );
@@ -651,7 +622,6 @@ const CashflowTab = ({
           periodFrom,
           periodTo,
           budgetId: selectedBudget!.id,
-          parentArticleId: selectedParentArticleId || undefined,
         }
       : skipToken
   );
@@ -744,8 +714,11 @@ const CashflowTab = ({
       showPlan={showPlanColumns}
       periodFrom={periodFrom}
       periodTo={periodTo}
+<<<<<<< HEAD
       articleSearchQuery={articleSearchQuery}
       breakdown={breakdown}
+=======
+>>>>>>> 1af8208
     />
   );
 };

@@ -2,8 +2,6 @@ import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
-import { requireFeature } from '../../middlewares/subscription.guard';
-import { SubscriptionPlan } from '@prisma/client';
 import importsController from './imports.controller';
 
 const router: Router = Router();
@@ -322,16 +320,8 @@ router.delete('/sessions/:sessionId', importsController.deleteSession);
  *       201:
  *         description: Rule created
  */
-router.get(
-  '/rules',
-  requireFeature('mapping_rules', SubscriptionPlan.TEAM),
-  importsController.getMappingRules
-);
-router.post(
-  '/rules',
-  requireFeature('mapping_rules', SubscriptionPlan.TEAM),
-  importsController.createMappingRule
-);
+router.get('/rules', importsController.getMappingRules);
+router.post('/rules', importsController.createMappingRule);
 
 /**
  * @swagger
@@ -384,16 +374,8 @@ router.post(
  *       204:
  *         description: Rule deleted
  */
-router.patch(
-  '/rules/:id',
-  requireFeature('mapping_rules', SubscriptionPlan.TEAM),
-  importsController.updateMappingRule
-);
-router.delete(
-  '/rules/:id',
-  requireFeature('mapping_rules', SubscriptionPlan.TEAM),
-  importsController.deleteMappingRule
-);
+router.patch('/rules/:id', importsController.updateMappingRule);
+router.delete('/rules/:id', importsController.deleteMappingRule);
 
 /**
  * @swagger

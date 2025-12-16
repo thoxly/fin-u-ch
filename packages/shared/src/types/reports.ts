@@ -93,9 +93,6 @@ export interface ArticleGroup {
   type: OperationType;
   months: MonthlyData[];
   total: number;
-  parentId?: string | null;
-  hasOperations?: boolean; // true если по этой статье есть реальные операции
-  children?: ArticleGroup[]; // Дочерние статьи
 }
 
 export interface MonthlyData {

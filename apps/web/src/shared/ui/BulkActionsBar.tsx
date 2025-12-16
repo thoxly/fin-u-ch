@@ -9,7 +9,6 @@ interface BulkActionsBarProps {
     variant?: 'danger' | 'warning' | 'secondary';
     className?: string;
   }>;
-  className?: string;
 }
 
 /**
@@ -20,25 +19,13 @@ export const BulkActionsBar = ({
   selectedCount,
   onClear,
   actions,
-  className,
 }: BulkActionsBarProps) => {
   if (selectedCount === 0) return null;
 
   return (
-    <div
-      className={`mt-4 flex items-center justify-between ${className || ''}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          Выбрано: {selectedCount}
-        </span>
-        <Button
-          variant="secondary"
-          className="text-xs px-2 py-1 h-auto min-h-0 ml-2"
-          onClick={onClear}
-        >
-          Сбросить
-        </Button>
+    <div className="mt-4 flex items-center justify-between">
+      <div className="text-sm text-gray-600 dark:text-gray-400">
+        Выбрано: {selectedCount}
       </div>
       <div className="flex gap-2">
         {actions.map((action, index) => (

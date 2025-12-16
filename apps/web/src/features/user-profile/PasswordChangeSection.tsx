@@ -1,27 +1,7 @@
 import { useState } from 'react';
 import { Lock, KeyRound } from 'lucide-react';
-import {
-  Input,
-  PasswordInput,
-  Button,
-  PasswordValidationError,
-} from '../../shared/ui';
-
-const PASSWORD_REQUIREMENTS = {
-  minLength: 12,
-  hasLowercase: /[a-z]/,
-  hasUppercase: /[A-Z]/,
-  hasDigit: /\d/,
-};
-
-const validatePassword = (password: string): boolean => {
-  return (
-    password.length >= PASSWORD_REQUIREMENTS.minLength &&
-    PASSWORD_REQUIREMENTS.hasLowercase.test(password) &&
-    PASSWORD_REQUIREMENTS.hasUppercase.test(password) &&
-    PASSWORD_REQUIREMENTS.hasDigit.test(password)
-  );
-};
+import { Input } from '../../shared/ui/Input';
+import { Button } from '../../shared/ui/Button';
 
 interface PasswordChangeSectionProps {
   onChangePassword: (
@@ -36,8 +16,6 @@ export const PasswordChangeSection = ({
   isLoading,
 }: PasswordChangeSectionProps) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [showPasswordError, setShowPasswordError] = useState(false);
-  const [isPasswordValid, setIsPasswordValid] = useState(true);
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -46,13 +24,13 @@ export const PasswordChangeSection = ({
 
   const handleChangePassword = async (): Promise<void> => {
     try {
-      if (!validatePassword(passwordData.newPassword)) {
-        setShowPasswordError(true);
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert('Пароли не совпадают');
         return;
       }
 
-      if (passwordData.newPassword !== passwordData.confirmPassword) {
-        alert('Пароли не совпадают');
+      if (passwordData.newPassword.length < 6) {
+        alert('Пароль должен быть не менее 6 символов');
         return;
       }
 
@@ -116,7 +94,8 @@ export const PasswordChangeSection = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Новый пароль
             </label>
-            <PasswordInput
+            <Input
+              type="password"
               value={passwordData.newPassword}
               onChange={(e) =>
                 setPasswordData({
@@ -125,8 +104,7 @@ export const PasswordChangeSection = ({
                 })
               }
               placeholder="Введите новый пароль"
-              showValidation={true}
-              onValidationChange={setIsPasswordValid}
+              icon={<KeyRound size={16} />}
             />
           </div>
           <div>
@@ -164,16 +142,11 @@ export const PasswordChangeSection = ({
             <Button
               size="sm"
               onClick={handleChangePassword}
-              disabled={isLoading || !isPasswordValid}
+              disabled={isLoading}
             >
               {isLoading ? 'Изменение...' : 'Изменить пароль'}
             </Button>
           </div>
-
-          <PasswordValidationError
-            isOpen={showPasswordError}
-            onClose={() => setShowPasswordError(false)}
-          />
         </div>
       )}
     </div>

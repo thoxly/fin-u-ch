@@ -19,8 +19,11 @@ interface ReportParams {
   periodTo: string;
   activity?: string;
   level?: string;
+<<<<<<< HEAD
   parentArticleId?: string;
   breakdown?: CashflowBreakdown;
+=======
+>>>>>>> 1af8208
 }
 
 interface BDDSReportParams {
@@ -28,7 +31,6 @@ interface BDDSReportParams {
   periodTo: string;
   activity?: string;
   budgetId?: string;
-  parentArticleId?: string;
 }
 
 export const reportsApi = apiSlice.injectEndpoints({

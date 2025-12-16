@@ -1,12 +1,12 @@
 import { Response, NextFunction } from 'express';
 import { TenantRequest } from '../../../middlewares/tenant';
-import accountsService from './accounts.service';
+import salariesService from './salaries.service';
 import auditLogService from '../../audit/audit.service';
 
-export class AccountsController {
+export class SalariesController {
   async getAll(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.getAll(req.companyId!);
+      const result = await salariesService.getAll(req.companyId!);
       res.json(result);
     } catch (error) {
       next(error);
@@ -15,7 +15,7 @@ export class AccountsController {
 
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.getById(
+      const result = await salariesService.getById(
         req.params.id,
         req.companyId!
       );
@@ -27,13 +27,13 @@ export class AccountsController {
 
   async create(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const result = await accountsService.create(req.companyId!, req.body);
+      const result = await salariesService.create(req.companyId!, req.body);
 
       await auditLogService.logAction({
         userId: req.userId!,
         companyId: req.companyId!,
         action: 'create',
-        entity: 'account',
+        entity: 'salary',
         entityId: result.id,
         changes: { new: result },
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
@@ -47,12 +47,12 @@ export class AccountsController {
 
   async update(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const oldAccount = await accountsService.getById(
+      const oldSalary = await salariesService.getById(
         req.params.id,
         req.companyId!
       );
 
-      const result = await accountsService.update(
+      const result = await salariesService.update(
         req.params.id,
         req.companyId!,
         req.body
@@ -62,9 +62,9 @@ export class AccountsController {
         userId: req.userId!,
         companyId: req.companyId!,
         action: 'update',
-        entity: 'account',
+        entity: 'salary',
         entityId: result.id,
-        changes: { old: oldAccount, new: result },
+        changes: { old: oldSalary, new: result },
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
       });
 
@@ -76,12 +76,12 @@ export class AccountsController {
 
   async delete(req: TenantRequest, res: Response, next: NextFunction) {
     try {
-      const oldAccount = await accountsService.getById(
+      const oldSalary = await salariesService.getById(
         req.params.id,
         req.companyId!
       );
 
-      const result = await accountsService.delete(
+      const result = await salariesService.delete(
         req.params.id,
         req.companyId!
       );
@@ -90,9 +90,9 @@ export class AccountsController {
         userId: req.userId!,
         companyId: req.companyId!,
         action: 'delete',
-        entity: 'account',
+        entity: 'salary',
         entityId: req.params.id,
-        changes: { old: oldAccount },
+        changes: { old: oldSalary },
         metadata: { ip: req.ip, userAgent: req.get('user-agent') },
       });
 
@@ -103,4 +103,4 @@ export class AccountsController {
   }
 }
 
-export default new AccountsController();
+export default new SalariesController();
