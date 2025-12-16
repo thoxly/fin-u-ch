@@ -4,7 +4,6 @@ import type {
   CashflowReport,
   BDDSReport,
   PlanFactReport,
-  CashflowBreakdown,
 } from '@shared/types/reports';
 
 interface DashboardParams {
@@ -19,11 +18,6 @@ interface ReportParams {
   periodTo: string;
   activity?: string;
   level?: string;
-<<<<<<< HEAD
-  parentArticleId?: string;
-  breakdown?: CashflowBreakdown;
-=======
->>>>>>> 1af8208
 }
 
 interface BDDSReportParams {
