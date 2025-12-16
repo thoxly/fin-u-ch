@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SubscriptionPlan {
+  START
+  TEAM
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIAL
+}
+
 model Account {
   id                      String              @id @default(uuid())
   companyId               String
@@ -113,14 +126,29 @@ model Company {
   operations          Operation[]
   plan_items          PlanItem[]
   roles               Role[]
-<<<<<<< HEAD
   subscription        Subscription?
-=======
-  salaries            Salary[]
->>>>>>> 1af8208
   users               User[]
 
   @@map("companies")
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  companyId   String             @unique
+  plan        SubscriptionPlan   @default(START)
+  status      SubscriptionStatus @default(ACTIVE)
+  startDate   DateTime           @default(now())
+  endDate     DateTime? // Null для вечных/бесплатных или автопродлеваемых
+  trialEndsAt DateTime?
+  promoCode   String? // Промокод, по которому активирована подписка
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([plan])
+  @@map("subscriptions")
 }
 
 model Counterparty {

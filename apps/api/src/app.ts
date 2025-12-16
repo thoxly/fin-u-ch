@@ -23,6 +23,7 @@ import rolesRoutes from './modules/roles/roles.routes';
 import auditLogRoutes from './modules/audit/audit.routes';
 import demoRoutes from './modules/demo/demo.routes';
 import importsRoutes from './modules/imports/imports.routes';
+import subscriptionRoutes from './modules/subscription/subscription.routes';
 
 const app: Application = express();
 
@@ -63,6 +64,7 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/demo', demoRoutes);
 app.use('/api/imports', importsRoutes);
+app.use('/api/subscription', subscriptionRoutes);
 
 // Error handling
 app.use(errorHandler);

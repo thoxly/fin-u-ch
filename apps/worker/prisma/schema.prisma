@@ -7,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-<<<<<<< HEAD
 enum SubscriptionPlan {
   START
   TEAM
@@ -38,79 +37,6 @@ model Account {
   sourceAccountOperations Operation[]         @relation("operations_sourceAccountIdToaccounts")
   targetAccountOperations Operation[]         @relation("operations_targetAccountIdToaccounts")
   planItems               PlanItem[]
-  integrations            Integration[]
-=======
-model Company {
-  id           String    @id @default(uuid())
-  name         String
-  currencyBase String    @default("RUB")
-  inn          String? // ИНН компании для определения направления операций
-  uiSettings   Json? // UI preferences: navigation icons, theme, etc.
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-
-  users              User[]
-  accounts           Account[]
-  departments        Department[]
-  counterparties     Counterparty[]
-  deals              Deal[]
-  articles           Article[]
-  operations         Operation[]
-  planItems          PlanItem[]
-  salaries           Salary[]
-  budgets            Budget[]
-  roles              Role[]
-  auditLogs          AuditLog[]
-  importSessions     ImportSession[]
-  importedOperations ImportedOperation[]
-  mappingRules       MappingRule[]
-
-  @@map("companies")
-}
-
-model User {
-  id                  String   @id @default(uuid())
-  companyId           String
-  email               String   @unique
-  passwordHash        String
-  firstName           String?
-  lastName            String?
-  isActive            Boolean  @default(true)
-  isSuperAdmin        Boolean  @default(false) // Флаг супер-администратора компании
-  isEmailVerified     Boolean  @default(false)
-  preferences         Json? // User preferences: theme, navigation icons, etc.
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  userRoles   UserRole[]
-  auditLogs   AuditLog[]
-  emailTokens EmailToken[]
-
-  @@index([companyId])
-  @@map("users")
-}
-
-model Account {
-  id                String   @id @default(uuid())
-  companyId         String
-  name              String
-  number            String?
-  currency          String   @default("RUB")
-  openingBalance    Float    @default(0)
-  excludeFromTotals Boolean  @default(false)
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  operations         Operation[]         @relation("AccountOperations")
-  sourceOperations   Operation[]         @relation("SourceAccountOperations")
-  targetOperations   Operation[]         @relation("TargetAccountOperations")
-  planItems          PlanItem[]
-  importedOperations ImportedOperation[]
->>>>>>> 1af8208
 
   @@index([companyId])
   @@map("accounts")
@@ -136,11 +62,6 @@ model Article {
   importedOperations ImportedOperation[]
   operations         Operation[]
   planItems          PlanItem[]
-<<<<<<< HEAD
-  integrations       Integration[]
-=======
-  importedOperations ImportedOperation[]
->>>>>>> 1af8208
 
   @@index([companyId])
   @@index([companyId, parentId])
@@ -183,20 +104,32 @@ model Budget {
   @@map("budgets")
 }
 
-model PromoCode {
-  id           String           @id @default(uuid())
-  code         String           @unique
-  plan         SubscriptionPlan
-  durationDays Int? // Длительность триала/подписки (null = вечно)
-  maxUsages    Int? // Лимит использования (null = безлимит)
-  usedCount    Int              @default(0)
-  isActive     Boolean          @default(true)
-  expiresAt    DateTime?
-  createdAt    DateTime         @default(now())
+model Company {
+  id                  String              @id @default(uuid())
+  name                String
+  currencyBase        String              @default("RUB")
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+  uiSettings          Json?
+  inn                 String?
+  accounts            Account[]
+  articles            Article[]
+  audit_logs          AuditLog[]
+  budgets             Budget[]
+  counterparties      Counterparty[]
+  deals               Deal[]
+  departments         Department[]
+  import_sessions     ImportSession[]
+  imported_operations ImportedOperation[]
+  mapping_rules       MappingRule[]
+  operations          Operation[]
+  plan_items          PlanItem[]
+  roles               Role[]
+  subscription        Subscription?
+  users               User[]
 
-  @@index([code])
-  @@index([isActive, expiresAt])
-  @@map("promo_codes")
+  @@map("companies")
 }
 
 model Subscription {
@@ -216,35 +149,6 @@ model Subscription {
   @@index([status])
   @@index([plan])
   @@map("subscriptions")
-}
-
-model Company {
-  id                  String              @id @default(uuid())
-  name                String
-  currencyBase        String              @default("RUB")
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  deletedAt           DateTime?
-  uiSettings          Json?
-  inn                 String?
-  accounts            Account[]
-  articles            Article[]
-  audit_logs          AuditLog[]
-  budgets             Budget[]
-  counterparties      Counterparty[]
-  deals               Deal[]
-  departments         Department[]
-  import_sessions     ImportSession[]
-  imported_operations ImportedOperation[]
-  integrations        Integration[]
-  mapping_rules       MappingRule[]
-  operations          Operation[]
-  plan_items          PlanItem[]
-  roles               Role[]
-  subscription        Subscription?
-  users               User[]
-
-  @@map("companies")
 }
 
 model Counterparty {
@@ -481,71 +385,6 @@ model PlanItem {
   @@map("plan_items")
 }
 
-<<<<<<< HEAD
-=======
-model Salary {
-  id                     String    @id @default(uuid())
-  companyId              String
-  employeeCounterpartyId String
-  departmentId           String?
-  baseWage               Float
-  contributionsPct       Float     @default(30.0)
-  incomeTaxPct           Float     @default(13.0)
-  periodicity            String    @default("monthly") // monthly|weekly|biweekly
-  effectiveFrom          DateTime
-  effectiveTo            DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-
-  company              Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  employeeCounterparty Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-  department           Department?  @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-
-  @@index([companyId])
-  @@map("salaries")
-}
-
-model Budget {
-  id        String    @id @default(uuid())
-  companyId String
-  name      String
-  startDate DateTime
-  endDate   DateTime?
-  status    String    @default("active") // active|archived
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  planItems PlanItem[]
-
-  @@index([companyId, status])
-  @@map("budgets")
-}
-
-// Роли
-model Role {
-  id          String    @id @default(cuid())
-  companyId   String
-  name        String // Название роли (например, "Бухгалтер", "Финансовый менеджер")
-  description String? // Описание роли
-  category    String? // Группа ролей (например, "Бухгалтерия", "Менеджеры отделов")
-  isSystem    Boolean   @default(false) // Системная роль (нельзя удалить)
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  company     Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  permissions RolePermission[]
-  userRoles   UserRole[]
-
-  @@index([companyId])
-  @@index([companyId, isActive])
-  @@map("roles")
-}
-
-// Права роли на сущности
->>>>>>> 1af8208
 model RolePermission {
   id        String   @id @default(uuid())
   roleId    String

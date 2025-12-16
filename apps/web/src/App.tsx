@@ -15,16 +15,11 @@ import { AccountsPage } from './pages/catalogs/AccountsPage';
 import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
-<<<<<<< HEAD
-import { ProfilePage as ProfilePageOld } from './pages/ProfilePage';
-import { CompanyPage as CompanyPageOld } from './pages/CompanyPage';
-import { PricingPage } from './pages/PricingPage';
-import { AdminPage as AdminPageOld } from './pages/AdminPage';
-// Profile pages
+// Profile pages with new structure
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { SecurityPage } from './pages/profile/SecurityPage';
 import { SettingsPage as ProfileSettingsPage } from './pages/profile/SettingsPage';
-// Company pages
+// Company pages with new structure
 import { CompanySettingsPage } from './pages/company/SettingsPage';
 import { CurrencyPage } from './pages/company/CurrencyPage';
 import { TariffPage } from './pages/company/TariffPage';
@@ -33,12 +28,9 @@ import { IntegrationsPage } from './pages/company/IntegrationsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { RolesPage } from './pages/admin/RolesPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
-=======
-import { SalariesPage } from './pages/catalogs/SalariesPage';
-import { ProfilePage } from './pages/ProfilePage';
 import { CompanyPage } from './pages/CompanyPage';
 import { AdminPage } from './pages/AdminPage';
->>>>>>> 1af8208
+import { PricingPage } from './pages/PricingPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
@@ -171,7 +163,7 @@ function App() {
           }
         />
 
-        {/* Profile and Company routes - accessible to all authenticated users */}
+        {/* Profile routes with new structure */}
         <Route
           path="/profile"
           element={
@@ -181,10 +173,70 @@ function App() {
           }
         />
         <Route
+          path="/profile/security"
+          element={
+            <PrivateRoute>
+              <SecurityPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/profile/settings"
+          element={
+            <PrivateRoute>
+              <ProfileSettingsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Company routes with new structure */}
+        <Route
           path="/company"
           element={
             <PrivateRoute>
               <CompanyPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/tariff"
+          element={
+            <PrivateRoute>
+              <TariffPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/currency"
+          element={
+            <PrivateRoute>
+              <CurrencyPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/settings"
+          element={
+            <PrivateRoute>
+              <CompanySettingsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/integrations"
+          element={
+            <PrivateRoute>
+              <IntegrationsPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* Pricing page */}
+        <Route
+          path="/pricing"
+          element={
+            <PrivateRoute>
+              <PricingPage />
             </PrivateRoute>
           }
         />
