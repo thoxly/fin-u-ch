@@ -41,6 +41,7 @@ const getEntityForMenuItem = (
     Подразделения: { entity: 'departments', action: 'read' },
     Контрагенты: { entity: 'counterparties', action: 'read' },
     Сделки: { entity: 'deals', action: 'read' },
+    Зарплаты: { entity: 'salaries', action: 'read' },
     Администрирование: { entity: 'users', action: 'read' },
   };
 
@@ -109,6 +110,12 @@ const getBaseNavigation = (): NavigationItem[] => {
           name: 'Сделки',
           href: '/catalogs/deals',
           entity: 'deals',
+          action: 'read',
+        },
+        {
+          name: 'Зарплаты',
+          href: '/catalogs/salaries',
+          entity: 'salaries',
           action: 'read',
         },
       ],
@@ -350,13 +357,7 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 />
               </Link>
             </div>
-<<<<<<< HEAD
-            <div className="flex items-center gap-4">
-              <UserMenu userEmail={user?.email} />
-            </div>
-=======
             <UserMenu userEmail={user?.email} />
->>>>>>> 1af8208
           </div>
         </div>
       </header>
