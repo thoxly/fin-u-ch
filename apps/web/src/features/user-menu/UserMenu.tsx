@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
 import { usePermissions } from '../../shared/hooks/usePermissions';
-import { useAppSelector } from '../../shared/hooks/useRedux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 
 interface UserMenuProps {
@@ -26,7 +26,7 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const { hasPermission, isSuperAdmin } = usePermissions();
 
   // Получаем данные о тарифе
-  const subscriptionData = useAppSelector(
+  const subscriptionData = useSelector(
     (state: RootState) => state.subscription?.data ?? null
   );
 
