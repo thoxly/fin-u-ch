@@ -63,7 +63,6 @@ export const DashboardPage = () => {
   // Проверяем права на просмотр различных виджетов
   const canViewOperations = canRead('operations');
   const canViewReports = canRead('reports');
-  const canViewDashboard = canRead('dashboard');
   const canViewAccounts = canRead('accounts');
 
   // Получаем данные дашборда из API (только если есть права на просмотр)
@@ -119,14 +118,7 @@ export const DashboardPage = () => {
       mode: 'both',
       periodFormat: periodFilters.format, // Передаем формат периода
     },
-<<<<<<< HEAD
-    {
-      skip: !canViewOperations && !canViewReports && !canViewDashboard,
-      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
-    }
-=======
     { skip: !canViewOperations && !canViewReports }
->>>>>>> 1af8208
   );
 
   // Получаем накопительные данные для графика поступлений/списаний
@@ -138,14 +130,7 @@ export const DashboardPage = () => {
         mode: 'both',
         periodFormat: periodFilters.format,
       },
-<<<<<<< HEAD
-      {
-        skip: !canViewOperations && !canViewReports && !canViewDashboard,
-        refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
-      }
-=======
       { skip: !canViewOperations && !canViewReports }
->>>>>>> 1af8208
     );
 
   // Получаем последние операции (только если есть права на просмотр операций)
@@ -385,7 +370,7 @@ export const DashboardPage = () => {
         {dashboardData && (
           <>
             {/* Графики и таблицы */}
-            {(canViewDashboard || canViewReports || canViewOperations) && (
+            {canViewReports && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* График поступлений/списаний/чистого потока */}
                 <IncomeExpenseChart data={incomeExpenseData} />
