@@ -1,9 +1,5 @@
 import prisma from '../../../config/db';
-import {
-  getMonthKey,
-  getMonthsBetween,
-  CashflowBreakdown,
-} from '@fin-u-ch/shared';
+import { getMonthKey, getMonthsBetween } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 
 export interface CashflowParams {
@@ -11,11 +7,6 @@ export interface CashflowParams {
   periodTo: Date;
   activity?: string;
   rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
-<<<<<<< HEAD
-  parentArticleId?: string; // ID родительской статьи для суммирования по потомкам
-  breakdown?: CashflowBreakdown; // Разрез отчета: по видам деятельности, сделкам, счетам, подразделениям, контрагентам
-=======
->>>>>>> 1af8208
 }
 
 // Internal aggregation row
@@ -44,8 +35,6 @@ interface ArticleGroup {
 
 interface ActivityGroup {
   activity: 'operating' | 'investing' | 'financing' | 'unknown';
-  key?: string; // ID сделки/счета/подразделения/контрагента
-  name?: string; // Название сделки/счета/подразделения/контрагента
   incomeGroups: ArticleGroup[];
   expenseGroups: ArticleGroup[];
   totalIncome: number;
@@ -56,7 +45,6 @@ interface ActivityGroup {
 interface CashflowReport {
   periodFrom: string;
   periodTo: string;
-  breakdown?: CashflowBreakdown;
   activities: ActivityGroup[];
 }
 
@@ -65,114 +53,11 @@ export class CashflowService {
     companyId: string,
     params: CashflowParams
   ): Promise<CashflowReport> {
-<<<<<<< HEAD
-    const startTime = Date.now();
-    const breakdown = params.breakdown || 'activity';
-    const cacheKey = generateCacheKey(companyId, 'cashflow', params);
-
-    logger.debug('Cashflow report generation started', {
-      companyId,
-      params: {
-        periodFrom: params.periodFrom.toISOString(),
-        periodTo: params.periodTo.toISOString(),
-        activity: params.activity,
-        rounding: params.rounding,
-        parentArticleId: params.parentArticleId,
-        breakdown,
-      },
-    });
-
-    const cached = await getCachedReport(cacheKey);
-    if (cached) {
-      logger.debug('Cashflow report retrieved from cache', {
-        companyId,
-        cacheKey,
-      });
-      return cached as CashflowReport;
-    }
-
-    // Если указан parentArticleId, получаем все ID потомков
-    let articleIdsFilter: string[] | undefined;
-    if (params.parentArticleId) {
-      const descendantIds = await articlesService.getDescendantIds(
-        params.parentArticleId,
-        companyId
-      );
-      // Включаем саму родительскую статью и всех потомков
-      articleIdsFilter = [params.parentArticleId, ...descendantIds];
-    }
-
-    // Получаем все операции за период
-    logger.debug('Fetching operations for cashflow report', {
-      companyId,
-      periodFrom: params.periodFrom.toISOString(),
-      periodTo: params.periodTo.toISOString(),
-      articleIdsFilter: articleIdsFilter?.length || 0,
-      breakdown,
-    });
-=======
     const cacheKey = generateCacheKey(companyId, 'cashflow', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) return cached as CashflowReport;
->>>>>>> 1af8208
-
-    // Определяем, какие связи нужно включить в зависимости от разреза
-    const includeRelations: any = {
-      article: {
-        select: { id: true, name: true, activity: true, type: true },
-      },
-    };
-
-    if (breakdown === 'deal') {
-      includeRelations.deal = {
-        select: { id: true, name: true },
-      };
-    } else if (breakdown === 'account') {
-      includeRelations.account = {
-        select: { id: true, name: true },
-      };
-    } else if (breakdown === 'department') {
-      includeRelations.department = {
-        select: { id: true, name: true },
-      };
-    } else if (breakdown === 'counterparty') {
-      includeRelations.counterparty = {
-        select: { id: true, name: true },
-      };
-    }
-
-    // Формируем фильтр для операций в зависимости от разреза
-    const whereClause: any = {
-      companyId,
-      operationDate: {
-        gte: params.periodFrom,
-        lte: params.periodTo,
-      },
-      type: { in: ['income', 'expense'] },
-      isConfirmed: true,
-      isTemplate: false,
-      // Если указан parentArticleId, фильтруем по статье и её потомкам
-      ...(articleIdsFilter && {
-        articleId: { in: articleIdsFilter },
-      }),
-    };
-
-    // Фильтруем операции по наличию нужного атрибута для разрезов
-    if (breakdown === 'deal') {
-      whereClause.dealId = { not: null };
-    } else if (breakdown === 'account') {
-      whereClause.accountId = { not: null };
-    } else if (breakdown === 'department') {
-      whereClause.departmentId = { not: null };
-    } else if (breakdown === 'counterparty') {
-      whereClause.counterpartyId = { not: null };
-    }
 
     const operations = await prisma.operation.findMany({
-<<<<<<< HEAD
-      where: whereClause,
-      include: includeRelations,
-=======
       where: {
         companyId,
         operationDate: {
@@ -188,101 +73,12 @@ export class CashflowService {
           select: { id: true, name: true, activity: true, type: true },
         },
       },
->>>>>>> 1af8208
     });
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
     const articleMap = new Map<string, CashflowRow>();
 
-<<<<<<< HEAD
-    // Фильтруем операции по активности, если указана
-    // Явно типизируем как массив операций, чтобы TypeScript правильно определил тип
-    // Проблема: TypeScript может неправильно вывести тип из-за сложного типа Prisma
-    // Используем двойное приведение типов для обхода проблемы
-    type OperationType = {
-      id: string;
-      article: {
-        id: string;
-        name: string;
-        activity: string | null;
-        type: string;
-      } | null;
-      deal?: { id: string; name: string } | null;
-      account?: { id: string; name: string } | null;
-      department?: { id: string; name: string } | null;
-      counterparty?: { id: string; name: string } | null;
-      [key: string]: any;
-    };
-    const filteredOperations = (
-      params.activity
-        ? (operations as unknown as OperationType[]).filter((op) => {
-            return op.article?.activity === params.activity;
-          })
-        : (operations as unknown as OperationType[])
-    ) as OperationType[];
-
-    // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
-    const articlesWithOperations = new Set<string>();
-    for (const op of filteredOperations) {
-      if (op.article) {
-        articlesWithOperations.add(op.article.id);
-      }
-    }
-
-    // Для каждой статьи с операциями получаем всех родителей и всех потомков
-    const allArticleIds = new Set<string>();
-    for (const articleId of articlesWithOperations) {
-      allArticleIds.add(articleId);
-
-      // Получаем всех родителей
-      const ancestorIds = await articlesService.getAncestorIds(
-        articleId,
-        companyId
-      );
-      ancestorIds.forEach((id) => allArticleIds.add(id));
-
-      // Получаем всех потомков
-      const descendantIds = await articlesService.getDescendantIds(
-        articleId,
-        companyId
-      );
-      descendantIds.forEach((id) => allArticleIds.add(id));
-    }
-
-    // Получаем данные всех статей из иерархии
-    const allArticles = await prisma.article.findMany({
-      where: {
-        id: { in: Array.from(allArticleIds) },
-        companyId,
-      },
-      select: {
-        id: true,
-        name: true,
-        parentId: true,
-        activity: true,
-        type: true,
-      },
-    });
-
-    // Создаем Map для быстрого доступа к статьям
-    type ArticleData = {
-      id: string;
-      name: string;
-      parentId: string | null;
-      activity: string | null;
-      type: string;
-    };
-    const articleDataMap = new Map<string, ArticleData>(
-      allArticles.map((a: ArticleData) => [a.id, a])
-    );
-
-    // Агрегируем операции по статьям (используем уже отфильтрованные операции)
-    const operationsByArticle = new Map<string, CashflowRow>();
-
-    for (const op of filteredOperations) {
-=======
     for (const op of operations) {
->>>>>>> 1af8208
       if (!op.article) continue;
       if (params.activity && op.article.activity !== params.activity) continue;
 
@@ -313,304 +109,6 @@ export class CashflowService {
       return Math.round(value / unit) * unit;
     };
 
-<<<<<<< HEAD
-    // Создаем иерархическую структуру статей
-    // Сначала создаем плоский список всех ArticleGroup
-    const articleGroupMap = new Map<string, ArticleGroup>();
-
-    for (const articleData of allArticles) {
-      const operationsData = operationsByArticle.get(articleData.id);
-      const hasOps = operationsData !== undefined;
-
-      const monthsData: MonthlyData[] = months.map((m) => ({
-        month: m,
-        amount: applyRounding(operationsData?.months[m] || 0),
-      }));
-
-      articleGroupMap.set(articleData.id, {
-        articleId: articleData.id,
-        articleName: articleData.name,
-        type: articleData.type as 'income' | 'expense',
-        months: monthsData,
-        total: applyRounding(operationsData?.total || 0),
-        parentId: articleData.parentId,
-        hasOperations: hasOps,
-        children: [],
-      });
-    }
-
-    // Строим иерархию: добавляем дочерние статьи к родителям
-    const rootArticles: ArticleGroup[] = [];
-
-    for (const articleGroup of articleGroupMap.values()) {
-      if (articleGroup.parentId && articleGroupMap.has(articleGroup.parentId)) {
-        const parent = articleGroupMap.get(articleGroup.parentId)!;
-        if (!parent.children) {
-          parent.children = [];
-        }
-        parent.children.push(articleGroup);
-      } else {
-        rootArticles.push(articleGroup);
-      }
-    }
-
-    // Агрегируем суммы от дочерних статей к родительским (снизу вверх)
-    const aggregateFromChildren = (article: ArticleGroup): void => {
-      if (article.children && article.children.length > 0) {
-        // Сначала обрабатываем всех детей
-        for (const child of article.children) {
-          aggregateFromChildren(child);
-        }
-
-        // Начинаем с текущих сумм родительской статьи (уже содержат операции по этой статье)
-        const aggregatedMonths = new Map<string, number>();
-        // Инициализируем карту текущими суммами родительской статьи
-        for (const monthData of article.months) {
-          aggregatedMonths.set(monthData.month, monthData.amount);
-        }
-        let aggregatedTotal = article.total;
-
-        // Добавляем суммы всех дочерних статей к суммам родителя
-        for (const child of article.children) {
-          for (const monthData of child.months) {
-            const current = aggregatedMonths.get(monthData.month) || 0;
-            aggregatedMonths.set(monthData.month, current + monthData.amount);
-          }
-          aggregatedTotal += child.total;
-        }
-
-        // Обновляем суммы родительской статьи (родитель + все дети)
-        article.months = months.map((m) => ({
-          month: m,
-          amount: applyRounding(aggregatedMonths.get(m) || 0),
-        }));
-        article.total = applyRounding(aggregatedTotal);
-      }
-    };
-
-    // Агрегируем для всех корневых статей
-    for (const rootArticle of rootArticles) {
-      aggregateFromChildren(rootArticle);
-    }
-
-    // Сортируем статьи по имени
-    const sortArticles = (articles: ArticleGroup[]): ArticleGroup[] => {
-      return articles
-        .sort((a, b) => a.articleName.localeCompare(b.articleName))
-        .map((article) => ({
-          ...article,
-          children: article.children
-            ? sortArticles(article.children)
-            : undefined,
-        }));
-    };
-
-    const sortedRootArticles = sortArticles(rootArticles);
-
-    // Группируем по выбранному разрезу
-    const byBreakdown: Map<string, ActivityGroup> = new Map();
-
-    if (breakdown === 'activity') {
-      // Текущая логика группировки по активностям
-      for (const rootArticle of sortedRootArticles) {
-        const articleData = articleDataMap.get(rootArticle.articleId);
-        if (!articleData) continue;
-
-        const activity = (articleData.activity ||
-          'unknown') as ActivityGroup['activity'];
-
-        // Если указан фильтр по активности, пропускаем статьи с другой активностью
-        // Но включаем их, если они являются родителями или потомками статей с нужной активностью
-        // (это уже учтено при фильтрации операций выше)
-        if (params.activity && articleData.activity !== params.activity) {
-          // Проверяем, есть ли у этой статьи операции (hasOperations)
-          // Если нет операций, значит это родительская/дочерняя статья, и мы её включаем
-          // Если есть операции, но активность не совпадает, пропускаем
-          if (rootArticle.hasOperations) {
-            continue;
-          }
-        }
-
-        if (!byBreakdown.has(activity)) {
-          byBreakdown.set(activity, {
-            activity,
-            incomeGroups: [],
-            expenseGroups: [],
-            totalIncome: 0,
-            totalExpense: 0,
-            netCashflow: 0,
-          });
-        }
-
-        const group = byBreakdown.get(activity)!;
-
-        if (rootArticle.type === 'income') {
-          group.incomeGroups.push(rootArticle);
-          group.totalIncome += rootArticle.total;
-        } else if (rootArticle.type === 'expense') {
-          group.expenseGroups.push(rootArticle);
-          group.totalExpense += rootArticle.total;
-        }
-      }
-    } else {
-      // Группировка по другим разрезам (deal, account, department, counterparty)
-      // Сначала группируем операции по выбранному разрезу
-      const operationsByBreakdown = new Map<
-        string,
-        { id: string; name: string; operations: typeof filteredOperations }
-      >();
-
-      for (const op of filteredOperations) {
-        if (!op.article) continue;
-
-        let breakdownKey: string | null = null;
-        let breakdownName: string | null = null;
-
-        if (breakdown === 'deal' && op.dealId && op.deal) {
-          breakdownKey = op.dealId;
-          breakdownName = op.deal.name;
-        } else if (breakdown === 'account' && op.accountId && op.account) {
-          breakdownKey = op.accountId;
-          breakdownName = op.account.name;
-        } else if (
-          breakdown === 'department' &&
-          op.departmentId &&
-          op.department
-        ) {
-          breakdownKey = op.departmentId;
-          breakdownName = op.department.name;
-        } else if (
-          breakdown === 'counterparty' &&
-          op.counterpartyId &&
-          op.counterparty
-        ) {
-          breakdownKey = op.counterpartyId;
-          breakdownName = op.counterparty.name;
-        }
-
-        if (!breakdownKey || !breakdownName) continue;
-
-        if (!operationsByBreakdown.has(breakdownKey)) {
-          operationsByBreakdown.set(breakdownKey, {
-            id: breakdownKey,
-            name: breakdownName,
-            operations: [],
-          });
-        }
-
-        operationsByBreakdown.get(breakdownKey)!.operations.push(op);
-      }
-
-      // Для каждого значения разреза создаем группу и агрегируем статьи
-      for (const [breakdownKey, breakdownData] of operationsByBreakdown) {
-        // Агрегируем операции по статьям для этого разреза
-        const breakdownOperationsByArticle = new Map<string, CashflowRow>();
-
-        for (const op of breakdownData.operations) {
-          if (!op.article) continue;
-
-          const articleId = op.article.id;
-          const articleData = articleDataMap.get(articleId);
-          if (!articleData) continue;
-
-          if (!breakdownOperationsByArticle.has(articleId)) {
-            breakdownOperationsByArticle.set(articleId, {
-              articleId: articleData.id,
-              articleName: articleData.name,
-              activity: articleData.activity || 'unknown',
-              type: articleData.type,
-              months: Object.fromEntries(months.map((m) => [m, 0])),
-              total: 0,
-            });
-          }
-
-          const row = breakdownOperationsByArticle.get(articleId)!;
-          const month = getMonthKey(new Date(op.operationDate));
-          if (row.months[month] !== undefined) {
-            row.months[month] += op.amount;
-            row.total += op.amount;
-          }
-        }
-
-        // Создаем ArticleGroup для этого разреза, используя уже полученные allArticles
-        const breakdownArticleGroupMap = new Map<string, ArticleGroup>();
-
-        for (const articleData of allArticles) {
-          const operationsData = breakdownOperationsByArticle.get(
-            articleData.id
-          );
-          const hasOps = operationsData !== undefined;
-
-          const monthsData: MonthlyData[] = months.map((m) => ({
-            month: m,
-            amount: applyRounding(operationsData?.months[m] || 0),
-          }));
-
-          breakdownArticleGroupMap.set(articleData.id, {
-            articleId: articleData.id,
-            articleName: articleData.name,
-            type: articleData.type as 'income' | 'expense',
-            months: monthsData,
-            total: applyRounding(operationsData?.total || 0),
-            parentId: articleData.parentId,
-            hasOperations: hasOps,
-            children: [],
-          });
-        }
-
-        // Строим иерархию
-        const breakdownRootArticles: ArticleGroup[] = [];
-
-        for (const articleGroup of breakdownArticleGroupMap.values()) {
-          if (
-            articleGroup.parentId &&
-            breakdownArticleGroupMap.has(articleGroup.parentId)
-          ) {
-            const parent = breakdownArticleGroupMap.get(articleGroup.parentId)!;
-            if (!parent.children) {
-              parent.children = [];
-            }
-            parent.children.push(articleGroup);
-          } else {
-            breakdownRootArticles.push(articleGroup);
-          }
-        }
-
-        // Агрегируем от детей к родителям
-        for (const rootArticle of breakdownRootArticles) {
-          aggregateFromChildren(rootArticle);
-        }
-
-        // Сортируем статьи
-        const sortedBreakdownArticles = sortArticles(breakdownRootArticles);
-
-        // Разделяем на доходы и расходы
-        const incomeGroups: ArticleGroup[] = [];
-        const expenseGroups: ArticleGroup[] = [];
-        let totalIncome = 0;
-        let totalExpense = 0;
-
-        for (const article of sortedBreakdownArticles) {
-          if (article.type === 'income') {
-            incomeGroups.push(article);
-            totalIncome += article.total;
-          } else if (article.type === 'expense') {
-            expenseGroups.push(article);
-            totalExpense += article.total;
-          }
-        }
-
-        byBreakdown.set(breakdownKey, {
-          activity: 'unknown', // Для не-activity разрезов используем 'unknown'
-          key: breakdownData.id,
-          name: breakdownData.name,
-          incomeGroups,
-          expenseGroups,
-          totalIncome: applyRounding(totalIncome),
-          totalExpense: applyRounding(totalExpense),
-          netCashflow: applyRounding(totalIncome - totalExpense),
-        });
-=======
     // Transform to activities with income/expense groups
     const byActivity: Map<string, ActivityGroup> = new Map();
 
@@ -654,31 +152,20 @@ export class CashflowService {
       } else if (row.type === 'expense') {
         group.expenseGroups.push(articleGroup);
         group.totalExpense += articleGroup.total;
->>>>>>> 1af8208
       }
     }
 
     // Finalize net values and optional rounding for totals
-    const activities = Array.from(byBreakdown.values()).map((g) => ({
+    const activities = Array.from(byActivity.values()).map((g) => ({
       ...g,
       totalIncome: applyRounding(g.totalIncome),
       totalExpense: applyRounding(g.totalExpense),
       netCashflow: applyRounding(g.totalIncome - g.totalExpense),
     }));
 
-    // Сортируем группы по имени для не-activity разрезов
-    if (breakdown !== 'activity') {
-      activities.sort((a, b) => {
-        const nameA = a.name || '';
-        const nameB = b.name || '';
-        return nameA.localeCompare(nameB);
-      });
-    }
-
     const response: CashflowReport = {
       periodFrom: params.periodFrom.toISOString().slice(0, 10),
       periodTo: params.periodTo.toISOString().slice(0, 10),
-      breakdown,
       activities,
     };
 

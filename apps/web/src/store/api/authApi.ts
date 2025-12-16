@@ -206,6 +206,20 @@ export const authApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['User'],
     }),
+    deleteMyAccount: builder.mutation<void, void>({
+      query: () => ({
+        url: '/users/me',
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['User'],
+    }),
+    logout: builder.mutation<void, void>({
+      query: () => ({
+        url: '/auth/logout',
+        method: 'POST',
+      }),
+      invalidatesTags: ['User'],
+    }),
   }),
 });
 
@@ -225,4 +239,6 @@ export const {
   useConfirmEmailChangeMutation,
   useGetPreferencesQuery,
   useUpdatePreferencesMutation,
+  useDeleteMyAccountMutation,
+  useLogoutMutation,
 } = authApi;

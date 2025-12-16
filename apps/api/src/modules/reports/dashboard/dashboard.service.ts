@@ -260,28 +260,13 @@ export class DashboardService {
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
 
-<<<<<<< HEAD
-    // Нормализуем даты для запроса к БД (устанавливаем время в начало/конец дня)
-    const normalizedPeriodFrom = new Date(params.periodFrom);
-    normalizedPeriodFrom.setHours(0, 0, 0, 0);
-    const normalizedPeriodTo = new Date(params.periodTo);
-    normalizedPeriodTo.setHours(23, 59, 59, 999);
-
-    logger.debug('Fetching operations for cumulative cashflow', {
-      companyId,
-      periodFrom: normalizedPeriodFrom.toISOString(),
-      periodTo: normalizedPeriodTo.toISOString(),
-    });
-
-=======
->>>>>>> 1af8208
     // Получаем все операции за период (только реальные, не шаблоны)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
         operationDate: {
-          gte: normalizedPeriodFrom,
-          lte: normalizedPeriodTo,
+          gte: params.periodFrom,
+          lte: params.periodTo,
         },
         isConfirmed: true,
         isTemplate: false,
@@ -296,57 +281,12 @@ export class DashboardService {
       },
     });
 
-    // Создаем интервалы (используем уже нормализованные даты из запроса к БД)
-    // ВАЖНО: Создаем новые Date объекты, чтобы избежать проблем с мутацией
-    const intervalsFromDate = new Date(
-      normalizedPeriodFrom.getFullYear(),
-      normalizedPeriodFrom.getMonth(),
-      normalizedPeriodFrom.getDate()
-    );
-    const intervalsToDate = new Date(
-      normalizedPeriodTo.getFullYear(),
-      normalizedPeriodTo.getMonth(),
-      normalizedPeriodTo.getDate(),
-      23,
-      59,
-      59,
-      999
-    );
-
-    logger.debug('Creating intervals', {
-      periodFormat,
-      fromDate: intervalsFromDate.toISOString(),
-      toDate: intervalsToDate.toISOString(),
-      totalDays:
-        Math.ceil(
-          (intervalsToDate.getTime() - intervalsFromDate.getTime()) /
-            (1000 * 60 * 60 * 24)
-        ) + 1,
-    });
-
+    // Создаем интервалы
     const intervals = createIntervals(
       periodFormat,
-      intervalsFromDate,
-      intervalsToDate
+      params.periodFrom,
+      params.periodTo
     );
-
-    logger.debug('Intervals created', {
-      intervalsCount: intervals.length,
-      firstInterval: intervals[0]
-        ? {
-            start: intervals[0].start.toISOString(),
-            end: intervals[0].end.toISOString(),
-            label: intervals[0].label,
-          }
-        : null,
-      lastInterval: intervals[intervals.length - 1]
-        ? {
-            start: intervals[intervals.length - 1].start.toISOString(),
-            end: intervals[intervals.length - 1].end.toISOString(),
-            label: intervals[intervals.length - 1].label,
-          }
-        : null,
-    });
 
     // Рассчитываем накопительные данные
     const cumulativeSeries = intervals.map((interval, index) => {
