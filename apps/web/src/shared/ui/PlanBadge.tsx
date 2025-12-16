@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../hooks/useRedux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 
 interface PlanBadgeProps {
@@ -32,7 +32,7 @@ const planConfig = {
 export const PlanBadge = ({ compact = false }: PlanBadgeProps) => {
   const navigate = useNavigate();
   // use a tolerant selector so tests / mock stores without `subscription` key don't crash
-  const subscriptionData = useAppSelector(
+  const subscriptionData = useSelector(
     (state: RootState) => state.subscription?.data ?? null
   );
 
