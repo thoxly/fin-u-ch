@@ -130,7 +130,7 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
             <>
               <hr className="my-1 border-gray-200 dark:border-gray-700" />
               <button
-                onClick={() => handleMenuItemClick('/company/tarif')}
+                onClick={() => handleMenuItemClick('/company/tariff')}
                 className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 <CreditCard size={16} />

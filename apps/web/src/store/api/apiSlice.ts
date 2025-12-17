@@ -127,6 +127,7 @@ export const apiSlice = createApi({
     'Role',
     'Permission',
     'AuditLog',
+    'Integration',
     'Import',
     'MappingRule',
   ],

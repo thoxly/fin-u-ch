@@ -124,6 +124,64 @@ export class ArticlesService {
       data: { isActive: false },
     });
   }
+
+  /**
+   * Получает все ID предков статьи (рекурсивно вверх по иерархии)
+   */
+  async getAncestorIds(
+    articleId: string,
+    companyId: string
+  ): Promise<string[]> {
+    const ancestors: string[] = [];
+
+    const collectParents = async (childId: string) => {
+      const article = await prisma.article.findFirst({
+        where: {
+          id: childId,
+          companyId,
+        },
+        select: { parentId: true },
+      });
+
+      if (article?.parentId) {
+        ancestors.push(article.parentId);
+        // Рекурсивно собираем предков
+        await collectParents(article.parentId);
+      }
+    };
+
+    await collectParents(articleId);
+    return ancestors;
+  }
+
+  /**
+   * Получает все ID потомков статьи (рекурсивно вниз по иерархии)
+   */
+  async getDescendantIds(
+    articleId: string,
+    companyId: string
+  ): Promise<string[]> {
+    const descendants: string[] = [];
+
+    const collectChildren = async (parentId: string) => {
+      const children = await prisma.article.findMany({
+        where: {
+          parentId,
+          companyId,
+        },
+        select: { id: true },
+      });
+
+      for (const child of children) {
+        descendants.push(child.id);
+        // Рекурсивно собираем потомков
+        await collectChildren(child.id);
+      }
+    };
+
+    await collectChildren(articleId);
+    return descendants;
+  }
 }
 
 export default new ArticlesService();
