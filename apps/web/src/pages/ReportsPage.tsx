@@ -12,7 +12,13 @@ import {
 import { useGetBudgetsQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery } from '../store/api/plansApi';
 import { CashflowTable } from '../widgets/CashflowTable';
-import type { Budget, CashflowReport, BDDSReport } from '@fin-u-ch/shared';
+import { useArticleTree } from '../shared/hooks/useArticleTree';
+import type {
+  Budget,
+  CashflowReport,
+  BDDSReport,
+  CashflowBreakdown,
+} from '@fin-u-ch/shared';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
   getPeriodRange,
@@ -29,6 +35,11 @@ type ReportMode = 'fact' | 'plan' | 'both';
 const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
+
+  // Нормализуем даты (убираем время для корректного сравнения)
+  fromDate.setHours(0, 0, 0, 0);
+  toDate.setHours(0, 0, 0, 0);
+
   const daysDiff =
     Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
     1;
@@ -67,12 +78,27 @@ export const ReportsPage = () => {
   const [reportMode, setReportMode] = useState<ReportMode>('fact');
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
   const [showBudgetMenu, setShowBudgetMenu] = useState(false);
+  const [showArticleFilter, setShowArticleFilter] = useState(false);
+  const [selectedParentArticleId] = useState<string | null>(null);
+  const [articleSearchQuery, setArticleSearchQuery] = useState<string>('');
+  const [breakdown, setBreakdown] = useState<CashflowBreakdown>('activity');
   const planButtonRef = useRef<HTMLButtonElement>(null);
   const bothButtonRef = useRef<HTMLButtonElement>(null);
   const budgetMenuRef = useRef<HTMLDivElement>(null);
+  const articleFilterRef = useRef<HTMLDivElement>(null);
+  // Проверка подписки для отчетов убрана - отчеты доступны в базовой подписке
+  // const subscriptionData = useAppSelector(
+  //   (state: RootState) => state?.subscription?.data ?? null
+  // );
+  // const planHierarchy = { START: 0, TEAM: 1, BUSINESS: 2 };
+  // const requiredLevel = planHierarchy['TEAM'];
+  // const currentLevel = planHierarchy[subscriptionData?.plan || 'START'] || 0;
 
   // Проверка прав на просмотр отчётов
   const { canRead } = usePermissions();
+
+  // Загружаем дерево статей для фильтра
+  const { tree: _articleTree = [] } = useArticleTree({ isActive: true });
 
   // Загружаем активные бюджеты (только если есть права на просмотр отчётов)
   const { data: budgets = [] } = useGetBudgetsQuery(
@@ -84,6 +110,15 @@ export const ReportsPage = () => {
   const { data: plans = [] } = useGetPlansQuery(undefined, {
     skip: !canRead('reports'),
   });
+
+  // Проверка подписки для отчетов убрана - отчеты доступны в базовой подписке
+  // if (currentLevel < requiredLevel) {
+  //   return (
+  //     <Layout>
+  //       <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
+  //     </Layout>
+  //   );
+  // }
   const hasPlans = plans.length > 0;
 
   // Если планов нет, принудительно устанавливаем режим "Факт"
@@ -135,12 +170,22 @@ export const ReportsPage = () => {
 
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
-    const format = detectPeriodFormat(
-      periodFilters.range.from,
-      periodFilters.range.to
-    );
-    const newRange = getPreviousPeriod(periodFilters.range, format);
-    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    // Определяем текущий формат: используем сохраненный или определяем автоматически
+    const currentFormat =
+      periodFilters.format ||
+      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+
+    // Если формат 'day', всегда используем его для переключения
+    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
+
+    const newRange = getPreviousPeriod(periodFilters.range, formatToUse);
+
+    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
+    const newFormat =
+      currentFormat === 'day'
+        ? 'day'
+        : detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -148,12 +193,22 @@ export const ReportsPage = () => {
   };
 
   const handleNextPeriod = () => {
-    const format = detectPeriodFormat(
-      periodFilters.range.from,
-      periodFilters.range.to
-    );
-    const newRange = getNextPeriod(periodFilters.range, format);
-    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
+    // Определяем текущий формат: используем сохраненный или определяем автоматически
+    const currentFormat =
+      periodFilters.format ||
+      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+
+    // Если формат 'day', всегда используем его для переключения
+    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
+
+    const newRange = getNextPeriod(periodFilters.range, formatToUse);
+
+    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
+    const newFormat =
+      currentFormat === 'day'
+        ? 'day'
+        : detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -161,12 +216,36 @@ export const ReportsPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
+    // Нормализуем даты (убираем время для корректного сравнения)
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    // Вычисляем разницу в днях для определения формата
+    const daysDiff =
+      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // Определяем формат на основе разницы дней
+    let format: PeriodFormat = 'day';
+    if (daysDiff === 1) {
+      format = 'day';
+    } else if (daysDiff <= 7) {
+      format = 'week';
+    } else if (daysDiff <= 31) {
+      format = 'month';
+    } else if (daysDiff <= 93) {
+      format = 'quarter';
+    } else {
+      format = 'year';
+    }
+
     // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
     const newRange = {
-      from: startDate.toISOString(),
-      to: endDate.toISOString(),
+      from: start.toISOString(),
+      to: end.toISOString(),
     };
-    const format = detectPeriodFormat(newRange.from, newRange.to);
+
     setPeriodFilters({
       format,
       range: newRange,
@@ -209,11 +288,19 @@ export const ReportsPage = () => {
       ) {
         setShowBudgetMenu(false);
       }
+      // Закрываем фильтр статей если клик вне
+      if (
+        showArticleFilter &&
+        articleFilterRef.current &&
+        !articleFilterRef.current.contains(target)
+      ) {
+        setShowArticleFilter(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showBudgetMenu]);
+  }, [showBudgetMenu, showArticleFilter]);
 
   // Если нет прав на просмотр, показываем сообщение
   if (!canRead('reports')) {
@@ -232,6 +319,15 @@ export const ReportsPage = () => {
       </Layout>
     );
   }
+
+  // Проверка тарифа убрана - отчеты доступны в базовой подписке
+  // if (currentLevel < requiredLevel) {
+  //   return (
+  //     <Layout>
+  //       <FeatureBlocker feature="reports_odds" requiredPlan="TEAM" />
+  //     </Layout>
+  //   );
+  // }
 
   return (
     <Layout>
@@ -435,6 +531,61 @@ export const ReportsPage = () => {
               </div>
             </>
           )}
+
+          {/* Селектор разреза */}
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400">
+              Разрез:
+            </span>
+            <select
+              value={breakdown}
+              onChange={(e) =>
+                setBreakdown(e.target.value as CashflowBreakdown)
+              }
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            >
+              <option value="activity">По видам деятельности</option>
+              <option value="deal">По сделкам</option>
+              <option value="account">По счетам</option>
+              <option value="department">По подразделениям</option>
+              <option value="counterparty">По контрагентам</option>
+            </select>
+          </div>
+
+          {/* Поле поиска статей */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="text"
+                value={articleSearchQuery}
+                onChange={(e) => setArticleSearchQuery(e.target.value)}
+                placeholder="Поиск статьи..."
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+              {articleSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setArticleSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  aria-label="Очистить поиск"
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
         </Card>
 
         {/* Контент отчетов */}
@@ -444,6 +595,9 @@ export const ReportsPage = () => {
           periodFormat={periodFilters.format}
           reportMode={reportMode}
           selectedBudget={selectedBudget}
+          selectedParentArticleId={selectedParentArticleId}
+          articleSearchQuery={articleSearchQuery}
+          breakdown={breakdown}
         />
       </div>
     </Layout>
@@ -457,12 +611,18 @@ const CashflowTab = ({
   periodFormat: _periodFormat,
   reportMode,
   selectedBudget,
+  selectedParentArticleId,
+  articleSearchQuery,
+  breakdown,
 }: {
   periodFrom: string;
   periodTo: string;
   periodFormat: 'day' | 'week' | 'month' | 'quarter' | 'year';
   reportMode: ReportMode;
   selectedBudget: Budget | null;
+  selectedParentArticleId: string | null;
+  articleSearchQuery: string;
+  breakdown: CashflowBreakdown;
 }) => {
   const { canRead } = usePermissions();
 
@@ -474,6 +634,8 @@ const CashflowTab = ({
       ? {
           periodFrom,
           periodTo,
+          parentArticleId: selectedParentArticleId || undefined,
+          breakdown,
         }
       : skipToken
   );
@@ -489,6 +651,7 @@ const CashflowTab = ({
           periodFrom,
           periodTo,
           budgetId: selectedBudget!.id,
+          parentArticleId: selectedParentArticleId || undefined,
         }
       : skipToken
   );
@@ -581,6 +744,8 @@ const CashflowTab = ({
       showPlan={showPlanColumns}
       periodFrom={periodFrom}
       periodTo={periodTo}
+      articleSearchQuery={articleSearchQuery}
+      breakdown={breakdown}
     />
   );
 };

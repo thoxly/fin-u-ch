@@ -4,6 +4,7 @@ import type {
   CashflowReport,
   BDDSReport,
   PlanFactReport,
+  CashflowBreakdown,
 } from '@shared/types/reports';
 
 interface DashboardParams {
@@ -18,6 +19,8 @@ interface ReportParams {
   periodTo: string;
   activity?: string;
   level?: string;
+  parentArticleId?: string;
+  breakdown?: CashflowBreakdown;
 }
 
 interface BDDSReportParams {
@@ -25,6 +28,7 @@ interface BDDSReportParams {
   periodTo: string;
   activity?: string;
   budgetId?: string;
+  parentArticleId?: string;
 }
 
 export const reportsApi = apiSlice.injectEndpoints({
