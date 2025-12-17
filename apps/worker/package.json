@@ -10,7 +10,8 @@
     "build": "tsc && node scripts/add-js-extensions.js",
     "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "recurring-now": "tsx src/index.ts run-recurring-now"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

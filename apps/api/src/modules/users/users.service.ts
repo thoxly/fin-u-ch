@@ -381,6 +381,108 @@ export class UsersService {
   }
 
   /**
+<<<<<<< HEAD
+   * Удалить свой аккаунт (включая удаление из БД и всей компании)
+   * Удаляет все пользователи компании (включая неактивных/приглашённых),
+   * все данные компании и саму компанию
+   */
+  async deleteMyAccount(userId: string, companyId: string) {
+    logger.warn(
+      '[UsersService.deleteMyAccount] Удаление своего аккаунта и компании',
+      {
+        userId,
+        companyId,
+      }
+    );
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        companyId: true,
+        isSuperAdmin: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (user.companyId !== companyId) {
+      throw new AppError('User does not belong to this company', 403);
+    }
+
+    // Выполняем полное удаление компании и всех связанных данных в транзакции
+    await prisma.$transaction(async (tx) => {
+      logger.debug('[UsersService.deleteMyAccount] Удаление данных компании', {
+        companyId,
+      });
+
+      // 1. Сначала удаляем записи из таблиц, которые ссылаются на другие таблицы (чтобы избежать FK ошибок)
+      // ImportedOperation ссылается на многое, удаляем первой
+      await tx.importedOperation.deleteMany({ where: { companyId } });
+
+      // Удаляем сессии импорта
+      await tx.importSession.deleteMany({ where: { companyId } });
+
+      // Удаляем правила маппинга
+      await tx.mappingRule.deleteMany({ where: { companyId } });
+
+      // Удаляем логи аудита (ссылаются на User и Company)
+      await tx.auditLog.deleteMany({ where: { companyId } });
+
+      // Удаляем операции
+      await tx.operation.deleteMany({ where: { companyId } });
+
+      // Удаляем элементы плана
+      await tx.planItem.deleteMany({ where: { companyId } });
+
+      // Удаляем зарплаты - DEPRECATED
+
+      // Удаляем интеграции - DEPRECATED (Integration model removed)
+      // await tx.integration.deleteMany({ where: { companyId } });
+
+      // 2. Удаляем основные сущности
+      await tx.budget.deleteMany({ where: { companyId } });
+      await tx.deal.deleteMany({ where: { companyId } });
+      await tx.article.deleteMany({ where: { companyId } }); // Article может ссылаться на себя (parentId), но deleteMany обычно справляется
+      await tx.account.deleteMany({ where: { companyId } });
+      await tx.counterparty.deleteMany({ where: { companyId } });
+      await tx.department.deleteMany({ where: { companyId } });
+      await tx.subscription.deleteMany({ where: { companyId } });
+
+      // Удаляем роли (и связанные RolePermission удалятся каскадно)
+      await tx.role.deleteMany({ where: { companyId } });
+
+      // 3. Удаляем всех пользователей компании
+      // Сначала удаляем токены email, хотя они удалятся каскадно, но на всякий случай
+      // await tx.emailToken.deleteMany({ where: { user: { companyId } } });
+
+      // Удаляем пользователей
+      await tx.user.deleteMany({
+        where: { companyId },
+      });
+
+      // 4. Удаляем саму компанию
+      await tx.company.delete({ where: { id: companyId } });
+    });
+
+    logger.warn(
+      '[UsersService.deleteMyAccount] Аккаунт и компания полностью удалены',
+      {
+        userId,
+        companyId,
+        email: user.email,
+      }
+    );
+
+    return { success: true };
+  }
+
+  /**
+=======
+>>>>>>> 1af8208
    * Пригласить пользователя по email
    */
   async inviteUser(

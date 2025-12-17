@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Save,
 } from 'lucide-react';
 import { Modal } from '../../shared/ui/Modal';
 import { Breadcrumb, BreadcrumbItem } from '../../shared/ui/Breadcrumb';
@@ -15,7 +16,12 @@ import { useUploadStatementMutation } from '../../store/api/importsApi';
 import { useNotification } from '../../shared/hooks/useNotification';
 import { ImportMappingTable } from './ImportMappingTable';
 import { ImportHistory } from './ImportHistory';
-import { useGetCompanyQuery } from '../../store/api/companiesApi';
+import {
+  useGetCompanyQuery,
+  useUpdateCompanyMutation,
+} from '../../store/api/companiesApi';
+import { Input } from '../../shared/ui/Input';
+import { Button } from '../../shared/ui/Button';
 
 interface BankImportModalProps {
   isOpen: boolean;
@@ -50,7 +56,10 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
     string | null
   >(null);
   const [isMinimizing, setIsMinimizing] = useState(false); // Флаг для предотвращения перезаписи при сворачивании
+  const [innValue, setInnValue] = useState('');
   const [uploadStatement, { isLoading }] = useUploadStatementMutation();
+  const [updateCompany, { isLoading: isUpdatingInn }] =
+    useUpdateCompanyMutation();
   const { showSuccess, showError } = useNotification();
   const { data: company } = useGetCompanyQuery();
 
@@ -60,6 +69,34 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
       setShowInnInfo(true);
     }
   }, [isOpen, company?.inn]);
+
+  // Обработчик сохранения ИНН
+  const handleSaveInn = async () => {
+    if (!innValue.trim()) {
+      showError('Введите ИНН');
+      return;
+    }
+
+    // Базовая валидация ИНН (10 или 12 цифр)
+    const innDigits = innValue.trim().replace(/\D/g, '');
+    if (innDigits.length !== 10 && innDigits.length !== 12) {
+      showError(
+        'ИНН должен содержать 10 (для юридических лиц) или 12 (для индивидуальных предпринимателей) цифр'
+      );
+      return;
+    }
+
+    try {
+      await updateCompany({
+        inn: innDigits,
+      }).unwrap();
+      showSuccess('ИНН успешно сохранён');
+      setInnValue('');
+    } catch (error) {
+      console.error('Ошибка при сохранении ИНН:', error);
+      showError('Ошибка при сохранении ИНН');
+    }
+  };
 
   // Загружаем состояние из localStorage при монтировании и проверяем срок действия
   useEffect(() => {
@@ -641,10 +678,43 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
                         </li>
                       </ul>
                       {!company?.inn && (
-                        <p className="mt-2 font-medium text-orange-700 dark:text-orange-300">
-                          💡 Перейдите в настройки профиля, чтобы добавить ИНН и
-                          упростить импорт выписок.
-                        </p>
+                        <div className="mt-4 space-y-2">
+                          <p className="font-medium text-orange-700 dark:text-orange-300">
+                            💡 Добавьте ИНН прямо сейчас:
+                          </p>
+                          <div className="flex gap-2">
+                            <Input
+                              type="text"
+                              value={innValue}
+                              onChange={(e) => setInnValue(e.target.value)}
+                              placeholder="Введите ИНН (10 или 12 цифр)"
+                              className="flex-1"
+                              disabled={isUpdatingInn}
+                              maxLength={12}
+                            />
+                            <Button
+                              onClick={handleSaveInn}
+                              disabled={isUpdatingInn || !innValue.trim()}
+                              variant="primary"
+                              className="whitespace-nowrap"
+                            >
+                              {isUpdatingInn ? (
+                                <>
+                                  <Loader2
+                                    size={16}
+                                    className="animate-spin mr-2"
+                                  />
+                                  Сохранение...
+                                </>
+                              ) : (
+                                <>
+                                  <Save size={16} className="mr-2" />
+                                  Сохранить
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

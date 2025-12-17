@@ -1,39 +1,12 @@
 import cron from 'node-cron';
 import { logger } from './config/logger';
 import { env } from './config/env';
-import {
-  generateSalaryOperations,
-  getCurrentMonth,
-} from './jobs/salary.generate.monthly';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
+import { cleanupExpiredDemoUsers } from './jobs/cleanup-demo-users.job';
 import { prisma } from './config/prisma';
 
 logger.info('🚀 Worker starting...');
 logger.info(`Environment: ${env.NODE_ENV}`);
-
-/**
- * Задача генерации зарплатных операций
- * Запускается каждое 1-е число месяца в 00:00
- * Cron pattern: '0 0 1 * *' (минута час день месяц день_недели)
- */
-const salaryGenerationTask = cron.schedule(
-  '0 0 1 * *',
-  async () => {
-    logger.info('🔄 Running scheduled salary generation task...');
-
-    try {
-      const currentMonth = getCurrentMonth();
-      await generateSalaryOperations({ month: currentMonth });
-      logger.info('✅ Salary generation task completed successfully');
-    } catch (error) {
-      logger.error('❌ Salary generation task failed:', error);
-    }
-  },
-  {
-    scheduled: true,
-    timezone: 'Europe/Moscow', // Можно изменить на нужную таймзону
-  }
-);
 
 /**
  * Задача генерации периодических операций
@@ -60,21 +33,31 @@ const recurringOperationsTask = cron.schedule(
   }
 );
 
-// Функция для ручного запуска задачи (для тестирования)
-export async function runSalaryGenerationManually(
-  month?: string
-): Promise<void> {
-  logger.info('🔧 Manual salary generation triggered');
+/**
+ * Задача очистки старых демо-пользователей
+ * Запускается каждый час в 15 минут
+ */
+const cleanupDemoUsersTask = cron.schedule(
+  '15 * * * *',
+  async () => {
+    logger.info('🔄 Running scheduled demo user cleanup task...');
 
-  try {
-    const targetMonth = month || getCurrentMonth();
-    await generateSalaryOperations({ month: targetMonth });
-    logger.info('✅ Manual salary generation completed successfully');
-  } catch (error) {
-    logger.error('❌ Manual salary generation failed:', error);
-    throw error;
+    try {
+      const deletedCount = await cleanupExpiredDemoUsers(24); // Удаляем аккаунты старше 24 часов
+      if (deletedCount > 0) {
+        logger.info(`✅ Cleanup completed. Deleted ${deletedCount} users.`);
+      } else {
+        logger.info('✅ Cleanup check completed. No expired users found.');
+      }
+    } catch (error) {
+      logger.error('❌ Demo user cleanup task failed:', error);
+    }
+  },
+  {
+    scheduled: true,
+    timezone: 'Europe/Moscow',
   }
-}
+);
 
 // Функция для ручного запуска генерации периодических операций (для тестирования)
 export async function runRecurringOperationsManually(
@@ -98,34 +81,47 @@ const shutdown = async (signal: string) => {
   logger.info(`${signal} received, shutting down gracefully...`);
 
   // Останавливаем cron задачи
-  salaryGenerationTask.stop();
   recurringOperationsTask.stop();
+  cleanupDemoUsersTask.stop();
 
-  // Закрываем Prisma соединение
+  // Закрываем подключение к БД
   await prisma.$disconnect();
 
-  logger.info('Worker stopped');
+  logger.info('Worker shut down complete');
   process.exit(0);
 };
 
-process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
-// Проверка подключения к БД
-prisma
-  .$connect()
-  .then(() => {
-    logger.info('✅ Database connection established');
-    logger.info(
-      '✅ Salary generation task scheduled (runs on 1st of each month at 00:00)'
-    );
-    logger.info('✅ Recurring operations task scheduled (runs daily at 00:01)');
-    logger.info('👷 Worker is running and waiting for scheduled tasks...');
-  })
-  .catch((error: unknown) => {
-    logger.error('❌ Failed to connect to database:', error);
-    process.exit(1);
-  });
+// Обработка необработанных исключений
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
-// Keep the process alive
-process.stdin.resume();
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  shutdown('UNCAUGHT_EXCEPTION');
+});
+
+logger.info('✅ Worker started successfully');
+logger.info('📋 Active tasks:');
+logger.info('  - Recurring operations: Daily at 00:01');
+logger.info('  - Demo user cleanup: Hourly at :15');
+
+// CLI support
+const args = process.argv.slice(2);
+const command = args[0];
+
+if (command === 'run-recurring-now') {
+  logger.info('🔧 Running recurring operations manually...');
+  runRecurringOperationsManually()
+    .then(() => {
+      logger.info('✅ Manual execution completed');
+      process.exit(0);
+    })
+    .catch((error) => {
+      logger.error('❌ Manual execution failed:', error);
+      process.exit(1);
+    });
+}

@@ -5,6 +5,7 @@ import prisma from '../config/db';
 
 export interface TenantRequest extends AuthRequest {
   companyId?: string;
+  isWorker?: boolean;
 }
 
 export const extractTenant = async (

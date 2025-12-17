@@ -119,7 +119,6 @@ export const apiSlice = createApi({
     'Department',
     'Counterparty',
     'Deal',
-    'Salary',
     'Operation',
     'Plan',
     'Budget',

@@ -7,6 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum SubscriptionPlan {
+  START
+  TEAM
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIAL
+}
+
 model Account {
   id                      String              @id @default(uuid())
   companyId               String
@@ -113,10 +126,45 @@ model Company {
   operations          Operation[]
   plan_items          PlanItem[]
   roles               Role[]
-  salaries            Salary[]
+  subscription        Subscription?
   users               User[]
 
   @@map("companies")
+}
+
+model PromoCode {
+  id           String           @id @default(uuid())
+  code         String           @unique
+  plan         SubscriptionPlan
+  durationDays Int? // Длительность триала/подписки (null = вечно)
+  maxUsages    Int? // Лимит использования (null = безлимит)
+  usedCount    Int              @default(0)
+  isActive     Boolean          @default(true)
+  expiresAt    DateTime?
+  createdAt    DateTime         @default(now())
+
+  @@index([code])
+  @@index([isActive, expiresAt])
+  @@map("promo_codes")
+}
+
+model Subscription {
+  id          String             @id @default(uuid())
+  companyId   String             @unique
+  plan        SubscriptionPlan   @default(START)
+  status      SubscriptionStatus @default(ACTIVE)
+  startDate   DateTime           @default(now())
+  endDate     DateTime? // Null для вечных/бесплатных или автопродлеваемых
+  trialEndsAt DateTime?
+  promoCode   String? // Промокод, по которому активирована подписка
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  company     Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([status])
+  @@index([plan])
+  @@map("subscriptions")
 }
 
 model Counterparty {
@@ -133,7 +181,6 @@ model Counterparty {
   deals               Deal[]
   imported_operations ImportedOperation[]
   operations          Operation[]
-  salaries            Salary[]
 
   @@index([companyId])
   @@map("counterparties")
@@ -171,7 +218,6 @@ model Department {
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   imported_operations ImportedOperation[]
   operations          Operation[]
-  salaries            Salary[]
 
   @@index([companyId])
   @@map("departments")
@@ -388,27 +434,6 @@ model Role {
   @@index([companyId])
   @@index([companyId, isActive])
   @@map("roles")
-}
-
-model Salary {
-  id                     String       @id @default(uuid())
-  companyId              String
-  employeeCounterpartyId String
-  departmentId           String?
-  baseWage               Float
-  contributionsPct       Float        @default(30.0)
-  incomeTaxPct           Float        @default(13.0)
-  periodicity            String       @default("monthly")
-  effectiveFrom          DateTime
-  effectiveTo            DateTime?
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  department             Department?  @relation(fields: [departmentId], references: [id])
-  counterparty           Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@map("salaries")
 }
 
 model UserRole {

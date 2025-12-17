@@ -5,7 +5,6 @@ import type {
   Department,
   Counterparty,
   Deal,
-  Salary,
 } from '@shared/types/catalogs';
 
 export const catalogsApi = apiSlice.injectEndpoints({
@@ -203,38 +202,6 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Deal'],
     }),
-
-    // Salaries
-    getSalaries: builder.query<Salary[], void>({
-      query: () => '/salaries',
-      providesTags: ['Salary'],
-    }),
-    createSalary: builder.mutation<Salary, Partial<Salary>>({
-      query: (data) => ({
-        url: '/salaries',
-        method: 'POST',
-        body: data,
-      }),
-      invalidatesTags: ['Salary'],
-    }),
-    updateSalary: builder.mutation<
-      Salary,
-      { id: string; data: Partial<Salary> }
-    >({
-      query: ({ id, data }) => ({
-        url: `/salaries/${id}`,
-        method: 'PATCH',
-        body: data,
-      }),
-      invalidatesTags: ['Salary'],
-    }),
-    deleteSalary: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/salaries/${id}`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['Salary'],
-    }),
   }),
 });
 
@@ -262,8 +229,4 @@ export const {
   useCreateDealMutation,
   useUpdateDealMutation,
   useDeleteDealMutation,
-  useGetSalariesQuery,
-  useCreateSalaryMutation,
-  useUpdateSalaryMutation,
-  useDeleteSalaryMutation,
 } = catalogsApi;
