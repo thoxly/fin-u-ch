@@ -1,5 +1,21 @@
 import { CashflowService } from './cashflow.service';
 
+// Mock config imports to avoid import.meta issues in Jest
+jest.mock('../../../config/env', () => ({
+  env: {
+    NODE_ENV: 'test',
+    PORT: 4000,
+    DATABASE_URL: 'postgresql://test',
+    REDIS_URL: 'redis://localhost:6379',
+    JWT_SECRET: 'test-secret',
+    JWT_REFRESH_SECRET: 'test-refresh-secret',
+    JWT_EXPIRES_IN: '15m',
+    JWT_REFRESH_EXPIRES_IN: '7d',
+    CORS_ORIGIN: '*',
+    FILE_UPLOAD_MAX_SIZE: 10485760,
+  },
+}));
+
 // Mock the prisma import
 jest.mock('../../../config/db', () => ({
   __esModule: true,
