@@ -9,7 +9,8 @@ import {
   useGetOzonIntegrationQuery,
   useDisconnectOzonIntegrationMutation,
 } from '../../store/api/integrationsApi';
-import { useAppSelector } from '../../shared/hooks/useRedux';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 import { useNotification } from '../../shared/hooks/useNotification';
 
 interface Integration {
@@ -29,7 +30,8 @@ interface Integration {
 
 export const IntegrationsPage = () => {
   const plan =
-    useAppSelector((state) => state.subscription?.data?.plan) || 'START';
+    useSelector((state: RootState) => state.subscription?.data?.plan) ||
+    'START';
   const canUseIntegrations = plan === 'TEAM' || plan === 'BUSINESS';
 
   const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =

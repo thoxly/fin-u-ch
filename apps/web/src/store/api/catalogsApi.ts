@@ -29,6 +29,29 @@ export const catalogsApi = apiSlice.injectEndpoints({
       },
       providesTags: ['Article'],
     }),
+    getArticlesTree: builder.query<
+      Article[],
+      {
+        type?: 'income' | 'expense';
+        activity?: 'operating' | 'investing' | 'financing';
+        isActive?: boolean;
+      } | void
+    >({
+      query: (filters) => {
+        const params = new URLSearchParams();
+        if (filters && typeof filters === 'object' && filters !== null) {
+          if ('type' in filters && filters.type)
+            params.append('type', filters.type);
+          if ('activity' in filters && filters.activity)
+            params.append('activity', filters.activity);
+          if ('isActive' in filters && filters.isActive !== undefined)
+            params.append('isActive', String(filters.isActive));
+        }
+        const queryString = params.toString();
+        return `/articles/tree${queryString ? `?${queryString}` : ''}`;
+      },
+      providesTags: ['Article'],
+    }),
     createArticle: builder.mutation<Article, Partial<Article>>({
       query: (data) => ({
         url: '/articles',
@@ -207,6 +230,7 @@ export const catalogsApi = apiSlice.injectEndpoints({
 
 export const {
   useGetArticlesQuery,
+  useGetArticlesTreeQuery,
   useCreateArticleMutation,
   useUpdateArticleMutation,
   useDeleteArticleMutation,
