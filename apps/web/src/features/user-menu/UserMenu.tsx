@@ -1,9 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, UserCircle, Building2, Shield } from 'lucide-react';
+import {
+  User,
+  LogOut,
+  UserCircle,
+  Building2,
+  Shield,
+  HelpCircle,
+} from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
 import { usePermissions } from '../../shared/hooks/usePermissions';
+import { useGetMeQuery } from '../../store/api/authApi';
 
 interface UserMenuProps {
   userEmail?: string;
@@ -14,6 +22,7 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { data: user } = useGetMeQuery();
   const { hasPermission, isSuperAdmin } = usePermissions();
 
   // Проверяем, есть ли у пользователя доступ к администрированию
@@ -34,6 +43,78 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
     navigate(path);
     setIsOpen(false);
   };
+  const handleSupportClick = (): void => {
+    const botUsername = 'vect_a_bot';
+
+    // Если пользователь не авторизован — просто открываем бота
+    if (!user) {
+      window.open(`https://t.me/${botUsername}`, '_blank');
+      setIsOpen(false);
+      return;
+    }
+
+    // ===== Подготовка данных =====
+
+    // user_id — ТОЛЬКО цифры (важно для backend-логики бота)
+    const userId = String(user.id ?? '').replace(/\D/g, '');
+    // Если по какой-то причине userId пустой — открываем бота без payload
+    if (!userId) {
+      window.open(`https://t.me/${botUsername}`, '_blank');
+      setIsOpen(false);
+      return;
+    }
+
+    // ===== Формируем payload для /start =====
+    // Вставляем явный параметр user_id с id текущего пользователя
+    const startPayload = `user_id=${userId}`;
+
+    const telegramUrl = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
+
+    console.log('[Telegram deeplink]', telegramUrl);
+
+    window.open(telegramUrl, '_blank');
+    setIsOpen(false);
+  };
+
+  //   const handleSupportClick = (): void => {
+  //   const botUsername = 'vect_a_bot';
+
+  //   if (!user) {
+  //     window.open(`https://t.me/${botUsername}`, '_blank');
+  //     setIsOpen(false);
+  //     return;
+  //   }
+
+  //   const params = new URLSearchParams();
+
+  //   // user_id — только цифры
+
+  //   // company_id — только безопасные символы
+  //   const companyId = String(user.companyId || '0')
+  //     .replace(/[^a-zA-Z0-9]/g, '');
+
+  //   // company_name — оставляем кириллицу, убираем опасные символы
+  //   let companyName = (user.companyName || 'Без компании')
+  //     .replace(/[^\p{L}\p{N}\s]/gu, '') // буквы (в т.ч. кириллица), цифры, пробелы
+  //     .replace(/\s+/g, ' ')
+  //     .trim();
+
+  //   // Ограничение по длине (20 символов кириллицы ≈ безопасно)
+  //   companyName = companyName.substring(0, 20);
+
+  //   params.set('cid', companyId);
+  //   params.set('cname', companyName);
+  // const userId = String(user.id || '')
+  //     .replace(/[^0-9]/g, '');
+  //   params.set('uid', userId);
+  //   const telegramUrl = `https://t.me/${botUsername}?start=${encodeURIComponent(params.toString())}`;
+  // // window.open(telegramUrl, '_blank');
+
+  //   console.log('Opening Telegram with deep link:', telegramUrl);
+  //   console.log(params.get('uid'), params.get('cid'), params.get('cname'));
+  //   window.open(telegramUrl, '_blank');
+  //   setIsOpen(false);
+  // };
 
   // Закрытие меню при клике вне его
   useEffect(() => {
@@ -90,6 +171,13 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
               Моя компания
             </button>
           )}
+          <button
+            onClick={handleSupportClick}
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <HelpCircle size={16} />
+            Поддержка
+          </button>
           {hasAdminAccess && (
             <>
               <hr className="my-1 border-gray-200 dark:border-gray-700" />

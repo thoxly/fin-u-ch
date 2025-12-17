@@ -27,6 +27,7 @@ import importsRoutes from './modules/imports/imports.routes';
 import integrationsRoutes from './modules/integrations/integrations.routes';
 import subscriptionRoutes from './modules/subscription/subscription.routes';
 import devRoutes from './modules/dev/dev.routes';
+import supportRoutes from './modules/support/support.routes';
 
 const app: Application = express();
 
@@ -71,6 +72,7 @@ app.use('/api/imports', importsRoutes);
 
 app.use('/api/integrations', integrationsRoutes);
 app.use('/api/subscription', subscriptionRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/dev', devRoutes);
 
 // Error handling
