@@ -16,6 +16,14 @@ export interface DemoStartSessionResponse {
   refreshToken: string;
 }
 
+export interface RequestDemoInput {
+  name: string;
+  phone?: string;
+  email?: string;
+  telegram?: string;
+  consentMarketing: boolean;
+}
+
 export const demoApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Получить учетные данные статического демо-пользователя
@@ -34,8 +42,20 @@ export const demoApi = apiSlice.injectEndpoints({
       transformResponse: (response: { data: DemoStartSessionResponse }) =>
         response.data,
     }),
+
+    // Отправить заявку на демонстрацию (для связи с менеджером)
+    requestDemo: builder.mutation<void, RequestDemoInput>({
+      query: (data) => ({
+        url: '/demo/request',
+        method: 'POST',
+        body: data,
+      }),
+    }),
   }),
 });
 
-export const { useGetDemoCredentialsQuery, useStartDemoSessionMutation } =
-  demoApi;
+export const {
+  useGetDemoCredentialsQuery,
+  useStartDemoSessionMutation,
+  useRequestDemoMutation,
+} = demoApi;
