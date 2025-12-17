@@ -17,6 +17,9 @@ COPY packages/shared ./packages/shared
 # Copy api package
 COPY apps/api ./apps/api
 
+# Copy scripts for demo user setup
+COPY scripts ./scripts
+
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 
@@ -54,6 +57,9 @@ COPY --from=builder /app/packages/shared ./packages/shared
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 COPY --from=builder /app/apps/api/package.json ./apps/api/
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
+
+# Copy scripts for demo user setup
+COPY --from=builder /app/scripts ./scripts
 
 # Install dependencies fresh (this will compile native modules for this image)
 RUN pnpm install --frozen-lockfile --prod=false
