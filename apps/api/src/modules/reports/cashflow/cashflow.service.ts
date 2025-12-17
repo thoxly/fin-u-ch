@@ -164,10 +164,10 @@ export class CashflowService {
       whereClause.counterpartyId = { not: null };
     }
 
-    const operations = await prisma.operation.findMany({
+    const operations = (await prisma.operation.findMany({
       where: whereClause,
       include: includeRelations,
-    });
+    })) as any[];
 
     logger.debug('Operations fetched for cashflow report', {
       companyId,
@@ -178,10 +178,7 @@ export class CashflowService {
 
     // Фильтруем операции по активности, если указана
     const filteredOperations = params.activity
-      ? operations.filter(
-          (op: (typeof operations)[0]) =>
-            op.article?.activity === params.activity
-        )
+      ? operations.filter((op: any) => op.article?.activity === params.activity)
       : operations;
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
