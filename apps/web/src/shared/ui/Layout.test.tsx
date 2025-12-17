@@ -169,13 +169,13 @@ describe('Layout - MenuPopover Integration', () => {
       fireEvent.click(catalogButton);
     }
 
-    // Упрощенная проверка - только один элемент меню
-    await waitFor(
-      () => {
-        expect(screen.getByText('Статьи')).toBeInTheDocument();
-      },
-      { timeout: 5000 }
-    );
+    await waitFor(() => {
+      expect(screen.getByText('Статьи')).toBeInTheDocument();
+      expect(screen.getByText('Счета')).toBeInTheDocument();
+      expect(screen.getByText('Контрагенты')).toBeInTheDocument();
+      expect(screen.getByText('Сделки')).toBeInTheDocument();
+      // Зарплаты были удалены из функциональности
+    });
   });
 
   it('should open MenuPopover when Enter key is pressed on Справочники', async () => {
