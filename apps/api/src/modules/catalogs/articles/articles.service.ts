@@ -68,15 +68,45 @@ export class ArticlesService {
       where,
       include: {
         parent: { select: { id: true, name: true } },
-        children: true,
         counterparty: { select: { id: true, name: true } },
       } as any,
       orderBy: { name: 'asc' },
     });
 
-    // Build tree structure: return all articles as flat list
-    // Frontend will build the tree from parentId relationships
-    return articles;
+    // Build tree structure on backend
+    // Create a map for quick lookup
+    const articleMap = new Map();
+    const rootArticles: any[] = [];
+
+    // First pass: create nodes with children array
+    articles.forEach((article) => {
+      articleMap.set(article.id, {
+        ...article,
+        children: [],
+      });
+    });
+
+    // Second pass: build tree structure
+    articles.forEach((article) => {
+      const articleWithChildren = articleMap.get(article.id);
+
+      if (article.parentId) {
+        // If has parent, add to parent's children
+        const parent = articleMap.get(article.parentId);
+        if (parent) {
+          parent.children.push(articleWithChildren);
+        } else {
+          // If parent not found (filtered out), add to root
+          rootArticles.push(articleWithChildren);
+        }
+      } else {
+        // No parent, add to root
+        rootArticles.push(articleWithChildren);
+      }
+    });
+
+    // Return only root articles - children are already nested
+    return rootArticles;
   }
 
   async getById(id: string, companyId: string) {

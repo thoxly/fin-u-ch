@@ -75,48 +75,59 @@ export const ArticleTree = ({
     disabled: false,
   });
 
-  // Фильтрация по листьям
+  // Фильтрация дерева по поисковому запросу
   const filteredTree = useMemo(() => {
-    if (!showLeavesOnly) {
+    if (!searchQuery || searchQuery.trim() === '') {
       return tree;
     }
 
-    // Функция для фильтрации дерева, оставляя только листья (узлы без детей)
-    const filterLeaves = (
+    const lowerQuery = searchQuery.toLowerCase();
+
+    // Функция проверяет, содержит ли узел или его потомки совпадение с поиском
+    const nodeMatchesSearch = (
+      node: ArticleTreeNodeType,
+      query: string
+    ): boolean => {
+      // Проверяем текущий узел
+      if (node.name.toLowerCase().includes(query)) {
+        return true;
+      }
+
+      // Проверяем детей рекурсивно
+      if (node.children && node.children.length > 0) {
+        return node.children.some((child) => nodeMatchesSearch(child, query));
+      }
+
+      return false;
+    };
+
+    // Функция фильтрует дерево, оставляя только узлы с совпадениями и путь до них
+    const filterTree = (
       nodes: ArticleTreeNodeType[]
     ): ArticleTreeNodeType[] => {
       return nodes
         .map((node) => {
-          // Проверяем, является ли узел листом (нет дочерних узлов)
-          const isLeaf = !node.children || node.children.length === 0;
-
-          if (isLeaf) {
-            // Если это лист, включаем его
-            return {
-              ...node,
-              children: [],
-            };
+          // Проверяем, есть ли совпадение в этом узле или его потомках
+          if (!nodeMatchesSearch(node, lowerQuery)) {
+            return null;
           }
 
-          // Если у узла есть дети, рекурсивно фильтруем их
-          const filteredChildren = filterLeaves(node.children);
+          // Если есть совпадение, фильтруем детей
+          const filteredChildren =
+            node.children && node.children.length > 0
+              ? filterTree(node.children)
+              : [];
 
-          // Если после фильтрации остались дети, включаем узел с отфильтрованными детьми
-          if (filteredChildren.length > 0) {
-            return {
-              ...node,
-              children: filteredChildren,
-            };
-          }
-
-          // Если после фильтрации детей не осталось, узел не включаем
-          return null;
+          return {
+            ...node,
+            children: filteredChildren,
+          };
         })
         .filter((node): node is ArticleTreeNodeType => node !== null);
     };
 
-    return filterLeaves(tree);
-  }, [tree, showLeavesOnly]);
+    return filterTree(tree);
+  }, [tree, searchQuery]);
 
   // Автоматически разворачиваем ветки до найденных статей при поиске
   useEffect(() => {
@@ -245,7 +256,7 @@ export const ArticleTree = ({
       return;
     }
 
-    // Если перетаскиваем на root-drop-zone или root-drop-zone-visual, или отпускаем в пустое место, делаем корневой (null)
+    // Если перетаскиваем на root-drop-zone или root-drop-zone-visual, или отпускаем в пустое место, убираем из группы (null)
     if (
       !over ||
       over.id === 'root-drop-zone' ||
@@ -330,7 +341,7 @@ export const ArticleTree = ({
             isDragging={activeId === node.id}
           />
         ))}
-        {/* Зона для перетаскивания на корень (показываем только если статья не корневая) */}
+        {/* Зона для перетаскивания, чтобы убрать из группы (показываем только если статья в группе) */}
         {activeId && draggedArticle && draggedArticle.parentId && (
           <div
             ref={setRootDropRef}
@@ -343,7 +354,7 @@ export const ArticleTree = ({
             style={{ minHeight: '60px' }}
           >
             <div className="flex items-center justify-center gap-2">
-              <span>Перетащите сюда, чтобы сделать статью корневой</span>
+              <span>Перетащите сюда, чтобы убрать из группы</span>
             </div>
           </div>
         )}
