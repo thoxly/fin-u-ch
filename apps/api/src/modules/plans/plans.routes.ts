@@ -2,15 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
-import { requireFeature } from '../../middlewares/subscription.guard';
-import { SubscriptionPlan } from '@prisma/client';
 import plansController from './plans.controller';
 
 const router: Router = Router();
 
 router.use(authenticate);
 router.use(extractTenant);
-router.use(requireFeature('planning', SubscriptionPlan.TEAM));
 
 /**
  * @swagger

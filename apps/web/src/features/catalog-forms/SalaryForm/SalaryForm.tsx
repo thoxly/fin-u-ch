@@ -7,7 +7,6 @@ import {
 } from '@/store/api/catalogsApi';
 import { Salary } from '@shared/types/catalogs';
 import { useState, useEffect } from 'react';
-import { useNotification } from '@/shared/hooks/useNotification';
 
 export const SalaryForm = ({
   salary,
@@ -41,7 +40,6 @@ export const SalaryForm = ({
   const { data: departments = [] } = useGetDepartmentsQuery();
   const [create, { isLoading: isCreating }] = useCreateSalaryMutation();
   const [update, { isLoading: isUpdating }] = useUpdateSalaryMutation();
-  const { showSuccess, showError } = useNotification();
 
   const employees = counterparties.filter((c) => c.category === 'employee');
 
@@ -75,44 +73,11 @@ export const SalaryForm = ({
         : undefined,
     };
     try {
-      if (salary) {
-        await update({ id: salary.id, data }).unwrap();
-        showSuccess('Зарплата успешно обновлена');
-      } else {
-        await create(data).unwrap();
-        showSuccess('Зарплата успешно создана');
-      }
+      if (salary) await update({ id: salary.id, data }).unwrap();
+      else await create(data).unwrap();
       onClose();
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : salary
-          ? 'Ошибка при обновлении зарплаты'
-          : 'Ошибка при создании зарплаты';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : salary
-            ? 'Ошибка при обновлении зарплаты'
-            : 'Ошибка при создании зарплаты'
-      );
+      console.error('Failed to save salary:', error);
     }
   };
 

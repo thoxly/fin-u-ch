@@ -3,32 +3,24 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-// Determine project root: go up from apps/api/src/config to project root
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// From apps/api/src/config/env.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
-const projectRoot = path.resolve(__dirname, '../../../..'); // -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
-const apiRoot = path.resolve(__dirname, '..'); // -> apps/api
-
-// Load .env from monorepo root, fallback to apps/api
-const rootEnvPath = path.resolve(projectRoot, '.env');
-const apiEnvPath = path.resolve(apiRoot, '.env');
-
-// Load .env with override to ensure latest values are used
-const rootResult = dotenv.config({ path: rootEnvPath, override: true });
-if (rootResult.error) {
-  console.warn(`Failed to load .env from root: ${rootResult.error.message}`);
+// Determine project root: go up from apps/api/src/config to apps/api, then to root
+// From apps/api/src/config -> apps/api/src -> apps/api -> root
+//
+// For Jest tests, __dirname is available (CommonJS mode in tests)
+// For production, use import.meta.url (ES modules)
+let projectRoot: string;
+if (typeof __dirname !== 'undefined') {
+  // Jest / CommonJS environment
+  projectRoot = path.resolve(__dirname, '../..');
+} else {
+  // ES modules environment (production)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  projectRoot = path.resolve(__dirname, '../..');
 }
 
-// If DATABASE_URL is still not set, try loading from apps/api
-if (!process.env.DATABASE_URL) {
-  const apiResult = dotenv.config({ path: apiEnvPath, override: true });
-  if (apiResult.error) {
-    console.warn(
-      `Failed to load .env from apps/api: ${apiResult.error.message}`
-    );
-  }
-}
+// Load .env from monorepo root
+dotenv.config({ path: path.resolve(projectRoot, '.env') });
 
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -38,14 +30,11 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || 'change-me-in-production',
   JWT_ACCESS_EXPIRES_IN: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
   JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-  WORKER_API_KEY: process.env.WORKER_API_KEY,
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://vect-a.ru',
   SMTP_HOST: process.env.SMTP_HOST || '',
   SMTP_PORT: parseInt(process.env.SMTP_PORT || '465', 10),
   SMTP_SECURE:
-    process.env.SMTP_SECURE !== undefined
-      ? process.env.SMTP_SECURE === 'true'
-      : process.env.SMTP_PORT === '465',
+    process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
   SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || '',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, Trash2, Shield, Plus } from 'lucide-react';
-import { Layout } from '../../shared/ui/Layout';
+import { AdminLayout } from '../../shared/ui/AdminLayout';
 import { Card } from '../../shared/ui/Card';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -30,7 +30,6 @@ const ENTITIES = [
   { name: 'departments', label: 'Подразделения' },
   { name: 'counterparties', label: 'Контрагенты' },
   { name: 'deals', label: 'Сделки' },
-  { name: 'salaries', label: 'Зарплаты' },
   { name: 'operations', label: 'Операции' },
   { name: 'budgets', label: 'Бюджеты' },
   { name: 'reports', label: 'Отчёты' },
@@ -212,7 +211,7 @@ export const RolesPage = () => {
       setIsRoleModalOpen(false);
       resetForm();
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -221,22 +220,8 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при сохранении роли';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при сохранении роли'
-      );
+          : 'Ошибка при сохранении роли';
+      showError(errorMessage);
     }
   };
 
@@ -250,7 +235,7 @@ export const RolesPage = () => {
       await deleteRole(role.id).unwrap();
       showSuccess('Роль успешно удалена');
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -259,22 +244,8 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при удалении роли';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при удалении роли'
-      );
+          : 'Ошибка при удалении роли';
+      showError(errorMessage);
     }
   };
 
@@ -310,7 +281,7 @@ export const RolesPage = () => {
       setSelectedRole(null);
       setPermissions({});
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -319,22 +290,8 @@ export const RolesPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при обновлении прав';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при обновлении прав'
-      );
+          : 'Ошибка при обновлении прав';
+      showError(errorMessage);
     }
   };
 
@@ -504,7 +461,7 @@ export const RolesPage = () => {
 
   if (!canManageRoles()) {
     return (
-      <Layout>
+      <AdminLayout>
         <Card className="p-8 text-center max-w-md mx-auto">
           <Shield size={48} className="mx-auto mb-4 text-gray-400" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">
@@ -514,15 +471,30 @@ export const RolesPage = () => {
             У вас нет прав для управления ролями
           </p>
         </Card>
-      </Layout>
+      </AdminLayout>
     );
   }
 
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-4 md:space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+              Роли и права
+            </h1>
+            <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">
+              Управление ролями и настройка прав доступа
+            </p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => navigate('/admin')}
+              variant="outline"
+              className="w-full sm:w-auto"
+            >
+              Назад
+            </Button>
             <ProtectedAction entity="users" action="manage_roles">
               <Button
                 onClick={handleCreateRole}
@@ -732,6 +704,6 @@ export const RolesPage = () => {
           )}
         </Modal>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };

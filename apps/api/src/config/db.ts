@@ -5,22 +5,24 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import logger from './logger';
 
-// Determine project root: go up from apps/api/src/config to project root
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-// From apps/api/src/config/db.ts -> apps/api/src/config -> apps/api/src -> apps/api -> apps -> root
-const projectRoot = path.resolve(__dirname, '../../../..'); // up to monorepo root
-const apiRoot = path.resolve(__dirname, '..'); // apps/api
+// Determine project root: go up from apps/api/src/config to apps/api, then to root
+// From apps/api/src/config -> apps/api/src -> apps/api -> root
+//
+// For Jest tests, __dirname is available (CommonJS mode in tests)
+// For production, use import.meta.url (ES modules)
+let projectRoot: string;
+if (typeof __dirname !== 'undefined') {
+  // Jest / CommonJS environment
+  projectRoot = path.resolve(__dirname, '../..');
+} else {
+  // ES modules environment (production)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  projectRoot = path.resolve(__dirname, '../..');
+}
 
 // Load .env before initializing Prisma
-// Try root first, then fallback to apps/api
-const rootEnvPath = path.resolve(projectRoot, '.env');
-const apiEnvPath = path.resolve(apiRoot, '.env');
-dotenv.config({ path: rootEnvPath });
-// If DATABASE_URL is still not set, try loading from apps/api
-if (!process.env.DATABASE_URL) {
-  dotenv.config({ path: apiEnvPath });
-}
+dotenv.config({ path: path.resolve(projectRoot, '.env') });
 
 const prisma = new PrismaClient({
   log: [

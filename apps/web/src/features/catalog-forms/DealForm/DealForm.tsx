@@ -7,8 +7,6 @@ import {
 } from '@/store/api/catalogsApi';
 import { Deal } from '@shared/types/catalogs';
 import { useState, useEffect } from 'react';
-import { useNotification } from '@/shared/hooks/useNotification';
-import { NOTIFICATION_MESSAGES } from '@/constants/notificationMessages';
 
 export const DealForm = ({
   deal,
@@ -29,7 +27,6 @@ export const DealForm = ({
   const { data: departments = [] } = useGetDepartmentsQuery();
   const [create, { isLoading: isCreating }] = useCreateDealMutation();
   const [update, { isLoading: isUpdating }] = useUpdateDealMutation();
-  const { showSuccess, showError } = useNotification();
 
   // Синхронизация локального состояния с пропсом deal
   useEffect(() => {
@@ -50,11 +47,9 @@ export const DealForm = ({
     try {
       if (deal) {
         await update({ id: deal.id, data }).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.DEAL.UPDATE_SUCCESS);
         onClose();
       } else {
         const result = await create(data).unwrap();
-        showSuccess(NOTIFICATION_MESSAGES.DEAL.CREATE_SUCCESS);
         if (onSuccess && result.id) {
           onSuccess(result.id);
         } else {
@@ -62,35 +57,7 @@ export const DealForm = ({
         }
       }
     } catch (error) {
-      const rawErrorMessage =
-        error &&
-        typeof error === 'object' &&
-        'data' in error &&
-        error.data &&
-        typeof error.data === 'object' &&
-        'message' in error.data &&
-        typeof error.data.message === 'string'
-          ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : deal
-          ? NOTIFICATION_MESSAGES.DEAL.UPDATE_ERROR
-          : NOTIFICATION_MESSAGES.DEAL.CREATE_ERROR;
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : deal
-            ? NOTIFICATION_MESSAGES.DEAL.UPDATE_ERROR
-            : NOTIFICATION_MESSAGES.DEAL.CREATE_ERROR
-      );
+      console.error('Failed to save deal:', error);
     }
   };
 

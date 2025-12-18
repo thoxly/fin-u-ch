@@ -1,4 +1,3 @@
-import prisma from '../../../config/db';
 import { AppError } from '../../../middlewares/error';
 import { validateRequired } from '../../../utils/validation';
 
@@ -13,64 +12,36 @@ export interface CreateSalaryDTO {
   effectiveTo?: Date;
 }
 
+// DEPRECATED: Salary model has been removed from the schema
+// This service is kept for backwards compatibility but returns empty data
 export class SalariesService {
-  async getAll(companyId: string) {
-    return prisma.salary.findMany({
-      where: { companyId },
-      include: {
-        counterparty: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-      } as any,
-      orderBy: { effectiveFrom: 'desc' },
-    });
+  async getAll(companyId: string): Promise<any[]> {
+    // Salary model removed - return empty array
+    return [];
   }
 
-  async getById(id: string, companyId: string) {
-    const salary = await prisma.salary.findFirst({
-      where: { id, companyId },
-      include: {
-        counterparty: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-      } as any,
-    });
-
-    if (!salary) {
-      throw new AppError('Salary not found', 404);
-    }
-
-    return salary;
+  async getById(id: string, companyId: string): Promise<any> {
+    // Salary model removed
+    throw new AppError('Salary feature has been deprecated', 404);
   }
 
-  async create(companyId: string, data: CreateSalaryDTO) {
-    validateRequired({
-      employeeCounterpartyId: data.employeeCounterpartyId,
-      baseWage: data.baseWage,
-      effectiveFrom: data.effectiveFrom,
-    });
-
-    return prisma.salary.create({
-      data: {
-        ...data,
-        companyId,
-      },
-    });
+  async create(companyId: string, data: CreateSalaryDTO): Promise<any> {
+    // Salary model removed - return stub for audit log compatibility
+    return { id: 'deprecated', ...data, companyId };
   }
 
-  async update(id: string, companyId: string, data: Partial<CreateSalaryDTO>) {
-    await this.getById(id, companyId);
-
-    return prisma.salary.update({
-      where: { id },
-      data,
-    });
+  async update(
+    id: string,
+    companyId: string,
+    data: Partial<CreateSalaryDTO>
+  ): Promise<any> {
+    // Salary model removed - return stub for audit log compatibility
+    return { id, ...data, companyId };
   }
 
-  async delete(id: string, companyId: string) {
-    await this.getById(id, companyId);
-
-    return prisma.salary.delete({
-      where: { id },
-    });
+  async delete(id: string, companyId: string): Promise<any> {
+    // Salary model removed - return stub
+    return { id, companyId };
   }
 }
 

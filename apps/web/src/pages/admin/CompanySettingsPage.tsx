@@ -52,7 +52,7 @@ export const CompanySettingsPage = () => {
       }).unwrap();
       showSuccess('Настройки компании успешно обновлены');
     } catch (error) {
-      const rawErrorMessage =
+      const errorMessage =
         error &&
         typeof error === 'object' &&
         'data' in error &&
@@ -61,22 +61,8 @@ export const CompanySettingsPage = () => {
         'message' in error.data &&
         typeof error.data.message === 'string'
           ? error.data.message
-          : undefined;
-
-      const errorMessage = rawErrorMessage
-        ? rawErrorMessage
-            .replace(/Операция\s+[\w-]+:\s*/gi, '')
-            .replace(/^[^:]+:\s*/i, '')
-            .trim()
-        : 'Ошибка при обновлении настроек компании';
-
-      showError(
-        errorMessage &&
-          errorMessage.length > 5 &&
-          !errorMessage.match(/^[A-Z_]+$/)
-          ? errorMessage
-          : 'Ошибка при обновлении настроек компании'
-      );
+          : 'Ошибка при обновлении настроек компании';
+      showError(errorMessage);
     }
   };
 

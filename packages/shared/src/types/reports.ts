@@ -61,14 +61,25 @@ export interface TimeSeries {
   };
 }
 
+export type CashflowBreakdown =
+  | 'activity'
+  | 'deal'
+  | 'account'
+  | 'department'
+  | 'counterparty';
+
 export interface CashflowReport {
   periodFrom: string;
   periodTo: string;
+  breakdown?: CashflowBreakdown;
   activities: ActivityGroup[];
 }
 
 export interface ActivityGroup {
   activity: Activity;
+  // Для разрезов отличных от 'activity' используются эти поля
+  key?: string; // ID сделки/счета/подразделения/контрагента
+  name?: string; // Название сделки/счета/подразделения/контрагента
   incomeGroups: ArticleGroup[];
   expenseGroups: ArticleGroup[];
   totalIncome: number;

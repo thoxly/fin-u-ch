@@ -318,10 +318,6 @@ No Critical or High severity issues found.${reportNote}`;
     }
     catch (error) {
         console.error('\n❌ Error during review:', error);
-        if (error instanceof Error) {
-            console.error('Error message:', error.message);
-            console.error('Error stack:', error.stack);
-        }
         process.exit(1);
     }
 }

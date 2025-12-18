@@ -223,7 +223,6 @@ export async function migrateExistingUsers(): Promise<void> {
           'counterparties',
           'departments',
           'deals',
-          'salaries',
         ];
         for (const entityName of catalogEntities) {
           operationsEditorPermissions.push({
@@ -263,7 +262,7 @@ export async function migrateExistingUsers(): Promise<void> {
           user_roles: {
             none: {},
           },
-        } as any,
+        },
         orderBy: {
           createdAt: 'asc', // Сортируем по дате создания, чтобы первый пользователь был первым
         },

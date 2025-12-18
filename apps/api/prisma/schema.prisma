@@ -37,7 +37,6 @@ model Account {
   sourceAccountOperations Operation[]         @relation("operations_sourceAccountIdToaccounts")
   targetAccountOperations Operation[]         @relation("operations_targetAccountIdToaccounts")
   planItems               PlanItem[]
-  integrations            Integration[]
 
   @@index([companyId])
   @@map("accounts")
@@ -63,7 +62,6 @@ model Article {
   importedOperations ImportedOperation[]
   operations         Operation[]
   planItems          PlanItem[]
-  integrations       Integration[]
 
   @@index([companyId])
   @@index([companyId, parentId])
@@ -106,6 +104,34 @@ model Budget {
   @@map("budgets")
 }
 
+model Company {
+  id                  String              @id @default(uuid())
+  name                String
+  currencyBase        String              @default("RUB")
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  deletedAt           DateTime?
+  uiSettings          Json?
+  inn                 String?
+  accounts            Account[]
+  articles            Article[]
+  audit_logs          AuditLog[]
+  budgets             Budget[]
+  counterparties      Counterparty[]
+  deals               Deal[]
+  departments         Department[]
+  import_sessions     ImportSession[]
+  imported_operations ImportedOperation[]
+  mapping_rules       MappingRule[]
+  operations          Operation[]
+  plan_items          PlanItem[]
+  roles               Role[]
+  subscription        Subscription?
+  users               User[]
+
+  @@map("companies")
+}
+
 model PromoCode {
   id           String           @id @default(uuid())
   code         String           @unique
@@ -141,36 +167,6 @@ model Subscription {
   @@map("subscriptions")
 }
 
-model Company {
-  id                  String              @id @default(uuid())
-  name                String
-  currencyBase        String              @default("RUB")
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  deletedAt           DateTime?
-  uiSettings          Json?
-  inn                 String?
-  accounts            Account[]
-  articles            Article[]
-  audit_logs          AuditLog[]
-  budgets             Budget[]
-  counterparties      Counterparty[]
-  deals               Deal[]
-  departments         Department[]
-  import_sessions     ImportSession[]
-  imported_operations ImportedOperation[]
-  integrations        Integration[]
-  mapping_rules       MappingRule[]
-  operations          Operation[]
-  plan_items          PlanItem[]
-  roles               Role[]
-  salaries            Salary[]
-  subscription        Subscription?
-  users               User[]
-
-  @@map("companies")
-}
-
 model Counterparty {
   id                  String              @id @default(uuid())
   companyId           String
@@ -185,7 +181,6 @@ model Counterparty {
   deals               Deal[]
   imported_operations ImportedOperation[]
   operations          Operation[]
-  salaries            Salary[]
 
   @@index([companyId])
   @@map("counterparties")
@@ -223,7 +218,6 @@ model Department {
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   imported_operations ImportedOperation[]
   operations          Operation[]
-  salaries            Salary[]
 
   @@index([companyId])
   @@map("departments")
@@ -442,27 +436,6 @@ model Role {
   @@map("roles")
 }
 
-model Salary {
-  id                     String       @id @default(uuid())
-  companyId              String
-  employeeCounterpartyId String
-  departmentId           String?
-  baseWage               Float
-  contributionsPct       Float        @default(30.0)
-  incomeTaxPct           Float        @default(13.0)
-  periodicity            String       @default("monthly")
-  effectiveFrom          DateTime
-  effectiveTo            DateTime?
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  department             Department?  @relation(fields: [departmentId], references: [id])
-  counterparty           Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@map("salaries")
-}
-
 model UserRole {
   id         String   @id @default(uuid())
   userId     String
@@ -498,29 +471,4 @@ model User {
 
   @@index([companyId])
   @@map("users")
-}
-
-model Integration {
-  id              String   @id @default(cuid())
-  companyId       String
-  type            String // 'ozon', 'yandex', etc.
-  clientKey       String
-  apiKey          String
-  paymentSchedule String // 'next_week', 'week_after'
-  articleId       String
-  accountId       String
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations с обратными связями
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  article Article @relation(fields: [articleId], references: [id])
-  account Account @relation(fields: [accountId], references: [id])
-
-  @@unique([companyId, type])
-  @@index([companyId])
-  @@index([articleId])
-  @@index([accountId])
-  @@map("integrations")
 }

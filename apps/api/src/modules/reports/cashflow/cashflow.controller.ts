@@ -7,6 +7,24 @@ export class CashflowController {
   async getCashflow(req: TenantRequest, res: Response, next: NextFunction) {
     const startTime = Date.now();
     try {
+      const breakdown = req.query.breakdown as string | undefined;
+      const validBreakdowns = [
+        'activity',
+        'deal',
+        'account',
+        'department',
+        'counterparty',
+      ];
+      const validatedBreakdown =
+        breakdown && validBreakdowns.includes(breakdown)
+          ? (breakdown as
+              | 'activity'
+              | 'deal'
+              | 'account'
+              | 'department'
+              | 'counterparty')
+          : undefined;
+
       const params = {
         periodFrom: req.query.periodFrom
           ? new Date(req.query.periodFrom as string)
@@ -19,6 +37,7 @@ export class CashflowController {
           ? parseInt(req.query.rounding as string, 10)
           : undefined,
         parentArticleId: req.query.parentArticleId as string | undefined,
+        breakdown: validatedBreakdown,
       };
 
       logger.info('Cashflow report request', {
@@ -30,6 +49,7 @@ export class CashflowController {
           activity: params.activity,
           rounding: params.rounding,
           parentArticleId: params.parentArticleId,
+          breakdown: params.breakdown,
         },
       });
 

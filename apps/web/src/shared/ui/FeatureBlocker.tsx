@@ -3,7 +3,7 @@ import { Lock } from 'lucide-react';
 import { Card } from './Card';
 import { Button } from './Button';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../hooks/useRedux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../store/store';
 
 interface FeatureBlockerProps {
@@ -35,11 +35,11 @@ const featureDescriptions: Record<
   integrations: {
     title: 'Интеграции',
     description:
-      'Подключение интеграций (Ozon и др.) доступно только на тарифе BUSINESS.',
+      'Подключение интеграций (Ozon и др.) доступно на тарифах TEAM и BUSINESS.',
   },
   reports_odds: {
     title: 'Отчёты ОДДС',
-    description: 'Расширенные отчёты доступны только на тарифе TEAM и выше.',
+    description: 'Отчёты доступны в базовой подписке.',
   },
 };
 
@@ -106,7 +106,7 @@ export function withFeatureAccess<P extends object>(
 ) {
   return function WrappedComponent(props: P) {
     // Используем tolerant selector — в тестах стор может быть без subscription
-    const subscriptionData = useAppSelector(
+    const subscriptionData = useSelector(
       (state: RootState) => state.subscription?.data ?? null
     );
 

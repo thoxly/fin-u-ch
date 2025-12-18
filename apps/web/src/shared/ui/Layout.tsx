@@ -9,13 +9,12 @@ import { CatalogFormRenderer } from './CatalogFormRenderer';
 import { UserMenu } from '../../features/user-menu';
 import { usePermissions } from '../hooks/usePermissions';
 import { CollapsedImportSections } from '../../features/bank-import/CollapsedImportSections';
-import { PlanBadge } from './PlanBadge';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-export interface NavigationItem {
+interface NavigationItem {
   name: string;
   href?: string;
   children?: NavigationItem[];
@@ -44,10 +43,6 @@ const getEntityForMenuItem = (
     Сделки: { entity: 'deals', action: 'read' },
     Зарплаты: { entity: 'salaries', action: 'read' },
     Администрирование: { entity: 'users', action: 'read' },
-    Пользователи: { entity: 'users', action: 'read' },
-    Роли: { entity: 'users', action: 'manage_roles' },
-    'Журнал действий': { entity: 'audit', action: 'read' },
-    'Настройки компании': { entity: 'users', action: 'read' }, // TODO: Clarify entity for company settings
   };
 
   return mapping[name] || null;
@@ -128,15 +123,7 @@ const getBaseNavigation = (): NavigationItem[] => {
   ];
 };
 
-interface LayoutProps {
-  children: ReactNode;
-  navigationItems?: NavigationItem[];
-}
-
-export const Layout = ({
-  children,
-  navigationItems,
-}: LayoutProps): JSX.Element => {
+export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
   const { getIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
@@ -148,8 +135,8 @@ export const Layout = ({
 
   // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
   const baseNavigation = useMemo(() => {
-    return navigationItems || getBaseNavigation();
-  }, [navigationItems]);
+    return getBaseNavigation();
+  }, []);
 
   // Фильтруем навигацию по правам
   const navigation = useMemo(() => {
@@ -370,10 +357,7 @@ export const Layout = ({
                 />
               </Link>
             </div>
-            <div className="flex items-center gap-4">
-              <PlanBadge compact={true} />
-              <UserMenu userEmail={user?.email} />
-            </div>
+            <UserMenu userEmail={user?.email} />
           </div>
         </div>
       </header>
@@ -416,9 +400,6 @@ export const Layout = ({
                       className="ml-auto opacity-50"
                     />
                   </div>
-                  {/* УДАЛЕНО: {isPopoverActive(item.name) && (
-                    <MenuPopover items={item.children || []} title={item.name} />
-                  )} */}
                 </div>
               ) : (
                 <Link

@@ -3,7 +3,6 @@ import { AccountForm } from '../../features/catalog-forms/index';
 import { DepartmentForm } from '../../features/catalog-forms/index';
 import { CounterpartyForm } from '../../features/catalog-forms/index';
 import { DealForm } from '../../features/catalog-forms/index';
-import { SalaryForm } from '../../features/catalog-forms/index';
 
 interface CatalogFormRendererProps {
   catalogType: string;
@@ -35,8 +34,6 @@ export const CatalogFormRenderer = ({
         );
       case 'Сделки':
         return <DealForm deal={editingData || null} onClose={onClose} />;
-      case 'Зарплаты':
-        return <SalaryForm salary={editingData || null} onClose={onClose} />;
       default:
         return (
           <div className="p-4 text-gray-600 dark:text-gray-400">

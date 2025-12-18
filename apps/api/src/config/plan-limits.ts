@@ -19,7 +19,8 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
       'dictionaries', // Справочники (статьи, счета, контрагенты, сделки, отделы)
       'dashboard', // Дашборд
       'export', // Экспорт данных
-      // НЕТ: planning, roles, reports_odds, recurring, mapping_rules, integrations
+      'reports_odds', // Отчеты ОДДС
+      // НЕТ: planning, roles, recurring, mapping_rules, integrations
     ],
   },
   TEAM: {

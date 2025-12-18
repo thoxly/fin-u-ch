@@ -3,9 +3,6 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
-import { VerifyEmailChangeOldPage } from './pages/auth/VerifyEmailChangeOldPage';
-import { VerifyEmailChangePage } from './pages/auth/VerifyEmailChangePage';
-import { AcceptInvitationPage } from './pages/auth/AcceptInvitationPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -18,16 +15,11 @@ import { AccountsPage } from './pages/catalogs/AccountsPage';
 import { DepartmentsPage } from './pages/catalogs/DepartmentsPage';
 import { CounterpartiesPage } from './pages/catalogs/CounterpartiesPage';
 import { DealsPage } from './pages/catalogs/DealsPage';
-import { SalariesPage } from './pages/catalogs/SalariesPage';
-import { ProfilePage as ProfilePageOld } from './pages/ProfilePage';
-import { CompanyPage as CompanyPageOld } from './pages/CompanyPage';
-import { PricingPage } from './pages/PricingPage';
-import { AdminPage as AdminPageOld } from './pages/AdminPage';
-// Profile pages
+// Profile pages with new structure
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { SecurityPage } from './pages/profile/SecurityPage';
 import { SettingsPage as ProfileSettingsPage } from './pages/profile/SettingsPage';
-// Company pages
+// Company pages with new structure
 import { CompanySettingsPage } from './pages/company/SettingsPage';
 import { CurrencyPage } from './pages/company/CurrencyPage';
 import { TariffPage } from './pages/company/TariffPage';
@@ -36,6 +28,9 @@ import { IntegrationsPage } from './pages/company/IntegrationsPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { RolesPage } from './pages/admin/RolesPage';
 import { AuditLogsPage } from './pages/admin/AuditLogsPage';
+import { CompanyPage } from './pages/CompanyPage';
+import { AdminPage } from './pages/AdminPage';
+import { PricingPage } from './pages/PricingPage';
 import { PrivateRoute } from './components/PrivateRoute';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
@@ -47,22 +42,12 @@ function App() {
     <>
       <ThemeProvider />
       <NotificationContainer />
-
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
-        <Route
-          path="/verify-email-change-old"
-          element={<VerifyEmailChangeOldPage />}
-        />
-        <Route
-          path="/verify-email-change"
-          element={<VerifyEmailChangePage />}
-        />
-        <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -177,18 +162,8 @@ function App() {
             </PrivateRoute>
           }
         />
-        <Route
-          path="/catalogs/salaries"
-          element={
-            <PrivateRoute>
-              <ProtectedRoute entity="salaries" action="read">
-                <SalariesPage />
-              </ProtectedRoute>
-            </PrivateRoute>
-          }
-        />
 
-        {/* Profile routes - separate pages for profile sections */}
+        {/* Profile routes with new structure */}
         <Route
           path="/profile"
           element={
@@ -214,12 +189,20 @@ function App() {
           }
         />
 
-        {/* Company routes - separate pages for company sections */}
+        {/* Company routes with new structure */}
         <Route
           path="/company"
           element={
             <PrivateRoute>
-              <CompanySettingsPage />
+              <CompanyPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/company/tariff"
+          element={
+            <PrivateRoute>
+              <TariffPage />
             </PrivateRoute>
           }
         />
@@ -232,10 +215,10 @@ function App() {
           }
         />
         <Route
-          path="/company/tarif"
+          path="/company/settings"
           element={
             <PrivateRoute>
-              <TariffPage />
+              <CompanySettingsPage />
             </PrivateRoute>
           }
         />
@@ -248,7 +231,7 @@ function App() {
           }
         />
 
-        {/* Pricing page - for selecting and upgrading tariffs */}
+        {/* Pricing page */}
         <Route
           path="/pricing"
           element={
@@ -258,12 +241,12 @@ function App() {
           }
         />
 
-        {/* Admin route - single tabbed admin page (legacy) */}
+        {/* Admin route - single page with tabs */}
         <Route
           path="/admin"
           element={
             <PrivateRoute>
-              <AdminPageOld />
+              <AdminPage />
             </PrivateRoute>
           }
         />

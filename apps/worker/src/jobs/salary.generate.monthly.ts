@@ -1,6 +1,12 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 
+// Type helper for Prisma transaction client
+type TransactionClient = Omit<
+  typeof prisma,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
   companyId?: string; // Optional: generate for specific company only
@@ -29,20 +35,15 @@ export async function generateSalaryOperations(
     const targetDate = new Date(year, monthNum - 1, 1);
 
     // Получаем активные записи зарплат
-    const salaries = await prisma.salary.findMany({
+    const salaries = await (prisma as any).salary.findMany({
       where: {
         ...(companyId && { companyId }),
         effectiveFrom: { lte: targetDate },
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: targetDate } }],
       },
       include: {
-        company: {
-          select: {
-            id: true,
-            currencyBase: true,
-          },
-        },
-        counterparty: {
+        company: true,
+        employeeCounterparty: {
           select: {
             id: true,
             name: true,
@@ -87,67 +88,64 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: TransactionClient) => {
           // 1. ФОТ (начисление зарплаты)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (tx as any).operation.create({
+          await tx.operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
               operationDate: targetDate,
               amount: baseWage,
-              currency: salary.company.currencyBase,
+              currency: salary.company?.currencyBase || 'RUB',
               accountId: account.id,
               articleId: articles.wage.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Зарплата за ${month} - ${salary.counterparty.name}`,
+              description: `Зарплата за ${month} - ${salary.employeeCounterparty?.name || 'Неизвестно'}`,
             },
           });
 
           // 2. Взносы (страховые взносы)
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (tx as any).operation.create({
+          await tx.operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
               operationDate: targetDate,
               amount: contributions,
-              currency: salary.company.currencyBase,
+              currency: salary.company?.currencyBase || 'RUB',
               accountId: account.id,
               articleId: articles.contributions.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `Страховые взносы за ${month} - ${salary.counterparty.name} (${salary.contributionsPct}%)`,
+              description: `Страховые взносы за ${month} - ${salary.employeeCounterparty?.name || 'Неизвестно'} (${salary.contributionsPct}%)`,
             },
           });
 
           // 3. НДФЛ
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (tx as any).operation.create({
+          await tx.operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
               operationDate: targetDate,
               amount: incomeTax,
-              currency: salary.company.currencyBase,
+              currency: salary.company?.currencyBase || 'RUB',
               accountId: account.id,
               articleId: articles.incomeTax.id,
               counterpartyId: salary.employeeCounterpartyId,
               departmentId: salary.departmentId,
-              description: `НДФЛ за ${month} - ${salary.counterparty.name} (${salary.incomeTaxPct}%)`,
+              description: `НДФЛ за ${month} - ${salary.employeeCounterparty?.name || 'Неизвестно'} (${salary.incomeTaxPct}%)`,
             },
           });
         });
 
         totalOperations += 3;
         logger.info(
-          `Generated salary operations for ${salary.counterparty.name}: ` +
+          `Generated salary operations for ${salary.employeeCounterparty?.name || 'Неизвестно'}: ` +
             `wage=${baseWage}, contributions=${contributions.toFixed(2)}, tax=${incomeTax.toFixed(2)}`
         );
       } catch (error) {
         logger.error(
-          `Error generating salary for ${salary.counterparty?.name || salary.employeeCounterpartyId}:`,
+          `Error generating salary for ${salary.employeeCounterparty?.name || 'Неизвестно'}:`,
           error
         );
         // Продолжаем обработку остальных записей

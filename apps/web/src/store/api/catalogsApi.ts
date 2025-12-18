@@ -5,47 +5,25 @@ import type {
   Department,
   Counterparty,
   Deal,
-  Salary,
 } from '@shared/types/catalogs';
 
 export const catalogsApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     // Articles
-    /**
-     * Получает все статьи (включая родительские)
-     *
-     * ⚠️ ВНИМАНИЕ: Для выбора статьи в операциях, планах и импорте используйте `useLeafArticles()`
-     * из `@/shared/hooks/useArticleTree` вместо прямого использования этого хука.
-     *
-     * Используйте напрямую только для:
-     * - Отображения каталога статей (ArticlesPage)
-     * - Администрирования и управления статьями
-     * - Аналитики, где нужны все статьи
-     *
-     * @param filters - Фильтры для статей
-     * @returns Query результат с массивом всех статей
-     */
     getArticles: builder.query<
       Article[],
       {
         type?: 'income' | 'expense' | 'transfer';
         activity?: 'operating' | 'investing' | 'financing';
         isActive?: boolean;
-        asTree?: boolean;
       } | void
     >({
       query: (filters) => {
         const params = new URLSearchParams();
-        if (filters && typeof filters === 'object' && filters !== null) {
-          if ('type' in filters && filters.type)
-            params.append('type', filters.type);
-          if ('activity' in filters && filters.activity)
-            params.append('activity', filters.activity);
-          if ('isActive' in filters && filters.isActive !== undefined)
-            params.append('isActive', String(filters.isActive));
-          if ('asTree' in filters && filters.asTree === true)
-            params.append('asTree', 'true');
-        }
+        if (filters?.type) params.append('type', filters.type);
+        if (filters?.activity) params.append('activity', filters.activity);
+        if (filters?.isActive !== undefined)
+          params.append('isActive', String(filters.isActive));
         const queryString = params.toString();
         return `/articles${queryString ? `?${queryString}` : ''}`;
       },
@@ -247,38 +225,6 @@ export const catalogsApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: ['Deal'],
     }),
-
-    // Salaries
-    getSalaries: builder.query<Salary[], void>({
-      query: () => '/salaries',
-      providesTags: ['Salary'],
-    }),
-    createSalary: builder.mutation<Salary, Partial<Salary>>({
-      query: (data) => ({
-        url: '/salaries',
-        method: 'POST',
-        body: data,
-      }),
-      invalidatesTags: ['Salary'],
-    }),
-    updateSalary: builder.mutation<
-      Salary,
-      { id: string; data: Partial<Salary> }
-    >({
-      query: ({ id, data }) => ({
-        url: `/salaries/${id}`,
-        method: 'PATCH',
-        body: data,
-      }),
-      invalidatesTags: ['Salary'],
-    }),
-    deleteSalary: builder.mutation<void, string>({
-      query: (id) => ({
-        url: `/salaries/${id}`,
-        method: 'DELETE',
-      }),
-      invalidatesTags: ['Salary'],
-    }),
   }),
 });
 
@@ -307,8 +253,4 @@ export const {
   useCreateDealMutation,
   useUpdateDealMutation,
   useDeleteDealMutation,
-  useGetSalariesQuery,
-  useCreateSalaryMutation,
-  useUpdateSalaryMutation,
-  useDeleteSalaryMutation,
 } = catalogsApi;

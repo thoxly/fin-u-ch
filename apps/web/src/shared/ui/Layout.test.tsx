@@ -3,8 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import { apiSlice } from '../../store/api/apiSlice';
-import subscriptionReducer from '../../store/slices/subscriptionSlice';
+import { Layout } from './Layout';
 
 // Mock CatalogFormRenderer
 jest.mock('./CatalogFormRenderer', () => ({
@@ -20,11 +19,6 @@ jest.mock('./CatalogFormRenderer', () => ({
       <button onClick={onClose}>Close Form</button>
     </div>
   ),
-}));
-
-// Mock PlanBadge to avoid dependency on subscription slice shape in tests
-jest.mock('./PlanBadge', () => ({
-  PlanBadge: () => <div data-testid="plan-badge" />,
 }));
 
 // Mock navigation icons hook
@@ -74,7 +68,6 @@ jest.mock('../hooks/usePermissions', () => ({
         departments: ['read', 'create', 'update', 'delete'],
         counterparties: ['read', 'create', 'update', 'delete'],
         deals: ['read', 'create', 'update', 'delete'],
-        salaries: ['read', 'create', 'update', 'delete'],
         operations: ['read', 'create', 'update', 'delete'],
         plans: ['read', 'create', 'update', 'delete'],
         budgets: ['read', 'create', 'update', 'delete'],
@@ -102,9 +95,7 @@ jest.mock('../../store/api/companiesApi', () => ({
   ],
 }));
 
-// Require Layout after mocks so PlanBadge mock is applied
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { Layout } = require('./Layout');
+import { apiSlice } from '../../store/api/apiSlice';
 
 // Create a mock store
 const createMockStore = () => {
@@ -113,24 +104,6 @@ const createMockStore = () => {
       [apiSlice.reducerPath]: apiSlice.reducer,
       auth: (state = { user: null, token: null }) => state,
       notification: (state = { notifications: [] }) => state,
-      subscription: subscriptionReducer,
-    },
-    preloadedState: {
-      subscription: {
-        data: {
-          plan: 'START',
-          status: 'active',
-          startDate: '',
-          endDate: null,
-          trialEndsAt: null,
-          promoCode: null,
-          limits: { maxUsers: 1, features: [] },
-          userLimit: { current: 1, max: 1, remaining: 0, isUnlimited: false },
-        },
-        loading: false,
-        error: null,
-        activatingPromo: false,
-      },
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware({
@@ -201,7 +174,7 @@ describe('Layout - MenuPopover Integration', () => {
       expect(screen.getByText('Счета')).toBeInTheDocument();
       expect(screen.getByText('Контрагенты')).toBeInTheDocument();
       expect(screen.getByText('Сделки')).toBeInTheDocument();
-      expect(screen.getByText('Зарплаты')).toBeInTheDocument();
+      // Зарплаты были удалены из функциональности
     });
   });
 

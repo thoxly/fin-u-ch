@@ -367,7 +367,6 @@ export async function seedInitialData(
     'counterparties',
     'departments',
     'deals',
-    'salaries',
   ];
   for (const entityName of catalogEntities) {
     operationsEditorPermissions.push({

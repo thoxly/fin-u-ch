@@ -30,11 +30,6 @@ import {
 const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
-
-  // Нормализуем даты (убираем время для корректного сравнения)
-  fromDate.setHours(0, 0, 0, 0);
-  toDate.setHours(0, 0, 0, 0);
-
   const daysDiff =
     Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
     1;
@@ -73,22 +68,12 @@ export const DashboardPage = () => {
   // Получаем данные дашборда из API (только если есть права на просмотр)
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
-
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getPreviousPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getPreviousPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -96,22 +81,12 @@ export const DashboardPage = () => {
   };
 
   const handleNextPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
-
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getNextPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const format = detectPeriodFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
+    const newRange = getNextPeriod(periodFilters.range, format);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -119,36 +94,12 @@ export const DashboardPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    // Нормализуем даты (убираем время для корректного сравнения)
-    const start = new Date(startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(endDate);
-    end.setHours(0, 0, 0, 0);
-
-    // Вычисляем разницу в днях для определения формата
-    const daysDiff =
-      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    // Определяем формат на основе разницы дней
-    let format: PeriodFormat = 'day';
-    if (daysDiff === 1) {
-      format = 'day';
-    } else if (daysDiff <= 7) {
-      format = 'week';
-    } else if (daysDiff <= 31) {
-      format = 'month';
-    } else if (daysDiff <= 93) {
-      format = 'quarter';
-    } else {
-      format = 'year';
-    }
-
     // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
     const newRange = {
-      from: start.toISOString(),
-      to: end.toISOString(),
+      from: startDate.toISOString(),
+      to: endDate.toISOString(),
     };
-
+    const format = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format,
       range: newRange,
@@ -167,10 +118,7 @@ export const DashboardPage = () => {
       mode: 'both',
       periodFormat: periodFilters.format, // Передаем формат периода
     },
-    {
-      skip: !canViewOperations && !canViewReports,
-      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
-    }
+    { skip: !canViewOperations && !canViewReports }
   );
 
   // Получаем накопительные данные для графика поступлений/списаний
@@ -182,10 +130,7 @@ export const DashboardPage = () => {
         mode: 'both',
         periodFormat: periodFilters.format,
       },
-      {
-        skip: !canViewOperations && !canViewReports,
-        refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
-      }
+      { skip: !canViewOperations && !canViewReports }
     );
 
   // Получаем последние операции (только если есть права на просмотр операций)
@@ -194,10 +139,7 @@ export const DashboardPage = () => {
       dateFrom: periodFilters.range.from,
       dateTo: periodFilters.range.to,
     },
-    {
-      skip: !canViewOperations,
-      refetchOnMountOrArgChange: true, // Обновляем данные при загрузке страницы
-    }
+    { skip: !canViewOperations }
   );
 
   // Трансформируем данные для графиков

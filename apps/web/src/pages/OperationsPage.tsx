@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Trash2, X, Copy, Check, FileUp } from 'lucide-react';
+import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -40,15 +40,6 @@ import { BulkActionsBar } from '../shared/ui/BulkActionsBar';
 import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
-
-import { IntegrationsDropdown } from '../features/integrations/IntegrationsDropdown';
-import { OzonIcon } from '../features/integrations/OzonIcon';
-import {
-  useDisconnectOzonIntegrationMutation,
-  useGetOzonIntegrationQuery,
-} from '../store/api/integrationsApi';
-import { useAppSelector } from '../shared/hooks/useRedux';
-
 import { usePermissions } from '../shared/hooks/usePermissions';
 
 export const OperationsPage = () => {
@@ -67,17 +58,17 @@ export const OperationsPage = () => {
     } | null;
   };
 
-  // type OpsQuery = {
-  //   type?: string;
-  //   dateFrom?: string;
-  //   dateTo?: string;
-  //   articleId?: string;
-  //   counterpartyId?: string;
-  //   dealId?: string;
-  //   departmentId?: string;
-  //   limit?: number;
-  //   offset?: number;
-  // };
+  type OpsQuery = {
+    type?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    articleId?: string;
+    counterpartyId?: string;
+    dealId?: string;
+    departmentId?: string;
+    limit?: number;
+    offset?: number;
+  };
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingOperation, setEditingOperation] = useState<Operation | null>(
@@ -85,86 +76,6 @@ export const OperationsPage = () => {
   );
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-
-  const plan =
-    useAppSelector((state) => state.subscription?.data?.plan) || 'START';
-  const canUseIntegrations = plan === 'BUSINESS';
-
-  // Загружаем данные интеграции Ozon только для разрешённых тарифов
-  const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
-    useGetOzonIntegrationQuery(undefined, { skip: !canUseIntegrations });
-  const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
-  const { showSuccess, showError } = useNotification();
-
-  // ...existing code...
-
-  // Инициализируем интеграции с данными из API
-  const [integrations, setIntegrations] = useState<
-    Array<{
-      id: string;
-      name: string;
-      icon: typeof OzonIcon;
-      connected: boolean;
-      data?: {
-        clientKey?: string;
-        apiKey?: string;
-        paymentSchedule?: 'next_week' | 'week_after';
-        articleId?: string;
-        accountId?: string;
-      };
-    }>
-  >([
-    {
-      id: 'ozon',
-      name: 'Ozon',
-      icon: OzonIcon,
-      connected: false,
-      data: undefined,
-    },
-  ]);
-
-  const handleIntegrationDisconnect = async (integrationId: string) => {
-    if (integrationId === 'ozon') {
-      try {
-        const result = await disconnectOzonIntegration().unwrap();
-        if (result.success) {
-          setIntegrations((prev) =>
-            prev.map((integration) =>
-              integration.id === 'ozon'
-                ? {
-                    ...integration,
-                    connected: false,
-                    data: undefined,
-                  }
-                : integration
-            )
-          );
-          showSuccess('Интеграция Ozon успешно отключена');
-        } else {
-          // Очищаем системную информацию из сообщения об ошибке
-          const rawError = result.error || 'Ошибка при отключении интеграции';
-          const sanitizedError =
-            typeof rawError === 'string'
-              ? rawError
-                  .replace(/Операция\s+[\w-]+:\s*/gi, '')
-                  .replace(/^[^:]+:\s*/i, '')
-                  .trim()
-              : 'Ошибка при отключении интеграции';
-
-          showError(
-            sanitizedError &&
-              sanitizedError.length > 5 &&
-              !sanitizedError.match(/^[A-Z_]+$/)
-              ? sanitizedError
-              : 'Ошибка при отключении интеграции'
-          );
-        }
-      } catch (error) {
-        console.error('Failed to disconnect Ozon integration:', error);
-        showError('Ошибка при отключении интеграции');
-      }
-    }
-  };
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -205,28 +116,7 @@ export const OperationsPage = () => {
   const { data: deals = [] } = useGetDealsQuery();
   const { data: departments = [] } = useGetDepartmentsQuery();
   const { data: accounts = [] } = useGetAccountsQuery();
-  const { data: _company } = useGetCompanyQuery();
-
-  // Обновляем состояние интеграций при загрузке данных
-  useEffect(() => {
-    if (!canUseIntegrations) {
-      return;
-    }
-
-    if (ozonIntegrationData?.success && ozonIntegrationData.data) {
-      setIntegrations((prev) =>
-        prev.map((integration) =>
-          integration.id === 'ozon'
-            ? {
-                ...integration,
-                connected: ozonIntegrationData.data!.connected,
-                data: ozonIntegrationData.data!.data,
-              }
-            : integration
-        )
-      );
-    }
-  }, [canUseIntegrations, ozonIntegrationData]);
+  const { data: company } = useGetCompanyQuery();
 
   // Фильтруем статьи по типу операции
   const filteredArticles = useMemo(() => {
@@ -298,6 +188,7 @@ export const OperationsPage = () => {
   const [deleteOperation] = useDeleteOperationMutation();
   const [confirmOperation] = useConfirmOperationMutation();
   const [bulkDeleteOperations] = useBulkDeleteOperationsMutation();
+  const { showSuccess, showError } = useNotification();
 
   const { selectedIds, toggleSelectOne, toggleSelectAll, clearSelection } =
     useBulkSelection();
@@ -305,38 +196,7 @@ export const OperationsPage = () => {
   const isMobile = useIsMobile();
   const { canCreate, canUpdate } = usePermissions();
 
-  const handleIntegrationUpdate = (
-    integrationId: string,
-    data: {
-      clientKey: string;
-      apiKey: string;
-      paymentSchedule: 'next_week' | 'week_after';
-      articleId: string;
-      accountId: string;
-    }
-  ) => {
-    setIntegrations((prev) =>
-      prev.map((integration) =>
-        integration.id === integrationId
-          ? {
-              ...integration,
-              connected: true,
-              data: {
-                ...data,
-                articleId: data.articleId,
-                accountId: data.accountId,
-              },
-            }
-          : integration
-      )
-    );
-    showSuccess('Интеграция успешно подключена');
-  };
-
-  // Extract data reloading logic to avoid duplication
-
   // Функция для ручной перезагрузки данных (после мутаций)
-
   const reloadOperationsData = useCallback(async () => {
     clearSelection();
     await refetch();
@@ -356,7 +216,7 @@ export const OperationsPage = () => {
 
   const handleCopy = (operation: Operation) => {
     // Создаем глубокую копию операции без id для создания новой
-
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const {
       id: _id,
       createdAt: _createdAt,
@@ -451,11 +311,11 @@ export const OperationsPage = () => {
   };
 
   const handleImportClick = () => {
-    // if (!company?.inn) {
-    //   showError(
-    //     'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
-    //   );
-    // }
+    if (!company?.inn) {
+      showError(
+        'Рекомендуем указать ИНН компании в настройках для автоматического определения направления операций (списание/поступление)'
+      );
+    }
     setIsImportModalOpen(true);
   };
 
@@ -468,7 +328,36 @@ export const OperationsPage = () => {
     return labels[type] || type;
   };
 
-  // Обработчик сортировки
+  const getPeriodicityLabel = (op: OperationWithRelations) => {
+    // Если это дочерняя операция (есть родитель)
+    if (op.recurrenceParentId && op.recurrenceParent) {
+      const parentRepeat = op.recurrenceParent.repeat;
+      const parentDate = op.recurrenceParent.operationDate;
+      const labels: Record<string, string> = {
+        daily: 'Ежедневно',
+        weekly: 'Еженедельно',
+        monthly: 'Ежемесячно',
+        quarterly: 'Ежеквартально',
+        semiannual: 'Раз в полгода',
+        annual: 'Ежегодно',
+      };
+      const periodLabel = labels[parentRepeat] || parentRepeat;
+      const formattedDate = formatDate(parentDate);
+      return `${periodLabel} с ${formattedDate}`;
+    }
+
+    // Если это родительская операция или обычная операция
+    const labels: Record<string, string> = {
+      none: '-',
+      daily: 'Ежедневно',
+      weekly: 'Еженедельно',
+      monthly: 'Ежемесячно',
+      quarterly: 'Ежеквартально',
+      semiannual: 'Раз в полгода',
+      annual: 'Ежегодно',
+    };
+    return labels[op.repeat] || op.repeat;
+  };
 
   // Обработчик сортировки
   const handleSort = (key: string) => {
@@ -608,6 +497,7 @@ export const OperationsPage = () => {
           : 'Не подтверждена',
       };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortedItems]);
 
   const handleClearFilters = () => {
@@ -845,27 +735,18 @@ export const OperationsPage = () => {
             Операции
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
-            {canUseIntegrations && (
-              <IntegrationsDropdown
-                integrations={integrations}
-                onIntegrationUpdate={handleIntegrationUpdate}
-                onIntegrationDisconnect={handleIntegrationDisconnect}
-                isLoading={isLoadingOzonIntegration}
-              />
-            )}
             {canUpdate('operations') && (
               <>
                 <RecurringOperations onEdit={handleEdit} />
-                {plan !== 'START' && <MappingRules />}
+                <MappingRules />
               </>
             )}
-
             <ExportMenu
               filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
               buildRows={buildExportRows}
               columns={exportColumns}
             />
-            {canUpdate('operations') && plan !== 'START' && (
+            {canUpdate('operations') && (
               <button
                 onClick={handleImportClick}
                 className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
@@ -1290,43 +1171,4 @@ export const OperationsPage = () => {
       </div>
     </Layout>
   );
-};
-
-const getPeriodicityLabel = (
-  op: Operation & {
-    recurrenceParent?: {
-      id: string;
-      repeat: string;
-      operationDate: Date | string;
-    } | null;
-  }
-) => {
-  // Если это дочерняя операция (есть родитель)
-  if (op.recurrenceParentId && op.recurrenceParent) {
-    const parentRepeat = op.recurrenceParent.repeat;
-    const parentDate = op.recurrenceParent.operationDate;
-    const labels: Record<string, string> = {
-      daily: 'Ежедневно',
-      weekly: 'Еженедельно',
-      monthly: 'Ежемесячно',
-      quarterly: 'Ежеквартально',
-      semiannual: 'Раз в полгода',
-      annual: 'Ежегодно',
-    };
-    const periodLabel = labels[parentRepeat] || parentRepeat;
-    const formattedDate = formatDate(parentDate);
-    return `${periodLabel} с ${formattedDate}`;
-  }
-
-  // Если это родительская операция или обычная операция
-  const labels: Record<string, string> = {
-    none: '-',
-    daily: 'Ежедневно',
-    weekly: 'Еженедельно',
-    monthly: 'Ежемесячно',
-    quarterly: 'Ежеквартально',
-    semiannual: 'Раз в полгода',
-    annual: 'Ежегодно',
-  };
-  return labels[op.repeat] || op.repeat;
 };
