@@ -1,62 +1,78 @@
+import * as XLSX from 'xlsx';
 import type { ExportRow } from './exportData';
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
 
 export function downloadExcelXml(
   rows: ExportRow[],
   filename: string,
   columns?: string[]
 ): void {
+  // Determine headers
   const headers =
     columns ||
-    Array.from(
-      rows.reduce<Set<string>>((set, row) => {
-        Object.keys(row).forEach((k) => set.add(k));
-        return set;
-      }, new Set<string>())
-    );
+    (rows && rows.length > 0
+      ? Array.from(
+          rows.reduce<Set<string>>((set, row) => {
+            Object.keys(row).forEach((k) => set.add(k));
+            return set;
+          }, new Set<string>())
+        )
+      : ['date', 'category', 'amount', 'type']); // Default headers if no data
 
-  const headerCells = headers
-    .map((h) => `<Cell><Data ss:Type="String">${escapeXml(h)}</Data></Cell>`)
-    .join('');
+  // Prepare data array
+  const data: Array<Array<string | number>> = [];
 
-  const rowXml = rows
-    .map((row) => {
-      const cells = headers
-        .map((h) => {
-          const v = row[h];
-          if (typeof v === 'number') {
-            return `<Cell><Data ss:Type="Number">${v}</Data></Cell>`;
-          }
-          const s = v == null ? '' : String(v);
-          return `<Cell><Data ss:Type="String">${escapeXml(s)}</Data></Cell>`;
-        })
-        .join('');
-      return `<Row>${cells}</Row>`;
-    })
-    .join('');
+  // Add header row
+  data.push(headers);
 
-  const xml = `<?xml version="1.0"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
-  xmlns:o="urn:schemas-microsoft-com:office:office"
-  xmlns:x="urn:schemas-microsoft-com:office:excel"
-  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="Export">
-    <Table>
-      <Row>${headerCells}</Row>
-      ${rowXml}
-    </Table>
-  </Worksheet>
-</Workbook>`;
+  // Add data rows
+  if (rows && rows.length > 0) {
+    rows.forEach((row) => {
+      const rowData = headers.map((h) => {
+        const value = row[h];
+        if (value === null || value === undefined) {
+          return '';
+        }
+        return value;
+      });
+      data.push(rowData);
+    });
+  }
 
-  const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
+  // Create workbook and worksheet
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+
+  // Set column widths (optional, but improves readability)
+  const columnWidths = headers.map((header) => {
+    const headerLength = header.length;
+    const maxDataLength =
+      rows && rows.length > 0
+        ? Math.max(
+            ...rows.map((row) => {
+              const val = row[header];
+              return val ? String(val).length : 0;
+            })
+          )
+        : 0;
+    const maxLength = Math.max(headerLength, maxDataLength);
+    return { wch: Math.min(Math.max(maxLength + 2, 10), 50) };
+  });
+  worksheet['!cols'] = columnWidths;
+
+  // Create workbook
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Export');
+
+  // Generate XLSX file
+  const excelBuffer = XLSX.write(workbook, {
+    type: 'array',
+    bookType: 'xlsx',
+    compression: true,
+  });
+
+  // Create blob and download
+  const blob = new Blob([excelBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
