@@ -11,6 +11,34 @@ router.use(extractTenant);
 
 /**
  * @swagger
+ * /api/articles/tree:
+ *   get:
+ *     summary: Get articles as tree structure
+ *     tags: [Articles]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [income, expense]
+ *       - in: query
+ *         name: isActive
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of articles with parent-child relationships
+ */
+router.get(
+  '/tree',
+  requirePermission('articles', 'read'),
+  articlesController.getTree
+);
+
+/**
+ * @swagger
  * /api/articles:
  *   get:
  *     summary: Get all articles

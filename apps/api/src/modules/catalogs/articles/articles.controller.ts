@@ -38,6 +38,40 @@ export class ArticlesController {
     }
   }
 
+  async getTree(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      const filters: {
+        type?: 'income' | 'expense';
+        activity?: 'operating' | 'investing' | 'financing';
+        isActive?: boolean;
+      } = {};
+
+      if (req.query.type) {
+        filters.type = req.query.type as 'income' | 'expense';
+      }
+
+      if (req.query.activity) {
+        filters.activity = req.query.activity as
+          | 'operating'
+          | 'investing'
+          | 'financing';
+      }
+
+      if (req.query.isActive !== undefined) {
+        const isActiveValue = req.query.isActive;
+        filters.isActive =
+          isActiveValue === 'true' ||
+          (typeof isActiveValue === 'string' &&
+            isActiveValue.toLowerCase() === 'true');
+      }
+
+      const result = await articlesService.getTree(req.companyId!, filters);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getById(req: TenantRequest, res: Response, next: NextFunction) {
     try {
       const result = await articlesService.getById(

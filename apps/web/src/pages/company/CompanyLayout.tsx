@@ -12,7 +12,7 @@ interface Tab {
 const tabs: Tab[] = [
   { id: 'settings', label: 'Основные настройки', path: '/company' },
   { id: 'currency', label: 'Валюта', path: '/company/currency' },
-  { id: 'tariff', label: 'Тариф', path: '/company/tarif' },
+  { id: 'tariff', label: 'Тариф', path: '/company/tariff' },
   { id: 'integrations', label: 'Интеграции', path: '/company/integrations' },
 ];
 
@@ -27,7 +27,7 @@ export const CompanyLayout = ({ children }: CompanyLayoutProps) => {
     const currentPath = location.pathname;
     if (currentPath === '/company') return 'settings';
     if (currentPath === '/company/currency') return 'currency';
-    if (currentPath === '/company/tarif') return 'tariff';
+    if (currentPath === '/company/tariff') return 'tariff';
     if (currentPath === '/company/integrations') return 'integrations';
     return 'settings';
   });
