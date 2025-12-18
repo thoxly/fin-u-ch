@@ -43,6 +43,7 @@ const PLANS: Record<SubscriptionPlan, PlanFeature> = {
       'Отчеты ОДДС',
       'Повторяющиеся операции',
       'Правила маппинга для импорта',
+      'Интеграции (Ozon и другие)',
     ],
   },
   BUSINESS: {

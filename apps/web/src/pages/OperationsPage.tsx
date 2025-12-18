@@ -1,5 +1,13 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Trash2, X, Copy, Check, FileUp, Plus } from 'lucide-react';
+import {
+  Trash2,
+  X,
+  Copy,
+  Check,
+  FileUp,
+  Plus,
+  Link as LinkIcon,
+} from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
@@ -41,6 +49,12 @@ import { BankImportModal } from '../features/bank-import/BankImportModal';
 import { ExportMenu } from '../shared/ui/ExportMenu';
 import type { ExportRow } from '../shared/lib/exportData';
 import { usePermissions } from '../shared/hooks/usePermissions';
+import { OzonIntegration } from '../features/integrations/ozon-integration-operation/OzonIntegration';
+import {
+  useGetOzonIntegrationQuery,
+  useDisconnectOzonIntegrationMutation,
+} from '../store/api/integrationsApi';
+import { useGetSubscriptionQuery } from '../store/api/subscriptionApi';
 
 export const OperationsPage = () => {
   type OperationWithRelations = Operation & {
@@ -76,6 +90,7 @@ export const OperationsPage = () => {
   );
   const [isCopying, setIsCopying] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isIntegrationsModalOpen, setIsIntegrationsModalOpen] = useState(false);
 
   // Состояния для модалок подтверждения удаления
   const [deleteModal, setDeleteModal] = useState<{
@@ -195,6 +210,16 @@ export const OperationsPage = () => {
   const selectAllCheckboxRef = useRef<HTMLInputElement | null>(null);
   const isMobile = useIsMobile();
   const { canCreate, canUpdate } = usePermissions();
+
+  // Проверка доступа к интеграциям
+  const { data: subscription } = useGetSubscriptionQuery();
+  const plan = (subscription?.plan as 'START' | 'TEAM' | 'BUSINESS') || 'START';
+  const canUseIntegrations = plan === 'TEAM' || plan === 'BUSINESS';
+
+  const { data: ozonIntegrationData } = useGetOzonIntegrationQuery(undefined, {
+    skip: !canUseIntegrations || !isIntegrationsModalOpen,
+  });
+  const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
 
   // Функция для ручной перезагрузки данных (после мутаций)
   const reloadOperationsData = useCallback(async () => {
@@ -741,6 +766,18 @@ export const OperationsPage = () => {
                 <MappingRules />
               </>
             )}
+            {canUseIntegrations && (
+              <button
+                onClick={() => setIsIntegrationsModalOpen(true)}
+                className="relative p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-primary-500 dark:hover:border-primary-400 transition-colors flex items-center justify-center"
+                title="Интеграции"
+              >
+                <LinkIcon
+                  size={18}
+                  className="text-primary-600 dark:text-primary-400"
+                />
+              </button>
+            )}
             <ExportMenu
               filenameBase={`operations-${new Date().toISOString().split('T')[0]}`}
               buildRows={buildExportRows}
@@ -1168,6 +1205,34 @@ export const OperationsPage = () => {
             reloadOperationsData();
           }}
         />
+
+        {canUseIntegrations && (
+          <Modal
+            isOpen={isIntegrationsModalOpen}
+            onClose={() => setIsIntegrationsModalOpen(false)}
+            title="Интеграции"
+            size="2xl"
+          >
+            <OzonIntegration
+              onSave={() => {
+                setIsIntegrationsModalOpen(false);
+                reloadOperationsData();
+              }}
+              onCancel={() => setIsIntegrationsModalOpen(false)}
+              onDisconnect={async () => {
+                try {
+                  await disconnectOzonIntegration().unwrap();
+                  showSuccess('Интеграция успешно отключена');
+                  reloadOperationsData();
+                } catch (error) {
+                  showError('Ошибка при отключении интеграции');
+                }
+              }}
+              initialData={ozonIntegrationData?.data?.data}
+              isConnected={ozonIntegrationData?.data?.connected || false}
+            />
+          </Modal>
+        )}
       </div>
     </Layout>
   );
