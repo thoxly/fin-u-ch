@@ -6,7 +6,7 @@ import {
   useDeleteOperationMutation,
 } from '../../store/api/operationsApi';
 import { formatDate } from '../../shared/lib/date';
-import { formatMoney } from '../../shared/lib/money';
+import { formatOperationAmount } from '../../shared/lib/money';
 import type { Operation } from '@fin-u-ch/shared';
 import { Periodicity } from '@fin-u-ch/shared';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -191,7 +191,12 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                               <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                                {formatMoney(op.amount, op.currency)}
+                                {formatOperationAmount(
+                                  op.amount,
+                                  op.currency,
+                                  op.originalAmount,
+                                  op.originalCurrency
+                                )}
                               </span>
                               <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
                                 {getPeriodicityLabel(op.repeat)}
@@ -262,7 +267,12 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-1">
                             <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                              {formatMoney(op.amount, op.currency)}
+                              {formatOperationAmount(
+                                op.amount,
+                                op.currency,
+                                op.originalAmount,
+                                op.originalCurrency
+                              )}
                             </span>
                             <span className="text-xs px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300">
                               {getPeriodicityLabel(op.repeat)}

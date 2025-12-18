@@ -47,6 +47,16 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:4000',
         changeOrigin: true,
+        secure: false,
+        ws: true, // Enable WebSocket proxying
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying request:', req.method, req.url);
+          });
+        },
       },
     },
   },

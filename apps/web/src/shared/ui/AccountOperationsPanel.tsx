@@ -1,6 +1,6 @@
 import React from 'react';
 import { OffCanvas } from './OffCanvas';
-import { formatMoney } from '../lib/money';
+import { formatOperationAmount } from '../lib/money';
 import type { Article } from '@fin-u-ch/shared';
 import { OperationType } from '@fin-u-ch/shared';
 
@@ -8,6 +8,9 @@ type Operation = {
   id: string;
   type: OperationType | string;
   amount: number;
+  currency: string;
+  originalAmount?: number | null;
+  originalCurrency?: string | null;
   description: string | null;
   accountId: string | null;
   sourceAccountId: string | null;
@@ -65,7 +68,12 @@ export const AccountOperationsPanel: React.FC<AccountOperationsPanelProps> = ({
                           : 'text-blue-600 dark:text-blue-400 font-semibold'
                     }
                   >
-                    {formatMoney(op.amount)}
+                    {formatOperationAmount(
+                      op.amount,
+                      op.currency,
+                      op.originalAmount,
+                      op.originalCurrency
+                    )}
                   </div>
                 </div>
               </div>

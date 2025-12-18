@@ -38,7 +38,7 @@ import {
 } from '../store/api/catalogsApi';
 import { useGetCompanyQuery } from '../store/api/companiesApi';
 import { formatDate } from '../shared/lib/date';
-import { formatMoney } from '../shared/lib/money';
+import { formatOperationAmount } from '../shared/lib/money';
 import type { Operation } from '@shared/types/operations';
 import { useNotification } from '../shared/hooks/useNotification';
 import { NOTIFICATION_MESSAGES } from '../constants/notificationMessages';
@@ -657,7 +657,13 @@ export const OperationsPage = () => {
     {
       key: 'amount',
       header: 'Сумма',
-      render: (op: Operation) => formatMoney(op.amount, op.currency),
+      render: (op: Operation) =>
+        formatOperationAmount(
+          op.amount,
+          op.currency,
+          op.originalAmount,
+          op.originalCurrency
+        ),
       width: '150px',
       sortable: true,
     },
@@ -1012,7 +1018,12 @@ export const OperationsPage = () => {
                       </span>
                       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         {getOperationTypeLabel(op.type)} —{' '}
-                        {formatMoney(op.amount, op.currency)}
+                        {formatOperationAmount(
+                          op.amount,
+                          op.currency,
+                          op.originalAmount,
+                          op.originalCurrency
+                        )}
                       </span>
                     </div>
                   </div>

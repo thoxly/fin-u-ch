@@ -1,21 +1,19 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Archive, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 
 import { Layout } from '../shared/ui/Layout';
 import { Card } from '../shared/ui/Card';
 import { Button } from '../shared/ui/Button';
-import { OffCanvas } from '../shared/ui/OffCanvas';
+import { Modal } from '../shared/ui/Modal';
 import { ConfirmDeleteModal } from '../shared/ui/ConfirmDeleteModal';
 import { Table } from '../shared/ui/Table';
 import { PlanForm } from '../features/plan-editor/PlanForm';
 import { CashflowTable } from '../widgets/CashflowTable';
-import {
-  useGetBudgetQuery,
-  useUpdateBudgetMutation,
-} from '../store/api/budgetsApi';
+import { useGetBudgetQuery } from '../store/api/budgetsApi';
 import { useGetPlansQuery, useDeletePlanMutation } from '../store/api/plansApi';
 import { useGetBddsReportQuery } from '../store/api/reportsApi';
+import { useGetCounterpartiesQuery } from '../store/api/catalogsApi';
 import { formatDate } from '../shared/lib/date';
 import { formatMoney } from '../shared/lib/money';
 import type { PlanItem } from '@fin-u-ch/shared';
@@ -35,6 +33,9 @@ type PlanItemFromAPI = Omit<
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  article?: { id: string; name: string };
+  account?: { id: string; name: string } | null;
+  deal?: { id: string; name: string } | null;
 };
 
 export const BudgetDetailsPage = () => {
@@ -54,8 +55,19 @@ export const BudgetDetailsPage = () => {
   // RTK Query возвращает строки, но типы указывают Date - приводим к правильному типу
   const plans = plansData as unknown as PlanItemFromAPI[];
 
+  // Загружаем контрагентов для сопоставления по ID
+  const { data: counterparties = [] } = useGetCounterpartiesQuery();
+
+  // Создаем Map для быстрого поиска контрагента по ID
+  const counterpartyMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    counterparties.forEach((cp) => {
+      map.set(cp.id, { id: cp.id, name: cp.name });
+    });
+    return map;
+  }, [counterparties]);
+
   const [deletePlan] = useDeletePlanMutation();
-  const [updateBudget] = useUpdateBudgetMutation();
   const { showSuccess, showError } = useNotification();
 
   // Определяем период для отчета на основе дат бюджета
@@ -122,15 +134,6 @@ export const BudgetDetailsPage = () => {
     setEditingPlan(null);
   };
 
-  const handleArchive = async () => {
-    if (!budget) return;
-    const newStatus = budget.status === 'active' ? 'archived' : 'active';
-    await updateBudget({
-      id: budget.id,
-      data: { status: newStatus },
-    });
-  };
-
   const getTypeLabel = (type: string) => {
     return type === 'income'
       ? 'Поступление'
@@ -166,6 +169,13 @@ export const BudgetDetailsPage = () => {
       width: '110px',
     },
     {
+      key: 'endDate',
+      header: 'Окончание',
+      render: (plan: PlanItemFromAPI) =>
+        plan.endDate ? formatDate(plan.endDate) : '-',
+      width: '110px',
+    },
+    {
       key: 'amount',
       header: 'Сумма',
       render: (plan: PlanItemFromAPI) =>
@@ -173,11 +183,34 @@ export const BudgetDetailsPage = () => {
       width: '130px',
     },
     {
+      key: 'currency',
+      header: 'Валюта',
+      render: (plan: PlanItemFromAPI) => plan.currency,
+      width: '80px',
+    },
+    {
       key: 'articleName',
       header: 'Статья',
-      render: (plan: PlanItemFromAPI) =>
-        (plan as PlanItemFromAPI & { article?: { name: string } }).article
-          ?.name || '-',
+      render: (plan: PlanItemFromAPI) => plan.article?.name || '-',
+    },
+    {
+      key: 'account',
+      header: 'Счет',
+      render: (plan: PlanItemFromAPI) => plan.account?.name || '-',
+    },
+    {
+      key: 'counterparty',
+      header: 'Контрагент',
+      render: (plan: PlanItemFromAPI) => {
+        if (!plan.counterpartyId) return '-';
+        const counterparty = counterpartyMap.get(plan.counterpartyId);
+        return counterparty?.name || '-';
+      },
+    },
+    {
+      key: 'deal',
+      header: 'Сделка',
+      render: (plan: PlanItemFromAPI) => plan.deal?.name || '-',
     },
     {
       key: 'repeat',
@@ -192,53 +225,31 @@ export const BudgetDetailsPage = () => {
         <div className="flex gap-2">
           <ProtectedAction
             entity="budgets"
-            action="update"
-            fallback={
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled
-                title="Нет прав на редактирование"
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
-            }
-          >
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleEdit(plan)}
-              title="Редактировать"
-            >
-              <Pencil className="w-4 h-4" />
-            </Button>
-          </ProtectedAction>
-          <ProtectedAction
-            entity="budgets"
             action="delete"
             fallback={
-              <Button
-                variant="danger"
-                size="sm"
+              <button
                 disabled
                 title="Нет прав на удаление"
+                className="text-gray-400 cursor-not-allowed p-1 rounded"
               >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+                <Trash2 size={16} />
+              </button>
             }
           >
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => handleDelete(plan.id)}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(plan.id);
+              }}
               title="Удалить"
+              className="text-red-600 hover:text-red-800 dark:text-red-500 dark:hover:text-red-400 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
             >
-              <Trash2 className="w-4 h-4" />
-            </Button>
+              <Trash2 size={16} />
+            </button>
           </ProtectedAction>
         </div>
       ),
-      width: '120px',
+      width: '80px',
     },
   ];
 
@@ -291,32 +302,17 @@ export const BudgetDetailsPage = () => {
           <div className="flex gap-2">
             <ProtectedAction
               entity="budgets"
-              action="archive"
-              fallback={
-                <Button variant="secondary" disabled>
-                  <Archive className="w-4 h-4 mr-2" />
-                  {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
-                </Button>
-              }
-            >
-              <Button variant="secondary" onClick={handleArchive}>
-                <Archive className="w-4 h-4 mr-2" />
-                {budget.status === 'active' ? 'Архивировать' : 'Восстановить'}
-              </Button>
-            </ProtectedAction>
-            <ProtectedAction
-              entity="budgets"
               action="create"
               fallback={
                 <Button disabled>
                   <Plus className="w-4 h-4 mr-2" />
-                  Добавить позицию
+                  Добавить статью
                 </Button>
               }
             >
               <Button onClick={handleCreate}>
                 <Plus className="w-4 h-4 mr-2" />
-                Добавить позицию
+                Добавить статью
               </Button>
             </ProtectedAction>
           </div>
@@ -346,11 +342,11 @@ export const BudgetDetailsPage = () => {
         )}
       </div>
 
-      {/* Список плановых записей */}
+      {/* Список статей бюджета */}
       <Card>
         <div className="mb-4">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Плановые записи
+            Статьи бюджета
           </h2>
         </div>
         <Table
@@ -358,28 +354,34 @@ export const BudgetDetailsPage = () => {
           data={plans}
           keyExtractor={(plan) => plan.id}
           loading={isPlansLoading}
-          emptyMessage="Нет плановых записей"
+          emptyMessage="Нет статей"
+          onRowClick={(plan) => {
+            if (canRead('budgets')) {
+              handleEdit(plan);
+            }
+          }}
         />
       </Card>
 
       {/* Форма добавления/редактирования */}
-      <OffCanvas
+      <Modal
         isOpen={isFormOpen}
         onClose={handleCloseForm}
-        title={editingPlan ? 'Редактировать план' : 'Добавить план'}
+        title={editingPlan ? 'Редактировать статью' : 'Добавить статью'}
+        size="2xl"
       >
         <PlanForm
           plan={editingPlan}
           budgetId={budgetId}
           onClose={handleCloseForm}
         />
-      </OffCanvas>
+      </Modal>
 
       <ConfirmDeleteModal
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, id: null })}
         onConfirm={confirmDelete}
-        message="Вы уверены, что хотите удалить эту плановую запись?"
+        message="Вы уверены, что хотите удалить эту статью?"
         confirmText="Удалить"
       />
     </Layout>

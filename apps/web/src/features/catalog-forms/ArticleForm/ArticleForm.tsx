@@ -121,12 +121,12 @@ export const ArticleForm = ({
         required
       />
       <ArticleParentSelect
-        label="Родительская статья"
+        label="Группа"
         value={parentId}
         onChange={(value) => setParentId(value)}
         articleType={type}
         excludeArticleId={article?.id}
-        placeholder="Корневая статья (без родителя)"
+        placeholder="Без группы"
       />
       <Select
         label="Контрагент"

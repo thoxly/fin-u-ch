@@ -1,6 +1,7 @@
 import { ReactNode, useState, useMemo } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useGetMeQuery } from '../../store/api/authApi';
+import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 import * as Icons from 'lucide-react';
 import { MenuPopover, MenuPopoverItem, MenuPopoverAction } from './MenuPopover';
 import { useNavigationIcons } from '../hooks/useNavigationIcons';
@@ -125,6 +126,7 @@ const getBaseNavigation = (): NavigationItem[] => {
 
 export const Layout = ({ children }: LayoutProps): JSX.Element => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { getIcon } = useNavigationIcons();
   const { data: user } = useGetMeQuery();
   const {
@@ -132,6 +134,33 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     isLoading: permissionsLoading,
     permissions: permissionsMap,
   } = usePermissions();
+
+  // Получаем данные о тарифе
+  const { data: subscriptionData } = useGetSubscriptionQuery(undefined, {
+    skip: !user, // Загружаем только если пользователь авторизован
+  });
+
+  const planConfig = {
+    START: {
+      label: 'START',
+      icon: '⭐',
+      color: 'text-gray-600 dark:text-gray-400',
+    },
+    TEAM: {
+      label: 'TEAM',
+      icon: '👥',
+      color: 'text-blue-600 dark:text-blue-400',
+    },
+    BUSINESS: {
+      label: 'BUSINESS',
+      icon: '🚀',
+      color: 'text-purple-600 dark:text-purple-400',
+    },
+  };
+
+  const currentPlan = subscriptionData?.plan
+    ? planConfig[subscriptionData.plan as keyof typeof planConfig]
+    : null;
 
   // Получаем базовую навигацию (без администрирования - оно теперь в user dropdown)
   const baseNavigation = useMemo(() => {
@@ -419,6 +448,27 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
               )
             )}
           </nav>
+
+          {/* Current Plan Badge */}
+          {currentPlan && (
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => navigate('/company/tariff')}
+                className="w-full group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+              >
+                <Icons.CreditCard
+                  size={16}
+                  className="opacity-70 group-hover:opacity-100"
+                />
+                <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
+                  Тариф
+                </span>
+                <span className={`text-xs font-semibold ${currentPlan.color}`}>
+                  {currentPlan.icon} {currentPlan.label}
+                </span>
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main content */}
@@ -502,6 +552,29 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
                 )
               )}
             </nav>
+
+            {/* Current Plan Badge for Mobile */}
+            {currentPlan && (
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    navigate('/company/tariff');
+                    setIsMobileNavOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                >
+                  <Icons.CreditCard size={16} />
+                  <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
+                    Тариф
+                  </span>
+                  <span
+                    className={`text-xs font-semibold ${currentPlan.color}`}
+                  >
+                    {currentPlan.icon} {currentPlan.label}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </OffCanvas>
       )}

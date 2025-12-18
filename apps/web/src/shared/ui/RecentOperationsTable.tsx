@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatMoney } from '../lib/money';
+import { formatOperationAmount } from '../lib/money';
 import { Operation } from '@shared/types/operations';
 
 interface RecentOperationsTableProps {
@@ -80,7 +80,12 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
                   </span>
                 </td>
                 <td className="py-3 px-2 text-sm text-right font-medium text-gray-900 dark:text-gray-100">
-                  {formatMoney(operation.amount, operation.currency)}
+                  {formatOperationAmount(
+                    operation.amount,
+                    operation.currency,
+                    operation.originalAmount,
+                    operation.originalCurrency
+                  )}
                 </td>
                 <td className="py-3 px-2 text-sm text-gray-600 dark:text-gray-400">
                   {operation.description || 'Без описания'}

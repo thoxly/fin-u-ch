@@ -60,7 +60,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     new Set()
   );
 
-  // Загружаем дерево статей для определения родительских связей
+  // Загружаем дерево статей для определения групповых связей
   const { tree: articleTree } = useArticleTree({ isActive: true });
 
   // Создаем плоский список статей с Map для быстрого поиска
@@ -190,7 +190,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     }
   }, [activitiesToExpand]);
 
-  // Автоматически разворачиваем родительские статьи для найденных дочерних статей
+  // Автоматически разворачиваем группы статей для найденных дочерних статей
   useEffect(() => {
     if (matchedArticleIds.size > 0) {
       setExpandedArticles((prev) => {

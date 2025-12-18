@@ -7,6 +7,11 @@ import {
   formatIntervalLabel,
 } from '@fin-u-ch/shared';
 import logger from '../../../config/logger';
+import {
+  convertOperationAmountToBase,
+  getOperationCurrency,
+  convertOpeningBalanceToBase,
+} from '../../../utils/currency-converter';
 
 export interface DashboardParams {
   periodFrom: Date;
@@ -214,11 +219,66 @@ export class DashboardService {
       })),
     });
 
-    // Получаем все активные счета
-    const accounts = await prisma.account.findMany({
+    // Получаем все активные счета с валютами
+    const accountsRaw = await prisma.account.findMany({
       where: { companyId, isActive: true },
       orderBy: { name: 'asc' },
     });
+    const accounts = accountsRaw.map((acc) => ({
+      id: acc.id,
+      name: acc.name,
+      currency: acc.currency,
+      openingBalance: acc.openingBalance,
+    }));
+
+    // Создаем Map счетов для быстрого доступа
+    const accountsMap = new Map(
+      accounts.map((acc) => [acc.id, { currency: acc.currency }])
+    );
+
+    // Пересчитываем суммы операций в базовую валюту
+    // Если операция уже имеет originalAmount и originalCurrency, значит она уже конвертирована
+    // и мы используем amount и currency напрямую (они уже в базовой валюте)
+    const operationsWithConvertedAmounts = await Promise.all(
+      operations.map(async (op) => {
+        // Если операция уже конвертирована (есть originalAmount), используем значения из БД
+        if (op.originalAmount != null && op.originalCurrency) {
+          return {
+            ...op,
+            amount: op.amount, // Уже в базовой валюте
+            currency: op.currency, // Уже базовая валюта
+            originalAmount: op.originalAmount,
+            originalCurrency: op.originalCurrency,
+          };
+        }
+
+        // Старая операция без конвертации - пересчитываем
+        const operationCurrency = getOperationCurrency(
+          {
+            type: op.type,
+            accountId: op.accountId,
+            sourceAccountId: op.sourceAccountId,
+            targetAccountId: op.targetAccountId,
+            currency: op.currency,
+          },
+          accountsMap
+        );
+
+        const convertedAmount = await convertOperationAmountToBase(
+          op.amount,
+          operationCurrency,
+          companyId,
+          op.operationDate
+        );
+
+        return {
+          ...op,
+          amount: convertedAmount,
+          originalAmount: op.amount,
+          originalCurrency: operationCurrency,
+        };
+      })
+    );
 
     // Создаем интервалы
     const intervals = createIntervals(
@@ -231,7 +291,7 @@ export class DashboardService {
     logger.info('Dashboard: starting interval mapping', {
       companyId,
       intervalsCount: intervals.length,
-      operationsCount: operations.length,
+      operationsCount: operationsWithConvertedAmounts.length,
       firstInterval: intervals[0]
         ? {
             start: intervals[0].start.toISOString(),
@@ -239,17 +299,17 @@ export class DashboardService {
             label: intervals[0].label,
           }
         : null,
-      firstOperation: operations[0]
+      firstOperation: operationsWithConvertedAmounts[0]
         ? {
-            date: operations[0].operationDate.toISOString(),
-            type: operations[0].type,
-            amount: operations[0].amount,
+            date: operationsWithConvertedAmounts[0].operationDate.toISOString(),
+            type: operationsWithConvertedAmounts[0].type,
+            amount: operationsWithConvertedAmounts[0].amount,
           }
         : null,
     });
 
     const incomeExpenseSeries = intervals.map((interval) => {
-      const intervalOps = operations.filter((op: PrismaOperation) => {
+      const intervalOps = operationsWithConvertedAmounts.filter((op: any) => {
         const opDate = new Date(op.operationDate);
         // Нормализуем дату операции до начала дня в UTC для корректного сравнения
         const opDateNormalized = new Date(
@@ -293,12 +353,12 @@ export class DashboardService {
       });
 
       const income = intervalOps
-        .filter((op: PrismaOperation) => op.type === 'income')
-        .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+        .filter((op: any) => op.type === 'income')
+        .reduce((sum: number, op: any) => sum + op.amount, 0);
 
       const expense = intervalOps
-        .filter((op: PrismaOperation) => op.type === 'expense')
-        .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+        .filter((op: any) => op.type === 'expense')
+        .reduce((sum: number, op: any) => sum + op.amount, 0);
 
       return {
         date: interval.start.toISOString().split('T')[0],
@@ -343,7 +403,7 @@ export class DashboardService {
       await this.calculateAccountBalancesByIntervals(
         companyId,
         accounts,
-        operations,
+        operationsWithConvertedAmounts,
         accountBalancesIntervals
       );
 
@@ -441,17 +501,75 @@ export class DashboardService {
       },
     });
 
-    logger.info('CumulativeCashFlow: operations fetched', {
+    // Получаем все активные счета с валютами
+    const accountsRaw = await prisma.account.findMany({
+      where: { companyId, isActive: true },
+    });
+    const accounts = accountsRaw.map((acc) => ({
+      id: acc.id,
+      currency: acc.currency,
+    }));
+
+    // Создаем Map счетов для быстрого доступа
+    const accountsMap = new Map(
+      accounts.map((acc) => [acc.id, { currency: acc.currency }])
+    );
+
+    // Пересчитываем суммы операций в базовую валюту
+    // Если операция уже имеет originalAmount и originalCurrency, значит она уже конвертирована
+    // и мы используем amount и currency напрямую (они уже в базовой валюте)
+    const operationsWithConvertedAmounts = await Promise.all(
+      operations.map(async (op) => {
+        // Если операция уже конвертирована (есть originalAmount), используем значения из БД
+        if (op.originalAmount != null && op.originalCurrency) {
+          return {
+            ...op,
+            amount: op.amount, // Уже в базовой валюте
+            currency: op.currency, // Уже базовая валюта
+          };
+        }
+
+        // Старая операция без конвертации - пересчитываем
+        const operationCurrency = getOperationCurrency(
+          {
+            type: op.type,
+            accountId: op.accountId,
+            sourceAccountId: op.sourceAccountId,
+            targetAccountId: op.targetAccountId,
+            currency: op.currency,
+          },
+          accountsMap
+        );
+
+        const convertedAmount = await convertOperationAmountToBase(
+          op.amount,
+          operationCurrency,
+          companyId,
+          op.operationDate
+        );
+
+        return {
+          ...op,
+          amount: convertedAmount,
+          originalAmount: op.amount,
+          originalCurrency: operationCurrency,
+        };
+      })
+    );
+
+    logger.info('CumulativeCashFlow: operations fetched and converted', {
       companyId,
-      operationsCount: operations.length,
+      operationsCount: operationsWithConvertedAmounts.length,
       periodFrom: params.periodFrom.toISOString(),
       maxDate: maxDate.toISOString(),
-      sampleOperations: operations.slice(0, 3).map((op) => ({
-        id: op.id,
-        date: op.operationDate.toISOString(),
-        type: op.type,
-        amount: op.amount,
-      })),
+      sampleOperations: operationsWithConvertedAmounts
+        .slice(0, 3)
+        .map((op) => ({
+          id: op.id,
+          date: op.operationDate.toISOString(),
+          type: op.type,
+          amount: op.amount,
+        })),
     });
 
     // Создаем интервалы
@@ -469,7 +587,7 @@ export class DashboardService {
 
       for (let i = 0; i <= index; i++) {
         const currentInterval = intervals[i];
-        const intervalOps = operations.filter((op: PrismaOperation) => {
+        const intervalOps = operationsWithConvertedAmounts.filter((op: any) => {
           const opDate = new Date(op.operationDate);
           // Нормализуем дату операции до начала дня в UTC для корректного сравнения
           const opDateNormalized = new Date(
@@ -513,60 +631,62 @@ export class DashboardService {
         });
 
         const intervalIncome = intervalOps
-          .filter((op: PrismaOperation) => op.type === 'income')
-          .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+          .filter((op: any) => op.type === 'income')
+          .reduce((sum: number, op: any) => sum + op.amount, 0);
 
         const intervalExpense = intervalOps
-          .filter((op: PrismaOperation) => op.type === 'expense')
-          .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+          .filter((op: any) => op.type === 'expense')
+          .reduce((sum: number, op: any) => sum + op.amount, 0);
 
         cumulativeIncome += intervalIncome;
         cumulativeExpense += intervalExpense;
       }
 
       // Получаем операции для текущего интервала
-      const currentIntervalOps = operations.filter((op: PrismaOperation) => {
-        const opDate = new Date(op.operationDate);
-        // Нормализуем дату операции до начала дня в UTC для корректного сравнения
-        const opDateNormalized = new Date(
-          Date.UTC(
-            opDate.getUTCFullYear(),
-            opDate.getUTCMonth(),
-            opDate.getUTCDate(),
-            0,
-            0,
-            0,
-            0
-          )
-        );
-        // Сравниваем нормализованные даты
-        const intervalStartNormalized = new Date(
-          Date.UTC(
-            interval.start.getUTCFullYear(),
-            interval.start.getUTCMonth(),
-            interval.start.getUTCDate(),
-            0,
-            0,
-            0,
-            0
-          )
-        );
-        const intervalEndNormalized = new Date(
-          Date.UTC(
-            interval.end.getUTCFullYear(),
-            interval.end.getUTCMonth(),
-            interval.end.getUTCDate(),
-            0,
-            0,
-            0,
-            0
-          )
-        );
-        return (
-          opDateNormalized >= intervalStartNormalized &&
-          opDateNormalized <= intervalEndNormalized
-        );
-      });
+      const currentIntervalOps = operationsWithConvertedAmounts.filter(
+        (op: any) => {
+          const opDate = new Date(op.operationDate);
+          // Нормализуем дату операции до начала дня в UTC для корректного сравнения
+          const opDateNormalized = new Date(
+            Date.UTC(
+              opDate.getUTCFullYear(),
+              opDate.getUTCMonth(),
+              opDate.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
+          // Сравниваем нормализованные даты
+          const intervalStartNormalized = new Date(
+            Date.UTC(
+              interval.start.getUTCFullYear(),
+              interval.start.getUTCMonth(),
+              interval.start.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
+          const intervalEndNormalized = new Date(
+            Date.UTC(
+              interval.end.getUTCFullYear(),
+              interval.end.getUTCMonth(),
+              interval.end.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
+          return (
+            opDateNormalized >= intervalStartNormalized &&
+            opDateNormalized <= intervalEndNormalized
+          );
+        }
+      );
 
       return {
         date: interval.start.toISOString().split('T')[0],
@@ -588,13 +708,13 @@ export class DashboardService {
     });
 
     // Рассчитываем общие суммы за период
-    const totalIncome = operations
-      .filter((op: PrismaOperation) => op.type === 'income')
-      .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+    const totalIncome = operationsWithConvertedAmounts
+      .filter((op: any) => op.type === 'income')
+      .reduce((sum: number, op: any) => sum + op.amount, 0);
 
-    const totalExpense = operations
-      .filter((op: PrismaOperation) => op.type === 'expense')
-      .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
+    const totalExpense = operationsWithConvertedAmounts
+      .filter((op: any) => op.type === 'expense')
+      .reduce((sum: number, op: any) => sum + op.amount, 0);
 
     logger.info('CumulativeCashFlow: cumulativeSeries calculated', {
       companyId,
@@ -705,8 +825,13 @@ export class DashboardService {
    */
   private async calculateAccountBalancesByIntervals(
     companyId: string,
-    accounts: Array<{ id: string; name: string; openingBalance: number }>,
-    operations: PrismaOperation[],
+    accounts: Array<{
+      id: string;
+      name: string;
+      openingBalance: number;
+      currency: string;
+    }>,
+    operations: any[], // Уже пересчитанные операции
     intervals: Interval[]
   ): Promise<
     Array<{
@@ -733,7 +858,7 @@ export class DashboardService {
     const accountIdsSet = new Set(accountIds);
 
     // Получаем все операции с начала истории (для расчета начальных балансов, только реальные, не шаблоны)
-    const allOperations = await prisma.operation.findMany({
+    const allOperationsRaw = await prisma.operation.findMany({
       where: {
         companyId,
         OR: [
@@ -752,13 +877,63 @@ export class DashboardService {
       },
     });
 
+    // Создаем Map счетов для определения валюты операций
+    const accountsMap = new Map(
+      accounts.map((acc) => [acc.id, { currency: acc.currency }])
+    );
+
+    // Пересчитываем исторические операции в базовую валюту
+    const allOperations = await Promise.all(
+      allOperationsRaw.map(async (op) => {
+        const operationCurrency = getOperationCurrency(
+          {
+            type: op.type,
+            accountId: op.accountId,
+            sourceAccountId: op.sourceAccountId,
+            targetAccountId: op.targetAccountId,
+            currency: op.currency,
+          },
+          accountsMap
+        );
+
+        const convertedAmount = await convertOperationAmountToBase(
+          op.amount,
+          operationCurrency,
+          companyId,
+          op.operationDate
+        );
+
+        return {
+          ...op,
+          amount: convertedAmount,
+        };
+      })
+    );
+
+    // Пересчитываем openingBalance в базовую валюту
+    const accountsWithConvertedBalance = await Promise.all(
+      accounts.map(async (acc) => {
+        const accountCurrency = acc.currency;
+        const convertedBalance = await convertOpeningBalanceToBase(
+          acc.openingBalance,
+          accountCurrency,
+          companyId
+        );
+
+        return {
+          ...acc,
+          openingBalance: convertedBalance,
+        };
+      })
+    );
+
     // Создаем Map для быстрого доступа к операциям по интервалам
-    const operationsByInterval = new Map<number, PrismaOperation[]>();
+    const operationsByInterval = new Map<number, any[]>();
 
     // Предварительно группируем операции по интервалам
     // ВАЖНО: Для дневных интервалов нормализуем даты для корректного сравнения
     intervals.forEach((interval, index) => {
-      const intervalOps = operations.filter((op) => {
+      const intervalOps = operations.filter((op: any) => {
         const opDate = new Date(op.operationDate);
         // Нормализуем дату операции до начала дня в UTC для корректного сравнения
         const opDateNormalized = new Date(
@@ -821,13 +996,13 @@ export class DashboardService {
     // Создаем Map для накопления изменений балансов
     const balanceChanges = new Map<string, number>();
 
-    // Инициализируем начальные балансы
-    accounts.forEach((account) => {
+    // Инициализируем начальные балансы (уже пересчитанные)
+    accountsWithConvertedBalance.forEach((account) => {
       balanceChanges.set(account.id, account.openingBalance);
     });
 
-    // Применяем исторические операции один раз
-    allOperations.forEach((op: PrismaOperation) => {
+    // Применяем исторические операции один раз (уже пересчитанные)
+    allOperations.forEach((op: any) => {
       this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
     });
 
@@ -873,7 +1048,7 @@ export class DashboardService {
       // ВАЖНО: Включаем ВСЕ счета, даже если у них нет операций в этот день
       // Это позволяет видеть изменения баланса день за днем
       const balancesObj: Record<string, number> = {};
-      accounts.forEach((account) => {
+      accountsWithConvertedBalance.forEach((account) => {
         const balance = balancesAtEndOfDay.get(account.id) || 0;
         balancesObj[account.id] = balance;
       });

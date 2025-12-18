@@ -129,7 +129,12 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={filteredData || []}
-              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+              margin={{
+                top: 5,
+                right: isSmall ? 5 : 30,
+                left: isSmall ? 0 : 5,
+                bottom: 48,
+              }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -142,8 +147,9 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={isSmall ? 10 : 12}
                 tickFormatter={(value) => formatMoney(value)}
+                width={isSmall ? 60 : 80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -158,6 +164,56 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                   />
                 )}
                 labelFormatter={(label) => `${label}`}
+                wrapperStyle={
+                  isSmall
+                    ? {
+                        zIndex: 1000,
+                        pointerEvents: 'none',
+                        maxWidth: 'calc(100vw - 32px)',
+                      }
+                    : undefined
+                }
+                position={
+                  isSmall
+                    ? (point: { x?: number; y?: number } | null) => {
+                        if (!point) return { x: 16, y: 16 };
+
+                        const viewportWidth = window.innerWidth;
+                        const viewportHeight = window.innerHeight;
+                        // Максимальная ширина тултипа на мобильных: минимум из 200px и (viewportWidth - 32px)
+                        const tooltipWidth = Math.min(200, viewportWidth - 32);
+                        const tooltipHeight = 80;
+                        const padding = 16;
+
+                        let x = (point.x as number) || 0;
+                        let y = (point.y as number) || 0;
+
+                        // Корректируем позицию по X
+                        if (x + tooltipWidth > viewportWidth - padding) {
+                          x = Math.max(
+                            padding,
+                            viewportWidth - tooltipWidth - padding
+                          );
+                        }
+                        if (x < padding) {
+                          x = padding;
+                        }
+
+                        // Корректируем позицию по Y
+                        if (y + tooltipHeight > viewportHeight - padding) {
+                          y = Math.max(
+                            padding,
+                            viewportHeight - tooltipHeight - padding
+                          );
+                        }
+                        if (y < padding) {
+                          y = padding;
+                        }
+
+                        return { x, y };
+                      }
+                    : undefined
+                }
               />
               {/* Не отображаем легенду и линии, когда нет данных */}
             </LineChart>
@@ -204,12 +260,14 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
               />
             </div>
           </div>
-          <ExportMenu
-            filenameBase="income_expense"
-            buildRows={buildExportRows}
-            columns={['date', 'category', 'amount', 'type']}
-            entity="reports"
-          />
+          {!isSmall && hasData && (
+            <ExportMenu
+              filenameBase="income_expense"
+              buildRows={buildExportRows}
+              columns={['date', 'category', 'amount', 'type']}
+              entity="reports"
+            />
+          )}
         </div>
       </div>
 
@@ -217,7 +275,12 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
+            margin={{
+              top: 5,
+              right: isSmall ? 5 : 30,
+              left: isSmall ? 0 : 5,
+              bottom: 28,
+            }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -226,22 +289,87 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
             <XAxis
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
-              tick={{ fontSize: 11 }}
-              angle={filteredData.length > 8 ? -45 : 0}
+              fontSize={isSmall ? 10 : 12}
+              tick={{ fontSize: isSmall ? 9 : 11 }}
+              angle={filteredData.length > 8 ? (isSmall ? -35 : -45) : 0}
               textAnchor={filteredData.length > 8 ? 'end' : 'middle'}
-              height={filteredData.length > 8 ? 80 : 30}
+              height={filteredData.length > 8 ? (isSmall ? 60 : 80) : 30}
+              interval={
+                isSmall
+                  ? filteredData.length <= 10
+                    ? 0 // Если точек мало, показываем все
+                    : filteredData.length <= 20
+                      ? 1 // Каждую вторую
+                      : 2 // Каждую третью (для 31 точки = ~10 меток)
+                  : filteredData.length <= 31
+                    ? 0 // На десктопе показываем все до 31
+                    : 'preserveStartEnd'
+              }
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
+              fontSize={isSmall ? 10 : 12}
+              tick={{ fontSize: isSmall ? 10 : 12 }}
               tickFormatter={(value) => formatMoney(value)}
+              width={isSmall ? 60 : 80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
               ]}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={<CustomTooltip />}
+              wrapperStyle={
+                isSmall
+                  ? {
+                      zIndex: 1000,
+                      pointerEvents: 'none',
+                      maxWidth: 'calc(100vw - 32px)',
+                    }
+                  : undefined
+              }
+              position={
+                isSmall
+                  ? (point: { x?: number; y?: number } | null) => {
+                      if (!point) return { x: 16, y: 16 };
+
+                      const viewportWidth = window.innerWidth;
+                      const viewportHeight = window.innerHeight;
+                      // Максимальная ширина тултипа на мобильных: минимум из 200px и (viewportWidth - 32px)
+                      const tooltipWidth = Math.min(200, viewportWidth - 32);
+                      const tooltipHeight = 80;
+                      const padding = 16;
+
+                      let x = (point.x as number) || 0;
+                      let y = (point.y as number) || 0;
+
+                      // Корректируем позицию по X
+                      if (x + tooltipWidth > viewportWidth - padding) {
+                        x = Math.max(
+                          padding,
+                          viewportWidth - tooltipWidth - padding
+                        );
+                      }
+                      if (x < padding) {
+                        x = padding;
+                      }
+
+                      // Корректируем позицию по Y
+                      if (y + tooltipHeight > viewportHeight - padding) {
+                        y = Math.max(
+                          padding,
+                          viewportHeight - tooltipHeight - padding
+                        );
+                      }
+                      if (y < padding) {
+                        y = padding;
+                      }
+
+                      return { x, y };
+                    }
+                  : undefined
+              }
+            />
             {!isSmall && (
               <Legend
                 verticalAlign="bottom"
