@@ -45,6 +45,40 @@ export class ArticlesService {
     });
   }
 
+  async getTree(
+    companyId: string,
+    filters?: Omit<ArticleFilters, 'type'> & { type?: 'income' | 'expense' }
+  ) {
+    const where: any = { companyId };
+
+    if (filters?.type) {
+      where.type = filters.type;
+    }
+
+    if (filters?.activity) {
+      where.activity = filters.activity;
+    }
+
+    if (filters?.isActive !== undefined) {
+      where.isActive = filters.isActive;
+    }
+
+    // Get all articles matching filters
+    const articles = await prisma.article.findMany({
+      where,
+      include: {
+        parent: { select: { id: true, name: true } },
+        children: true,
+        counterparty: { select: { id: true, name: true } },
+      } as any,
+      orderBy: { name: 'asc' },
+    });
+
+    // Build tree structure: return all articles as flat list
+    // Frontend will build the tree from parentId relationships
+    return articles;
+  }
+
   async getById(id: string, companyId: string) {
     const article = await prisma.article.findFirst({
       where: { id, companyId },
