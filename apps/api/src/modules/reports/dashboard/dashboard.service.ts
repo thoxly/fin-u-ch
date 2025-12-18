@@ -1,6 +1,12 @@
 import prisma from '../../../config/db';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
-import { createIntervals, PeriodFormat, Interval } from '@fin-u-ch/shared';
+import {
+  createIntervals,
+  PeriodFormat,
+  Interval,
+  formatIntervalLabel,
+} from '@fin-u-ch/shared';
+import logger from '../../../config/logger';
 
 export interface DashboardParams {
   periodFrom: Date;
@@ -114,24 +120,72 @@ type AccountType = {
 };
 
 export class DashboardService {
+  /**
+   * Получает текущую дату (начало дня в UTC) для фильтрации будущих операций
+   * Использует UTC, чтобы избежать проблем с часовыми поясами
+   */
+  private getTodayStart(): Date {
+    const now = new Date();
+    // Используем UTC для согласованности с данными в БД
+    const today = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    return today;
+  }
+
   async getDashboard(
     companyId: string,
     params: DashboardParams
   ): Promise<DashboardResponse> {
+    logger.info('=== Dashboard.getDashboard CALLED ===', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      mode: params.mode,
+      periodFormat: params.periodFormat,
+    });
+
     const cacheKey = generateCacheKey(companyId, 'dashboard', params);
     const cached = await getCachedReport(cacheKey);
-    if (cached) return cached as DashboardResponse;
+    if (cached) {
+      logger.info('Dashboard: returning cached data', { companyId });
+      return cached as DashboardResponse;
+    }
 
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
 
-    // Получаем все операции за период (только реальные, не шаблоны)
+    // Получаем текущую дату для фильтрации будущих операций
+    const todayStart = this.getTodayStart();
+    // Используем минимальное значение между концом периода и сегодняшним днем
+    const maxDate = new Date(
+      Math.min(params.periodTo.getTime(), todayStart.getTime())
+    );
+
+    logger.info('Dashboard: filtering future operations', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      todayStart: todayStart.toISOString(),
+      maxDate: maxDate.toISOString(),
+      periodFormat,
+    });
+
+    // Получаем все операции за период (только реальные, не шаблоны, не будущие)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
         operationDate: {
           gte: params.periodFrom,
-          lte: params.periodTo,
+          lte: maxDate, // Исключаем операции в будущем
         },
         isConfirmed: true,
         isTemplate: false,
@@ -145,6 +199,19 @@ export class DashboardService {
       orderBy: {
         operationDate: 'asc',
       },
+    });
+
+    logger.info('Dashboard: operations fetched', {
+      companyId,
+      operationsCount: operations.length,
+      periodFrom: params.periodFrom.toISOString(),
+      maxDate: maxDate.toISOString(),
+      sampleOperations: operations.slice(0, 3).map((op) => ({
+        id: op.id,
+        date: op.operationDate.toISOString(),
+        type: op.type,
+        amount: op.amount,
+      })),
     });
 
     // Получаем все активные счета
@@ -161,10 +228,68 @@ export class DashboardService {
     );
 
     // 1. Рассчитываем поступления/списания по интервалам
+    logger.info('Dashboard: starting interval mapping', {
+      companyId,
+      intervalsCount: intervals.length,
+      operationsCount: operations.length,
+      firstInterval: intervals[0]
+        ? {
+            start: intervals[0].start.toISOString(),
+            end: intervals[0].end.toISOString(),
+            label: intervals[0].label,
+          }
+        : null,
+      firstOperation: operations[0]
+        ? {
+            date: operations[0].operationDate.toISOString(),
+            type: operations[0].type,
+            amount: operations[0].amount,
+          }
+        : null,
+    });
+
     const incomeExpenseSeries = intervals.map((interval) => {
       const intervalOps = operations.filter((op: PrismaOperation) => {
         const opDate = new Date(op.operationDate);
-        return opDate >= interval.start && opDate <= interval.end;
+        // Нормализуем дату операции до начала дня в UTC для корректного сравнения
+        const opDateNormalized = new Date(
+          Date.UTC(
+            opDate.getUTCFullYear(),
+            opDate.getUTCMonth(),
+            opDate.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        // Сравниваем нормализованные даты
+        const intervalStartNormalized = new Date(
+          Date.UTC(
+            interval.start.getUTCFullYear(),
+            interval.start.getUTCMonth(),
+            interval.start.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        const intervalEndNormalized = new Date(
+          Date.UTC(
+            interval.end.getUTCFullYear(),
+            interval.end.getUTCMonth(),
+            interval.end.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        return (
+          opDateNormalized >= intervalStartNormalized &&
+          opDateNormalized <= intervalEndNormalized
+        );
       });
 
       const income = intervalOps
@@ -194,13 +319,32 @@ export class DashboardService {
       0
     );
 
+    logger.info('Dashboard: incomeExpenseSeries calculated', {
+      companyId,
+      seriesLength: incomeExpenseSeries.length,
+      totalIncome,
+      totalExpense,
+      seriesWithData: incomeExpenseSeries.filter(
+        (p) => p.income > 0 || p.expense > 0
+      ).length,
+      sampleSeries: incomeExpenseSeries
+        .filter((p) => p.income > 0 || p.expense > 0)
+        .slice(0, 5),
+    });
+
     // 3. Рассчитываем балансы по счетам на каждый интервал
+    // ВАЖНО: Для графика остатков всегда используем дневные интервалы,
+    // чтобы показать изменения баланса по дням, а не только по месяцам/кварталам
+    const accountBalancesIntervals = this.createDailyIntervals(
+      params.periodFrom,
+      params.periodTo
+    );
     const accountBalancesSeries =
       await this.calculateAccountBalancesByIntervals(
         companyId,
         accounts,
         operations,
-        intervals
+        accountBalancesIntervals
       );
 
     // 4. Рассчитываем финальные балансы на конец периода
@@ -260,13 +404,29 @@ export class DashboardService {
     // Определяем формат периода (по умолчанию день)
     const periodFormat = params.periodFormat || 'day';
 
-    // Получаем все операции за период (только реальные, не шаблоны)
+    // Получаем текущую дату для фильтрации будущих операций
+    const todayStart = this.getTodayStart();
+    // Используем минимальное значение между концом периода и сегодняшним днем
+    const maxDate = new Date(
+      Math.min(params.periodTo.getTime(), todayStart.getTime())
+    );
+
+    logger.info('CumulativeCashFlow: filtering future operations', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      todayStart: todayStart.toISOString(),
+      maxDate: maxDate.toISOString(),
+      periodFormat,
+    });
+
+    // Получаем все операции за период (только реальные, не шаблоны, не будущие)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
         operationDate: {
           gte: params.periodFrom,
-          lte: params.periodTo,
+          lte: maxDate, // Исключаем операции в будущем
         },
         isConfirmed: true,
         isTemplate: false,
@@ -279,6 +439,19 @@ export class DashboardService {
       orderBy: {
         operationDate: 'asc',
       },
+    });
+
+    logger.info('CumulativeCashFlow: operations fetched', {
+      companyId,
+      operationsCount: operations.length,
+      periodFrom: params.periodFrom.toISOString(),
+      maxDate: maxDate.toISOString(),
+      sampleOperations: operations.slice(0, 3).map((op) => ({
+        id: op.id,
+        date: op.operationDate.toISOString(),
+        type: op.type,
+        amount: op.amount,
+      })),
     });
 
     // Создаем интервалы
@@ -298,8 +471,44 @@ export class DashboardService {
         const currentInterval = intervals[i];
         const intervalOps = operations.filter((op: PrismaOperation) => {
           const opDate = new Date(op.operationDate);
+          // Нормализуем дату операции до начала дня в UTC для корректного сравнения
+          const opDateNormalized = new Date(
+            Date.UTC(
+              opDate.getUTCFullYear(),
+              opDate.getUTCMonth(),
+              opDate.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
+          // Сравниваем нормализованные даты
+          const intervalStartNormalized = new Date(
+            Date.UTC(
+              currentInterval.start.getUTCFullYear(),
+              currentInterval.start.getUTCMonth(),
+              currentInterval.start.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
+          const intervalEndNormalized = new Date(
+            Date.UTC(
+              currentInterval.end.getUTCFullYear(),
+              currentInterval.end.getUTCMonth(),
+              currentInterval.end.getUTCDate(),
+              0,
+              0,
+              0,
+              0
+            )
+          );
           return (
-            opDate >= currentInterval.start && opDate <= currentInterval.end
+            opDateNormalized >= intervalStartNormalized &&
+            opDateNormalized <= intervalEndNormalized
           );
         });
 
@@ -318,7 +527,45 @@ export class DashboardService {
       // Получаем операции для текущего интервала
       const currentIntervalOps = operations.filter((op: PrismaOperation) => {
         const opDate = new Date(op.operationDate);
-        return opDate >= interval.start && opDate <= interval.end;
+        // Нормализуем дату операции до начала дня в UTC для корректного сравнения
+        const opDateNormalized = new Date(
+          Date.UTC(
+            opDate.getUTCFullYear(),
+            opDate.getUTCMonth(),
+            opDate.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        // Сравниваем нормализованные даты
+        const intervalStartNormalized = new Date(
+          Date.UTC(
+            interval.start.getUTCFullYear(),
+            interval.start.getUTCMonth(),
+            interval.start.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        const intervalEndNormalized = new Date(
+          Date.UTC(
+            interval.end.getUTCFullYear(),
+            interval.end.getUTCMonth(),
+            interval.end.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        return (
+          opDateNormalized >= intervalStartNormalized &&
+          opDateNormalized <= intervalEndNormalized
+        );
       });
 
       return {
@@ -349,6 +596,27 @@ export class DashboardService {
       .filter((op: PrismaOperation) => op.type === 'expense')
       .reduce((sum: number, op: PrismaOperation) => sum + op.amount, 0);
 
+    logger.info('CumulativeCashFlow: cumulativeSeries calculated', {
+      companyId,
+      seriesLength: cumulativeSeries.length,
+      totalIncome,
+      totalExpense,
+      seriesWithData: cumulativeSeries.filter(
+        (p) =>
+          (p.cumulativeIncome !== null && p.cumulativeIncome !== 0) ||
+          (p.cumulativeExpense !== null && p.cumulativeExpense !== 0) ||
+          (p.cumulativeNetCashFlow !== null && p.cumulativeNetCashFlow !== 0)
+      ).length,
+      sampleSeries: cumulativeSeries
+        .filter(
+          (p) =>
+            (p.cumulativeIncome !== null && p.cumulativeIncome !== 0) ||
+            (p.cumulativeExpense !== null && p.cumulativeExpense !== 0) ||
+            (p.cumulativeNetCashFlow !== null && p.cumulativeNetCashFlow !== 0)
+        )
+        .slice(0, 5),
+    });
+
     const result: CumulativeCashFlowResponse = {
       cumulativeSeries,
       summary: {
@@ -360,6 +628,75 @@ export class DashboardService {
 
     await cacheReport(cacheKey, result);
     return result;
+  }
+
+  /**
+   * Создает ежедневные интервалы для графика остатков
+   * Всегда создает интервалы по дням, независимо от длины периода
+   */
+  private createDailyIntervals(fromDate: Date, toDate: Date): Interval[] {
+    const intervals: Interval[] = [];
+
+    // Нормализуем даты для корректного вычисления (используем UTC)
+    const fromDateNormalized = new Date(
+      Date.UTC(
+        fromDate.getUTCFullYear(),
+        fromDate.getUTCMonth(),
+        fromDate.getUTCDate()
+      )
+    );
+    const toDateNormalized = new Date(
+      Date.UTC(
+        toDate.getUTCFullYear(),
+        toDate.getUTCMonth(),
+        toDate.getUTCDate()
+      )
+    );
+
+    const totalDays =
+      Math.ceil(
+        (toDateNormalized.getTime() - fromDateNormalized.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    // Создаем интервал для каждого дня
+    const dayDate = new Date(fromDateNormalized);
+
+    for (let dayCount = 0; dayCount < totalDays; dayCount++) {
+      const start = new Date(
+        Date.UTC(
+          dayDate.getUTCFullYear(),
+          dayDate.getUTCMonth(),
+          dayDate.getUTCDate(),
+          0,
+          0,
+          0,
+          0
+        )
+      );
+      const end = new Date(
+        Date.UTC(
+          dayDate.getUTCFullYear(),
+          dayDate.getUTCMonth(),
+          dayDate.getUTCDate(),
+          0,
+          0,
+          0,
+          0
+        )
+      );
+
+      intervals.push({
+        start,
+        end,
+        label: formatIntervalLabel(start, end, 'day'),
+      });
+
+      // Переходим к следующему дню
+      dayDate.setUTCDate(dayDate.getUTCDate() + 1);
+    }
+
+    return intervals;
   }
 
   /**
@@ -419,11 +756,65 @@ export class DashboardService {
     const operationsByInterval = new Map<number, PrismaOperation[]>();
 
     // Предварительно группируем операции по интервалам
+    // ВАЖНО: Для дневных интервалов нормализуем даты для корректного сравнения
     intervals.forEach((interval, index) => {
       const intervalOps = operations.filter((op) => {
         const opDate = new Date(op.operationDate);
-        return opDate >= interval.start && opDate <= interval.end;
+        // Нормализуем дату операции до начала дня в UTC для корректного сравнения
+        const opDateNormalized = new Date(
+          Date.UTC(
+            opDate.getUTCFullYear(),
+            opDate.getUTCMonth(),
+            opDate.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        // Нормализуем даты интервала
+        const intervalStartNormalized = new Date(
+          Date.UTC(
+            interval.start.getUTCFullYear(),
+            interval.start.getUTCMonth(),
+            interval.start.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        const intervalEndNormalized = new Date(
+          Date.UTC(
+            interval.end.getUTCFullYear(),
+            interval.end.getUTCMonth(),
+            interval.end.getUTCDate(),
+            0,
+            0,
+            0,
+            0
+          )
+        );
+        // Для дневных интервалов start и end могут быть одинаковыми (начало дня)
+        // В этом случае проверяем, что дата операции совпадает с датой интервала
+        if (
+          intervalStartNormalized.getTime() === intervalEndNormalized.getTime()
+        ) {
+          return (
+            opDateNormalized.getTime() === intervalStartNormalized.getTime()
+          );
+        }
+        return (
+          opDateNormalized >= intervalStartNormalized &&
+          opDateNormalized <= intervalEndNormalized
+        );
       });
+      // Сортируем операции по дате для правильного расчета балансов
+      intervalOps.sort(
+        (a, b) =>
+          new Date(a.operationDate).getTime() -
+          new Date(b.operationDate).getTime()
+      );
       operationsByInterval.set(index, intervalOps);
     });
 
@@ -461,20 +852,30 @@ export class DashboardService {
     }> = [];
 
     // Для каждого интервала вычисляем балансы
+    // ВАЖНО: Балансы накапливаются день за днем, показывая изменения по времени
     intervals.forEach((interval, index) => {
-      // Копируем текущие балансы для этого интервала
-      const currentBalances = new Map(balanceChanges);
-
-      // Применяем операции из текущего интервала
+      // Получаем операции из текущего интервала (уже отсортированные по дате)
       const currentIntervalOps = operationsByInterval.get(index) || [];
+
+      // Балансы на НАЧАЛО дня (до применения операций этого дня)
+      // Для первого дня это баланс после всех исторических операций
+      // Для последующих дней это баланс после всех операций предыдущих дней
+      const balancesAtStartOfDay = new Map(balanceChanges);
+
+      // Применяем операции из текущего интервала для получения баланса на КОНЕЦ дня
+      const balancesAtEndOfDay = new Map(balancesAtStartOfDay);
       currentIntervalOps.forEach((op) => {
-        this.applyOperationToBalances(currentBalances, op, accountIdsSet);
+        this.applyOperationToBalances(balancesAtEndOfDay, op, accountIdsSet);
       });
 
       // Конвертируем Map в объект для результата
+      // Показываем баланс на КОНЕЦ дня (после всех операций этого дня)
+      // ВАЖНО: Включаем ВСЕ счета, даже если у них нет операций в этот день
+      // Это позволяет видеть изменения баланса день за днем
       const balancesObj: Record<string, number> = {};
       accounts.forEach((account) => {
-        balancesObj[account.id] = currentBalances.get(account.id) || 0;
+        const balance = balancesAtEndOfDay.get(account.id) || 0;
+        balancesObj[account.id] = balance;
       });
 
       // Формируем операции для интервала
@@ -498,9 +899,23 @@ export class DashboardService {
       });
 
       // Обновляем накопленные балансы для следующего интервала
+      // Это баланс на КОНЕЦ текущего дня, который станет балансом на НАЧАЛО следующего дня
       currentIntervalOps.forEach((op) => {
         this.applyOperationToBalances(balanceChanges, op, accountIdsSet);
       });
+    });
+
+    logger.info('AccountBalances: calculated balances', {
+      companyId,
+      intervalsCount: intervals.length,
+      resultCount: result.length,
+      sampleResult: result.slice(0, 3).map((r) => ({
+        date: r.date,
+        label: r.label,
+        accountsCount: Object.keys(r.accounts).length,
+        hasOperations: r.hasOperations,
+        sampleBalances: Object.entries(r.accounts).slice(0, 2),
+      })),
     });
 
     return result;
