@@ -15,6 +15,19 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../shared/hooks/usePermissions', () => ({
   usePermissions: () => ({
     hasPermission: jest.fn().mockReturnValue(true),
+    isSuperAdmin: false,
+  }),
+}));
+
+// Mock authApi
+jest.mock('../../store/api/authApi', () => ({
+  useGetMeQuery: jest.fn().mockReturnValue({
+    data: {
+      id: '1',
+      email: 'test@example.com',
+      companyId: '1',
+      companyName: 'Test Company',
+    },
   }),
 }));
 
@@ -74,6 +87,7 @@ describe('UserMenu', () => {
         expect(screen.getByText('Мой профиль')).toBeInTheDocument();
         expect(screen.getByText('Моя компания')).toBeInTheDocument();
         expect(screen.getByText('Администрирование')).toBeInTheDocument();
+        expect(screen.getByText('Поддержка')).toBeInTheDocument();
         expect(screen.getByText('Выйти')).toBeInTheDocument();
       },
       { timeout: 10000 }
@@ -120,6 +134,30 @@ describe('UserMenu', () => {
     });
 
     expect(mockNavigate).toHaveBeenCalledWith('/admin');
+  });
+
+  it('opens telegram bot when support button is clicked', async () => {
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    renderWithProviders(<UserMenu userEmail="test@example.com" />);
+
+    const menuButton = screen.getByRole('button');
+    fireEvent.click(menuButton);
+
+    await waitFor(() => {
+      const supportButton = screen.getByText('Поддержка');
+      fireEvent.click(supportButton);
+    });
+
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('https://t.me/Vecta_supportBot'),
+      '_blank'
+    );
+    expect(openSpy).toHaveBeenCalledWith(
+      expect.stringContaining('user_id=1'),
+      '_blank'
+    );
+
+    openSpy.mockRestore();
   });
 
   it('closes dropdown when clicking outside', async () => {

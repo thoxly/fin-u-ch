@@ -449,26 +449,33 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
             )}
           </nav>
 
-          {/* Current Plan Badge */}
-          {currentPlan && (
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => navigate('/company/tariff')}
-                className="w-full group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
-              >
-                <Icons.CreditCard
-                  size={16}
-                  className="opacity-70 group-hover:opacity-100"
-                />
-                <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
-                  Тариф
-                </span>
-                <span className={`text-xs font-semibold ${currentPlan.color}`}>
-                  {currentPlan.icon} {currentPlan.label}
-                </span>
-              </button>
-            </div>
-          )}
+          {/* Support Link */}
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => {
+                const botUsername = 'Vecta_supportBot';
+                if (!user || !user.id) {
+                  window.open(`https://t.me/${botUsername}`, '_blank');
+                  return;
+                }
+                const userId = String(user.id).replace(/\D/g, '');
+                if (!userId) {
+                  window.open(`https://t.me/${botUsername}`, '_blank');
+                  return;
+                }
+                const startPayload = `user_id=${userId}`;
+                const supportBotUrl = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
+                window.open(supportBotUrl, '_blank');
+              }}
+              className="w-full group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <Icons.HelpCircle
+                size={16}
+                className="opacity-70 group-hover:opacity-100"
+              />
+              <span>Поддержка</span>
+            </button>
+          </div>
         </aside>
 
         {/* Main content */}
@@ -553,28 +560,31 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
               )}
             </nav>
 
-            {/* Current Plan Badge for Mobile */}
-            {currentPlan && (
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  onClick={() => {
-                    navigate('/company/tariff');
-                    setIsMobileNavOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-gray-800 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
-                >
-                  <Icons.CreditCard size={16} />
-                  <span className="flex-1 text-left text-gray-700 dark:text-gray-300">
-                    Тариф
-                  </span>
-                  <span
-                    className={`text-xs font-semibold ${currentPlan.color}`}
-                  >
-                    {currentPlan.icon} {currentPlan.label}
-                  </span>
-                </button>
-              </div>
-            )}
+            {/* Support Link for Mobile */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setIsMobileNavOpen(false);
+                  const botUsername = 'Vecta_supportBot';
+                  if (!user || !user.id) {
+                    window.open(`https://t.me/${botUsername}`, '_blank');
+                    return;
+                  }
+                  const userId = String(user.id).replace(/\D/g, '');
+                  if (!userId) {
+                    window.open(`https://t.me/${botUsername}`, '_blank');
+                    return;
+                  }
+                  const startPayload = `user_id=${userId}`;
+                  const supportBotUrl = `https://t.me/${botUsername}?start=${encodeURIComponent(startPayload)}`;
+                  window.open(supportBotUrl, '_blank');
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                <Icons.HelpCircle size={16} />
+                <span>Поддержка</span>
+              </button>
+            </div>
           </div>
         </OffCanvas>
       )}
