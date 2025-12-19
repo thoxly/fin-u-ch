@@ -5,6 +5,16 @@ interface CurrencyRates {
   lastUpdated: number; // timestamp последнего обновления
 }
 
+interface CbrApiResponse {
+  Valute?: {
+    [key: string]: {
+      CharCode: string;
+      Value: number;
+      Nominal: number;
+    };
+  };
+}
+
 // Кеш курсов валют в памяти
 // Ключ: дата (YYYY-MM-DD), значение: курсы валют
 const ratesCache = new Map<string, CurrencyRates>();
@@ -59,7 +69,7 @@ export class CurrencyService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as CbrApiResponse;
       const rates: CurrencyRates = {
         lastUpdated: Date.now(),
       };
@@ -69,7 +79,7 @@ export class CurrencyService {
       // Курс к рублю = Value / Nominal
       if (data.Valute) {
         Object.keys(data.Valute).forEach((key) => {
-          const currency = data.Valute[key];
+          const currency = data.Valute![key];
           // Конвертируем код валюты (например, "USD" -> "USD")
           rates[currency.CharCode] = currency.Value / currency.Nominal;
         });
