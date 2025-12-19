@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
 
 interface GenerateRecurringParams {
   companyId?: string; // Optional: generate for specific company only
@@ -15,6 +16,9 @@ interface GenerateRecurringParams {
 export async function generateRecurringOperations(
   params: GenerateRecurringParams = {}
 ): Promise<void> {
+  const jobName = 'recurring_operations';
+  const startTime = Date.now();
+
   const { companyId, targetDate = new Date() } = params;
 
   // Устанавливаем время на начало дня для целевой даты
@@ -138,8 +142,20 @@ export async function generateRecurringOperations(
     logger.info(
       `Recurring operations generation completed. Created: ${totalCreated}, Skipped: ${totalSkipped}`
     );
+
+    // Record metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'success' });
+    jobLastSuccess.set({ job_name: jobName }, Date.now() / 1000);
   } catch (error) {
     logger.error('Error in generateRecurringOperations:', error);
+
+    // Record error metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'error' });
+
     throw error;
   }
 }

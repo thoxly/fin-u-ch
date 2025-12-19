@@ -1,3 +1,7 @@
+// Security note: xlsx@0.18.5 has known vulnerabilities:
+// - CVE-2023-30533 (Prototype Pollution) - fixed in 0.19.3 (not released)
+// - CVE-2024-22363 (ReDoS) - fixed in 0.20.2 (not released)
+// Consider migrating to exceljs or xlsx-populate when fixed versions are available
 import * as XLSX from 'xlsx';
 import type { ExportRow } from './exportData';
 

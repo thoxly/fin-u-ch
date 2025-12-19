@@ -1,5 +1,142 @@
 # ARCHITECTURE
 
+## Общая архитектура системы
+
+```mermaid
+graph TB
+    subgraph Client["Client Layer"]
+        Browser[Browser]
+    end
+
+    subgraph Frontend["Frontend App (React)"]
+        WebApp[Web Application<br/>Port 5173]
+        Redux[Redux Store<br/>RTK Query]
+    end
+
+    subgraph Infrastructure["Infrastructure"]
+        Nginx[Nginx<br/>Reverse Proxy<br/>Port 80/443]
+    end
+
+    subgraph Backend["Backend Services"]
+        API[API Server<br/>Express + TypeScript<br/>Port 4000]
+        Worker[Worker App<br/>Node-cron<br/>Background Jobs]
+    end
+
+    subgraph Data["Data Layer"]
+        PostgreSQL[(PostgreSQL<br/>Database)]
+        Redis[(Redis<br/>Cache)]
+    end
+
+    Browser -->|HTTPS| Nginx
+    Nginx -->|/| WebApp
+    Nginx -->|/api/*| API
+    WebApp -->|API Calls| API
+    API -->|Read/Write| PostgreSQL
+    API -->|Cache| Redis
+    Worker -->|Read/Write| PostgreSQL
+    Worker -->|Scheduled Jobs| API
+```
+
+## Поток данных запроса
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant Frontend
+    participant Nginx
+    participant API
+    participant Auth
+    participant Permissions
+    participant DB
+    participant Redis
+
+    User->>Browser: Запрос страницы
+    Browser->>Frontend: HTTP Request
+    Frontend->>API: API Call (RTK Query)
+    API->>Auth: Проверка JWT токена
+    Auth-->>API: User ID
+    API->>Permissions: Проверка прав доступа
+    Permissions-->>API: Разрешение/Запрет
+    API->>Redis: Проверка кэша
+    alt Кэш найден
+        Redis-->>API: Данные из кэша
+    else Кэш не найден
+        API->>DB: SQL запрос
+        DB-->>API: Данные
+        API->>Redis: Сохранение в кэш
+    end
+    API-->>Frontend: JSON Response
+    Frontend-->>Browser: Обновление UI
+    Browser-->>User: Отображение данных
+```
+
+## Структура модулей Backend
+
+```mermaid
+graph LR
+    subgraph API["API Server"]
+        Auth[Auth Module]
+        Users[Users Module]
+        Companies[Companies Module]
+        Catalogs[Catalogs Module]
+        Operations[Operations Module]
+        Budgets[Budgets Module]
+        Plans[Plans Module]
+        Reports[Reports Module]
+        Roles[Roles Module]
+        Audit[Audit Module]
+        Imports[Imports Module]
+        Subscription[Subscription Module]
+        Demo[Demo Module]
+    end
+
+    subgraph Middleware["Middleware"]
+        AuthMW[Authentication]
+        TenantMW[Tenant Extraction]
+        PermissionsMW[Permissions Check]
+        ErrorMW[Error Handler]
+    end
+
+    subgraph Services["Services"]
+        Mail[Mail Service]
+        Token[Token Service]
+    end
+
+    API --> Middleware
+    Middleware --> Services
+```
+
+## Система прав доступа (RBAC)
+
+```mermaid
+graph TB
+    User[User] -->|has| UserRoles[User Roles]
+    UserRoles -->|references| Role[Role]
+    Role -->|has| RolePermissions[Role Permissions]
+    RolePermissions -->|defines| Permission[Permission<br/>entity + action]
+
+    Request[API Request] -->|requires| Permission
+    Permission -->|checked by| PermissionsService[Permissions Service]
+    PermissionsService -->|evaluates| Policy[Permission Policy]
+    Policy -->|allows/denies| Request
+```
+
+## Worker App - Фоновые задачи
+
+```mermaid
+graph TB
+    Worker[Worker App] -->|Scheduled| CronScheduler[Cron Scheduler]
+
+    CronScheduler -->|Daily 00:01| RecurringOps[Generate Recurring Operations]
+    CronScheduler -->|Hourly :15| CleanupDemo[Cleanup Demo Users]
+
+    RecurringOps -->|Creates| Operations[Operations in DB]
+    CleanupDemo -->|Deletes| DemoUsers[Expired Demo Users]
+
+    Operations -->|Updates| Reports[Reports Cache]
+```
+
 ## Структура папок
 
 ```
@@ -60,10 +197,9 @@
    │     │  ├─ OperationsPage/
    │     │  ├─ PlansPage/
    │     │  └─ ReportsPage/
-   │     ├─ features/          # самостоятельные фичи (формы/виджеты)
-   │     │  ├─ operation-form/
-   │     │  ├─ plan-editor/
-   │     │  └─ salary-wizard/
+     │     ├─ features/          # самостоятельные фичи (формы/виджеты)
+     │     │  ├─ operation-form/
+     │     │  └─ plan-editor/
    │     ├─ entities/          # доменные сущности UI-слоя
    │     │  ├─ article/
    │     │  ├─ account/
@@ -99,52 +235,108 @@
    │     ├─ db/
    │     │  ├─ models/         # Prisma модели (автогенерация)
    │     │  └─ seeders/
-   │     ├─ middlewares/
-   │     │  ├─ auth.ts         # JWT проверка
-   │     │  ├─ tenant.ts       # извлечение companyId
-   │     │  └─ error.ts        # единый обработчик ошибок
-   │     ├─ modules/           # по доменным модулям
-   │     │  ├─ auth/
-   │     │  │  ├─ auth.model.ts
-   │     │  │  ├─ auth.service.ts
-   │     │  │  ├─ auth.controller.ts
-   │     │  │  └─ auth.routes.ts
-   │     │  ├─ companies/
-   │     │  ├─ users/
-   │     │  ├─ catalogs/
-   │     │  │  ├─ articles/
-   │     │  │  ├─ accounts/
-   │     │  │  ├─ departments/
-   │     │  │  ├─ counterparties/
-   │     │  │  └─ deals/
-   │     │  ├─ salaries/
-   │     │  ├─ operations/
-   │     │  ├─ budgets/        # управление бюджетами (новый)
-   │     │  │  ├─ budgets.service.ts
-   │     │  │  ├─ budgets.controller.ts
-   │     │  │  └─ budgets.routes.ts
-   │     │  ├─ plans/          # планирование с поддержкой бюджетов
-   │     │  ├─ reports/
-   │     │  │  ├─ dashboard/
-   │     │  │  ├─ cashflow/
-   │     │  │  ├─ bdds/
-   │     │  │  ├─ planfact/
-   │     │  │  └─ utils/
-   │     │  ├─ demo/            # демо-система
-   │     │  │  ├─ demo.service.ts
-   │     │  │  ├─ demo-catalogs.service.ts
-   │     │  │  ├─ demo-data-generator.service.ts
-   │     │  │  └─ demo.routes.ts
-   │     │  ├─ recurrence/     # общая утилита повторений
-   │     │  └─ permissions/
-   │     ├─ utils/             # date, money, validation
-   │     └─ routes.ts          # сборка всех *.routes
+     │     ├─ middlewares/
+     │     │  ├─ auth.ts         # JWT проверка
+     │     │  ├─ tenant.ts       # извлечение companyId
+     │     │  ├─ permissions.ts  # проверка прав доступа
+     │     │  ├─ error.ts        # единый обработчик ошибок
+     │     │  ├─ subscription.guard.ts # проверка лимитов подписки
+     │     │  └─ user-limit.guard.ts   # проверка лимита пользователей
+     │     ├─ modules/           # по доменным модулям
+     │     │  ├─ auth/           # аутентификация и авторизация
+     │     │  │  ├─ auth.service.ts
+     │     │  │  ├─ auth.controller.ts
+     │     │  │  ├─ auth.routes.ts
+     │     │  │  ├─ password-reset.service.ts
+     │     │  │  └─ migrate-existing-users.ts
+     │     │  ├─ companies/      # управление компаниями
+     │     │  │  ├─ companies.service.ts
+     │     │  │  ├─ companies.controller.ts
+     │     │  │  └─ companies.routes.ts
+     │     │  ├─ users/          # управление пользователями
+     │     │  │  ├─ users.service.ts
+     │     │  │  ├─ users.controller.ts
+     │     │  │  └─ users.routes.ts
+     │     │  ├─ catalogs/       # справочники
+     │     │  │  ├─ articles/   # статьи доходов/расходов
+     │     │  │  ├─ accounts/   # счета
+     │     │  │  ├─ departments/ # подразделения
+     │     │  │  ├─ counterparties/ # контрагенты
+     │     │  │  └─ deals/      # сделки
+     │     │  ├─ operations/    # финансовые операции
+     │     │  │  ├─ operations.service.ts
+     │     │  │  ├─ operations.controller.ts
+     │     │  │  └─ operations.routes.ts
+     │     │  ├─ budgets/       # управление бюджетами
+     │     │  │  ├─ budgets.service.ts
+     │     │  │  ├─ budgets.controller.ts
+     │     │  │  └─ budgets.routes.ts
+     │     │  ├─ plans/         # планирование (PlanItem)
+     │     │  │  ├─ plans.service.ts
+     │     │  │  ├─ plans.controller.ts
+     │     │  │  └─ plans.routes.ts
+     │     │  ├─ reports/       # отчеты
+     │     │  │  ├─ dashboard/  # дашборд
+     │     │  │  ├─ cashflow/   # ОДДС
+     │     │  │  ├─ bdds/       # БДДС
+     │     │  │  ├─ planfact/   # план-факт
+     │     │  │  ├─ cache/      # управление кэшем
+     │     │  │  └─ utils/      # утилиты (кэширование, даты)
+     │     │  ├─ roles/         # система ролей и прав доступа
+     │     │  │  ├─ roles.service.ts
+     │     │  │  ├─ roles.controller.ts
+     │     │  │  ├─ roles.routes.ts
+     │     │  │  ├─ permissions.service.ts
+     │     │  │  ├─ config/     # конфигурация сущностей и действий
+     │     │  │  └─ policy/     # политики доступа
+     │     │  ├─ audit/         # журнал аудита
+     │     │  │  ├─ audit.service.ts
+     │     │  │  ├─ audit.controller.ts
+     │     │  │  └─ audit.routes.ts
+     │     │  ├─ demo/          # демо-система
+     │     │  │  ├─ demo.service.ts
+     │     │  │  ├─ demo-catalogs.service.ts
+     │     │  │  ├─ demo-data-generator.service.ts
+     │     │  │  ├─ demo.controller.ts
+     │     │  │  └─ demo.routes.ts
+     │     │  ├─ imports/       # импорт банковских выписок
+     │     │  │  ├─ imports.service.ts
+     │     │  │  ├─ imports.controller.ts
+     │     │  │  ├─ imports.routes.ts
+     │     │  │  ├─ parsers/    # парсеры выписок (ClientBank Exchange)
+     │     │  │  ├─ services/   # сервисы (сопоставление, дубликаты, правила)
+     │     │  │  └─ utils/      # утилиты (batch processing)
+     │     │  ├─ subscription/  # система подписок
+     │     │  │  ├─ subscription.service.ts
+     │     │  │  ├─ subscription.controller.ts
+     │     │  │  ├─ subscription.routes.ts
+     │     │  │  └─ promo-code.service.ts
+     │     │  ├─ support/       # поддержка (Telegram интеграция)
+     │     │  │  ├─ support.service.ts
+     │     │  │  ├─ support.controller.ts
+     │     │  │  └─ support.routes.ts
+     │     │  └─ currency/      # конвертация валют
+     │     │     └─ currency.service.ts
+     │     ├─ services/          # общие сервисы
+     │     │  └─ mail/           # отправка email (верификация, сброс пароля)
+     │     │     ├─ mail.service.ts
+     │     │     ├─ token.service.ts
+     │     │     ├─ rate-limit.middleware.ts
+     │     │     └─ templates/   # HTML шаблоны писем
+     │     ├─ utils/             # утилиты
+     │     │  ├─ jwt.ts          # работа с JWT токенами
+     │     │  ├─ hash.ts         # хеширование паролей
+     │     │  ├─ validation.ts   # валидация данных
+     │     │  ├─ currency-converter.ts # конвертация валют
+     │     │  └─ subscription.ts # утилиты подписок
+     │     └─ routes.ts          # сборка всех *.routes (в app.ts)
    └─ worker/                  # фоновые задачи/cron
       ├─ jest.config.js         # конфиг Jest для тестов воркера
       ├─ src/
       │  ├─ index.ts           # загрузка джобов/планировщика
       │  ├─ jobs/
-      │  │  └─ salary.generate.monthly.ts
+      │  │  ├─ operations.generate.recurring.ts # генерация периодических операций
+      │  │  └─ cleanup-demo-users.job.ts # очистка старых демо-пользователей
       │  └─ config/
       │     ├─ env.ts
       │     ├─ logger.ts
@@ -164,20 +356,41 @@
 - **Testing**: Jest (unit/integration тесты), Playwright (E2E тесты).
 - **Монорепо**: /apps/web, /apps/api, /apps/worker, /packages/shared (типы/enum-ы).
 - **Фоновые задачи** (Worker App):
-  - Генерация зарплатных операций по расписанию (ежемесячно) — как отдельный воркер/cron.
+  - Генерация периодических операций (ежедневно в 00:01) — `operations.generate.recurring.ts`.
+  - Очистка старых демо-пользователей (ежечасно в :15) — `cleanup-demo-users.job.ts`.
   - «Разворачивание» планов в календарную сетку при вычислении отчётов на лету.
 
 ## Модули backend
 
-- **auth** (JWT, refresh).
-- **companies, users** (включая UI настройки).
-- **catalogs**: articles, accounts, departments, counterparties, deals, salaries.
-- **operations** (факт).
-- **budgets** (управление бюджетами, группировка плановых записей).
-- **plans** (PlanItem с поддержкой budgetId).
-- **reports** (dashboard, cashflow/ODDS, plan-vs-fact BDDs).
-- **demo** (автоматическое создание демо-пользователя с тестовыми данными).
-- **permissions** (минимум: в рамках companyId).
+- **auth** - Аутентификация и авторизация (JWT, refresh tokens, email verification, password reset).
+- **companies** - Управление компаниями (настройки, валюта, UI preferences).
+- **users** - Управление пользователями (профиль, настройки, смена email/пароля, приглашения).
+- **catalogs** - Справочники:
+  - **articles** - Статьи доходов/расходов (иерархическая структура).
+  - **accounts** - Банковские счета и касса.
+  - **departments** - Подразделения компании.
+  - **counterparties** - Контрагенты (клиенты, поставщики, сотрудники, государство).
+  - **deals** - Сделки и проекты.
+- **operations** - Финансовые операции (доходы, расходы, переводы, периодические операции).
+- **budgets** - Управление бюджетами (создание, архивирование, группировка планов).
+- **plans** - Плановые записи БДДС (PlanItem с поддержкой budgetId и периодичности).
+- **reports** - Отчеты:
+  - **dashboard** - Дашборд с KPI и графиками.
+  - **cashflow** - ОДДС (операционный денежный поток).
+  - **bdds** - БДДС (бюджет движения денежных средств).
+  - **planfact** - План-факт анализ.
+  - **cache** - Управление кэшем отчетов.
+- **roles** - Система ролей и прав доступа (RBAC на уровне сущностей и действий).
+- **audit** - Журнал аудита (логирование всех действий пользователей).
+- **demo** - Демо-система (автоматическое создание тестовых данных).
+- **imports** - Импорт банковских выписок:
+  - Парсинг выписок (ClientBank Exchange формат).
+  - Автоматическое сопоставление со справочниками.
+  - Правила маппинга (mapping rules).
+  - Обнаружение дубликатов.
+- **subscription** - Система подписок и тарифных планов (промокоды, лимиты).
+- **support** - Интеграция с поддержкой (Telegram).
+- **currency** - Конвертация валют.
 
 ## Хранилище и индексация
 
@@ -312,7 +525,8 @@ server {
 
 ### Основные возможности
 
-- **Генерация зарплатных операций**: Автоматическое создание операций по зарплате ежемесячно
+- **Генерация периодических операций**: Автоматическое создание операций на основе шаблонов с периодичностью
+- **Очистка демо-пользователей**: Автоматическое удаление старых демо-аккаунтов
 - **Планировщик задач**: Использует `node-cron` для запуска задач по расписанию
 - **Graceful shutdown**: Корректное завершение работы с отключением от БД
 
@@ -322,7 +536,8 @@ server {
 apps/worker/src/
 ├── index.ts              # Точка входа, настройка cron задач
 ├── jobs/
-│   └── salary.generate.monthly.ts  # Генерация зарплатных операций
+│   ├── operations.generate.recurring.ts   # Генерация периодических операций
+│   └── cleanup-demo-users.job.ts          # Очистка старых демо-пользователей
 └── config/
     ├── env.ts            # Переменные окружения
     ├── logger.ts         # Winston логгер
@@ -331,7 +546,8 @@ apps/worker/src/
 
 ### Расписание
 
-- **Зарплатные операции**: `0 0 1 * *` (1-е число каждого месяца в 00:00)
+- **Периодические операции**: `1 0 * * *` (ежедневно в 00:01)
+- **Очистка демо-пользователей**: `15 * * * *` (ежечасно в :15)
 - **Часовой пояс**: `Europe/Moscow`
 
 ### Зависимости
@@ -355,30 +571,35 @@ pnpm start  # запуск production версии
 ### ✅ Полностью реализовано
 
 - **API**: Все основные endpoints работают
-- **Demo System**: Полная система демо-данных
+- **Demo System**: Полная система демо-данных с автоматическим созданием тестовых данных
 - **Reports API**: Все типы отчетов реализованы в backend (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact)
-- **Worker App**: Автоматическая генерация зарплатных операций
-- **Caching**: Redis кэширование для отчетов
-- **Multi-tenancy**: Полная изоляция данных по companyId
+- **Worker App**: Автоматическая генерация периодических операций и очистка демо-пользователей
+- **Caching**: Redis кэширование для отчетов с автоматической инвалидацией
+- **Multi-tenancy**: Полная изоляция данных по companyId на всех уровнях
 - **Frontend**: Все основные страницы и функционал
 - **Notifications System**: Полная система уведомлений с Redux store и UI компонентами
 - **UI Customization**: Настройка иконок навигации и тем компании
 - **Theme System**: Поддержка светлой/темной темы с автоматическим определением
 - **Responsive Design**: Адаптивный дизайн для всех устройств
+- **Dashboard Charts**: Полностью реализованные графики с использованием recharts (IncomeExpenseChart, WeeklyFlowChart, AccountBalancesChart)
+- **Article Hierarchy UI**: Полностью реализованная иерархия статей с компонентами ArticleTree, ArticleTreeNode, ArticleParentSelect, поддержкой drag-and-drop для изменения родителя, поиском по дереву и двумя режимами отображения (дерево/таблица)
+- **Role-Based Access Control (RBAC)**: Полная система ролей и прав доступа
+- **Audit Logging**: Система логирования всех действий пользователей
+- **Import System**: Полная система импорта банковских выписок с автоматическим сопоставлением
+- **Subscription System**: Система подписок и тарифных планов с промокодами
+- **Email System**: Верификация email, сброс пароля, смена email адреса
+- **Password Management**: Безопасное хранение паролей (bcrypt), сброс через email токены
+- **Export System**: Полностью реализованный экспорт данных в Excel (XLSX) и CSV через компонент ExportMenu, используется в CashflowTable, OperationsPage, и всех графиках Dashboard (IncomeExpenseChart, WeeklyFlowChart, AccountBalancesChart)
+- **Support Integration**: Интеграция с поддержкой через Telegram бот (отправка сообщений в Telegram группу через API бота)
+- **Ozon Integration**: Интеграция с Ozon для автоматической загрузки операций и выплат (UI компонент OzonIntegration, настройка API ключей, выбор статей и счетов)
+- **Mapping Rules**: Полная система настройки правил маппинга для импорта банковских выписок (MappingRules компонент, MappingRuleDialog для создания/редактирования правил, типы правил: contains, equals, regex, alias)
+- **Recurring Operations**: Полностью реализованная система повторяющихся операций (компонент RecurringOperations для управления шаблонами, автоматическая генерация через Worker job, поддержка различных периодичностей: daily, weekly, monthly, quarterly, semiannual, annual)
 
 ### ⚠️ Частично реализовано
 
-- **Soft Delete**: Поля есть в схеме, но не используются в сервисах
+- **Soft Delete**: Поля deletedAt есть в схеме для некоторых моделей (Company, User, Account, Department, Role), но не используются в сервисах (выполняется физическое удаление)
 - **Swagger Documentation**: Основные endpoints документированы, некоторые каталоги без полной документации
-- **Dashboard Charts**: График на дашборде помечен как заглушка (recharts подключен, требуется реализация)
-- **Plan vs Fact в CashflowTable**: Плановые значения в отчете ОДДС вычисляются как заглушка (TODO комментарии в коде)
-- **Article Hierarchy**: Поле parentId есть в схеме, но иерархия не реализована в UI
 
 ### ❌ Не реализовано
 
-- **Recurrence System**: Нет отдельной системы для шаблонов повторяющихся операций
-- **User Management**: Нет расширенного управления пользователями (роли, права)
-- **Import/Export**: Нет импорта банковских выписок или экспорта данных
-- **Advanced Permissions**: Только базовая изоляция по companyId
-- **Article Hierarchy UI**: Иерархия статей не отображается в интерфейсе
-- **Plan vs Fact Calculations**: Плановые значения в отчетах вычисляются как заглушки
+- Нет функций, которые не реализованы (все основные функции реализованы)
