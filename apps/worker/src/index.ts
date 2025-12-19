@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { logger } from './config/logger';
 import { env } from './config/env';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
@@ -16,12 +16,12 @@ const metricsPort = parseInt(process.env.WORKER_METRICS_PORT || '4001', 10);
 const app = express();
 
 // Health check endpoint
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Metrics endpoint for Prometheus
-app.get('/metrics', async (req, res) => {
+app.get('/metrics', async (_req: Request, res: Response) => {
   try {
     res.set('Content-Type', register.contentType);
     res.end(await register.metrics());
