@@ -510,10 +510,7 @@ Delete the demo user and all associated data.
 
 **Implementation Status:** ✅ All report endpoints are fully implemented and working.
 
-**Frontend Status:** ⚠️ Some frontend components have placeholder implementations:
-
-- Dashboard charts are placeholders (requires recharts integration)
-- Plan vs Fact calculations in CashflowTable use placeholder logic
+**Frontend Status:** ✅ All major components are fully implemented
 
 **UI/UX Features:** ✅ Fully implemented:
 
@@ -709,23 +706,377 @@ Update company UI settings.
 
 ---
 
+## Roles and Permissions
+
+### GET /api/roles
+
+Get all roles for company.
+
+**Requires:** `users:manage_roles` permission
+
+**Response:**
+
+```json
+[
+  {
+    "id": "string",
+    "name": "string",
+    "description": "string",
+    "category": "string",
+    "isSystem": "boolean",
+    "isActive": "boolean"
+  }
+]
+```
+
+### GET /api/roles/category/:category
+
+Get roles by category.
+
+**Requires:** `users:manage_roles` permission
+
+### GET /api/roles/:id
+
+Get role by ID.
+
+**Requires:** `users:manage_roles` permission
+
+### POST /api/roles
+
+Create a new role.
+
+**Requires:** `users:manage_roles` permission
+
+**Request Body:**
+
+```json
+{
+  "name": "string",
+  "description": "string",
+  "category": "string"
+}
+```
+
+### PUT /api/roles/:id
+
+Update role.
+
+**Requires:** `users:manage_roles` permission
+
+### DELETE /api/roles/:id
+
+Delete role (soft delete).
+
+**Requires:** `users:manage_roles` permission
+
+### GET /api/roles/:id/permissions
+
+Get role permissions.
+
+**Requires:** `users:manage_roles` permission
+
+### PUT /api/roles/:id/permissions
+
+Update role permissions.
+
+**Requires:** `users:manage_roles` permission
+
+**Request Body:**
+
+```json
+{
+  "permissions": [
+    {
+      "entity": "string",
+      "action": "string",
+      "allowed": "boolean"
+    }
+  ]
+}
+```
+
+### GET /api/users/:id/permissions
+
+Get user permissions.
+
+**Response:**
+
+```json
+{
+  "operations": {
+    "create": true,
+    "read": true,
+    "update": false,
+    "delete": false
+  }
+}
+```
+
+---
+
+## Audit Logs
+
+### GET /api/audit-logs
+
+Get audit logs with filtering.
+
+**Requires:** `audit:read` permission
+
+**Query Parameters:**
+
+- `userId` - Filter by user ID
+- `entity` - Filter by entity type (operation, budget, article, etc.)
+- `entityId` - Filter by entity ID
+- `action` - Filter by action (create, update, delete, etc.)
+- `dateFrom` - Start date
+- `dateTo` - End date
+- `limit` - Number of records (default: 100)
+- `offset` - Offset (default: 0)
+
+**Response:**
+
+```json
+[
+  {
+    "id": "string",
+    "userId": "string",
+    "action": "string",
+    "entity": "string",
+    "entityId": "string",
+    "changes": {},
+    "metadata": {},
+    "createdAt": "string"
+  }
+]
+```
+
+### GET /api/audit-logs/entity/:entity/:entityId
+
+Get audit logs for specific entity.
+
+**Requires:** `audit:read` permission
+
+---
+
+## Bank Statement Imports
+
+### POST /api/imports/upload
+
+Upload bank statement file (.txt format, ClientBank Exchange).
+
+**Request:** `multipart/form-data` with `file` field
+
+**Response:**
+
+```json
+{
+  "sessionId": "string",
+  "fileName": "string",
+  "operationsCount": 0
+}
+```
+
+### GET /api/imports/sessions
+
+Get import sessions history.
+
+**Query Parameters:**
+
+- `status` - Filter by status
+- `limit` - Number of records
+- `offset` - Offset
+
+### GET /api/imports/sessions/:sessionId
+
+Get import session information.
+
+### DELETE /api/imports/sessions/:sessionId
+
+Delete import session.
+
+### GET /api/imports/sessions/:sessionId/operations
+
+Get imported operations from session.
+
+**Query Parameters:**
+
+- `confirmed` - Filter by confirmed status
+- `matched` - Filter by matched status
+- `processed` - Filter by processed status
+- `limit` - Number of records
+- `offset` - Offset
+
+### PATCH /api/imports/operations/:id
+
+Update imported operation.
+
+**Request Body:**
+
+```json
+{
+  "matchedArticleId": "string",
+  "matchedCounterpartyId": "string",
+  "matchedAccountId": "string",
+  "confirmed": "boolean",
+  "direction": "income|expense|transfer"
+}
+```
+
+### PATCH /api/imports/sessions/:sessionId/operations/bulk
+
+Bulk update imported operations.
+
+**Request Body:**
+
+```json
+{
+  "operationIds": ["string"],
+  "matchedArticleId": "string",
+  "matchedCounterpartyId": "string",
+  "matchedAccountId": "string",
+  "confirmed": "boolean"
+}
+```
+
+### POST /api/imports/sessions/:sessionId/apply-rules
+
+Apply mapping rules to session.
+
+### POST /api/imports/sessions/:sessionId/import
+
+Import operations (create real operations).
+
+**Request Body:**
+
+```json
+{
+  "operationIds": ["string"]
+}
+```
+
+### GET /api/imports/rules
+
+Get mapping rules.
+
+**Query Parameters:**
+
+- `targetType` - Filter by target type
+- `sourceField` - Filter by source field
+
+### POST /api/imports/rules
+
+Create mapping rule.
+
+**Request Body:**
+
+```json
+{
+  "ruleType": "contains|equals|regex|alias",
+  "pattern": "string",
+  "targetType": "article|counterparty|account|operationType",
+  "targetId": "string",
+  "targetName": "string",
+  "sourceField": "description|receiver|payer|inn"
+}
+```
+
+### PATCH /api/imports/rules/:id
+
+Update mapping rule.
+
+### DELETE /api/imports/rules/:id
+
+Delete mapping rule.
+
+### GET /api/imports/stats/total-imported
+
+Get total count of imported operations.
+
+---
+
+## Subscription
+
+### GET /api/subscription/current
+
+Get current subscription plan and limits.
+
+**Response:**
+
+```json
+{
+  "plan": "START|TEAM|BUSINESS",
+  "status": "ACTIVE|PAST_DUE|CANCELED|TRIAL",
+  "startDate": "string",
+  "endDate": "string",
+  "trialEndsAt": "string",
+  "promoCode": "string",
+  "limits": {
+    "maxUsers": 10,
+    "features": ["string"]
+  },
+  "userLimit": {
+    "current": 5,
+    "max": 10,
+    "remaining": 5,
+    "isUnlimited": false
+  }
+}
+```
+
+### POST /api/subscription/activate-promo
+
+Activate promo code.
+
+**Request Body:**
+
+```json
+{
+  "promoCode": "string"
+}
+```
+
+---
+
+## Support
+
+### POST /api/support/telegram
+
+Send support request to Telegram group.
+
+**Request Body:**
+
+```json
+{
+  "subject": "string",
+  "message": "string",
+  "email": "string"
+}
+```
+
+---
+
 ## Modules overview (routing prefixes)
 
 Defined in `apps/api/src/app.ts`:
 
-- `/api/auth` - Authentication (login, register, refresh)
-- `/api/users` - User management
-- `/api/companies` - Company management (including UI settings)
+- `/api/auth` - Authentication (login, register, refresh, email verification, password reset)
+- `/api/users` - User management (profile, preferences, invitations, roles assignment)
+- `/api/companies` - Company management (including UI settings, currency)
 - `/api/articles` - Articles catalog
 - `/api/accounts` - Accounts catalog
 - `/api/departments` - Departments catalog
 - `/api/counterparties` - Counterparties catalog
 - `/api/deals` - Deals catalog
 - `/api/salaries` - Salaries catalog
-- `/api/operations` - Financial operations
-- `/api/budgets` - Budget management (new)
-- `/api/plans` - Budget planning (enhanced with budgetId support)
-- `/api/reports` - Financial reports (dashboard, cashflow, bdds, planfact)
+- `/api/operations` - Financial operations (CRUD, bulk delete, confirm)
+- `/api/budgets` - Budget management
+- `/api/plans` - Budget planning (PlanItem with budgetId support)
+- `/api/reports` - Financial reports (dashboard, cashflow, bdds, planfact, cache management)
+- `/api/roles` - Roles and permissions management
+- `/api/audit-logs` - Audit logs (action history)
+- `/api/imports` - Bank statement imports (upload, mapping rules, sessions)
+- `/api/subscription` - Subscription management (plans, promo codes)
+- `/api/support` - Support integration (Telegram)
 - `/api/demo` - Demo system (credentials, create, info, exists, delete)
 
 Use Swagger UI at `/api-docs` for the authoritative, up-to-date contract.

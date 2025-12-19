@@ -771,10 +771,23 @@ jobs:
           scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
           scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
 
+          # Copy monitoring configurations
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/{alertmanager,prometheus,grafana,loki,promtail,tempo}'
+          scp -i ~/.ssh/deploy_key ops/monitoring/alertmanager/alertmanager.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/alertmanager/alertmanager.yml || true
+          scp -i ~/.ssh/deploy_key ops/monitoring/prometheus/prometheus.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/prometheus.yml || true
+          scp -i ~/.ssh/deploy_key ops/monitoring/prometheus/alerts.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/alerts.yml || true
+          scp -i ~/.ssh/deploy_key ops/monitoring/loki/loki-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/loki/loki-config.yml || true
+          scp -i ~/.ssh/deploy_key ops/monitoring/promtail/promtail-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/promtail/promtail-config.yml || true
+          scp -i ~/.ssh/deploy_key ops/monitoring/tempo/tempo.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/tempo/tempo.yml || true
+          # Copy Grafana provisioning
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/grafana/provisioning/{datasources,dashboards}'
+          scp -i ~/.ssh/deploy_key -r ops/monitoring/grafana/provisioning/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/grafana/provisioning/ || true
+
           # Copy diagnostic scripts
           scp -i ~/.ssh/deploy_key ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
           scp -i ~/.ssh/deploy_key ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh' || true
+          scp -i ~/.ssh/deploy_key ops/scripts/test-monitoring.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/test-monitoring.sh || true
+          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh /opt/fin-u-ch/test-monitoring.sh' || true
 
       - name: Upload SSL certificate
         run: |
@@ -863,9 +876,13 @@ jobs:
           docker compose -f docker-compose.prod.yml stop api web worker nginx 2>/dev/null || true
           docker compose -f docker-compose.prod.yml rm -f api web worker nginx 2>/dev/null || true
 
-          # Start with new images
+          # Start with new images (including monitoring services)
           echo "=== Starting containers with new images ==="
           docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker nginx
+
+          # Start monitoring services (if not already running)
+          echo "=== Starting monitoring services ==="
+          docker compose -f docker-compose.prod.yml up -d uptime-kuma prometheus alertmanager grafana loki promtail tempo node-exporter cadvisor postgres-exporter redis-exporter || true
 
           # Wait for health checks
           echo "=== Waiting for services to be healthy (30 seconds) ==="

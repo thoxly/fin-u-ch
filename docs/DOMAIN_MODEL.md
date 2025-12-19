@@ -8,21 +8,26 @@ Below is a concise entity overview aligned with current code. All entities are m
 
 - id
 - name
-- currencyBase
+- currencyBase (default: "RUB")
 - uiSettings (JSON) - UI preferences: navigation icons, theme, etc.
+- inn? (ИНН компании)
 - createdAt
-- deletedAt
+- deletedAt?
 - updatedAt
 
 ### User
 
 - id
 - companyId
-- email
+- email (unique)
 - passwordHash
-- isActive
+- firstName?
+- lastName?
+- isActive (default: true)
+- isEmailVerified (default: false)
+- isSuperAdmin (default: false) - системный администратор
+- preferences (JSON) - пользовательские настройки (тема, иконки навигации и т.д.)
 - createdAt
-- deletedAt
 - updatedAt
 
 ### Account (Счёт)
@@ -30,13 +35,12 @@ Below is a concise entity overview aligned with current code. All entities are m
 - id
 - companyId
 - name
-- number
-- currency
-- openingBalance
-- excludeFromTotals (bool)
-- isActive
+- number?
+- currency (default: "RUB")
+- openingBalance (default: 0)
+- excludeFromTotals (default: false)
+- isActive (default: true)
 - createdAt
-- deletedAt
 - updatedAt
 
 ### Department (Подразделение)
@@ -44,9 +48,8 @@ Below is a concise entity overview aligned with current code. All entities are m
 - id
 - companyId
 - name
-- description
+- description?
 - createdAt
-- deletedAt
 - updatedAt
 
 ### Counterparty (Контрагент)
@@ -94,7 +97,9 @@ Below is a concise entity overview aligned with current code. All entities are m
 - type (income|expense|transfer)
 - operationDate
 - amount
-- currency
+- currency (default: "RUB")
+- originalAmount? - исходная сумма в другой валюте
+- originalCurrency? - исходная валюта
 - accountId? (для income/expense)
 - sourceAccountId? (для transfer)
 - targetAccountId? (для transfer)
@@ -103,10 +108,12 @@ Below is a concise entity overview aligned with current code. All entities are m
 - dealId?
 - departmentId?
 - description?
-- **repeat** (enum: none|daily|weekly|monthly|quarterly|semiannual|annual) - периодичность повтора операции
+- **repeat** (enum: none|daily|weekly|monthly|quarterly|semiannual|annual, default: "none") - периодичность повтора операции
 - **recurrenceParentId?** - ссылка на родительскую операцию-шаблон для периодических операций
 - **recurrenceEndDate?** - дата окончания повторов (если не указана, повторяется бесконечно)
 - **isConfirmed** (boolean, default: true) - флаг подтверждения операции
+- **isTemplate** (boolean, default: false) - флаг шаблона операции
+- **sourceHash?** - хеш для определения дубликатов
 - createdAt
 - updatedAt
 
@@ -137,41 +144,180 @@ Below is a concise entity overview aligned with current code. All entities are m
 - startDate
 - endDate?
 - amount
-- currency
+- currency (default: "RUB")
 - articleId?
 - accountId? (для income/expense)
 - dealId?
 - budgetId? (связь с бюджетом)
 - description?
-- repeat (enum: daily|weekly|monthly|quarterly|semiannual|annual|none)
-- status (enum: active|paused|archived)
+- repeat (enum: daily|weekly|monthly|quarterly|semiannual|annual|none, default: "none")
+- status (enum: active|paused|archived, default: "active")
 - createdAt
 - updatedAt
 
-### Salary (Зарплата «правило»)
+### EmailToken (Токены для email операций)
+
+- id
+- userId
+- token (unique)
+- type - тип токена (email_verification, password_reset, email_change_old, email_change_new)
+- expiresAt
+- used (default: false)
+- metadata? (JSON) - дополнительная информация
+- createdAt
+- updatedAt
+
+**Назначение:** Хранение токенов для верификации email, сброса пароля и смены email адреса.
+
+### ImportSession (Сессия импорта банковских выписок)
 
 - id
 - companyId
-- employeeCounterpartyId (категория employee)
-- departmentId?
-- baseWage
-- contributionsPct (default 30.0)
-- incomeTaxPct (default 13.0)
-- periodicity (default: monthly)
-- effectiveFrom
-- effectiveTo?
+- userId
+- fileName
+- status (default: "draft") - статус сессии (draft, processing, completed, failed)
+- importedCount (default: 0) - количество импортированных операций
+- confirmedCount (default: 0) - количество подтвержденных операций
+- processedCount (default: 0) - количество обработанных операций
+- companyAccountNumber? - номер счета компании из выписки
 - createdAt
 - updatedAt
 
-### Автоматическая генерация зарплатных операций
+**Назначение:** Управление сессиями импорта банковских выписок.
 
-**Реализация:** Система автоматически создает операции зарплаты через Worker App без создания служебных записей. Каждая зарплатная запись генерирует 3 операции:
+### ImportedOperation (Импортированная операция)
 
-1. ФОТ (начисление зарплаты)
-2. Страховые взносы
-3. НДФЛ
+- id
+- importSessionId
+- companyId
+- date
+- number?
+- amount
+- description
+- direction? (income|expense|transfer)
+- payer?
+- payerInn?
+- payerAccount?
+- receiver?
+- receiverInn?
+- receiverAccount?
+- currency (default: "RUB")
+- matchedArticleId? - сопоставленная статья
+- matchedCounterpartyId? - сопоставленный контрагент
+- matchedAccountId? - сопоставленный счет
+- matchedDealId? - сопоставленная сделка
+- matchedDepartmentId? - сопоставленное подразделение
+- matchedBy? - способ сопоставления (rule, manual, auto)
+- matchedRuleId? - ID правила сопоставления
+- confirmed (default: false)
+- processed (default: false)
+- draft (default: true)
+- repeat (default: "none")
+- lockedFields? (JSON) - заблокированные поля
+- duplicateOfId? - ID дубликата
+- isDuplicate (default: false)
+- createdAt
+- updatedAt
 
-**Статус:** ✅ Полностью реализовано через Worker App
+**Назначение:** Временное хранение операций из банковских выписок до их подтверждения и импорта.
+
+### MappingRule (Правило сопоставления для импорта)
+
+- id
+- companyId
+- userId
+- ruleType - тип правила (contains, equals, regex, alias)
+- pattern - паттерн для сопоставления
+- targetType - тип цели (article, counterparty, account, operationType)
+- targetId? - ID целевого объекта
+- targetName? - название целевого объекта
+- sourceField (default: "description") - поле источника (description, receiver, payer, inn)
+- usageCount (default: 0) - количество использований
+- lastUsedAt?
+- createdAt
+- updatedAt
+
+**Назначение:** Автоматическое сопоставление импортированных операций со справочниками.
+
+### Role (Роль пользователя)
+
+- id
+- companyId
+- name
+- description?
+- category? - категория роли
+- isSystem (default: false) - системная роль (нельзя удалить/изменить)
+- isActive (default: true)
+- deletedAt? - мягкое удаление
+- createdAt
+- updatedAt
+
+**Назначение:** Управление ролями пользователей в рамках компании.
+
+### RolePermission (Права доступа роли)
+
+- id
+- roleId
+- entity - сущность (operations, articles, budgets, users и т.д.)
+- action - действие (create, read, update, delete, confirm, manage_roles и т.д.)
+- allowed (default: true)
+- createdAt
+- updatedAt
+
+**Назначение:** Определение прав доступа для ролей.
+
+### UserRole (Связь пользователя и роли)
+
+- id
+- userId
+- roleId
+- assignedAt (default: now())
+- assignedBy? - ID пользователя, который назначил роль
+
+**Назначение:** Многие-ко-многим связь между пользователями и ролями.
+
+### Subscription (Подписка компании)
+
+- id
+- companyId (unique)
+- plan (enum: START|TEAM|BUSINESS, default: START)
+- status (enum: ACTIVE|PAST_DUE|CANCELED|TRIAL, default: ACTIVE)
+- startDate (default: now())
+- endDate? - дата окончания (null для вечных/бесплатных)
+- trialEndsAt? - дата окончания триала
+- promoCode? - промокод, по которому активирована подписка
+- createdAt
+- updatedAt
+
+**Назначение:** Управление подписками и тарифными планами компаний.
+
+### PromoCode (Промокод)
+
+- id
+- code (unique)
+- plan (enum: START|TEAM|BUSINESS)
+- durationDays? - длительность триала/подписки (null = вечно)
+- maxUsages? - лимит использования (null = безлимит)
+- usedCount (default: 0)
+- isActive (default: true)
+- expiresAt?
+- createdAt
+
+**Назначение:** Промокоды для активации подписок и триалов.
+
+### AuditLog (Журнал аудита)
+
+- id
+- companyId
+- userId
+- action - действие (create, update, delete, confirm и т.д.)
+- entity - тип сущности (operation, budget, article, user и т.д.)
+- entityId - ID сущности
+- changes? (JSON) - изменения (до/после)
+- metadata? (JSON) - дополнительная информация
+- createdAt
+
+**Назначение:** Логирование всех действий пользователей для аудита и отладки.
 
 ## Виды деятельности (activity)
 
@@ -189,12 +335,6 @@ Below is a concise entity overview aligned with current code. All entities are m
 
 - openingBalance + ∑(income to account) − ∑(expense from account) ± transfers
 
-### Зарплата
-
-- **База**: baseWage
-- **Взносы**: baseWage \* contributionsPct/100 (отдельная статья «ФОТ»/«взносы»)
-- **НДФЛ**: baseWage \* incomeTaxPct/100 (как отдельная статья «налоги» или уменьшение выплаты «на руки» — выбрать одну модель; для MVP — двумя отдельными расходами: «ФОТ (начисление)» и «НДФЛ»)
-
 ### План-факт
 
 - **План** строится из PlanItem (раскрывается в помесячные суммы по правилам repeat)
@@ -205,6 +345,7 @@ Below is a concise entity overview aligned with current code. All entities are m
 
 - Article.parentId формирует древо; «Поступления/Списания/Перевод» — верхний уровень (по type)
 - В таблицах план/факт используется тот же справочник (свёртывание по parentId)
+- **UI реализация**: Полностью реализована в интерфейсе через компоненты ArticleTree, ArticleTreeNode, ArticleParentSelect с поддержкой drag-and-drop для изменения родителя, поиском по дереву и двумя режимами отображения (дерево/таблица)
 
 ## Ограничения и особенности реализации
 
@@ -215,15 +356,12 @@ Below is a concise entity overview aligned with current code. All entities are m
 
 ### Отсутствующие функции
 
-- **Recurrence**: Нет отдельной таблицы для шаблонов повторяющихся операций
-- **User Management**: Нет расширенного управления пользователями (роли, права)
-- **Import/Export**: Нет импорта банковских выписок или экспорта данных
-- **Notifications**: Базовая структура есть, но функционал не реализован
+- **Recurrence**: Полностью реализована через поле repeat в Operation (компонент RecurringOperations для управления шаблонами, автоматическая генерация через Worker job operations.generate.recurring.ts)
 
 ### Реализованные функции
 
 - **Demo System**: Полностью функциональная система демо-данных
-- **Worker App**: Автоматическая генерация зарплатных операций
+- **Worker App**: Автоматическая генерация периодических операций
 - **Caching**: Redis кэширование для отчетов
 - **Reports API**: Все типы отчетов реализованы в API (Dashboard, Cashflow/ОДДС, BDDS, Plan-Fact)
 - **Multi-tenancy**: Полная изоляция данных по companyId
@@ -232,10 +370,17 @@ Below is a concise entity overview aligned with current code. All entities are m
 - **Theme System**: Поддержка светлой/темной темы с автоматическим определением
 - **Budget Management**: Полная система управления бюджетами с группировкой плановых записей
 - **Plan Matrix Table**: Продвинутый компонент для отображения БДДС с группировкой по видам деятельности
+- **User Management**: Полная система управления пользователями с ролями и правами доступа
+- **Role-Based Access Control (RBAC)**: Система ролей и прав доступа на уровне сущностей и действий
+- **Import System**: Полная система импорта банковских выписок с автоматическим сопоставлением и правилами маппинга
+- **Mapping Rules**: Полная система настройки правил маппинга для импорта (MappingRule модель, типы правил: contains, equals, regex, alias, UI компоненты MappingRules и MappingRuleDialog)
+- **Support Integration**: Интеграция с поддержкой через Telegram бот (SupportService, отправка сообщений в Telegram группу)
+- **Ozon Integration**: Интеграция с Ozon для автоматической загрузки операций и выплат (UI компонент OzonIntegration, настройка API ключей, выбор статей и счетов)
+- **Audit Logging**: Система логирования всех действий пользователей
+- **Subscription System**: Система подписок и тарифных планов с промокодами
+- **Email Verification**: Система верификации email и сброса пароля
+- **Password Reset**: Система сброса пароля через email токены
 
 ### Частично реализованные функции
 
-- **Dashboard Charts**: График на дашборде помечен как заглушка (recharts подключен, требуется реализация)
-- **Plan vs Fact в CashflowTable**: Плановые значения в отчете ОДДС вычисляются как заглушка (TODO комментарии в коде)
-- **Article Hierarchy**: Поле parentId есть в схеме, но иерархия не реализована в UI
-- **Soft Delete**: Поля есть в схеме, но не используются в сервисах
+- **Soft Delete**: Поля deletedAt есть в схеме для Company, User, Account, Department, Role, но не используются в сервисах (выполняется физическое удаление)

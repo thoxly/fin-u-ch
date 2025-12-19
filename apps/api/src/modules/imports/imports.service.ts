@@ -20,6 +20,7 @@ import mappingRulesService from './services/mapping-rules.service';
 import operationImportService from './services/operation-import.service';
 import { BatchProcessor } from './utils/batch-processor';
 import { Prisma } from '@prisma/client';
+import { withSpan } from '../../utils/tracing';
 
 /**
  * Transforms Prisma ImportedOperation with relations to match frontend format
@@ -58,7 +59,13 @@ export class ImportsService {
     }
 
     // Парсинг файла
-    const parsedFile = await this.parseFile(fileName, fileBuffer);
+    const parsedFile = await withSpan('imports.parse_file', async (span) => {
+      const result = await this.parseFile(fileName, fileBuffer);
+      span.setAttribute('file.name', fileName);
+      span.setAttribute('file.size', fileBuffer.length);
+      span.setAttribute('documents.count', result.documents.length);
+      return result;
+    });
     const documents = parsedFile.documents;
     const companyAccountNumber = parsedFile.companyAccountNumber;
     const parseStats = parsedFile.stats;
@@ -78,11 +85,17 @@ export class ImportsService {
     });
 
     // Проверка дубликатов по хэшу (быстрая проверка)
-    const { duplicatesCount } =
-      await duplicateDetectionService.checkDuplicatesByHash(
-        companyId,
-        documents
-      );
+    const { duplicatesCount } = await withSpan(
+      'imports.check_duplicates',
+      async (span) => {
+        const result = await duplicateDetectionService.checkDuplicatesByHash(
+          companyId,
+          documents
+        );
+        span.setAttribute('duplicates.count', result.duplicatesCount);
+        return result;
+      }
+    );
 
     // Создаем сессию импорта
     const importSession = await sessionService.createSession(
@@ -101,12 +114,19 @@ export class ImportsService {
     });
 
     // Создаем черновики операций батчами
-    const importedOperations = await this.createImportedOperations(
-      importSession.id,
-      companyId,
-      documents,
-      company?.inn || null,
-      companyAccountNumber
+    const importedOperations = await withSpan(
+      'imports.create_operations',
+      async (span) => {
+        const result = await this.createImportedOperations(
+          importSession.id,
+          companyId,
+          documents,
+          company?.inn || null,
+          companyAccountNumber
+        );
+        span.setAttribute('operations.created', result.length);
+        return result;
+      }
     );
 
     logger.info('Upload statement processing completed', {

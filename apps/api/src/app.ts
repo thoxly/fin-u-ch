@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { errorHandler } from './middlewares/error';
+import { requestIdMiddleware } from './middlewares/request-id';
 import logger from './config/logger';
 import { swaggerSpec } from './config/swagger';
 
@@ -34,9 +35,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Request ID middleware (must be before request logging)
+app.use(requestIdMiddleware);
+
 // Request logging
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`);
+  const requestId = (req as any).requestId || 'unknown';
+  logger.info(`${req.method} ${req.path}`, { requestId });
   next();
 });
 

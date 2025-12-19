@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
+import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
 
 /**
  * Удаляет пользователя по ID (вместе с компанией)
@@ -80,32 +81,59 @@ async function deleteUser(userId: string): Promise<void> {
 export async function cleanupExpiredDemoUsers(
   maxAgeHours: number = 24
 ): Promise<number> {
+  const jobName = 'cleanup_demo_users';
+  const startTime = Date.now();
+
   const threshold = new Date();
   threshold.setHours(threshold.getHours() - maxAgeHours);
 
-  const expiredUsers = await prisma.user.findMany({
-    where: {
-      email: { startsWith: 'demo_' },
-      createdAt: { lt: threshold },
-    },
-    select: { id: true, email: true },
-  });
+  try {
+    const expiredUsers = await prisma.user.findMany({
+      where: {
+        email: { startsWith: 'demo_' },
+        createdAt: { lt: threshold },
+      },
+      select: { id: true, email: true },
+    });
 
-  if (expiredUsers.length === 0) {
-    return 0;
-  }
-
-  logger.info(`Found ${expiredUsers.length} expired demo users`);
-
-  let deletedCount = 0;
-  for (const user of expiredUsers) {
-    try {
-      await deleteUser(user.id);
-      deletedCount++;
-    } catch (error) {
-      logger.error(`Failed to delete expired demo user ${user.id}`, { error });
+    if (expiredUsers.length === 0) {
+      // Record metrics even if no users to delete
+      const duration = (Date.now() - startTime) / 1000;
+      jobDuration.observe({ job_name: jobName }, duration);
+      jobCounter.inc({ job_name: jobName, status: 'success' });
+      jobLastSuccess.set({ job_name: jobName }, Date.now() / 1000);
+      return 0;
     }
-  }
 
-  return deletedCount;
+    logger.info(`Found ${expiredUsers.length} expired demo users`);
+
+    let deletedCount = 0;
+    for (const user of expiredUsers) {
+      try {
+        await deleteUser(user.id);
+        deletedCount++;
+      } catch (error) {
+        logger.error(`Failed to delete expired demo user ${user.id}`, {
+          error,
+        });
+      }
+    }
+
+    // Record metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'success' });
+    jobLastSuccess.set({ job_name: jobName }, Date.now() / 1000);
+
+    return deletedCount;
+  } catch (error) {
+    logger.error('Error in cleanupExpiredDemoUsers:', error);
+
+    // Record error metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'error' });
+
+    throw error;
+  }
 }
