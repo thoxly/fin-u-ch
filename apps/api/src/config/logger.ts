@@ -48,7 +48,10 @@ const developmentFormat = winston.format.combine(
   winston.format.printf(
     ({ timestamp, level, message, requestId, traceId, ...meta }) => {
       const requestInfo = requestId ? `[${requestId}]` : '';
-      const traceInfo = traceId ? `[trace:${traceId.substring(0, 8)}]` : '';
+      const traceInfo =
+        traceId && typeof traceId === 'string'
+          ? `[trace:${traceId.substring(0, 8)}]`
+          : '';
       return `${timestamp} [${level}]${requestInfo}${traceInfo}: ${message} ${
         Object.keys(meta).length ? JSON.stringify(meta, null, 2) : ''
       }`;

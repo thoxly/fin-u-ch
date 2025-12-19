@@ -24,7 +24,7 @@ export function requestIdMiddleware(
         const spanContext = span.spanContext();
         if (spanContext && spanContext.traceId) {
           traceId = spanContext.traceId;
-          requestId = traceId;
+          requestId = traceId || randomUUID();
         } else {
           requestId = randomUUID();
         }
@@ -40,6 +40,7 @@ export function requestIdMiddleware(
   }
 
   // Add requestId to request object for use in controllers/services
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).requestId = requestId;
 
   // Add requestId to response header
@@ -54,6 +55,7 @@ export function requestIdMiddleware(
   const loggerWithContext = logger.child({ requestId });
 
   // Override req.logger if needed (optional)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req as any).logger = loggerWithContext;
 
   next();

@@ -40,8 +40,10 @@
     "@opentelemetry/sdk-node": "^0.54.0",
     "@opentelemetry/auto-instrumentations-node": "^0.54.0",
     "@opentelemetry/instrumentation-http": "^0.54.0",
-    "@opentelemetry/instrumentation-express": "^0.40.0",
-    "@opentelemetry/exporter-otlp-grpc": "^0.26.0"
+    "@opentelemetry/instrumentation-express": "^0.54.0",
+    "@opentelemetry/exporter-otlp-http": "^0.26.0",
+    "@opentelemetry/resources": "^1.27.0",
+    "@opentelemetry/semantic-conventions": "^1.27.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
