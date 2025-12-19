@@ -1,0 +1,44 @@
+{
+  "dashboard": {
+    "title": "Tracing - Service Map",
+    "tags": ["tracing", "tempo"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Map",
+        "type": "nodeGraph",
+        "targets": [
+          {
+            "datasource": {
+              "type": "tempo",
+              "uid": "tempo"
+            },
+            "queryType": "serviceMap",
+            "refId": "A"
+          }
+        ],
+        "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Trace Timeline",
+        "type": "traces",
+        "targets": [
+          {
+            "datasource": {
+              "type": "tempo",
+              "uid": "tempo"
+            },
+            "query": "{ service.name = \"fin-u-ch-api\" }",
+            "refId": "A"
+          }
+        ],
+        "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 }
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 16,
+    "version": 1
+  }
+}

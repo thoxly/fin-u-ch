@@ -4,6 +4,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
+// Initialize OpenTelemetry tracing BEFORE any other imports
+// This ensures all modules are instrumented
+import { initializeTracing } from './config/tracing';
+initializeTracing();
+
 // Determine project root: go up from apps/api/src to project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,7 +39,7 @@ import { env } from './config/env';
 import logger from './config/logger';
 import prisma from './config/db';
 import redis from './config/redis';
-import demoUserService from './modules/demo/demo.service';
+// import demoUserService from './modules/demo/demo.service'; // Reserved for future use
 import { execSync } from 'child_process';
 
 const PORT = env.PORT;
@@ -99,9 +104,12 @@ async function startServer() {
 const server = await startServer();
 
 // Graceful shutdown
+import { shutdownTracing } from './config/tracing';
+
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   server.close(async () => {
+    await shutdownTracing();
     await prisma.$disconnect();
     await redis.quit();
     logger.info('Server closed');
@@ -112,6 +120,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
   server.close(async () => {
+    await shutdownTracing();
     await prisma.$disconnect();
     await redis.quit();
     logger.info('Server closed');
