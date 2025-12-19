@@ -13,7 +13,7 @@ export interface CashflowParams {
   periodTo: Date;
   activity?: string;
   rounding?: number; // optional rounding unit (e.g., 1, 10, 100, 1000)
-  parentArticleId?: string; // ID родительской статьи для суммирования по потомкам
+  parentArticleId?: string; // ID группы статьи для суммирования по потомкам
   breakdown?: CashflowBreakdown; // Разрез отчета: по видам деятельности, сделкам, счетам, подразделениям, контрагентам
 }
 
@@ -63,6 +63,27 @@ interface CashflowReport {
 }
 
 export class CashflowService {
+  /**
+   * Получает текущую дату (начало дня в UTC) для фильтрации будущих операций
+   * Использует UTC, чтобы избежать проблем с часовыми поясами
+   */
+  private getTodayStart(): Date {
+    const now = new Date();
+    // Используем UTC для согласованности с данными в БД
+    const today = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    return today;
+  }
+
   async getCashflow(
     companyId: string,
     params: CashflowParams
@@ -99,7 +120,7 @@ export class CashflowService {
         params.parentArticleId,
         companyId
       );
-      // Включаем саму родительскую статью и всех потомков
+      // Включаем саму группу статьи и всех потомков
       articleIdsFilter = [params.parentArticleId, ...descendantIds];
     }
 
@@ -137,12 +158,28 @@ export class CashflowService {
       };
     }
 
+    // Получаем текущую дату для фильтрации будущих операций
+    const todayStart = this.getTodayStart();
+    // Используем минимальное значение между концом периода и сегодняшним днем
+    const maxDate = new Date(
+      Math.min(params.periodTo.getTime(), todayStart.getTime())
+    );
+
+    logger.info('Cashflow: filtering future operations', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      todayStart: todayStart.toISOString(),
+      maxDate: maxDate.toISOString(),
+      breakdown,
+    });
+
     // Формируем фильтр для операций в зависимости от разреза
     const whereClause: any = {
       companyId,
       operationDate: {
         gte: params.periodFrom,
-        lte: params.periodTo,
+        lte: maxDate, // Исключаем операции в будущем
       },
       type: { in: ['income', 'expense'] },
       isConfirmed: true,
@@ -169,17 +206,90 @@ export class CashflowService {
       include: includeRelations,
     })) as any[];
 
-    logger.debug('Operations fetched for cashflow report', {
+    // Получаем все активные счета с валютами для пересчета
+    const accountsRaw = await prisma.account.findMany({
+      where: { companyId, isActive: true },
+    });
+    const accounts = accountsRaw.map((acc) => ({
+      id: acc.id,
+      currency: acc.currency,
+    }));
+
+    // Создаем Map счетов для быстрого доступа
+    const accountsMap = new Map(
+      accounts.map((acc) => [acc.id, { currency: acc.currency }])
+    );
+
+    // Пересчитываем суммы операций в базовую валюту
+    // Если операция уже имеет originalAmount и originalCurrency, значит она уже конвертирована
+    // и мы используем amount и currency напрямую (они уже в базовой валюте)
+    const { convertOperationAmountToBase, getOperationCurrency } =
+      await import('../../../utils/currency-converter');
+
+    const operationsWithConvertedAmounts = await Promise.all(
+      operations.map(async (op: any) => {
+        // Если операция уже конвертирована (есть originalAmount), используем значения из БД
+        if (op.originalAmount != null && op.originalCurrency) {
+          return {
+            ...op,
+            amount: op.amount, // Уже в базовой валюте
+            currency: op.currency, // Уже базовая валюта
+          };
+        }
+
+        // Старая операция без конвертации - пересчитываем
+        const operationCurrency = getOperationCurrency(
+          {
+            type: op.type,
+            accountId: op.accountId,
+            sourceAccountId: op.sourceAccountId,
+            targetAccountId: op.targetAccountId,
+            currency: op.currency,
+          },
+          accountsMap
+        );
+
+        const convertedAmount = await convertOperationAmountToBase(
+          op.amount,
+          operationCurrency,
+          companyId,
+          op.operationDate
+        );
+
+        return {
+          ...op,
+          amount: convertedAmount,
+          originalAmount: op.amount,
+          originalCurrency: operationCurrency,
+        };
+      })
+    );
+
+    logger.info('Operations fetched and converted for cashflow report', {
       companyId,
-      operationsCount: operations.length,
+      operationsCount: operationsWithConvertedAmounts.length,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      maxDate: maxDate.toISOString(),
+      todayStart: todayStart.toISOString(),
+      sampleOperations: operationsWithConvertedAmounts
+        .slice(0, 3)
+        .map((op: any) => ({
+          id: op.id,
+          date: op.operationDate.toISOString(),
+          type: op.type,
+          amount: op.amount,
+        })),
     });
 
     const months = getMonthsBetween(params.periodFrom, params.periodTo);
 
     // Фильтруем операции по активности, если указана
     const filteredOperations = params.activity
-      ? operations.filter((op: any) => op.article?.activity === params.activity)
-      : operations;
+      ? operationsWithConvertedAmounts.filter(
+          (op: any) => op.article?.activity === params.activity
+        )
+      : operationsWithConvertedAmounts;
 
     // Находим все уникальные статьи, по которым есть операции (уже отфильтрованные)
     const articlesWithOperations = new Set<string>();
@@ -313,7 +423,7 @@ export class CashflowService {
       }
     }
 
-    // Агрегируем суммы от дочерних статей к родительским (снизу вверх)
+    // Агрегируем суммы от дочерних статей к группам (снизу вверх)
     const aggregateFromChildren = (article: ArticleGroup): void => {
       if (article.children && article.children.length > 0) {
         // Сначала обрабатываем всех детей
@@ -321,9 +431,9 @@ export class CashflowService {
           aggregateFromChildren(child);
         }
 
-        // Начинаем с текущих сумм родительской статьи (уже содержат операции по этой статье)
+        // Начинаем с текущих сумм группы статьи (уже содержат операции по этой статье)
         const aggregatedMonths = new Map<string, number>();
-        // Инициализируем карту текущими суммами родительской статьи
+        // Инициализируем карту текущими суммами группы статьи
         for (const monthData of article.months) {
           aggregatedMonths.set(monthData.month, monthData.amount);
         }
@@ -338,7 +448,7 @@ export class CashflowService {
           aggregatedTotal += child.total;
         }
 
-        // Обновляем суммы родительской статьи (родитель + все дети)
+        // Обновляем суммы группы статьи (группа + все дети)
         article.months = months.map((m) => ({
           month: m,
           amount: applyRounding(aggregatedMonths.get(m) || 0),
@@ -347,7 +457,7 @@ export class CashflowService {
       }
     };
 
-    // Агрегируем для всех корневых статей
+    // Агрегируем для всех статей без группы
     for (const rootArticle of rootArticles) {
       aggregateFromChildren(rootArticle);
     }
@@ -383,7 +493,7 @@ export class CashflowService {
         // (это уже учтено при фильтрации операций выше)
         if (params.activity && articleData.activity !== params.activity) {
           // Проверяем, есть ли у этой статьи операции (hasOperations)
-          // Если нет операций, значит это родительская/дочерняя статья, и мы её включаем
+          // Если нет операций, значит это группа/дочерняя статья, и мы её включаем
           // Если есть операции, но активность не совпадает, пропускаем
           if (rootArticle.hasOperations) {
             continue;

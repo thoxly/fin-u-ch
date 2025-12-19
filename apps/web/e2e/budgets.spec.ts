@@ -98,8 +98,8 @@ test.describe('Budgets', () => {
 
       // Check for budget details content
       const matrixTable = page.locator('table');
-      const planList = page.locator('text=Плановые записи');
-      const addButton = page.locator('button:has-text("Добавить позицию")');
+      const planList = page.locator('text=Статьи бюджета');
+      const addButton = page.locator('button:has-text("Добавить статью")');
 
       // Should have some budget details content
       const hasContent =
@@ -125,12 +125,12 @@ test.describe('Budgets', () => {
       const header = page.locator('h1');
       await expect(header).toBeVisible();
 
-      // Check for add plan button
-      const addButton = page.locator('button:has-text("Добавить позицию")');
+      // Check for add article button
+      const addButton = page.locator('button:has-text("Добавить статью")');
       await expect(addButton).toBeVisible();
 
-      // Check for plan list section
-      const planSection = page.locator('text=Плановые записи');
+      // Check for articles list section
+      const planSection = page.locator('text=Статьи бюджета');
       await expect(planSection).toBeVisible();
     }
   });
@@ -146,8 +146,8 @@ test.describe('Budgets', () => {
       await openButtons.first().click();
       await page.waitForLoadState('networkidle');
 
-      // Click add position button
-      const addButton = page.locator('button:has-text("Добавить позицию")');
+      // Click add article button
+      const addButton = page.locator('button:has-text("Добавить статью")');
       await addButton.click();
 
       // Should open offcanvas/side panel
@@ -155,7 +155,7 @@ test.describe('Budgets', () => {
       await expect(offcanvas).toBeVisible();
 
       // Check for form title
-      const formTitle = page.locator('text=Добавить план');
+      const formTitle = page.locator('text=Добавить статью');
       await expect(formTitle).toBeVisible();
     }
   });

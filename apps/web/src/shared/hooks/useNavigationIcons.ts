@@ -27,6 +27,7 @@ const DEFAULT_ICONS: Record<string, string> = {
   Сделки: 'Handshake',
   Зарплаты: 'DollarSign',
   Администрирование: 'Settings',
+  Поддержка: 'HelpCircle',
 };
 
 interface UseNavigationIconsReturn {

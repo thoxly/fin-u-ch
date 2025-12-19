@@ -93,19 +93,26 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               }
             />
           </div>
-          <ExportMenu
-            filenameBase="weekly_flow"
-            buildRows={buildExportRows}
-            columns={['date', 'category', 'amount', 'type']}
-            entity="reports"
-          />
+          {!isSmall && (
+            <ExportMenu
+              filenameBase="weekly_flow"
+              buildRows={buildExportRows}
+              columns={['date', 'category', 'amount', 'type']}
+              entity="reports"
+            />
+          )}
         </div>
 
         <div className="chart-body relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={data || []}
-              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+              margin={{
+                top: 5,
+                right: isSmall ? 5 : 30,
+                left: isSmall ? 0 : 20,
+                bottom: 48,
+              }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -114,12 +121,13 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
               <XAxis
                 dataKey="label"
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={isSmall ? 10 : 12}
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={isSmall ? 10 : 12}
                 tickFormatter={(value) => formatMoney(value)}
+                width={isSmall ? 60 : 80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -134,6 +142,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                   />
                 )}
                 labelFormatter={(label) => `${label}`}
+                wrapperStyle={
+                  isSmall ? { zIndex: 1000, pointerEvents: 'none' } : undefined
+                }
+                position={isSmall ? { x: 10, y: 10 } : undefined}
               />
               {/* Не отображаем легенду и столбцы, когда нет данных */}
             </BarChart>
@@ -177,17 +189,24 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             }
           />
         </div>
-        <ExportMenu
-          filenameBase="weekly_flow"
-          buildRows={buildExportRows}
-          columns={['date', 'category', 'amount', 'type']}
-        />
+        {!isSmall && hasData && (
+          <ExportMenu
+            filenameBase="weekly_flow"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+          />
+        )}
       </div>
       <div className="chart-body">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={filteredData}
-            margin={{ top: 5, right: 30, left: 20, bottom: 28 }}
+            margin={{
+              top: 5,
+              right: isSmall ? 5 : 30,
+              left: isSmall ? 0 : 20,
+              bottom: 28,
+            }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -196,16 +215,28 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
             <XAxis
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
-              tick={{ fontSize: 11 }}
-              angle={filteredData.length > 8 ? -45 : 0}
+              fontSize={isSmall ? 10 : 12}
+              tick={{ fontSize: isSmall ? 9 : 11 }}
+              angle={filteredData.length > 8 ? (isSmall ? -35 : -45) : 0}
               textAnchor={filteredData.length > 8 ? 'end' : 'middle'}
-              height={filteredData.length > 8 ? 80 : 30}
+              height={filteredData.length > 8 ? (isSmall ? 60 : 80) : 30}
+              interval={
+                isSmall
+                  ? filteredData.length <= 10
+                    ? 0
+                    : filteredData.length <= 20
+                      ? 1
+                      : 2
+                  : filteredData.length <= 31
+                    ? 0
+                    : 'preserveStartEnd'
+              }
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
+              fontSize={isSmall ? 10 : 12}
               tickFormatter={(value) => formatMoney(value)}
+              width={isSmall ? 60 : 80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -220,26 +251,34 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                   | undefined;
                 if (!p) return null;
                 return (
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 min-w-[170px]">
-                    <div className="mb-1">
-                      <p className="text-[13px] font-semibold text-gray-900 dark:text-white">
+                  <div
+                    className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg ${isSmall ? 'p-1.5' : 'p-2'} min-w-[150px] max-w-[200px]`}
+                  >
+                    <div className={isSmall ? 'mb-1' : 'mb-1'}>
+                      <p
+                        className={`${isSmall ? 'text-[11px]' : 'text-[13px]'} font-semibold text-gray-900 dark:text-white truncate`}
+                      >
                         {label}
                       </p>
                     </div>
                     <div className="space-y-0.5">
-                      <div className="flex items-center justify-between text-[11px]">
+                      <div
+                        className={`flex items-center justify-between ${isSmall ? 'text-[10px]' : 'text-[11px]'}`}
+                      >
                         <span className="text-gray-600 dark:text-gray-400">
                           Поступления
                         </span>
-                        <span className="font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-semibold text-green-600 dark:text-green-400 ml-2">
                           {formatMoney(p.income || 0)}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[11px]">
+                      <div
+                        className={`flex items-center justify-between ${isSmall ? 'text-[10px]' : 'text-[11px]'}`}
+                      >
                         <span className="text-gray-600 dark:text-gray-400">
                           Списания
                         </span>
-                        <span className="font-semibold text-red-600 dark:text-red-400">
+                        <span className="font-semibold text-red-600 dark:text-red-400 ml-2">
                           {formatMoney(p.expense || 0)}
                         </span>
                       </div>
@@ -247,6 +286,10 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                   </div>
                 );
               }}
+              wrapperStyle={
+                isSmall ? { zIndex: 1000, pointerEvents: 'none' } : undefined
+              }
+              position={isSmall ? { x: 10, y: 10 } : undefined}
             />
             {!isSmall && (
               <Legend

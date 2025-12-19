@@ -22,7 +22,7 @@ interface ArticleParentSelectProps {
 }
 
 /**
- * Компонент для выбора родительской статьи с иерархическим отображением
+ * Компонент для выбора группы статьи с иерархическим отображением
  * Показывает дерево статей в выпадающем списке с отступами и иконками
  */
 export const ArticleParentSelect = ({
@@ -30,8 +30,8 @@ export const ArticleParentSelect = ({
   onChange,
   articleType,
   excludeArticleId,
-  label = 'Родительская статья',
-  placeholder = 'Корневая статья (без родителя)',
+  label = 'Группа',
+  placeholder = 'Без группы',
   error,
   required = false,
   disabled = false,
@@ -57,9 +57,11 @@ export const ArticleParentSelect = ({
   // Функция для получения всех потомков статьи (для исключения)
   const getDescendantIds = (node: ArticleTreeNode): string[] => {
     const ids = [node.id];
-    node.children.forEach((child) => {
-      ids.push(...getDescendantIds(child));
-    });
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach((child) => {
+        ids.push(...getDescendantIds(child));
+      });
+    }
     return ids;
   };
 
@@ -80,10 +82,14 @@ export const ArticleParentSelect = ({
           }
           return true;
         })
-        .map((node) => ({
-          ...node,
-          children: findAndExclude(node.children),
-        }));
+        .map((node) => {
+          const children =
+            node.children && Array.isArray(node.children) ? node.children : [];
+          return {
+            ...node,
+            children: findAndExclude(children),
+          };
+        });
     };
 
     return findAndExclude(tree);
@@ -99,7 +105,7 @@ export const ArticleParentSelect = ({
     }> = [
       {
         value: '',
-        label: 'Корневая статья (без родителя)',
+        label: 'Без группы',
         level: 0,
         isLeaf: true,
       },
@@ -112,14 +118,16 @@ export const ArticleParentSelect = ({
       }
 
       const indent = '— '.repeat(level);
+      const children =
+        node.children && Array.isArray(node.children) ? node.children : [];
       result.push({
         value: node.id,
         label: `${indent}${node.name}`,
         level,
-        isLeaf: node.children.length === 0,
+        isLeaf: children.length === 0,
       });
 
-      node.children.forEach((child) => {
+      children.forEach((child) => {
         addNode(child, level + 1);
       });
     };

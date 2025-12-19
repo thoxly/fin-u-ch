@@ -103,7 +103,7 @@ export const ArticleTreeNode = ({
         ref={setRefs}
         style={{ ...style, paddingLeft: `${indentSize + 12}px` }}
         className={classNames(
-          'flex items-center py-3 hover:bg-gradient-to-r hover:from-blue-50 hover:to-transparent rounded-lg px-3 -mx-3 group cursor-pointer transition-all duration-200',
+          'flex items-center py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg px-3 -mx-3 group cursor-pointer transition-all duration-200',
           searchQuery &&
             article.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
             'bg-yellow-50 dark:bg-yellow-900/20',

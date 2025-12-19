@@ -194,7 +194,7 @@ function App() {
           path="/company"
           element={
             <PrivateRoute>
-              <CompanyPage />
+              <CompanySettingsPage />
             </PrivateRoute>
           }
         />

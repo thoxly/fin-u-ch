@@ -13,9 +13,10 @@ const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
 
   if (daysDiff === 1) {
     return 'day';
-  } else if (daysDiff <= 7) {
+  } else if (daysDiff <= 8) {
+    // Неделя может быть 7-8 дней из-за погрешностей вычисления
     return 'week';
-  } else if (daysDiff <= 31) {
+  } else if (daysDiff <= 32) {
     return 'month';
   } else if (daysDiff <= 93) {
     return 'quarter';
@@ -48,10 +49,16 @@ export const PeriodFilters = ({ value, onChange }: PeriodFiltersProps) => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
+    // Нормализуем даты до начала дня, чтобы избежать проблем с часовыми поясами
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(0, 0, 0, 0);
+
+    // Отправляем даты в формате YYYY-MM-DD
     const newRange = {
-      from: startDate.toISOString(),
-      to: endDate.toISOString(),
+      from: start.toISOString().split('T')[0],
+      to: end.toISOString().split('T')[0],
     };
     // Автоматически определяем формат на основе диапазона
     const format = detectPeriodFormat(newRange.from, newRange.to);

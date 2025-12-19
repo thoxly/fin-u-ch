@@ -4,7 +4,7 @@ import type { ArticleTreeNode } from '../types/articleTree';
 /**
  * Преобразует плоский список статей в дерево
  * @param articles - Плоский массив статей
- * @returns Массив корневых статей с вложенными children
+ * @returns Массив статей без группы с вложенными children
  */
 export function buildArticleTree(articles: Article[]): ArticleTreeNode[] {
   if (!articles || articles.length === 0) {
@@ -15,8 +15,13 @@ export function buildArticleTree(articles: Article[]): ArticleTreeNode[] {
   const articleMap = new Map<string, ArticleTreeNode>();
   const rootArticles: ArticleTreeNode[] = [];
 
+  // Фильтруем только активные статьи перед построением дерева
+  const activeArticles = articles.filter(
+    (article) => article.isActive !== false
+  );
+
   // Первый проход: создаем копии статей с пустыми массивами children
-  articles.forEach((article) => {
+  activeArticles.forEach((article) => {
     articleMap.set(article.id, {
       ...article,
       children: [],
@@ -24,7 +29,7 @@ export function buildArticleTree(articles: Article[]): ArticleTreeNode[] {
   });
 
   // Второй проход: строим дерево
-  articles.forEach((article) => {
+  activeArticles.forEach((article) => {
     const articleWithChildren = articleMap.get(article.id)!;
 
     if (article.parentId) {
@@ -33,16 +38,16 @@ export function buildArticleTree(articles: Article[]): ArticleTreeNode[] {
       if (parent) {
         parent.children.push(articleWithChildren);
       } else {
-        // Если родитель не найден (возможно, отфильтрован), делаем корневой
+        // Если родитель не найден (возможно, отфильтрован), делаем без группы
         rootArticles.push(articleWithChildren);
       }
     } else {
-      // Если нет родителя, это корневая статья
+      // Если нет родителя, это статья без группы
       rootArticles.push(articleWithChildren);
     }
   });
 
-  // Сортируем корневые статьи и рекурсивно сортируем детей
+  // Сортируем статьи без группы и рекурсивно сортируем детей
   const sortTree = (nodes: ArticleTreeNode[]): ArticleTreeNode[] => {
     return nodes
       .sort((a, b) => a.name.localeCompare(b.name))

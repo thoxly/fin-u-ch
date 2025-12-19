@@ -114,7 +114,7 @@ describe('CashflowTable', () => {
     renderWithProvider(<CashflowTable {...defaultProps} />);
 
     // Check for header text (can be uppercase in the component)
-    expect(screen.getByText(/статья/i)).toBeInTheDocument();
+    expect(screen.getByText(/главный разрез/i)).toBeInTheDocument();
     expect(screen.getByText(/итого/i)).toBeInTheDocument();
     expect(screen.getByText(/янв 25/i)).toBeInTheDocument();
     expect(screen.getByText(/февр 25/i)).toBeInTheDocument();
@@ -196,7 +196,7 @@ describe('CashflowTable', () => {
     renderWithProvider(<CashflowTable {...defaultProps} data={emptyData} />);
 
     // Check for header text (can be uppercase in the component)
-    expect(screen.getByText(/статья/i)).toBeInTheDocument();
+    expect(screen.getByText(/главный разрез/i)).toBeInTheDocument();
     expect(screen.getByText('Общий денежный поток')).toBeInTheDocument();
   });
 

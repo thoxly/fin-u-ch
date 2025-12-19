@@ -10,6 +10,7 @@ interface Article {
 interface Account {
   id: string;
   name: string;
+  currency: string;
 }
 
 interface Counterparty {
@@ -51,9 +52,16 @@ interface OperationFinancialParamsProps {
   onCounterpartyChange: (value: string) => void;
   onDealChange: (value: string) => void;
   onDepartmentChange: (value: string) => void;
+  onCurrencyChange?: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
   onOpenCreateModal?: (
-    field: 'account' | 'deal' | 'department' | 'currency',
+    field:
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'counterparty'
+      | 'currency',
     accountType?: 'source' | 'target' | 'default'
   ) => void;
 }
@@ -81,6 +89,7 @@ export const OperationFinancialParams = ({
   onCounterpartyChange,
   onDealChange,
   onDepartmentChange,
+  onCurrencyChange,
   onValidationErrorClear,
   onOpenCreateModal,
 }: OperationFinancialParamsProps) => {
@@ -95,43 +104,49 @@ export const OperationFinancialParams = ({
             label="Счет списания"
             value={sourceAccountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account', 'source');
-              } else {
-                onSourceAccountChange(value);
-                onValidationErrorClear('sourceAccountId');
+              onSourceAccountChange(value);
+              onValidationErrorClear('sourceAccountId');
+              // Автоматически устанавливаем валюту счета
+              if (onCurrencyChange && value) {
+                const account = accounts.find((a) => a.id === value);
+                if (account) {
+                  onCurrencyChange(account.currency);
+                }
               }
             }}
-            options={[
-              ...(onOpenCreateModal
-                ? [{ value: '__create__', label: '+ Добавить новый' }]
-                : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.sourceAccountId}
             required
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'source')
+                : undefined
+            }
           />
           <Select
             label="Счет зачисления"
             value={targetAccountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account', 'target');
-              } else {
-                onTargetAccountChange(value);
-                onValidationErrorClear('targetAccountId');
+              onTargetAccountChange(value);
+              onValidationErrorClear('targetAccountId');
+              // Автоматически устанавливаем валюту счета
+              if (onCurrencyChange && value) {
+                const account = accounts.find((a) => a.id === value);
+                if (account) {
+                  onCurrencyChange(account.currency);
+                }
               }
             }}
-            options={[
-              ...(onOpenCreateModal
-                ? [{ value: '__create__', label: '+ Добавить новый' }]
-                : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.targetAccountId}
             required
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('account', 'target')
+                : undefined
+            }
           />
         </div>
       ) : (
@@ -149,27 +164,31 @@ export const OperationFinancialParams = ({
             placeholder="Выберите статью"
             error={validationErrors.articleId}
             required
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('article') : undefined
+            }
           />
           <Select
             label="Счет"
             value={accountId}
             onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('account');
-              } else {
-                onAccountChange(value);
-                onValidationErrorClear('accountId');
+              onAccountChange(value);
+              onValidationErrorClear('accountId');
+              // Автоматически устанавливаем валюту счета
+              if (onCurrencyChange && value) {
+                const account = accounts.find((a) => a.id === value);
+                if (account) {
+                  onCurrencyChange(account.currency);
+                }
               }
             }}
-            options={[
-              ...(onOpenCreateModal
-                ? [{ value: '__create__', label: '+ Добавить новый' }]
-                : []),
-              ...accounts.map((a) => ({ value: a.id, label: a.name })),
-            ]}
+            options={accounts.map((a) => ({ value: a.id, label: a.name }))}
             placeholder="Выберите счет"
             error={validationErrors.accountId}
             required
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('account') : undefined
+            }
           />
           <Select
             label="Контрагент"
@@ -180,26 +199,20 @@ export const OperationFinancialParams = ({
               label: c.name,
             }))}
             placeholder="Не выбран"
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('counterparty')
+                : undefined
+            }
           />
           <Select
             label="Сделка"
             value={dealId}
-            onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('deal');
-              } else {
-                onDealChange(value);
-              }
-            }}
-            options={[
-              ...(onOpenCreateModal
-                ? [{ value: '__create__', label: '+ Добавить новый' }]
-                : []),
-              ...filteredDeals.map((d) => ({
-                value: d.id,
-                label: d.name,
-              })),
-            ]}
+            onChange={(value) => onDealChange(value)}
+            options={filteredDeals.map((d) => ({
+              value: d.id,
+              label: d.name,
+            }))}
             placeholder={
               counterpartyId
                 ? 'Не выбрана'
@@ -208,27 +221,24 @@ export const OperationFinancialParams = ({
                   : 'Выберите сделку'
             }
             disabled={filteredDeals.length === 0 && !onOpenCreateModal}
+            onCreateNew={
+              onOpenCreateModal ? () => onOpenCreateModal('deal') : undefined
+            }
           />
           <Select
             label="Подразделение"
             value={departmentId}
-            onChange={(value) => {
-              if (value === '__create__' && onOpenCreateModal) {
-                onOpenCreateModal('department');
-              } else {
-                onDepartmentChange(value);
-              }
-            }}
-            options={[
-              ...(onOpenCreateModal
-                ? [{ value: '__create__', label: '+ Добавить новый' }]
-                : []),
-              ...departments.map((d) => ({
-                value: d.id,
-                label: d.name,
-              })),
-            ]}
+            onChange={(value) => onDepartmentChange(value)}
+            options={departments.map((d) => ({
+              value: d.id,
+              label: d.name,
+            }))}
             placeholder="Не выбрано"
+            onCreateNew={
+              onOpenCreateModal
+                ? () => onOpenCreateModal('department')
+                : undefined
+            }
           />
         </div>
       )}

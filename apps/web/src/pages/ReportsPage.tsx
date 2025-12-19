@@ -31,7 +31,7 @@ type ReportType = 'cashflow';
 
 type ReportMode = 'fact' | 'plan' | 'both';
 
-// Автоматически определяет формат периода на основе диапазона дат
+// Автоматически определяет формат периода для API (как группировать данные)
 const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
   const fromDate = new Date(from);
   const toDate = new Date(to);
@@ -44,13 +44,43 @@ const detectPeriodFormat = (from: string, to: string): PeriodFormat => {
     Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
     1;
 
+  // Для периодов до 31 дня - показываем каждый день
+  if (daysDiff <= 31) {
+    return 'day';
+  }
+  // Для 32-93 дней - показываем по месяцам
+  else if (daysDiff <= 93) {
+    return 'month';
+  }
+  // Для более 93 дней - показываем по месяцам или кварталам
+  else if (daysDiff <= 365) {
+    return 'month';
+  } else {
+    return 'quarter';
+  }
+};
+
+// Определяет тип навигации (как переключаться между периодами)
+const detectNavigationFormat = (from: string, to: string): PeriodFormat => {
+  const fromDate = new Date(from);
+  const toDate = new Date(to);
+
+  // Нормализуем даты
+  fromDate.setHours(0, 0, 0, 0);
+  toDate.setHours(0, 0, 0, 0);
+
+  const daysDiff =
+    Math.ceil((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)) +
+    1;
+
   if (daysDiff === 1) {
     return 'day';
-  } else if (daysDiff <= 7) {
+  } else if (daysDiff >= 2 && daysDiff <= 8) {
+    // Неделя может быть 7-8 дней из-за погрешностей вычисления
     return 'week';
-  } else if (daysDiff <= 31) {
+  } else if (daysDiff >= 9 && daysDiff <= 32) {
     return 'month';
-  } else if (daysDiff <= 93) {
+  } else if (daysDiff >= 33 && daysDiff <= 93) {
     return 'quarter';
   } else {
     return 'year';
@@ -170,22 +200,14 @@ export const ReportsPage = () => {
 
   // Обработчики навигации по периодам
   const handlePreviousPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+    // Определяем навигационный формат (как переключаться)
+    const navFormat = detectNavigationFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
 
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getPreviousPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const newRange = getPreviousPeriod(periodFilters.range, navFormat);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -193,22 +215,14 @@ export const ReportsPage = () => {
   };
 
   const handleNextPeriod = () => {
-    // Определяем текущий формат: используем сохраненный или определяем автоматически
-    const currentFormat =
-      periodFilters.format ||
-      detectPeriodFormat(periodFilters.range.from, periodFilters.range.to);
+    // Определяем навигационный формат (как переключаться)
+    const navFormat = detectNavigationFormat(
+      periodFilters.range.from,
+      periodFilters.range.to
+    );
 
-    // Если формат 'day', всегда используем его для переключения
-    const formatToUse = currentFormat === 'day' ? 'day' : currentFormat;
-
-    const newRange = getNextPeriod(periodFilters.range, formatToUse);
-
-    // Сохраняем формат 'day', если он был установлен, иначе определяем автоматически
-    const newFormat =
-      currentFormat === 'day'
-        ? 'day'
-        : detectPeriodFormat(newRange.from, newRange.to);
-
+    const newRange = getNextPeriod(periodFilters.range, navFormat);
+    const newFormat = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
       format: newFormat,
       range: newRange,
@@ -216,35 +230,19 @@ export const ReportsPage = () => {
   };
 
   const handleDateRangeChange = (startDate: Date, endDate: Date) => {
-    // Нормализуем даты (убираем время для корректного сравнения)
+    // Нормализуем даты до начала дня, чтобы избежать проблем с часовыми поясами
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
     const end = new Date(endDate);
     end.setHours(0, 0, 0, 0);
 
-    // Вычисляем разницу в днях для определения формата
-    const daysDiff =
-      Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-    // Определяем формат на основе разницы дней
-    let format: PeriodFormat = 'day';
-    if (daysDiff === 1) {
-      format = 'day';
-    } else if (daysDiff <= 7) {
-      format = 'week';
-    } else if (daysDiff <= 31) {
-      format = 'month';
-    } else if (daysDiff <= 93) {
-      format = 'quarter';
-    } else {
-      format = 'year';
-    }
-
-    // Отправляем полные ISO даты с временем для правильной обработки часовых поясов
+    // Отправляем даты в формате YYYY-MM-DD
     const newRange = {
-      from: start.toISOString(),
-      to: end.toISOString(),
+      from: start.toISOString().split('T')[0],
+      to: end.toISOString().split('T')[0],
     };
+
+    const format = detectPeriodFormat(newRange.from, newRange.to);
 
     setPeriodFilters({
       format,

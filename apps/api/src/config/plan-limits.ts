@@ -35,7 +35,8 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimits> = {
       'reports_odds', // Отчеты ОДДС
       'recurring', // Повторяющиеся операции
       'mapping_rules', // Правила маппинга для импорта
-      // НЕТ: integrations, api_access
+      'integrations', // Интеграции (Ozon и другие)
+      // НЕТ: api_access
     ],
   },
   BUSINESS: {

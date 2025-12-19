@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
 import { usePermissions } from '../../shared/hooks/usePermissions';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store/store';
+import { useGetMeQuery } from '../../store/api/authApi';
+import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 
 interface UserMenuProps {
   userEmail?: string;
@@ -23,12 +23,13 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const menuRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const { data: user } = useGetMeQuery();
   const { hasPermission, isSuperAdmin } = usePermissions();
 
   // Получаем данные о тарифе
-  const subscriptionData = useSelector(
-    (state: RootState) => state.subscription?.data ?? null
-  );
+  const { data: subscriptionData } = useGetSubscriptionQuery(undefined, {
+    skip: !user, // Загружаем только если пользователь авторизован
+  });
 
   const planConfig = {
     START: { label: 'START', icon: '⭐' },
@@ -36,9 +37,10 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
     BUSINESS: { label: 'BUSINESS', icon: '🚀' },
   };
 
-  const currentPlan = subscriptionData?.plan
-    ? planConfig[subscriptionData.plan as keyof typeof planConfig]
-    : null;
+  // План всегда есть (по умолчанию START), используем дефолт если данные еще не загружены
+  const plan = subscriptionData?.plan || 'START';
+  const currentPlan =
+    planConfig[plan as keyof typeof planConfig] || planConfig.START;
 
   // Проверяем, есть ли у пользователя доступ к администрированию
   const hasAdminAccess =
@@ -126,21 +128,17 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
               </button>
             </>
           )}
-          {currentPlan && (
-            <>
-              <hr className="my-1 border-gray-200 dark:border-gray-700" />
-              <button
-                onClick={() => handleMenuItemClick('/company/tariff')}
-                className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
-              >
-                <CreditCard size={16} />
-                <span className="flex-1 text-left">Тариф</span>
-                <span className="text-xs font-semibold">
-                  {currentPlan.icon} {currentPlan.label}
-                </span>
-              </button>
-            </>
-          )}
+          <hr className="my-1 border-gray-200 dark:border-gray-700" />
+          <button
+            onClick={() => handleMenuItemClick('/company/tariff')}
+            className="flex items-center gap-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <CreditCard size={16} />
+            <span className="flex-1 text-left">Тариф</span>
+            <span className="text-xs font-semibold">
+              {currentPlan.icon} {currentPlan.label}
+            </span>
+          </button>
           <hr className="my-1 border-gray-200 dark:border-gray-700" />
           <button
             onClick={handleLogout}

@@ -19,6 +19,7 @@ import {
   ArrowDown,
   Loader2,
   CheckCircle,
+  Info,
 } from 'lucide-react';
 import { Button } from '../../shared/ui/Button';
 import { Table } from '../../shared/ui/Table';
@@ -920,6 +921,10 @@ export const ImportMappingTable = ({
   // Проверяем, все ли операции сопоставлены (используем unmatchedCount из API)
   const areAllOperationsMatched = unmatchedCount === 0;
 
+  // Проверяем, все ли операции уже импортированы
+  const areAllOperationsProcessed =
+    operations.length > 0 && operations.every((op) => op.processed);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       // Выбираем только необработанные операции
@@ -1140,6 +1145,39 @@ export const ImportMappingTable = ({
       width: '50px',
     },
     {
+      key: 'status',
+      header: '',
+      render: (op: ImportedOperation) => (
+        <div className="flex items-center gap-2">
+          {op.matchedBy && (
+            <span
+              className="text-green-600 dark:text-green-400"
+              title="Автосопоставлено"
+            >
+              <Check size={16} />
+            </span>
+          )}
+          {!op.matchedBy && (
+            <span
+              className="text-yellow-600 dark:text-yellow-400"
+              title="Требует внимания"
+            >
+              <AlertCircle size={16} />
+            </span>
+          )}
+          {op.confirmed && (
+            <span
+              className="text-blue-600 dark:text-blue-400"
+              title="Подтверждено"
+            >
+              <FileCheck size={16} />
+            </span>
+          )}
+        </div>
+      ),
+      width: '80px',
+    },
+    {
       key: 'number',
       header: '№',
       render: (op: ImportedOperation) => op.number || '-',
@@ -1231,7 +1269,10 @@ export const ImportMappingTable = ({
         >
           <span className="flex items-center gap-1">
             Тип операции
-            <span className="text-red-500" title="Обязательное поле">
+            <span
+              className="text-red-500"
+              title="Обязательное поле. Нажмите на ячейку и выберите из выпадающего списка"
+            >
               *
             </span>
           </span>
@@ -1252,29 +1293,6 @@ export const ImportMappingTable = ({
       width: '120px',
     },
     {
-      key: 'counterparty',
-      header: (
-        <button
-          onClick={() => handleSort('counterparty')}
-          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
-        >
-          Контрагент <SortIcon field="counterparty" />
-        </button>
-      ),
-      render: (op: ImportedOperation) => (
-        <ImportMappingRow
-          operation={op}
-          field="counterparty"
-          sessionId={sessionId}
-          onOpenCreateModal={handleOpenCreateModal}
-          onFieldUpdate={handleFieldUpdate}
-          disabled={op.processed}
-          isModalOpen={createModal.isOpen}
-        />
-      ),
-      width: '180px',
-    },
-    {
       key: 'article',
       header: (
         <button
@@ -1283,7 +1301,10 @@ export const ImportMappingTable = ({
         >
           <span className="flex items-center gap-1">
             Статья
-            <span className="text-red-500" title="Обязательное поле">
+            <span
+              className="text-red-500"
+              title="Обязательное поле. Нажмите на ячейку и выберите из выпадающего списка"
+            >
               *
             </span>
           </span>
@@ -1312,7 +1333,10 @@ export const ImportMappingTable = ({
         >
           <span className="flex items-center gap-1">
             Счет
-            <span className="text-red-500" title="Обязательное поле">
+            <span
+              className="text-red-500"
+              title="Обязательное поле. Нажмите на ячейку и выберите из выпадающего списка"
+            >
               *
             </span>
           </span>
@@ -1331,6 +1355,61 @@ export const ImportMappingTable = ({
         />
       ),
       width: '150px',
+    },
+    {
+      key: 'currency',
+      header: (
+        <button
+          onClick={() => handleSort('currency')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          <span className="flex items-center gap-1">
+            Валюта
+            <span
+              className="text-red-500"
+              title="Обязательное поле. Нажмите на ячейку и выберите из выпадающего списка"
+            >
+              *
+            </span>
+          </span>
+          <SortIcon field="currency" />
+        </button>
+      ),
+      render: (op: ImportedOperation) => (
+        <ImportMappingRow
+          operation={op}
+          field="currency"
+          sessionId={sessionId}
+          onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          disabled={op.processed}
+          isModalOpen={createModal.isOpen}
+        />
+      ),
+      width: '100px',
+    },
+    {
+      key: 'counterparty',
+      header: (
+        <button
+          onClick={() => handleSort('counterparty')}
+          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
+        >
+          Контрагент <SortIcon field="counterparty" />
+        </button>
+      ),
+      render: (op: ImportedOperation) => (
+        <ImportMappingRow
+          operation={op}
+          field="counterparty"
+          sessionId={sessionId}
+          onOpenCreateModal={handleOpenCreateModal}
+          onFieldUpdate={handleFieldUpdate}
+          disabled={op.processed}
+          isModalOpen={createModal.isOpen}
+        />
+      ),
+      width: '180px',
     },
     {
       key: 'deal',
@@ -1379,35 +1458,6 @@ export const ImportMappingTable = ({
       width: '150px',
     },
     {
-      key: 'currency',
-      header: (
-        <button
-          onClick={() => handleSort('currency')}
-          className="flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
-        >
-          <span className="flex items-center gap-1">
-            Валюта
-            <span className="text-red-500" title="Обязательное поле">
-              *
-            </span>
-          </span>
-          <SortIcon field="currency" />
-        </button>
-      ),
-      render: (op: ImportedOperation) => (
-        <ImportMappingRow
-          operation={op}
-          field="currency"
-          sessionId={sessionId}
-          onOpenCreateModal={handleOpenCreateModal}
-          onFieldUpdate={handleFieldUpdate}
-          disabled={op.processed}
-          isModalOpen={createModal.isOpen}
-        />
-      ),
-      width: '100px',
-    },
-    {
       key: 'rules',
       header: 'Правила',
       render: (op: ImportedOperation) => (
@@ -1419,39 +1469,6 @@ export const ImportMappingTable = ({
         />
       ),
       width: '150px',
-    },
-    {
-      key: 'status',
-      header: 'Статус',
-      render: (op: ImportedOperation) => (
-        <div className="flex items-center gap-2">
-          {op.matchedBy && (
-            <span
-              className="text-green-600 dark:text-green-400"
-              title="Автосопоставлено"
-            >
-              <Check size={16} />
-            </span>
-          )}
-          {!op.matchedBy && (
-            <span
-              className="text-yellow-600 dark:text-yellow-400"
-              title="Требует внимания"
-            >
-              <AlertCircle size={16} />
-            </span>
-          )}
-          {op.confirmed && (
-            <span
-              className="text-blue-600 dark:text-blue-400"
-              title="Подтверждено"
-            >
-              <FileCheck size={16} />
-            </span>
-          )}
-        </div>
-      ),
-      width: '100px',
     },
   ];
 
@@ -1561,6 +1578,56 @@ export const ImportMappingTable = ({
         </div>
       </div>
 
+      {/* Инструкция */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="flex items-start gap-3">
+          <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 space-y-2">
+            <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+              Что это и что нужно сделать?
+            </h4>
+            <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1.5">
+              <p>
+                Здесь отображаются операции из загруженной банковской выписки.
+                Часть полей уже заполнена автоматически системой.
+              </p>
+              <p className="font-medium mt-2">Ваша задача:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li>
+                  Проверьте операции с{' '}
+                  <span className="font-medium">желтой полоской слева</span> —
+                  для них нужно заполнить недостающие поля
+                </li>
+                <li>
+                  Операции с{' '}
+                  <span className="font-medium">зеленой полоской</span> уже
+                  полностью заполнены — их можно просто проверить и подтвердить
+                </li>
+                <li>
+                  <span className="font-medium">Обязательные поля</span>{' '}
+                  (помечены красной звездочкой{' '}
+                  <span className="text-red-500">*</span>):
+                  <span className="font-medium"> Тип операции</span>,{' '}
+                  <span className="font-medium">Статья</span>,
+                  <span className="font-medium"> Счет</span>,{' '}
+                  <span className="font-medium">Валюта</span> — нажмите на
+                  ячейку и выберите нужное значение из выпадающего списка
+                </li>
+                <li>
+                  Остальные поля (контрагент, сделка, подразделение) заполняются
+                  по необходимости — также нажмите на ячейку для выбора
+                </li>
+                <li>
+                  После заполнения всех обязательных полей нажмите кнопку{' '}
+                  <span className="font-medium">"Записать операции"</span>
+                  внизу страницы
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Таблица */}
       <div className="rounded-lg overflow-hidden">
         <Table
@@ -1633,35 +1700,34 @@ export const ImportMappingTable = ({
       )}
 
       {/* Действия */}
-      <div className="flex items-center justify-end gap-4 pt-4 border-t">
-        {/* TODO: Добавить кнопку "Экспорт шаблонов" для экспорта правил в JSON
-                  См. ТЗ: раздел "Frontend: UI компоненты" → "2. Таблица маппинга" → "Кнопки"
-                  Функция должна экспортировать все правила маппинга в JSON формате */}
-        <Button
-          onClick={handleImport}
-          disabled={
-            isImporting ||
-            total === 0 ||
-            (selectedIds.length === 0
-              ? !areAllOperationsMatched
-              : !isSelectedMatched)
-          }
-          className="btn-primary"
-          title={
-            selectedIds.length === 0 && !areAllOperationsMatched
-              ? 'Не все операции сопоставлены. Убедитесь, что у всех операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
-              : selectedIds.length > 0 && !isSelectedMatched
-                ? 'Не все выбранные операции сопоставлены. Убедитесь, что у всех выбранных операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
-                : undefined
-          }
-        >
-          <Download size={16} className="mr-2" />
-          Записать в Операции{' '}
-          {selectedIds.length > 0
-            ? `выбранные (${selectedIds.length})`
-            : 'все операции'}
-        </Button>
-      </div>
+      {!areAllOperationsProcessed && (
+        <div className="flex items-center justify-end gap-4 pt-4 border-t">
+          {/* TODO: Добавить кнопку "Экспорт шаблонов" для экспорта правил в JSON
+                    См. ТЗ: раздел "Frontend: UI компоненты" → "2. Таблица маппинга" → "Кнопки"
+                    Функция должна экспортировать все правила маппинга в JSON формате */}
+          <Button
+            onClick={handleImport}
+            disabled={
+              isImporting ||
+              total === 0 ||
+              (selectedIds.length === 0
+                ? !areAllOperationsMatched
+                : !isSelectedMatched)
+            }
+            className="btn-primary"
+            title={
+              selectedIds.length === 0 && !areAllOperationsMatched
+                ? 'Не все операции сопоставлены. Убедитесь, что у всех операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
+                : selectedIds.length > 0 && !isSelectedMatched
+                  ? 'Не все выбранные операции сопоставлены. Убедитесь, что у всех выбранных операций указаны: тип операции, статья, счет и валюта (или счета для переводов)'
+                  : undefined
+            }
+          >
+            <Download size={16} className="mr-2" />
+            Записать
+          </Button>
+        </div>
+      )}
 
       {/* OffCanvas для создания контрагентов, статей, счетов, сделок, подразделений и валют */}
       <OffCanvas

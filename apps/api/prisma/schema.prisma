@@ -337,6 +337,8 @@ model Operation {
   operationDate      DateTime
   amount             Float
   currency           String        @default("RUB")
+  originalAmount     Float?
+  originalCurrency   String?
   accountId          String?
   sourceAccountId    String?
   targetAccountId    String?

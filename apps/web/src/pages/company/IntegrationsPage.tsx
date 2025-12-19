@@ -9,8 +9,7 @@ import {
   useGetOzonIntegrationQuery,
   useDisconnectOzonIntegrationMutation,
 } from '../../store/api/integrationsApi';
-import { useSelector } from 'react-redux';
-import type { RootState } from '../../store';
+import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 import { useNotification } from '../../shared/hooks/useNotification';
 
 interface Integration {
@@ -29,13 +28,15 @@ interface Integration {
 }
 
 export const IntegrationsPage = () => {
-  const plan =
-    useSelector((state: RootState) => state.subscription?.data?.plan) ||
-    'START';
+  const { data: subscription } = useGetSubscriptionQuery();
+  const plan = (subscription?.plan as 'START' | 'TEAM' | 'BUSINESS') || 'START';
   const canUseIntegrations = plan === 'TEAM' || plan === 'BUSINESS';
 
-  const { data: ozonIntegrationData, isLoading: isLoadingOzonIntegration } =
-    useGetOzonIntegrationQuery(undefined, { skip: !canUseIntegrations });
+  const {
+    data: ozonIntegrationData,
+    isLoading: isLoadingOzonIntegration,
+    error: ozonIntegrationError,
+  } = useGetOzonIntegrationQuery(undefined, { skip: !canUseIntegrations });
   const [disconnectOzonIntegration] = useDisconnectOzonIntegrationMutation();
   const { showSuccess, showError } = useNotification();
 
@@ -64,6 +65,8 @@ export const IntegrationsPage = () => {
       return;
     }
 
+    // Обновляем состояние интеграции Ozon, даже если запрос еще не выполнен
+    // или завершился с ошибкой - показываем начальное состояние
     if (ozonIntegrationData?.success && ozonIntegrationData?.data) {
       setIntegrations((prev) =>
         prev.map((integration) =>
@@ -76,8 +79,11 @@ export const IntegrationsPage = () => {
             : integration
         )
       );
+    } else if (!isLoadingOzonIntegration && ozonIntegrationData === undefined) {
+      // Если запрос еще не выполнен, но загрузка завершена, оставляем начальное состояние
+      // (интеграция уже есть в начальном состоянии)
     }
-  }, [canUseIntegrations, ozonIntegrationData]);
+  }, [canUseIntegrations, ozonIntegrationData, isLoadingOzonIntegration]);
 
   const handleIntegrationUpdate = (
     integrationId: string,
@@ -232,24 +238,31 @@ export const IntegrationsPage = () => {
             Доступные интеграции
           </h2>
 
-          {isLoadingOzonIntegration ? (
-            <Card>
-              <div className="flex items-center justify-center py-8">
-                <Loader2
-                  size={32}
-                  className="text-primary-600 dark:text-primary-400 animate-spin"
-                />
-              </div>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {integrations.map((integration) => {
+          <div className="space-y-4">
+            {integrations.length === 0 ? (
+              <Card>
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  Нет доступных интеграций
+                </div>
+              </Card>
+            ) : (
+              integrations.map((integration) => {
                 const IconComponent = integration.icon;
+                const isOzonLoading =
+                  integration.id === 'ozon' && isLoadingOzonIntegration;
+
                 return (
                   <Card key={integration.id}>
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                        <IconComponent size={32} />
+                        {isOzonLoading ? (
+                          <Loader2
+                            size={24}
+                            className="text-primary-600 dark:text-primary-400 animate-spin"
+                          />
+                        ) : (
+                          <IconComponent size={32} />
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -257,17 +270,18 @@ export const IntegrationsPage = () => {
                           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
                             {integration.name}
                           </h3>
-                          {integration.connected ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                              <Check size={12} />
-                              Подключено
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
-                              <X size={12} />
-                              Не подключено
-                            </span>
-                          )}
+                          {!isOzonLoading &&
+                            (integration.connected ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                <Check size={12} />
+                                Подключено
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                                <X size={12} />
+                                Не подключено
+                              </span>
+                            ))}
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
                           {integration.description}
@@ -281,6 +295,7 @@ export const IntegrationsPage = () => {
                           variant={
                             integration.connected ? 'secondary' : 'primary'
                           }
+                          disabled={isOzonLoading}
                         >
                           {integration.connected ? 'Настроить' : 'Подключить'}
                         </Button>
@@ -288,8 +303,17 @@ export const IntegrationsPage = () => {
                     </div>
                   </Card>
                 );
-              })}
-            </div>
+              })
+            )}
+          </div>
+
+          {ozonIntegrationError && (
+            <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mt-4">
+              <div className="text-sm text-yellow-800 dark:text-yellow-300">
+                Не удалось загрузить данные интеграции Ozon. Попробуйте обновить
+                страницу.
+              </div>
+            </Card>
           )}
         </div>
 

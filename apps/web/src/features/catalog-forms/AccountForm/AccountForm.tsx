@@ -1,5 +1,6 @@
 import { Input } from '../../../shared/ui/Input';
-import { Button, Select } from '../../../shared/ui';
+import { Button } from '../../../shared/ui';
+import { CurrencySelect } from '../../../shared/ui/CurrencySelect';
 import {
   useCreateAccountMutation,
   useUpdateAccountMutation,
@@ -53,6 +54,7 @@ export const AccountForm = ({
   }, [account, initialNumber]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     const data = {
       name,
       number,
@@ -92,18 +94,16 @@ export const AccountForm = ({
         onChange={(e) => setNumber(e.target.value)}
         disabled={!canEdit}
       />
-      <Select
-        label="Валюта"
-        value={currency}
-        onChange={(value) => setCurrency(value)}
-        options={[
-          { value: 'RUB', label: 'RUB' },
-          { value: 'USD', label: 'USD' },
-          { value: 'EUR', label: 'EUR' },
-        ]}
-        required
-        disabled={!canEdit}
-      />
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Валюта
+        </label>
+        <CurrencySelect
+          value={currency}
+          onChange={setCurrency}
+          disabled={!canEdit}
+        />
+      </div>
       <Input
         label="Начальный остаток"
         type="number"

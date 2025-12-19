@@ -1,5 +1,6 @@
 import { Input } from '../../shared/ui/Input';
 import { Select } from '../../shared/ui/Select';
+import { CurrencySelect } from '../../shared/ui/CurrencySelect';
 import { OperationType } from '@fin-u-ch/shared';
 
 interface OperationBasicInfoProps {
@@ -23,12 +24,6 @@ const typeOptions = [
   { value: 'income', label: 'Поступление' },
   { value: 'expense', label: 'Списание' },
   { value: 'transfer', label: 'Перевод' },
-];
-
-const currencyOptions = [
-  { value: 'RUB', label: 'RUB' },
-  { value: 'USD', label: 'USD' },
-  { value: 'EUR', label: 'EUR' },
 ];
 
 export const OperationBasicInfo = ({
@@ -84,23 +79,13 @@ export const OperationBasicInfo = ({
           error={validationErrors.amount}
           required
         />
-        <Select
+        <CurrencySelect
           label="Валюта"
           value={currency}
           onChange={(value) => {
-            if (value === '__create__' && onOpenCreateModal) {
-              onOpenCreateModal('currency');
-            } else {
-              onCurrencyChange(value);
-              onValidationErrorClear('currency');
-            }
+            onCurrencyChange(value);
+            onValidationErrorClear('currency');
           }}
-          options={[
-            ...(onOpenCreateModal
-              ? [{ value: '__create__', label: '+ Добавить новый' }]
-              : []),
-            ...currencyOptions,
-          ]}
           error={validationErrors.currency}
           required
         />
