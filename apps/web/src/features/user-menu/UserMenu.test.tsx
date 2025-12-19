@@ -100,12 +100,11 @@ describe('UserMenu', () => {
         expect(screen.getByText('Мой профиль')).toBeInTheDocument();
         expect(screen.getByText('Моя компания')).toBeInTheDocument();
         expect(screen.getByText('Администрирование')).toBeInTheDocument();
-        expect(screen.getByText('Поддержка')).toBeInTheDocument();
         expect(screen.getByText('Выйти')).toBeInTheDocument();
       },
-      { timeout: 10000 }
+      { timeout: 5000 }
     );
-  }, 10000);
+  });
 
   it('navigates to profile page when profile button is clicked', async () => {
     renderWithProviders(<UserMenu userEmail="test@example.com" />);

@@ -195,9 +195,8 @@ describe('CashflowTable', () => {
 
     renderWithProvider(<CashflowTable {...defaultProps} data={emptyData} />);
 
-    // Check for header text (can be uppercase in the component)
-    expect(screen.getByText(/главный разрез/i)).toBeInTheDocument();
-    expect(screen.getByText('Общий денежный поток')).toBeInTheDocument();
+    // When there's no data, component shows empty state message
+    expect(screen.getByText(/нет данных для отображения/i)).toBeInTheDocument();
   });
 
   it('formats money values correctly', () => {

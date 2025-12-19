@@ -25,3 +25,12 @@ global.ResizeObserver = class ResizeObserver {
     // do nothing
   }
 };
+
+// Mock fetch for RTK Query
+global.fetch = jest.fn(() =>
+  Promise.resolve({
+    ok: true,
+    status: 200,
+    json: async () => ({}),
+  } as Response)
+) as jest.Mock;
