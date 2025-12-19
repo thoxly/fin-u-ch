@@ -27,6 +27,12 @@ jest.mock('../../../config/db', () => ({
       findMany: jest.fn(),
       findFirst: jest.fn(),
     },
+    account: {
+      findMany: jest.fn(),
+    },
+    company: {
+      findUnique: jest.fn(),
+    },
   },
 }));
 
@@ -36,10 +42,20 @@ jest.mock('../utils/cache', () => ({
   generateCacheKey: jest.fn().mockReturnValue('test-cache-key'),
 }));
 
+jest.mock('../../catalogs/articles/articles.service', () => ({
+  __esModule: true,
+  default: {
+    getDescendantIds: jest.fn().mockResolvedValue([]),
+    getAncestorIds: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 import prisma from '../../../config/db';
 const mockOperationFindMany = prisma.operation.findMany as jest.Mock;
 const mockArticleFindMany = prisma.article.findMany as jest.Mock;
 const mockArticleFindFirst = prisma.article.findFirst as jest.Mock;
+const mockAccountFindMany = prisma.account.findMany as jest.Mock;
+const mockCompanyFindUnique = prisma.company.findUnique as jest.Mock;
 
 describe('CashflowService', () => {
   let service: CashflowService;
@@ -48,8 +64,14 @@ describe('CashflowService', () => {
     service = new CashflowService();
     jest.clearAllMocks();
     // Set default mock returns
+    mockOperationFindMany.mockResolvedValue([]);
     mockArticleFindMany.mockResolvedValue([]);
     mockArticleFindFirst.mockResolvedValue(null);
+    mockAccountFindMany.mockResolvedValue([]);
+    mockCompanyFindUnique.mockResolvedValue({
+      id: 'company-id',
+      currencyBase: 'RUB',
+    });
   });
 
   describe('getCashflow', () => {

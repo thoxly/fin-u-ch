@@ -22,12 +22,34 @@ jest.mock('../../config/db', () => ({
   default: {
     account: {
       findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
+    company: {
+      findUnique: jest.fn(),
     },
     operation: {
       create: jest.fn(),
       update: jest.fn(),
     },
     $transaction: jest.fn(),
+  },
+}));
+
+jest.mock('../currency/currency.service', () => ({
+  __esModule: true,
+  default: {
+    convertToBase: jest
+      .fn()
+      .mockImplementation(
+        async (amount: number, currency: string, baseCurrency: string) => {
+          // Простой мок: если валюты одинаковые, возвращаем сумму
+          if (currency === baseCurrency) {
+            return amount;
+          }
+          // Для тестов просто возвращаем сумму (можно добавить реальную логику конвертации)
+          return amount;
+        }
+      ),
   },
 }));
 
@@ -172,6 +194,11 @@ describe('OperationsService', () => {
     };
 
     it('should validate account ownership on create for income operation', async () => {
+      // Mock company for base currency
+      (mockedPrisma.company.findUnique as jest.Mock).mockResolvedValue({
+        id: companyId,
+        currencyBase: 'RUB',
+      });
       // Mock account validation - account belongs to company
       (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
         { id: 'account-1' },
@@ -184,6 +211,10 @@ describe('OperationsService', () => {
 
       await operationsService.create(companyId, incomeOperation);
 
+      expect(mockedPrisma.company.findUnique).toHaveBeenCalledWith({
+        where: { id: companyId },
+        select: { currencyBase: true },
+      });
       expect(mockedPrisma.account.findMany).toHaveBeenCalledWith({
         where: {
           id: { in: ['account-1'] },
@@ -194,6 +225,11 @@ describe('OperationsService', () => {
     });
 
     it('should throw error if account does not belong to company on create', async () => {
+      // Mock company for base currency
+      (mockedPrisma.company.findUnique as jest.Mock).mockResolvedValue({
+        id: companyId,
+        currencyBase: 'RUB',
+      });
       // Mock account validation - account not found or doesn't belong to company
       (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([]);
 
@@ -207,6 +243,11 @@ describe('OperationsService', () => {
     });
 
     it('should validate both accounts on create for transfer operation', async () => {
+      // Mock company for base currency
+      (mockedPrisma.company.findUnique as jest.Mock).mockResolvedValue({
+        id: companyId,
+        currencyBase: 'RUB',
+      });
       // Mock account validation - both accounts belong to company
       (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
         { id: 'account-1' },
@@ -237,6 +278,11 @@ describe('OperationsService', () => {
     });
 
     it('should throw error if one of transfer accounts does not belong to company', async () => {
+      // Mock company for base currency
+      (mockedPrisma.company.findUnique as jest.Mock).mockResolvedValue({
+        id: companyId,
+        currencyBase: 'RUB',
+      });
       // Mock account validation - only one account found
       (mockedPrisma.account.findMany as jest.Mock).mockResolvedValue([
         { id: 'account-1' },
