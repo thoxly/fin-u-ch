@@ -9,6 +9,7 @@ import {
 } from '@fin-u-ch/shared';
 import currencyService from '../currency/currency.service';
 import logger from '../../config/logger';
+import { invalidateReportCache } from '../reports/utils/cache';
 
 // Keep for backward compatibility with tests
 export type CreateOperationDTO = CreateOperationInput;
@@ -320,7 +321,7 @@ export class OperationsService {
 
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
     if (validatedData.repeat && validatedData.repeat !== 'none') {
-      return prisma.$transaction(async (tx) => {
+      const template = await prisma.$transaction(async (tx) => {
         // Создаем шаблон (isTemplate: true)
         const template = await tx.operation.create({
           data: {
@@ -364,10 +365,15 @@ export class OperationsService {
 
         return template;
       });
+
+      // Инвалидируем кэш отчетов после создания повторяющейся операции
+      await invalidateReportCache(companyId);
+
+      return template;
     }
 
     // Обычная операция (не повторяющаяся)
-    return prisma.operation.create({
+    const operation = await prisma.operation.create({
       data: {
         ...validatedData,
         amount: converted.amount,
@@ -378,6 +384,11 @@ export class OperationsService {
         isTemplate: false,
       },
     });
+
+    // Инвалидируем кэш отчетов после создания операции
+    await invalidateReportCache(companyId);
+
+    return operation;
   }
 
   async update(
@@ -440,10 +451,15 @@ export class OperationsService {
         updateData.originalCurrency = converted.originalCurrency;
       }
 
-      return prisma.operation.update({
+      const updated = await prisma.operation.update({
         where: { id },
         data: updateData,
       });
+
+      // Инвалидируем кэш отчетов после обновления операции
+      await invalidateReportCache(companyId);
+
+      return updated;
     }
 
     return prisma.operation.findUnique({ where: { id } });
@@ -452,18 +468,28 @@ export class OperationsService {
   async delete(id: string, companyId: string) {
     await this.getById(id, companyId);
 
-    return prisma.operation.delete({
+    const deleted = await prisma.operation.delete({
       where: { id },
     });
+
+    // Инвалидируем кэш отчетов после удаления операции
+    await invalidateReportCache(companyId);
+
+    return deleted;
   }
 
   async confirmOperation(id: string, companyId: string) {
     await this.getById(id, companyId);
 
-    return prisma.operation.update({
+    const confirmed = await prisma.operation.update({
       where: { id, companyId },
       data: { isConfirmed: true },
     });
+
+    // Инвалидируем кэш отчетов после подтверждения операции
+    await invalidateReportCache(companyId);
+
+    return confirmed;
   }
 
   async bulkDelete(companyId: string, ids: string[]) {
@@ -497,7 +523,7 @@ export class OperationsService {
     }
 
     // Use transaction to ensure atomicity - all deletes succeed or none
-    return prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       return tx.operation.deleteMany({
         where: {
           companyId,
@@ -505,6 +531,13 @@ export class OperationsService {
         },
       });
     });
+
+    // Инвалидируем кэш отчетов после массового удаления операций
+    if (result.count > 0) {
+      await invalidateReportCache(companyId);
+    }
+
+    return result;
   }
 }
 
