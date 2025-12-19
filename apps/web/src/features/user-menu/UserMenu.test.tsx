@@ -31,10 +31,21 @@ jest.mock('../../store/api/authApi', () => ({
   }),
 }));
 
+// Mock subscriptionApi
+jest.mock('../../store/api/subscriptionApi', () => ({
+  useGetSubscriptionQuery: jest.fn().mockReturnValue({
+    data: null,
+    isLoading: false,
+  }),
+}));
+
 // Mock store
+import { apiSlice } from '../../store/api/apiSlice';
+
 const createMockStore = () => {
   return configureStore({
     reducer: {
+      [apiSlice.reducerPath]: apiSlice.reducer,
       auth: () => ({
         user: {
           id: '1',
@@ -47,6 +58,8 @@ const createMockStore = () => {
         notifications: [],
       }),
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(apiSlice.middleware),
   });
 };
 
@@ -136,29 +149,7 @@ describe('UserMenu', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/admin');
   });
 
-  it('opens telegram bot when support button is clicked', async () => {
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    renderWithProviders(<UserMenu userEmail="test@example.com" />);
-
-    const menuButton = screen.getByRole('button');
-    fireEvent.click(menuButton);
-
-    await waitFor(() => {
-      const supportButton = screen.getByText('Поддержка');
-      fireEvent.click(supportButton);
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.stringContaining('https://t.me/Vecta_supportBot'),
-      '_blank'
-    );
-    expect(openSpy).toHaveBeenCalledWith(
-      expect.stringContaining('user_id=1'),
-      '_blank'
-    );
-
-    openSpy.mockRestore();
-  });
+  // Тест удален, так как кнопка "Поддержка" была удалена из компонента
 
   it('closes dropdown when clicking outside', async () => {
     renderWithProviders(<UserMenu userEmail="test@example.com" />);

@@ -13,6 +13,7 @@ interface Article {
 interface Account {
   id: string;
   name: string;
+  currency: string;
 }
 
 interface Counterparty {
@@ -149,6 +150,7 @@ export const OperationFormFields = ({
           onCounterpartyChange={onCounterpartyChange}
           onDealChange={onDealChange}
           onDepartmentChange={onDepartmentChange}
+          onCurrencyChange={onCurrencyChange}
           onValidationErrorClear={onValidationErrorClear}
           onOpenCreateModal={onOpenCreateModal}
         />
