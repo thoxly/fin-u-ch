@@ -12,7 +12,6 @@ import {
 import { formatMoney } from '../lib/money';
 import { ChartLegend } from './ChartLegend';
 import { ExportMenu } from './ExportMenu';
-import { CustomTooltip } from './CustomTooltip';
 import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
 import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
@@ -101,7 +100,6 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
     isPanelOpen,
     hoveredOnce,
     setHoveredOnce,
-    handleOpenPanel,
     handleClosePanel,
     selectedPoint,
     accountsWithBalance,
@@ -127,7 +125,12 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={data || []}
-              margin={{ top: 5, right: 30, left: 20, bottom: 48 }}
+              margin={{
+                top: 5,
+                right: isSmall ? 5 : 30,
+                left: isSmall ? 0 : 20,
+                bottom: 48,
+              }}
             >
               <CartesianGrid
                 strokeDasharray="3 3"
@@ -136,12 +139,13 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
               <XAxis
                 dataKey="label"
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={isSmall ? 10 : 12}
               />
               <YAxis
                 className="text-gray-600 dark:text-gray-400"
-                fontSize={12}
+                fontSize={isSmall ? 10 : 12}
                 tickFormatter={(value) => formatMoney(value)}
+                width={isSmall ? 60 : 80}
                 domain={[
                   (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                   (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -156,6 +160,10 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                   />
                 )}
                 labelFormatter={(label) => `${label}`}
+                wrapperStyle={
+                  isSmall ? { zIndex: 1000, pointerEvents: 'none' } : undefined
+                }
+                position={isSmall ? { x: 10, y: 10 } : undefined}
               />
               {/* Не отображаем легенду и линии, когда нет данных */}
             </LineChart>
@@ -199,12 +207,14 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
             }
           />
         </div>
-        <ExportMenu
-          filenameBase="account_balances"
-          buildRows={buildExportRows}
-          columns={['date', 'category', 'amount', 'type']}
-          entity="reports"
-        />
+        {!isSmall && hasData && (
+          <ExportMenu
+            filenameBase="account_balances"
+            buildRows={buildExportRows}
+            columns={['date', 'category', 'amount', 'type']}
+            entity="reports"
+          />
+        )}
       </div>
       <div
         className="chart-body relative"
@@ -212,13 +222,18 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
       >
         {!hoveredOnce && hasData && (
           <div className="absolute top-2 right-2 bg-gray-700/80 text-gray-100 text-xs px-3 py-1.5 rounded-lg shadow-sm">
-            💡 Наведите на точку, чтобы увидеть операции
+            💡 Наведите на график, чтобы увидеть остатки
           </div>
         )}
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={processedData || data}
-            margin={{ top: 5, right: 30, left: 20, bottom: 56 }}
+            margin={{
+              top: 5,
+              right: isSmall ? 5 : 30,
+              left: isSmall ? 0 : 20,
+              bottom: 56,
+            }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -227,16 +242,32 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
             <XAxis
               dataKey="label"
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
-              tick={{ fontSize: 11 }}
-              angle={(processedData || data).length > 8 ? -45 : 0}
+              fontSize={isSmall ? 10 : 12}
+              tick={{ fontSize: isSmall ? 9 : 11 }}
+              angle={
+                (processedData || data).length > 8 ? (isSmall ? -35 : -45) : 0
+              }
               textAnchor={(processedData || data).length > 8 ? 'end' : 'middle'}
-              height={(processedData || data).length > 8 ? 80 : 30}
+              height={
+                (processedData || data).length > 8 ? (isSmall ? 60 : 80) : 30
+              }
+              interval={
+                isSmall
+                  ? (processedData || data).length <= 10
+                    ? 0
+                    : (processedData || data).length <= 20
+                      ? 1
+                      : 2
+                  : (processedData || data).length <= 31
+                    ? 0
+                    : 'preserveStartEnd'
+              }
             />
             <YAxis
               className="text-gray-600 dark:text-gray-400"
-              fontSize={12}
+              fontSize={isSmall ? 10 : 12}
               tickFormatter={(value) => formatMoney(value)}
+              width={isSmall ? 60 : 80}
               domain={[
                 (min: number) => (Number.isFinite(min) ? min * 0.95 : min),
                 (max: number) => (Number.isFinite(max) ? max * 1.05 : max),
@@ -245,21 +276,66 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
             <Tooltip
               cursor={false}
               content={({ active, payload, label }) => {
-                const currentPoint = (processedData || data).find(
-                  (d) => d.label === label
-                );
-                const hasOps = currentPoint?.operations?.some(
-                  (op) => op.amount && op.amount !== 0
-                );
-                if (!active || !hasOps) return null;
+                if (!active || !payload || payload.length === 0) {
+                  return null;
+                }
+
+                // Показываем остатки на счетах в tooltip
                 return (
-                  <CustomTooltip
-                    active={active}
-                    payload={payload}
-                    label={label}
-                  />
+                  <div
+                    className={`bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg ${isSmall ? 'p-1.5' : 'p-2'} ${isSmall ? 'min-w-[140px] max-w-[calc(100vw-32px)]' : 'min-w-[150px] max-w-[200px]'}`}
+                  >
+                    <div className={isSmall ? 'mb-1' : 'mb-2'}>
+                      <p
+                        className={`${isSmall ? 'text-[11px]' : 'text-[13px]'} font-semibold text-gray-900 dark:text-white truncate`}
+                      >
+                        {label}
+                      </p>
+                    </div>
+                    <div className="space-y-0.5">
+                      {payload.map((entry, index: number) => {
+                        if (
+                          !entry.dataKey ||
+                          entry.value === null ||
+                          entry.value === undefined
+                        ) {
+                          return null;
+                        }
+                        const accountName = entry.dataKey as string;
+                        const balance = entry.value as number;
+                        // Получаем цвет счета по его индексу в accountsWithBalance
+                        const accountIndex =
+                          accountsWithBalance.indexOf(accountName);
+                        const color =
+                          accountIndex >= 0
+                            ? getAccountColor(accountIndex)
+                            : entry.color || '#3b82f6';
+
+                        return (
+                          <div
+                            key={index}
+                            className={`flex items-center justify-between ${isSmall ? 'text-[10px]' : 'text-[11px]'}`}
+                          >
+                            <span className="text-gray-600 dark:text-gray-400 truncate mr-2">
+                              {accountName}
+                            </span>
+                            <span
+                              className="font-semibold ml-2 whitespace-nowrap"
+                              style={{ color }}
+                            >
+                              {formatMoney(balance)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 );
               }}
+              wrapperStyle={
+                isSmall ? { zIndex: 1000, pointerEvents: 'none' } : undefined
+              }
+              position={isSmall ? { x: 10, y: 10 } : undefined}
             />
             {!isSmall && (
               <Legend
@@ -278,50 +354,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                 strokeWidth={2}
                 activeDot={false}
                 connectNulls={false}
-                dot={(props) => {
-                  // Показываем точку только для счетов, по которым есть операции в этот день
-                  const dataPoint = (processedData || data)[props.index];
-                  const accountBalance = dataPoint?.[accountName];
-
-                  // Не показываем точки для null значений (будущие даты)
-                  if (accountBalance === null || accountBalance === undefined) {
-                    return null;
-                  }
-
-                  const operations = dataPoint?.operations || [];
-                  if (!operations.length) return null;
-
-                  const account = accounts.find(
-                    (acc) => acc.name === accountName
-                  );
-                  const accountId = account?.id;
-                  if (!accountId) return null;
-
-                  const hasAccountOperation = operations.some(
-                    (op) =>
-                      (op.type === 'income' || op.type === 'expense') &&
-                      op.amount &&
-                      op.amount !== 0 &&
-                      (op.accountId === accountId ||
-                        op.sourceAccountId === accountId ||
-                        op.targetAccountId === accountId)
-                  );
-
-                  if (!hasAccountOperation) return null;
-                  return (
-                    <circle
-                      key={`${accountName}-${props.index}`}
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={4}
-                      fill={getAccountColor(index)}
-                      strokeWidth={2}
-                      stroke={getAccountColor(index)}
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleOpenPanel(props.index)}
-                    />
-                  );
-                }}
+                dot={false}
                 name={accountName}
               />
             ))}

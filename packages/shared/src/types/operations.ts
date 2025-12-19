@@ -9,6 +9,8 @@ export interface Operation {
   operationDate: Date;
   amount: number;
   currency: string;
+  originalAmount?: number | null;
+  originalCurrency?: string | null;
   accountId?: string | null;
   sourceAccountId?: string | null;
   targetAccountId?: string | null;

@@ -15,13 +15,37 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../shared/hooks/usePermissions', () => ({
   usePermissions: () => ({
     hasPermission: jest.fn().mockReturnValue(true),
+    isSuperAdmin: false,
+  }),
+}));
+
+// Mock authApi
+jest.mock('../../store/api/authApi', () => ({
+  useGetMeQuery: jest.fn().mockReturnValue({
+    data: {
+      id: '1',
+      email: 'test@example.com',
+      companyId: '1',
+      companyName: 'Test Company',
+    },
+  }),
+}));
+
+// Mock subscriptionApi
+jest.mock('../../store/api/subscriptionApi', () => ({
+  useGetSubscriptionQuery: jest.fn().mockReturnValue({
+    data: null,
+    isLoading: false,
   }),
 }));
 
 // Mock store
+import { apiSlice } from '../../store/api/apiSlice';
+
 const createMockStore = () => {
   return configureStore({
     reducer: {
+      [apiSlice.reducerPath]: apiSlice.reducer,
       auth: () => ({
         user: {
           id: '1',
@@ -34,6 +58,8 @@ const createMockStore = () => {
         notifications: [],
       }),
     },
+    middleware: (getDefaultMiddleware) =>
+      getDefaultMiddleware().concat(apiSlice.middleware),
   });
 };
 
@@ -74,6 +100,7 @@ describe('UserMenu', () => {
         expect(screen.getByText('Мой профиль')).toBeInTheDocument();
         expect(screen.getByText('Моя компания')).toBeInTheDocument();
         expect(screen.getByText('Администрирование')).toBeInTheDocument();
+        expect(screen.getByText('Поддержка')).toBeInTheDocument();
         expect(screen.getByText('Выйти')).toBeInTheDocument();
       },
       { timeout: 10000 }
@@ -121,6 +148,8 @@ describe('UserMenu', () => {
 
     expect(mockNavigate).toHaveBeenCalledWith('/admin');
   });
+
+  // Тест удален, так как кнопка "Поддержка" была удалена из компонента
 
   it('closes dropdown when clicking outside', async () => {
     renderWithProviders(<UserMenu userEmail="test@example.com" />);

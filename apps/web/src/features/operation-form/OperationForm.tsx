@@ -25,6 +25,8 @@ import { OffCanvas } from '../../shared/ui/OffCanvas';
 import { AccountForm } from '../catalog-forms/AccountForm/AccountForm';
 import { DealForm } from '../catalog-forms/DealForm/DealForm';
 import { DepartmentForm } from '../catalog-forms/DepartmentForm/DepartmentForm';
+import { ArticleForm } from '../catalog-forms/ArticleForm/ArticleForm';
+import { CounterpartyForm } from '../catalog-forms/CounterpartyForm/CounterpartyForm';
 
 interface OperationFormProps {
   operation: Operation | null;
@@ -107,7 +109,14 @@ export const OperationForm = ({
   // Состояние для модалок создания
   const [createModal, setCreateModal] = useState<{
     isOpen: boolean;
-    field: 'account' | 'deal' | 'department' | 'currency' | null;
+    field:
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'counterparty'
+      | 'currency'
+      | null;
     accountType?: 'source' | 'target' | 'default';
   }>({
     isOpen: false,
@@ -126,7 +135,13 @@ export const OperationForm = ({
 
   // Обработчики для открытия модалок создания
   const handleOpenCreateModal = (
-    field: 'account' | 'deal' | 'department' | 'currency',
+    field:
+      | 'article'
+      | 'account'
+      | 'deal'
+      | 'department'
+      | 'counterparty'
+      | 'currency',
     accountType?: 'source' | 'target' | 'default'
   ) => {
     setCreateModal({
@@ -145,7 +160,10 @@ export const OperationForm = ({
 
   // Обработчик успешного создания элемента
   const handleCreateSuccess = (createdId: string) => {
-    if (createModal.field === 'account') {
+    if (createModal.field === 'article') {
+      setArticleId(createdId);
+      clearValidationError('articleId');
+    } else if (createModal.field === 'account') {
       if (createModal.accountType === 'source') {
         setSourceAccountId(createdId);
         clearValidationError('sourceAccountId');
@@ -160,6 +178,8 @@ export const OperationForm = ({
       setDealId(createdId);
     } else if (createModal.field === 'department') {
       setDepartmentId(createdId);
+    } else if (createModal.field === 'counterparty') {
+      setCounterpartyId(createdId);
     }
     handleCloseModal();
   };
@@ -269,23 +289,34 @@ export const OperationForm = ({
         onClose={onClose}
       />
 
-      {/* OffCanvas для создания счетов, сделок, подразделений и валют */}
+      {/* OffCanvas для создания статей, счетов, контрагентов, сделок, подразделений и валют */}
       <OffCanvas
         isOpen={createModal.isOpen && !!createModal.field}
         title={
-          createModal.field === 'account'
-            ? 'Создание счета'
-            : createModal.field === 'deal'
-              ? 'Создание сделки'
-              : createModal.field === 'department'
-                ? 'Создание подразделения'
-                : createModal.field === 'currency'
-                  ? 'Создание валюты'
-                  : ''
+          createModal.field === 'article'
+            ? 'Создание статьи'
+            : createModal.field === 'account'
+              ? 'Создание счета'
+              : createModal.field === 'deal'
+                ? 'Создание сделки'
+                : createModal.field === 'department'
+                  ? 'Создание подразделения'
+                  : createModal.field === 'counterparty'
+                    ? 'Создание контрагента'
+                    : createModal.field === 'currency'
+                      ? 'Создание валюты'
+                      : ''
         }
         onClose={handleCloseModal}
       >
-        {createModal.field === 'account' ? (
+        {createModal.field === 'article' ? (
+          <ArticleForm
+            article={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+            initialType={type as 'income' | 'expense'}
+          />
+        ) : createModal.field === 'account' ? (
           <AccountForm
             account={null}
             onClose={handleCloseModal}
@@ -300,6 +331,12 @@ export const OperationForm = ({
         ) : createModal.field === 'department' ? (
           <DepartmentForm
             department={null}
+            onClose={handleCloseModal}
+            onSuccess={handleCreateSuccess}
+          />
+        ) : createModal.field === 'counterparty' ? (
+          <CounterpartyForm
+            counterparty={null}
             onClose={handleCloseModal}
             onSuccess={handleCreateSuccess}
           />

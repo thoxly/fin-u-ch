@@ -2,6 +2,7 @@ import prisma from '../../../config/db';
 import { getMonthKey } from '@fin-u-ch/shared';
 import { cacheReport, getCachedReport, generateCacheKey } from '../utils/cache';
 import plansService from '../../plans/plans.service';
+import logger from '../../../config/logger';
 
 export interface PlanFactParams {
   periodFrom: Date;
@@ -19,6 +20,27 @@ export interface PlanFactRow {
 }
 
 export class PlanFactService {
+  /**
+   * Получает текущую дату (начало дня в UTC) для фильтрации будущих операций
+   * Использует UTC, чтобы избежать проблем с часовыми поясами
+   */
+  private getTodayStart(): Date {
+    const now = new Date();
+    // Используем UTC для согласованности с данными в БД
+    const today = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    return today;
+  }
+
   async getPlanFact(
     companyId: string,
     params: PlanFactParams
@@ -83,13 +105,29 @@ export class PlanFactService {
       }
     }
 
-    // Get fact data (только реальные операции, не шаблоны)
+    // Получаем текущую дату для фильтрации будущих операций
+    const todayStart = this.getTodayStart();
+    // Используем минимальное значение между концом периода и сегодняшним днем
+    const maxDate = new Date(
+      Math.min(params.periodTo.getTime(), todayStart.getTime())
+    );
+
+    logger.info('PlanFact: filtering future operations', {
+      companyId,
+      periodFrom: params.periodFrom.toISOString(),
+      periodTo: params.periodTo.toISOString(),
+      todayStart: todayStart.toISOString(),
+      maxDate: maxDate.toISOString(),
+      level: params.level,
+    });
+
+    // Get fact data (только реальные операции, не шаблоны, не будущие)
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
         operationDate: {
           gte: params.periodFrom,
-          lte: params.periodTo,
+          lte: maxDate, // Исключаем операции в будущем
         },
         type: { in: ['income', 'expense'] },
         isConfirmed: true,
@@ -100,6 +138,20 @@ export class PlanFactService {
         deal: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
       },
+    });
+
+    logger.info('PlanFact: operations fetched', {
+      companyId,
+      operationsCount: operations.length,
+      periodFrom: params.periodFrom.toISOString(),
+      maxDate: maxDate.toISOString(),
+      todayStart: todayStart.toISOString(),
+      sampleOperations: operations.slice(0, 3).map((op) => ({
+        id: op.id,
+        date: op.operationDate.toISOString(),
+        type: op.type,
+        amount: op.amount,
+      })),
     });
 
     for (const op of operations) {

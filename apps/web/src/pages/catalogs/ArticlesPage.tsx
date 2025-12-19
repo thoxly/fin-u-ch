@@ -31,7 +31,6 @@ export const ArticlesPage = () => {
   const [editing, setEditing] = useState<Article | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'tree'>('tree');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showLeavesOnly, setShowLeavesOnly] = useState(false);
   const [initialParentId, setInitialParentId] = useState<string | null>(null);
   const [isChangeParentModalOpen, setIsChangeParentModalOpen] = useState(false);
   const [articleToChangeParent, setArticleToChangeParent] =
@@ -54,6 +53,7 @@ export const ArticlesPage = () => {
     'operating' | 'investing' | 'financing' | ''
   >('');
   const filters = {
+    isActive: true, // Показываем только активные статьи
     ...(typeFilter && { type: typeFilter as 'income' | 'expense' }),
     ...(activityFilter && {
       activity: activityFilter as 'operating' | 'investing' | 'financing',
@@ -62,24 +62,47 @@ export const ArticlesPage = () => {
 
   const { canRead } = usePermissions();
 
+  // Всегда передаем фильтры, так как isActive: true обязателен
   const {
     data: articles = [],
     isLoading,
     error,
-  } = useGetArticlesQuery(
-    Object.keys(filters).length > 0 ? filters : undefined,
-    { skip: !canRead('articles') }
-  );
+    refetch: refetchArticles,
+  } = useGetArticlesQuery(filters, { skip: !canRead('articles') });
 
   const {
     tree,
     isLoading: isTreeLoading,
     error: treeError,
-  } = useArticleTree(Object.keys(filters).length > 0 ? filters : undefined);
+    refetch: refetchTree,
+  } = useArticleTree(filters);
   const [deleteArticle] = useDeleteArticleMutation();
   const [updateArticle] = useUpdateArticleMutation();
 
   const { selectedIds, toggleSelectOne } = useBulkSelection();
+
+  // Создаем Map для быстрого поиска статей по ID (для определения родителя и дочерних)
+  const articlesMap = useMemo(() => {
+    const map = new Map<string, Article>();
+    articles.forEach((article) => {
+      map.set(article.id, article);
+    });
+    return map;
+  }, [articles]);
+
+  // Определяем, является ли статья группой (имеет дочерние статьи)
+  const isArticleGroup = (articleId: string): boolean => {
+    return articles.some((article) => article.parentId === articleId);
+  };
+
+  // Получаем название родителя
+  const getParentName = (
+    parentId: string | null | undefined
+  ): string | null => {
+    if (!parentId) return null;
+    const parent = articlesMap.get(parentId);
+    return parent?.name || null;
+  };
 
   // Отладочная информация
   console.log('ArticlesPage - articles:', articles);
@@ -130,7 +153,7 @@ export const ArticlesPage = () => {
   const handleDragEnd = async (draggedId: string, targetId: string | null) => {
     console.log('[ArticlesPage] handleDragEnd called', { draggedId, targetId });
     try {
-      // Если targetId null, делаем статью корневой (передаем null, а не undefined)
+      // Если targetId null, убираем статью из группы (передаем null, а не undefined)
       const newParentId = targetId === null ? null : targetId;
       console.log('[ArticlesPage] Updating article parent', {
         draggedId,
@@ -199,9 +222,14 @@ export const ArticlesPage = () => {
         '[ArticlesPage] Calling deleteArticle mutation with id:',
         deleteModal.id
       );
-      const result = await deleteArticle(deleteModal.id).unwrap();
-      console.log('[ArticlesPage] deleteArticle success, result:', result);
+      await deleteArticle(deleteModal.id).unwrap();
+      console.log('[ArticlesPage] deleteArticle success');
+
+      // Явно обновляем данные после удаления
+      await Promise.all([refetchArticles(), refetchTree()]);
+
       setArticleToDelete(null);
+      setDeleteModal({ isOpen: false, id: null });
       console.log('[ArticlesPage] Delete completed successfully');
     } catch (error) {
       console.error('[ArticlesPage] Failed to delete article:', error);
@@ -247,6 +275,35 @@ export const ArticlesPage = () => {
       width: '40px',
     },
     { key: 'name', header: 'Название' },
+    {
+      key: 'groupOrArticle',
+      header: 'Группа/Статья',
+      render: (a: Article) => {
+        const isGroup = isArticleGroup(a.id);
+        const parentName = getParentName(a.parentId);
+
+        if (isGroup) {
+          return (
+            <span className="text-blue-600 dark:text-blue-400 font-medium">
+              Группа
+            </span>
+          );
+        }
+
+        if (parentName) {
+          return (
+            <span className="text-gray-700 dark:text-gray-300">
+              Статья •{' '}
+              <span className="text-gray-500 dark:text-gray-400">
+                Родитель: {parentName}
+              </span>
+            </span>
+          );
+        }
+
+        return <span className="text-gray-700 dark:text-gray-300">Статья</span>;
+      },
+    },
     {
       key: 'type',
       header: 'Тип',
@@ -356,8 +413,8 @@ export const ArticlesPage = () => {
               <ArticleTreeSearch
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
-                showLeavesOnly={showLeavesOnly}
-                onShowLeavesOnlyChange={setShowLeavesOnly}
+                showLeavesOnly={false}
+                onShowLeavesOnlyChange={() => {}}
               />
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
                 <div className="bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700 rounded-t-xl">
@@ -391,7 +448,7 @@ export const ArticlesPage = () => {
                       onChangeParent={handleChangeParent}
                       onDragEnd={handleDragEnd}
                       searchQuery={searchQuery}
-                      showLeavesOnly={showLeavesOnly}
+                      showLeavesOnly={false}
                     />
                   )}
                 </div>
@@ -488,7 +545,7 @@ export const ArticlesPage = () => {
           setArticleToChangeParent(null);
           setNewParentId('');
         }}
-        title="Изменить родительскую статью"
+        title="Изменить группу"
       >
         {articleToChangeParent && (
           <div className="space-y-4">
@@ -502,12 +559,12 @@ export const ArticlesPage = () => {
             </div>
             {articleToChangeParent.type !== 'transfer' && (
               <ArticleParentSelect
-                label="Новая родительская статья"
+                label="Новая группа"
                 value={newParentId}
                 onChange={setNewParentId}
                 articleType={articleToChangeParent.type as 'income' | 'expense'}
                 excludeArticleId={articleToChangeParent.id}
-                placeholder="Корневая статья (без родителя)"
+                placeholder="Без группы"
               />
             )}
             <div className="flex gap-4 pt-4">
@@ -550,7 +607,7 @@ export const ArticlesPage = () => {
                 const directChildren = articleToDelete.children.length;
                 const totalDescendants =
                   getTotalDescendantsCount(articleToDelete);
-                return `Вы уверены, что хотите удалить статью "${articleToDelete.name}"? У неё есть ${directChildren} ${directChildren === 1 ? 'дочерняя статья' : 'дочерних статей'}${totalDescendants > directChildren ? ` (всего ${totalDescendants} ${totalDescendants === 1 ? 'потомок' : 'потомков'})` : ''}, которые станут корневыми.`;
+                return `Вы уверены, что хотите удалить статью "${articleToDelete.name}"? У неё есть ${directChildren} ${directChildren === 1 ? 'дочерняя статья' : 'дочерних статей'}${totalDescendants > directChildren ? ` (всего ${totalDescendants} ${totalDescendants === 1 ? 'потомок' : 'потомков'})` : ''}, которые станут без группы.`;
               })()
             : 'Вы уверены, что хотите удалить эту статью?'
         }

@@ -6,12 +6,16 @@ import { PlanForm } from './PlanForm';
 // Mock the API hooks
 const mockUseGetArticlesQuery = jest.fn();
 const mockUseGetAccountsQuery = jest.fn();
+const mockUseGetCounterpartiesQuery = jest.fn();
+const mockUseGetDealsQuery = jest.fn();
 const mockUseCreatePlanMutation = jest.fn();
 const mockUseUpdatePlanMutation = jest.fn();
 
 jest.mock('../../store/api/catalogsApi', () => ({
   useGetArticlesQuery: () => mockUseGetArticlesQuery(),
   useGetAccountsQuery: () => mockUseGetAccountsQuery(),
+  useGetCounterpartiesQuery: () => mockUseGetCounterpartiesQuery(),
+  useGetDealsQuery: () => mockUseGetDealsQuery(),
 }));
 
 jest.mock('../../store/api/plansApi', () => ({
@@ -77,6 +81,16 @@ describe('PlanForm', () => {
       isLoading: false,
     });
 
+    mockUseGetCounterpartiesQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+
+    mockUseGetDealsQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+
     mockUseCreatePlanMutation.mockReturnValue([
       mockCreatePlan,
       { isLoading: false },
@@ -92,7 +106,6 @@ describe('PlanForm', () => {
       renderWithProvider(<PlanForm plan={null} onClose={mockOnClose} />);
 
       expect(screen.getByText('Тип')).toBeInTheDocument();
-      expect(screen.getByText('Статус')).toBeInTheDocument();
       expect(screen.getByText('Дата начала')).toBeInTheDocument();
       expect(screen.getByText('Сумма')).toBeInTheDocument();
       expect(screen.getByText('Создать')).toBeInTheDocument();

@@ -59,8 +59,9 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   const [expandedArticles, setExpandedArticles] = useState<Set<string>>(
     new Set()
   );
+  const [showDeviation, setShowDeviation] = useState<boolean>(false);
 
-  // Загружаем дерево статей для определения родительских связей
+  // Загружаем дерево статей для определения групповых связей
   const { tree: articleTree } = useArticleTree({ isActive: true });
 
   // Создаем плоский список статей с Map для быстрого поиска
@@ -190,7 +191,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     }
   }, [activitiesToExpand]);
 
-  // Автоматически разворачиваем родительские статьи для найденных дочерних статей
+  // Автоматически разворачиваем группы статей для найденных дочерних статей
   useEffect(() => {
     if (matchedArticleIds.size > 0) {
       setExpandedArticles((prev) => {
@@ -216,6 +217,16 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   }, [matchedArticleIds, articleMap]);
 
   const hasFactData = data.activities.length > 0;
+
+  const planActivityMap = useMemo(() => {
+    const map = new Map<string, ActivityGroup>();
+    if (planData?.activities) {
+      for (const activity of planData.activities) {
+        map.set(activity.activity, activity);
+      }
+    }
+    return map;
+  }, [planData]);
 
   const toggleSection = (activity: ActivityGroup) => {
     const key = getSectionKey(activity);
@@ -307,16 +318,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return { articleMonth, activityMonth, monthlyNet };
   }, [planData, allMonths]);
 
-  const planActivityMap = useMemo(() => {
-    const map = new Map<string, ActivityGroup>();
-    if (planData?.activities) {
-      for (const activity of planData.activities) {
-        map.set(activity.activity, activity);
-      }
-    }
-    return map;
-  }, [planData]);
-
   const getPlanAmount = useCallback(
     (articleId: string, month: string) => {
       return planLookups.articleMonth.get(`${articleId}__${month}`) ?? 0;
@@ -406,8 +407,53 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
   );
 
   const activitiesToRender = useMemo(() => {
-    return hasFactData ? data.activities : planData?.activities || [];
-  }, [hasFactData, data.activities, planData?.activities]);
+    const allActivities = hasFactData
+      ? data.activities
+      : planData?.activities || [];
+
+    // Фильтруем разрезы, где все значения нулевые
+    return allActivities.filter((activity) => {
+      // Проверяем фактические данные
+      const hasFactForActivity =
+        hasFactData &&
+        (activity.netCashflow !== 0 ||
+          activity.incomeGroups.some((g) =>
+            g.months.some((m) => m.amount !== 0)
+          ) ||
+          activity.expenseGroups.some((g) =>
+            g.months.some((m) => m.amount !== 0)
+          ));
+
+      // Проверяем плановые данные
+      const planActivity = planActivityMap.get(activity.activity);
+      const hasPlanForActivity =
+        planActivity &&
+        (planActivity.netCashflow !== 0 ||
+          planActivity.incomeGroups.some((g) =>
+            g.months.some((m) => m.amount !== 0)
+          ) ||
+          planActivity.expenseGroups.some((g) =>
+            g.months.some((m) => m.amount !== 0)
+          ));
+
+      // В режиме план-факт показываем, если есть хотя бы факт или план
+      // В режиме только факт - только если есть факт
+      // В режиме только план - только если есть план
+      if (showPlan) {
+        return hasFactForActivity || hasPlanForActivity;
+      } else if (hasFactData) {
+        return hasFactForActivity;
+      } else {
+        return hasPlanForActivity;
+      }
+    });
+  }, [
+    hasFactData,
+    data.activities,
+    planData?.activities,
+    showPlan,
+    planActivityMap,
+  ]);
 
   const formatMonthLabel = (month: string) =>
     new Date(`${month}-01`)
@@ -638,14 +684,15 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
           const planAmount = getPlanAmount(group.articleId, month);
 
           if (showPlan) {
+            const deviation = factAmount - planAmount;
             return (
               <React.Fragment
                 key={`${activity}-${type}-${group.articleId}-${month}`}
               >
                 <td
-                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
+                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums align-top ${
                     isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                  }`}
+                  } ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
                   style={{
                     minWidth: `${subColumnWidth}px`,
                   }}
@@ -663,24 +710,38 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   {formatNumber(planAmount)}
                 </td>
                 <td
-                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums ${
+                  className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums align-top ${
                     isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-                  }`}
+                  } ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
                   style={{
                     minWidth: `${subColumnWidth}px`,
                   }}
                 >
-                  {factAmount !== 0 && type === 'income' && (
-                    <span className="text-green-600 dark:text-green-400 mr-1">
-                      ▲
-                    </span>
+                  <div>
+                    {factAmount !== 0 && type === 'income' && (
+                      <span className="text-green-600 dark:text-green-400 mr-1">
+                        ▲
+                      </span>
+                    )}
+                    {factAmount !== 0 && type === 'expense' && (
+                      <span className="text-red-600 dark:text-red-400 mr-1">
+                        ▼
+                      </span>
+                    )}
+                    {formatNumber(factAmount)}
+                  </div>
+                  {showDeviation && deviation !== 0 && (
+                    <div
+                      className={`text-[11px] mt-1 leading-tight ${
+                        deviation > 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }`}
+                    >
+                      {deviation > 0 ? '+' : ''}
+                      {formatNumber(deviation)}
+                    </div>
                   )}
-                  {factAmount !== 0 && type === 'expense' && (
-                    <span className="text-red-600 dark:text-red-400 mr-1">
-                      ▼
-                    </span>
-                  )}
-                  {formatNumber(factAmount)}
                 </td>
               </React.Fragment>
             );
@@ -708,31 +769,115 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
             </td>
           );
         })}
-        <td
-          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums ${
-            isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
-          }`}
-          style={{
-            minWidth: `${columnWidths.total}px`,
-          }}
-        >
-          {(() => {
-            const total = hasFactData ? group.total : planGroup?.total || 0;
-            return (
-              <>
-                {total !== 0 && type === 'income' && (
-                  <span className="text-green-600 dark:text-green-400 mr-1">
-                    ▲
-                  </span>
-                )}
-                {total !== 0 && type === 'expense' && (
-                  <span className="text-red-600 dark:text-red-400 mr-1">▼</span>
-                )}
-                {formatNumber(total)}
-              </>
-            );
-          })()}
-        </td>
+        {showPlan ? (
+          <>
+            <td
+              className={`px-4 py-2 text-right text-[13px] font-normal text-gray-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums align-top ${
+                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+              } ${showDeviation ? 'pb-5' : ''}`}
+              style={{
+                minWidth: `${subColumnWidth}px`,
+              }}
+            >
+              {(() => {
+                const planTotal = planGroup?.total || 0;
+                return (
+                  <>
+                    {planTotal !== 0 && type === 'income' && (
+                      <span className="text-green-600 dark:text-green-400 mr-1">
+                        ▲
+                      </span>
+                    )}
+                    {planTotal !== 0 && type === 'expense' && (
+                      <span className="text-red-600 dark:text-red-400 mr-1">
+                        ▼
+                      </span>
+                    )}
+                    {formatNumber(planTotal)}
+                  </>
+                );
+              })()}
+            </td>
+            <td
+              className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums align-top ${
+                isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+              } ${showDeviation ? 'pb-5' : ''}`}
+              style={{
+                minWidth: `${subColumnWidth}px`,
+              }}
+            >
+              {(() => {
+                // В режиме план-факт факт всегда из group.total, вычисляем из месяцев если total не определен
+                const factTotal = hasFactData
+                  ? (group.total ??
+                    group.months.reduce((sum, m) => sum + m.amount, 0))
+                  : 0;
+                const planTotal =
+                  planGroup?.total ??
+                  (planGroup?.months?.reduce((sum, m) => sum + m.amount, 0) ||
+                    0);
+                const totalDeviation = factTotal - planTotal;
+                return (
+                  <>
+                    <div>
+                      {factTotal !== 0 && type === 'income' && (
+                        <span className="text-green-600 dark:text-green-400 mr-1">
+                          ▲
+                        </span>
+                      )}
+                      {factTotal !== 0 && type === 'expense' && (
+                        <span className="text-red-600 dark:text-red-400 mr-1">
+                          ▼
+                        </span>
+                      )}
+                      {formatNumber(factTotal)}
+                    </div>
+                    {showDeviation && totalDeviation !== 0 && (
+                      <div
+                        className={`text-[11px] mt-1 leading-tight ${
+                          totalDeviation > 0
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'
+                        }`}
+                      >
+                        {totalDeviation > 0 ? '+' : ''}
+                        {formatNumber(totalDeviation)}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </td>
+          </>
+        ) : (
+          <td
+            className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 bg-zinc-50 dark:bg-zinc-900 border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums ${
+              isMatched ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''
+            }`}
+            style={{
+              minWidth: `${columnWidths.total}px`,
+            }}
+          >
+            {(() => {
+              const total = hasFactData ? group.total : planGroup?.total || 0;
+              return (
+                <>
+                  {total !== 0 && type === 'income' && (
+                    <span className="text-green-600 dark:text-green-400 mr-1">
+                      ▲
+                    </span>
+                  )}
+                  {total !== 0 && type === 'expense' && (
+                    <span className="text-red-600 dark:text-red-400 mr-1">
+                      ▼
+                    </span>
+                  )}
+                  {formatNumber(total)}
+                </>
+              );
+            })()}
+          </td>
+        )}
       </tr>
     );
 
@@ -761,19 +906,32 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     const cellKey = key ?? `${activityKey}-${month}`;
 
     if (showPlan) {
+      const deviation = factValue - planValue;
       return (
         <React.Fragment key={cellKey}>
           <td
-            className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+            className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-500 dark:text-zinc-400 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums align-top ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
             style={{ minWidth: `${subColumnWidth}px` }}
           >
             {formatNumber(planValue)}
           </td>
           <td
-            className="px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums"
+            className={`px-3 py-2 text-right text-[13px] md:text-[13px] font-normal text-gray-900 dark:text-zinc-200 border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums align-top ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
             style={{ minWidth: `${subColumnWidth}px` }}
           >
-            {formatNumber(factValue)}
+            <div>{formatNumber(factValue)}</div>
+            {showDeviation && deviation !== 0 && (
+              <div
+                className={`text-[11px] mt-1 leading-tight ${
+                  deviation > 0
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}
+              >
+                {deviation > 0 ? '+' : ''}
+                {formatNumber(deviation)}
+              </div>
+            )}
           </td>
         </React.Fragment>
       );
@@ -790,6 +948,27 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     );
   };
 
+  // Если нет данных для отображения, показываем сообщение
+  if (activitiesToRender.length === 0) {
+    return (
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
+        <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700">
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {title || 'Отчет о движении денежных средств'}:{' '}
+            {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
+            {new Date(periodTo).toLocaleDateString('ru-RU')}
+          </div>
+        </div>
+        <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+          <p className="text-lg font-medium mb-2">Нет данных для отображения</p>
+          <p className="text-sm">
+            За выбранный период отсутствуют операции с ненулевыми значениями
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-xl max-w-full">
       <div className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
@@ -798,11 +977,26 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
           {new Date(periodFrom).toLocaleDateString('ru-RU')} —{' '}
           {new Date(periodTo).toLocaleDateString('ru-RU')}
         </div>
-        <ExportMenu
-          filenameBase={`cashflow_${periodFrom}_${periodTo}`}
-          buildRows={buildExportRows}
-          entity="reports"
-        />
+        <div className="flex items-center gap-2">
+          {showPlan && (
+            <button
+              type="button"
+              onClick={() => setShowDeviation(!showDeviation)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors border ${
+                showDeviation
+                  ? 'bg-primary-600 text-white border-primary-600 dark:bg-primary-500 dark:border-primary-500'
+                  : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+              }`}
+            >
+              Показать отклонение
+            </button>
+          )}
+          <ExportMenu
+            filenameBase={`cashflow_${periodFrom}_${periodTo}`}
+            buildRows={buildExportRows}
+            entity="reports"
+          />
+        </div>
       </div>
 
       <div className="w-full overflow-x-auto overflow-y-visible max-h-[calc(100vh-380px)] md:max-h-[80vh]">
@@ -813,7 +1007,7 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-white uppercase tracking-wider sticky left-0 bg-zinc-100 dark:bg-zinc-800 z-40 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.3)]"
                 style={{ width: `${columnWidths.article}px` }}
               >
-                СТАТЬЯ
+                ГЛАВНЫЙ РАЗРЕЗ
               </th>
               {allMonths.map((month) => (
                 <th
@@ -939,18 +1133,39 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                         `${activity.activity}-summary-${month}`
                       );
                     })}
-                    <td
-                      className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
-                      style={{
-                        minWidth: `${columnWidths.total}px`,
-                      }}
-                    >
-                      {formatNumber(
-                        hasFactData
-                          ? activity.netCashflow
-                          : (planSource?.netCashflow ?? activity.netCashflow)
-                      )}
-                    </td>
+                    {showPlan ? (
+                      <>
+                        <td
+                          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-500 dark:text-zinc-400 ${activityColor} border-l border-gray-200 dark:border-gray-700 whitespace-nowrap tabular-nums`}
+                          style={{
+                            minWidth: `${subColumnWidth}px`,
+                          }}
+                        >
+                          {formatNumber(planSource?.netCashflow ?? 0)}
+                        </td>
+                        <td
+                          className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
+                          style={{
+                            minWidth: `${subColumnWidth}px`,
+                          }}
+                        >
+                          {formatNumber(hasFactData ? activity.netCashflow : 0)}
+                        </td>
+                      </>
+                    ) : (
+                      <td
+                        className={`px-4 py-2 text-right text-[13px] font-normal text-gray-900 dark:text-zinc-200 ${activityColor} border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums`}
+                        style={{
+                          minWidth: `${columnWidths.total}px`,
+                        }}
+                      >
+                        {formatNumber(
+                          hasFactData
+                            ? activity.netCashflow
+                            : (planSource?.netCashflow ?? activity.netCashflow)
+                        )}
+                      </td>
+                    )}
                   </tr>
 
                   {expandedSections[getSectionKey(activity)] && (
@@ -1044,19 +1259,32 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 const planTotal = getPlanMonthNet(month);
 
                 if (showPlan) {
+                  const deviation = factTotal - planTotal;
                   return (
                     <React.Fragment key={`totals-${month}`}>
                       <td
-                        className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
+                        className={`px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336] align-top ${showDeviation && deviation !== 0 ? 'pb-6' : ''}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(planTotal)}
                       </td>
                       <td
-                        className="px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336]"
+                        className={`px-3 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums bg-indigo-100 dark:bg-[#232336] align-top ${showDeviation && deviation !== 0 ? 'pb-6' : ''}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        {formatNumber(factTotal)}
+                        <div>{formatNumber(factTotal)}</div>
+                        {showDeviation && deviation !== 0 && (
+                          <div
+                            className={`text-[11px] mt-1 leading-tight ${
+                              deviation > 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}
+                          >
+                            {deviation > 0 ? '+' : ''}
+                            {formatNumber(deviation)}
+                          </div>
+                        )}
                       </td>
                     </React.Fragment>
                   );
@@ -1072,18 +1300,39 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   </td>
                 );
               })}
-              <td
-                className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
-                style={{
-                  minWidth: `${columnWidths.total}px`,
-                }}
-              >
-                {formatNumber(
-                  hasFactData
-                    ? totalNetCashflow
-                    : (planTotalNetCashflow ?? totalNetCashflow)
-                )}
-              </td>
+              {showPlan ? (
+                <>
+                  <td
+                    className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l border-gray-300 dark:border-gray-600 whitespace-nowrap tabular-nums"
+                    style={{
+                      minWidth: `${subColumnWidth}px`,
+                    }}
+                  >
+                    {formatNumber(planTotalNetCashflow ?? 0)}
+                  </td>
+                  <td
+                    className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                    style={{
+                      minWidth: `${subColumnWidth}px`,
+                    }}
+                  >
+                    {formatNumber(hasFactData ? totalNetCashflow : 0)}
+                  </td>
+                </>
+              ) : (
+                <td
+                  className="px-4 py-4 text-right text-sm font-semibold text-indigo-900 dark:text-white bg-indigo-100 dark:bg-[#232336] border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums"
+                  style={{
+                    minWidth: `${columnWidths.total}px`,
+                  }}
+                >
+                  {formatNumber(
+                    hasFactData
+                      ? totalNetCashflow
+                      : (planTotalNetCashflow ?? totalNetCashflow)
+                  )}
+                </td>
+              )}
             </tr>
 
             <tr className="bg-zinc-50 dark:bg-[#202020] border-t border-gray-300 dark:border-t dark:border-white/8 sticky bottom-0 z-20">
@@ -1101,19 +1350,32 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                 const isPositive = balance >= 0;
 
                 if (showPlan) {
+                  const deviation = balance - planBalance;
                   return (
                     <React.Fragment key={`balance-${month}`}>
                       <td
-                        className="px-3 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020]"
+                        className={`px-3 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] align-top ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
                         {formatNumber(planBalance)}
                       </td>
                       <td
-                        className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'}`}
+                        className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] align-top ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'} ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
                         style={{ minWidth: `${subColumnWidth}px` }}
                       >
-                        {formatNumber(balance)}
+                        <div>{formatNumber(balance)}</div>
+                        {showDeviation && deviation !== 0 && (
+                          <div
+                            className={`text-[11px] mt-1 leading-tight ${
+                              deviation > 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`}
+                          >
+                            {deviation > 0 ? '+' : ''}
+                            {formatNumber(deviation)}
+                          </div>
+                        )}
                       </td>
                     </React.Fragment>
                   );

@@ -1,19 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Layout } from '../../shared/ui/Layout';
 import { Card } from '../../shared/ui/Card';
+import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
 
 interface Tab {
   id: string;
   label: string;
   path: string;
+  requiresPlan?: 'TEAM' | 'BUSINESS';
 }
 
-const tabs: Tab[] = [
+const allTabs: Tab[] = [
   { id: 'settings', label: 'Основные настройки', path: '/company' },
   { id: 'currency', label: 'Валюта', path: '/company/currency' },
   { id: 'tariff', label: 'Тариф', path: '/company/tariff' },
-  { id: 'integrations', label: 'Интеграции', path: '/company/integrations' },
+  {
+    id: 'integrations',
+    label: 'Интеграции',
+    path: '/company/integrations',
+    requiresPlan: 'TEAM',
+  },
 ];
 
 interface CompanyLayoutProps {
@@ -23,14 +30,53 @@ interface CompanyLayoutProps {
 export const CompanyLayout = ({ children }: CompanyLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  // Загружаем данные подписки через RTK Query
+  const { data: subscription } = useGetSubscriptionQuery();
+  const plan = (subscription?.plan as 'START' | 'TEAM' | 'BUSINESS') || 'START';
+
+  // Фильтруем вкладки в зависимости от тарифа
+  const tabs = useMemo(() => {
+    return allTabs.filter((tab) => {
+      if (!tab.requiresPlan) return true;
+      if (tab.requiresPlan === 'TEAM') {
+        return plan === 'TEAM' || plan === 'BUSINESS';
+      }
+      if (tab.requiresPlan === 'BUSINESS') {
+        return plan === 'BUSINESS';
+      }
+      return true;
+    });
+  }, [plan]);
+
   const [activeTab, setActiveTab] = useState(() => {
     const currentPath = location.pathname;
-    if (currentPath === '/company') return 'settings';
+    if (currentPath === '/company' || currentPath === '/company/')
+      return 'settings';
     if (currentPath === '/company/currency') return 'currency';
     if (currentPath === '/company/tariff') return 'tariff';
     if (currentPath === '/company/integrations') return 'integrations';
     return 'settings';
   });
+
+  useEffect(() => {
+    const currentPath = location.pathname;
+    if (currentPath === '/company' || currentPath === '/company/') {
+      setActiveTab('settings');
+    } else if (currentPath === '/company/currency') {
+      setActiveTab('currency');
+    } else if (currentPath === '/company/tariff') {
+      setActiveTab('tariff');
+    } else if (currentPath === '/company/integrations') {
+      // Проверяем, есть ли доступ к интеграциям
+      if (plan === 'TEAM' || plan === 'BUSINESS') {
+        setActiveTab('integrations');
+      } else {
+        // Если нет доступа, перенаправляем на тариф
+        navigate('/company/tariff');
+        setActiveTab('tariff');
+      }
+    }
+  }, [location.pathname, plan, navigate]);
 
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab.id);

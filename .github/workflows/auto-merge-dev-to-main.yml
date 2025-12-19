@@ -1,0 +1,71 @@
+name: Auto Create PR from dev to main
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev]
+
+jobs:
+  create-pr-to-main:
+    name: Create PR from dev to main
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'dev'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check if PR already exists
+        id: check-pr
+        run: |
+          # Проверяем, есть ли уже открытый PR из dev в main
+          EXISTING_PR=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR already exists: #$EXISTING_PR"
+            echo "pr_exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
+          else
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create PR from dev to main
+        if: steps.check-pr.outputs.pr_exists == 'false'
+        run: |
+          # Создаем PR из dev в main
+          gh pr create \
+            --base main \
+            --head dev \
+            --title "🚀 Auto-merge: dev → main" \
+            --body "This PR was automatically created after successful merge to dev branch.
+
+          ## Changes
+          This PR includes all changes from the dev branch that were successfully merged.
+
+          ## CI/CD
+          All CI checks must pass before this PR can be merged.
+
+          **Note**: This PR was automatically created by GitHub Actions workflow." \
+            --label "auto-created" || echo "Failed to create PR"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on existing PR
+        if: steps.check-pr.outputs.pr_exists == 'true'
+        run: |
+          gh pr comment ${{ steps.check-pr.outputs.pr_number }} \
+            --body "🔄 This PR has been updated with the latest changes from dev branch after successful merge." || echo "Failed to comment"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

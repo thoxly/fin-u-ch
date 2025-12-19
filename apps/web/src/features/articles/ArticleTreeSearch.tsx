@@ -2,7 +2,6 @@ import React from 'react';
 import { Search, X, ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
-import { Select } from '../../shared/ui/Select';
 
 interface ArticleTreeSearchProps {
   searchQuery: string;
@@ -56,41 +55,25 @@ export const ArticleTreeSearch = ({
           </div>
         </div>
 
-        {/* Фильтры и действия */}
-        <div className="flex gap-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 tracking-wide uppercase">
-              Фильтр
-            </label>
-            <Select
-              value={showLeavesOnly ? 'leaves' : 'all'}
-              onChange={(value) => onShowLeavesOnlyChange(value === 'leaves')}
-              options={[
-                { value: 'all', label: 'Показывать все' },
-                { value: 'leaves', label: 'Только листья' },
-              ]}
-              className="min-w-[150px]"
-            />
+        {/* Действия */}
+        {(onExpandAll || onCollapseAll) && (
+          <div className="flex items-end">
+            <Button
+              onClick={isAllExpanded ? onCollapseAll : onExpandAll}
+              variant="secondary"
+              size="md"
+              icon={
+                isAllExpanded ? (
+                  <ChevronsUpDown size={16} />
+                ) : (
+                  <ChevronsDownUp size={16} />
+                )
+              }
+            >
+              {isAllExpanded ? 'Свернуть все' : 'Развернуть все'}
+            </Button>
           </div>
-          {(onExpandAll || onCollapseAll) && (
-            <div className="flex items-end">
-              <Button
-                onClick={isAllExpanded ? onCollapseAll : onExpandAll}
-                variant="secondary"
-                size="md"
-                icon={
-                  isAllExpanded ? (
-                    <ChevronsUpDown size={16} />
-                  ) : (
-                    <ChevronsDownUp size={16} />
-                  )
-                }
-              >
-                {isAllExpanded ? 'Свернуть все' : 'Развернуть все'}
-              </Button>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

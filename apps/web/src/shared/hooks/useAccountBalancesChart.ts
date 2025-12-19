@@ -66,11 +66,14 @@ export function useAccountBalancesChart(
 
   const accountsWithBalance = useMemo(() => {
     if (!data) return [] as string[];
+    // Показываем все счета, у которых есть данные (даже если баланс отрицательный или равен нулю)
+    // Это позволяет видеть изменения баланса, даже если он становится отрицательным
     return accountKeys.filter((accountKey) =>
       data.some(
         (point) =>
           typeof point[accountKey] === 'number' &&
-          (point[accountKey] as number) > 0
+          point[accountKey] !== null &&
+          point[accountKey] !== undefined
       )
     );
   }, [accountKeys, data]);

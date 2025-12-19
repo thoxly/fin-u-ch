@@ -7,6 +7,8 @@ import {
   type CreateOperationInput,
   type UpdateOperationInput,
 } from '@fin-u-ch/shared';
+import currencyService from '../currency/currency.service';
+import logger from '../../config/logger';
 
 // Keep for backward compatibility with tests
 export type CreateOperationDTO = CreateOperationInput;
@@ -57,6 +59,121 @@ async function validateAccountsOwnership(
       `Invalid or unauthorized accounts: ${invalidIds.join(', ')}`,
       403
     );
+  }
+}
+
+// Вспомогательная функция для получения базовой валюты компании
+async function getCompanyBaseCurrency(companyId: string): Promise<string> {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { currencyBase: true },
+  });
+
+  if (!company) {
+    throw new AppError('Company not found', 404);
+  }
+
+  return company.currencyBase || 'RUB';
+}
+
+// Вспомогательная функция для конвертации операции в базовую валюту
+async function convertOperationToBase(
+  amount: number,
+  currency: string,
+  baseCurrency: string,
+  operationDate: Date
+): Promise<{
+  amount: number;
+  currency: string;
+  originalAmount: number | null;
+  originalCurrency: string | null;
+}> {
+  // Если валюта уже базовая, не конвертируем
+  if (currency === baseCurrency) {
+    return {
+      amount,
+      currency,
+      originalAmount: null,
+      originalCurrency: null,
+    };
+  }
+
+  try {
+    // Пытаемся получить курс на дату операции
+    let convertedAmount: number;
+    try {
+      convertedAmount = await currencyService.convertToBase(
+        amount,
+        currency,
+        baseCurrency,
+        operationDate
+      );
+    } catch (error) {
+      // Если не удалось получить курс на дату операции, пробуем вчерашний день
+      logger.warn(
+        'Failed to get currency rate for operation date, trying yesterday',
+        {
+          operationDate,
+          currency,
+          baseCurrency,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
+      );
+
+      const yesterday = new Date(operationDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      try {
+        convertedAmount = await currencyService.convertToBase(
+          amount,
+          currency,
+          baseCurrency,
+          yesterday
+        );
+      } catch (yesterdayError) {
+        // Если и вчерашний курс недоступен, используем текущий
+        logger.warn(
+          'Failed to get currency rate for yesterday, using current rate',
+          {
+            operationDate,
+            currency,
+            baseCurrency,
+            error:
+              yesterdayError instanceof Error
+                ? yesterdayError.message
+                : 'Unknown error',
+          }
+        );
+        convertedAmount = await currencyService.convertToBase(
+          amount,
+          currency,
+          baseCurrency
+        );
+      }
+    }
+
+    return {
+      amount: convertedAmount,
+      currency: baseCurrency,
+      originalAmount: amount,
+      originalCurrency: currency,
+    };
+  } catch (error) {
+    logger.error('Failed to convert operation to base currency', {
+      amount,
+      currency,
+      baseCurrency,
+      operationDate,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    // В случае ошибки сохраняем оригинальные значения
+    return {
+      amount,
+      currency,
+      originalAmount: null,
+      originalCurrency: null,
+    };
   }
 }
 
@@ -188,6 +305,19 @@ export class OperationsService {
       validatedData.targetAccountId,
     ]);
 
+    // Получаем базовую валюту компании
+    const baseCurrency = await getCompanyBaseCurrency(companyId);
+
+    // Конвертируем операцию в базовую валюту
+    const converted = await convertOperationToBase(
+      validatedData.amount,
+      validatedData.currency,
+      baseCurrency,
+      validatedData.operationDate instanceof Date
+        ? validatedData.operationDate
+        : new Date(validatedData.operationDate)
+    );
+
     // Если операция повторяющаяся, создаем шаблон и первую дочернюю операцию
     if (validatedData.repeat && validatedData.repeat !== 'none') {
       return prisma.$transaction(async (tx) => {
@@ -195,6 +325,10 @@ export class OperationsService {
         const template = await tx.operation.create({
           data: {
             ...validatedData,
+            amount: converted.amount,
+            currency: converted.currency,
+            originalAmount: converted.originalAmount,
+            originalCurrency: converted.originalCurrency,
             companyId,
             isTemplate: true,
             // Шаблон не должен иметь дату операции, используем дату начала повторов
@@ -210,6 +344,8 @@ export class OperationsService {
             operationDate: validatedData.operationDate,
             amount: template.amount,
             currency: template.currency,
+            originalAmount: template.originalAmount,
+            originalCurrency: template.originalCurrency,
             accountId: template.accountId,
             sourceAccountId: template.sourceAccountId,
             targetAccountId: template.targetAccountId,
@@ -234,6 +370,10 @@ export class OperationsService {
     return prisma.operation.create({
       data: {
         ...validatedData,
+        amount: converted.amount,
+        currency: converted.currency,
+        originalAmount: converted.originalAmount,
+        originalCurrency: converted.originalCurrency,
         companyId,
         isTemplate: false,
       },
@@ -245,7 +385,7 @@ export class OperationsService {
     companyId: string,
     data: Partial<CreateOperationInput>
   ) {
-    await this.getById(id, companyId);
+    const existingOperation = await this.getById(id, companyId);
 
     // Validate using Zod schema (partial validation for updates)
     if (Object.keys(data).length > 0) {
@@ -265,9 +405,44 @@ export class OperationsService {
         validatedData.targetAccountId,
       ]);
 
+      // Если изменяется amount или currency, нужно пересчитать в базовую валюту
+      const updateData: Partial<CreateOperationInput> & {
+        originalAmount?: number | null;
+        originalCurrency?: string | null;
+      } = { ...validatedData };
+
+      if (
+        validatedData.amount !== undefined ||
+        validatedData.currency !== undefined
+      ) {
+        const baseCurrency = await getCompanyBaseCurrency(companyId);
+        const amount = validatedData.amount ?? existingOperation.amount;
+        const currency = validatedData.currency ?? existingOperation.currency;
+        const operationDate =
+          validatedData.operationDate instanceof Date
+            ? validatedData.operationDate
+            : validatedData.operationDate
+              ? new Date(validatedData.operationDate)
+              : existingOperation.operationDate;
+
+        const converted = await convertOperationToBase(
+          amount,
+          currency,
+          baseCurrency,
+          operationDate instanceof Date
+            ? operationDate
+            : new Date(operationDate)
+        );
+
+        updateData.amount = converted.amount;
+        updateData.currency = converted.currency;
+        updateData.originalAmount = converted.originalAmount;
+        updateData.originalCurrency = converted.originalCurrency;
+      }
+
       return prisma.operation.update({
         where: { id },
-        data: validatedData,
+        data: updateData,
       });
     }
 
