@@ -259,7 +259,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                     ? 0
                     : (processedData || data).length <= 20
                       ? 1
-                      : 2
+                      : 'preserveStartEnd'
                   : isWide
                     ? (processedData || data).length <= 31
                       ? 0 // На широкоформатном десктопе показываем все до 31
@@ -268,7 +268,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                       ? 0 // На неширокоформатном десктопе показываем все до 10
                       : (processedData || data).length <= 20
                         ? 1 // Каждую вторую
-                        : 2 // Каждую третью (для 31 точки = ~10 меток)
+                        : 'preserveStartEnd' // Для больших объемов данных показываем только начало и конец
               }
             />
             <YAxis
