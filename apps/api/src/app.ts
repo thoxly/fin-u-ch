@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import promBundle from 'express-prom-bundle';
 import { errorHandler } from './middlewares/error';
 import { requestIdMiddleware } from './middlewares/request-id';
 import logger from './config/logger';
@@ -28,6 +29,21 @@ import subscriptionRoutes from './modules/subscription/subscription.routes';
 import supportRoutes from './modules/support/support.routes';
 
 const app: Application = express();
+
+// Prometheus metrics middleware (must be before other middleware)
+const metricsMiddleware = promBundle({
+  includeMethod: true,
+  includePath: true,
+  includeStatusCode: true,
+  includeUp: true,
+  customLabels: { project: 'fin-u-ch' },
+  promClient: {
+    collectDefaultMetrics: {},
+  },
+  metricsPath: '/api/metrics',
+});
+
+app.use(metricsMiddleware);
 
 // Middleware
 app.use(helmet());

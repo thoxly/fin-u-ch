@@ -33,10 +33,11 @@ scrape_configs:
     static_configs:
       - targets: ['cadvisor:8080']
 
-  # API metrics (will be added in PR5)
-  # - job_name: 'api'
-  #   static_configs:
-  #     - targets: ['api:4000']
+  # API metrics
+  - job_name: 'api'
+    static_configs:
+      - targets: ['api:4000']
+    metrics_path: '/api/metrics'
 
   # Worker metrics
   - job_name: 'worker'
