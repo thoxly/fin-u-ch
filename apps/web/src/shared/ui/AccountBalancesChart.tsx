@@ -16,6 +16,7 @@ import { AccountOperationsPanel } from './AccountOperationsPanel';
 import { InfoHint } from './InfoHint';
 import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
+import { useIsWideScreen } from '../hooks/useIsWideScreen';
 
 interface AccountBalancesChartProps {
   data: Array<
@@ -70,6 +71,7 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
   className = '',
 }) => {
   const isSmall = useIsSmallScreen();
+  const isWide = useIsWideScreen();
 
   // Определяем текущую дату (сегодня, без времени)
   const today = new Date();
@@ -258,9 +260,15 @@ export const AccountBalancesChart: React.FC<AccountBalancesChartProps> = ({
                     : (processedData || data).length <= 20
                       ? 1
                       : 2
-                  : (processedData || data).length <= 31
-                    ? 0
-                    : 'preserveStartEnd'
+                  : isWide
+                    ? (processedData || data).length <= 31
+                      ? 0 // На широкоформатном десктопе показываем все до 31
+                      : 'preserveStartEnd'
+                    : (processedData || data).length <= 10
+                      ? 0 // На неширокоформатном десктопе показываем все до 10
+                      : (processedData || data).length <= 20
+                        ? 1 // Каждую вторую
+                        : 2 // Каждую третью (для 31 точки = ~10 меток)
               }
             />
             <YAxis

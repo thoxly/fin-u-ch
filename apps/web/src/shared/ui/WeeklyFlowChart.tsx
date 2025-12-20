@@ -17,6 +17,7 @@ import { ExportMenu } from './ExportMenu';
 import { InfoHint } from './InfoHint';
 import { CustomTooltip } from './CustomTooltip';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
+import { useIsWideScreen } from '../hooks/useIsWideScreen';
 
 interface WeeklyFlowChartProps {
   data: AggregatedDataPoint[];
@@ -28,6 +29,7 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
   className = '',
 }) => {
   const isSmall = useIsSmallScreen();
+  const isWide = useIsWideScreen();
   // Tooltip content overridden below via custom renderer
 
   // Показываем все данные
@@ -227,9 +229,15 @@ export const WeeklyFlowChart: React.FC<WeeklyFlowChartProps> = ({
                     : filteredData.length <= 20
                       ? 1
                       : 2
-                  : filteredData.length <= 31
-                    ? 0
-                    : 'preserveStartEnd'
+                  : isWide
+                    ? filteredData.length <= 31
+                      ? 0 // На широкоформатном десктопе показываем все до 31
+                      : 'preserveStartEnd'
+                    : filteredData.length <= 10
+                      ? 0 // На неширокоформатном десктопе показываем все до 10
+                      : filteredData.length <= 20
+                        ? 1 // Каждую вторую
+                        : 2 // Каждую третью (для 31 точки = ~10 меток)
               }
             />
             <YAxis
