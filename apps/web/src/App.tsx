@@ -36,12 +36,14 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { RedirectToFirstAvailable } from './components/RedirectToFirstAvailable';
 import { NotificationContainer } from './components/Notification';
 import { ThemeProvider } from './components/ThemeProvider';
+import { YandexMetrikaTracker } from './components/YandexMetrikaTracker';
 
 function App() {
   return (
     <>
       <ThemeProvider />
       <NotificationContainer />
+      <YandexMetrikaTracker />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
