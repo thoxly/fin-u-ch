@@ -38,9 +38,7 @@ const metricsMiddleware = promBundle({
   includeUp: true,
   customLabels: { project: 'fin-u-ch' },
   promClient: {
-    collectDefaultMetrics: {
-      timeout: 10000,
-    },
+    collectDefaultMetrics: {},
   },
   metricsPath: '/api/metrics',
 });
