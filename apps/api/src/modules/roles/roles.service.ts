@@ -49,7 +49,7 @@ export class RolesService {
               user_roles: true,
             },
           },
-          permissions: {
+          role_permissions: {
             select: {
               entity: true,
               action: true,
@@ -71,7 +71,11 @@ export class RolesService {
         })),
       });
 
-      return roles;
+      // Маппинг role_permissions -> permissions для совместимости с фронтендом
+      return roles.map((role: any) => ({
+        ...role,
+        permissions: role.role_permissions || [],
+      }));
     } catch (error) {
       console.error('[RolesService.getAllRoles] Ошибка при получении ролей', {
         companyId,
@@ -100,7 +104,7 @@ export class RolesService {
         deletedAt: null,
       },
       include: {
-        permissions: {
+        role_permissions: {
           select: {
             id: true,
             entity: true,
@@ -129,11 +133,15 @@ export class RolesService {
       companyId,
       name: role.name,
       isSystem: role.isSystem,
-      permissionsCount: role.permissions.length,
+      permissionsCount: role.role_permissions.length,
       usersCount: role._count.user_roles,
     });
 
-    return role;
+    // Маппинг role_permissions -> permissions для совместимости с фронтендом
+    return {
+      ...role,
+      permissions: role.role_permissions || [],
+    };
   }
 
   /**
@@ -183,7 +191,7 @@ export class RolesService {
         isActive: true,
       },
       include: {
-        permissions: true,
+        role_permissions: true,
         _count: {
           select: {
             user_roles: true,
@@ -200,7 +208,11 @@ export class RolesService {
       isSystem: role.isSystem,
     });
 
-    return role;
+    // Маппинг role_permissions -> permissions для совместимости с фронтендом
+    return {
+      ...role,
+      permissions: role.role_permissions || [],
+    };
   }
 
   /**
@@ -266,7 +278,7 @@ export class RolesService {
         ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
       include: {
-        permissions: true,
+        role_permissions: true,
         _count: {
           select: {
             user_roles: true,
@@ -292,7 +304,11 @@ export class RolesService {
       },
     });
 
-    return updatedRole;
+    // Маппинг role_permissions -> permissions для совместимости с фронтендом
+    return {
+      ...updatedRole,
+      permissions: updatedRole.role_permissions || [],
+    };
   }
 
   /**
