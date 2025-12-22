@@ -138,13 +138,13 @@ export class AuthService {
               name: string;
               category: string;
               isSystem: boolean;
-              _count?: { userRoles: number };
+              _count?: { user_roles: number };
             }) => ({
               id: r.id,
               name: r.name,
               category: r.category,
               isSystem: r.isSystem,
-              usersCount: r._count?.userRoles || 0,
+              usersCount: r._count?.user_roles || 0,
             })
           ),
         });
@@ -263,13 +263,13 @@ export class AuthService {
             name: string;
             category: string;
             isSystem: boolean;
-            _count?: { userRoles: number };
+            _count?: { user_roles: number };
           }) => ({
             id: r.id,
             name: r.name,
             category: r.category,
             isSystem: r.isSystem,
-            usersCount: r._count?.userRoles || 0,
+            usersCount: r._count?.user_roles || 0,
           })
         ),
       });

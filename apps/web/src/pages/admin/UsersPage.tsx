@@ -532,7 +532,7 @@ export const UsersPage = () => {
           title="Пригласить пользователя"
           size="md"
         >
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 p-6">
             <div className="space-y-4 flex-1 min-h-0">
               <Input
                 label="Email"

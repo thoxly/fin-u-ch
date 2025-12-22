@@ -270,7 +270,7 @@ export class PermissionsService {
             },
             _count: {
               select: {
-                userRoles: true,
+                user_roles: true,
               },
             },
           },
