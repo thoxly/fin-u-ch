@@ -261,7 +261,7 @@ export class PermissionsService {
       include: {
         role: {
           include: {
-            permissions: {
+            role_permissions: {
               select: {
                 entity: true,
                 action: true,
@@ -292,7 +292,7 @@ export class PermissionsService {
           roleId: ur.roleId,
           roleName: ur.role.name,
           isSystem: ur.role.isSystem,
-          permissionsCount: ur.role.permissions.length,
+          permissionsCount: ur.role.role_permissions?.length || 0,
           assignedAt: ur.assignedAt,
         })),
       }
@@ -301,7 +301,10 @@ export class PermissionsService {
     return userRoles.map((ur: any) => ({
       id: ur.id,
       roleId: ur.roleId,
-      role: ur.role,
+      role: {
+        ...ur.role,
+        permissions: ur.role.role_permissions || [],
+      },
       assignedAt: ur.assignedAt,
       assignedBy: ur.assignedBy,
     }));
