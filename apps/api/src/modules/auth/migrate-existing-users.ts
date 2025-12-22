@@ -6,7 +6,7 @@ import { ENTITIES_CONFIG } from '../roles/config/entities.config';
  * Миграционный скрипт для существующих пользователей
  * Назначает роли всем пользователям, у которых их нет
  * - Первому пользователю компании назначается роль "Супер-пользователь"
- * - Остальным пользователям назначается роль "Добавление операций" (если существует)
+ * - Остальным пользователям назначается роль "Внесение операций" (если существует)
  */
 export async function migrateExistingUsers(): Promise<void> {
   logger.info(
@@ -46,14 +46,41 @@ export async function migrateExistingUsers(): Promise<void> {
         },
       });
 
-      // Ищем предустановленную роль "Добавление операций" (не системную)
+      // Ищем предустановленную роль "Внесение операций" (не системная)
       let operationsEditorRole = await prisma.role.findFirst({
         where: {
           companyId: company.id,
-          name: 'Добавление операций',
-          isSystem: false,
+          name: 'Внесение операций',
+          category: 'Предустановленные',
         },
       });
+
+      // Если роль с названием "Добавление операций" существует, переименовываем её
+      if (!operationsEditorRole) {
+        const oldOperationsEditorRole = await prisma.role.findFirst({
+          where: {
+            companyId: company.id,
+            name: 'Добавление операций',
+            category: 'Предустановленные',
+          },
+        });
+
+        if (oldOperationsEditorRole) {
+          operationsEditorRole = await prisma.role.update({
+            where: { id: oldOperationsEditorRole.id },
+            data: {
+              name: 'Внесение операций',
+            },
+          });
+          logger.info(
+            '[migrateExistingUsers] Переименована роль "Добавление операций" в "Внесение операций":',
+            {
+              roleId: operationsEditorRole.id,
+              companyId: company.id,
+            }
+          );
+        }
+      }
 
       // Создаём или обновляем роль "Супер-пользователь"
       if (!superAdminRole) {
@@ -171,9 +198,109 @@ export async function migrateExistingUsers(): Promise<void> {
         }
       );
 
+      // Проверяем и создаем роль "Полный доступ"
+      let fullAccessRole = await prisma.role.findFirst({
+        where: {
+          companyId: company.id,
+          name: 'Полный доступ',
+          category: 'Предустановленные',
+        },
+      });
+
+      if (!fullAccessRole) {
+        logger.info(
+          '[migrateExistingUsers] Создание роли "Полный доступ" для компании:',
+          {
+            companyId: company.id,
+          }
+        );
+
+        fullAccessRole = await prisma.role.create({
+          data: {
+            companyId: company.id,
+            name: 'Полный доступ',
+            description:
+              'Полный доступ ко всем функциям системы кроме управления пользователями и ролями',
+            category: 'Предустановленные',
+            isSystem: false,
+            isActive: true,
+          },
+        });
+
+        totalRolesCreated += 1;
+      } else {
+        logger.info(
+          '[migrateExistingUsers] Роль "Полный доступ" уже существует, обновляем права:',
+          {
+            roleId: fullAccessRole.id,
+            companyId: company.id,
+          }
+        );
+      }
+
+      // Получаем все существующие права роли "Полный доступ"
+      const existingFullAccessPermissions =
+        await prisma.rolePermission.findMany({
+          where: {
+            roleId: fullAccessRole.id,
+          },
+        });
+
+      // Создаём Set для быстрой проверки существующих прав
+      const existingFullAccessPermissionsSet = new Set(
+        existingFullAccessPermissions.map((p) => `${p.entity}:${p.action}`)
+      );
+
+      // Создаем права: все действия кроме сущностей категории "Администрирование"
+      const fullAccessPermissions = [];
+      for (const entity of entities) {
+        const entityConfig = ENTITIES_CONFIG[entity.name];
+
+        // Исключаем сущности категории "Администрирование"
+        if (entityConfig?.category !== 'Администрирование') {
+          for (const action of entity.actions) {
+            const permissionKey = `${entity.name}:${action}`;
+            if (!existingFullAccessPermissionsSet.has(permissionKey)) {
+              fullAccessPermissions.push({
+                roleId: fullAccessRole.id,
+                entity: entity.name,
+                action,
+                allowed: true,
+              });
+            }
+          }
+        }
+      }
+
+      if (fullAccessPermissions.length > 0) {
+        await prisma.rolePermission.createMany({
+          data: fullAccessPermissions,
+          skipDuplicates: true,
+        });
+      }
+
+      // Убеждаемся, что все права установлены в allowed: true
+      await prisma.rolePermission.updateMany({
+        where: {
+          roleId: fullAccessRole.id,
+          allowed: false,
+        },
+        data: {
+          allowed: true,
+        },
+      });
+
+      logger.info(
+        '[migrateExistingUsers] Обновлены права для роли "Полный доступ":',
+        {
+          roleId: fullAccessRole.id,
+          addedCount: fullAccessPermissions.length,
+        }
+      );
+
       if (!operationsEditorRole) {
         logger.info(
-          '[migrateExistingUsers] Создание роли "Добавление операций" для компании:',
+          '[migrateExistingUsers] Создание роли "Внесение операций" для компании:',
           {
             companyId: company.id,
           }
@@ -182,7 +309,7 @@ export async function migrateExistingUsers(): Promise<void> {
         operationsEditorRole = await prisma.role.create({
           data: {
             companyId: company.id,
-            name: 'Добавление операций',
+            name: 'Внесение операций',
             description:
               'Возможность создавать и просматривать операции, а также просматривать справочники',
             category: 'Предустановленные',
@@ -191,30 +318,32 @@ export async function migrateExistingUsers(): Promise<void> {
           },
         });
 
-        // Создаем права для роли "Добавление операций"
+        // Получаем все существующие права роли "Внесение операций"
+        const existingOperationsEditorPermissions =
+          await prisma.rolePermission.findMany({
+            where: {
+              roleId: operationsEditorRole.id,
+            },
+          });
+
+        // Создаём Set для быстрой проверки существующих прав
+        const existingOperationsEditorPermissionsSet = new Set(
+          existingOperationsEditorPermissions.map(
+            (p) => `${p.entity}:${p.action}`
+          )
+        );
+
+        // Создаем права для роли "Внесение операций"
         const operationsEditorPermissions = [];
 
         // Для операций: create и read
-        operationsEditorPermissions.push({
-          roleId: operationsEditorRole.id,
-          entity: 'operations',
-          action: 'create',
-          allowed: true,
-        });
-        operationsEditorPermissions.push({
-          roleId: operationsEditorRole.id,
-          entity: 'operations',
-          action: 'read',
-          allowed: true,
-        });
+        const operationsPermissions = [
+          { entity: 'operations', action: 'create' },
+          { entity: 'operations', action: 'read' },
+        ];
 
         // Для dashboard: read
-        operationsEditorPermissions.push({
-          roleId: operationsEditorRole.id,
-          entity: 'dashboard',
-          action: 'read',
-          allowed: true,
-        });
+        const dashboardPermission = { entity: 'dashboard', action: 'read' };
 
         // Для всех справочников (кроме администрирования): только read
         const catalogEntities = [
@@ -224,35 +353,139 @@ export async function migrateExistingUsers(): Promise<void> {
           'departments',
           'deals',
         ];
-        for (const entityName of catalogEntities) {
-          operationsEditorPermissions.push({
-            roleId: operationsEditorRole.id,
-            entity: entityName,
-            action: 'read',
-            allowed: true,
+        const catalogPermissions = catalogEntities.map((entityName) => ({
+          entity: entityName,
+          action: 'read' as const,
+        }));
+
+        // Для отчетов: только read (без export)
+        const reportsPermission = {
+          entity: 'reports',
+          action: 'read' as const,
+        };
+
+        // Объединяем все права
+        const allRequiredOperationsEditorPermissions = [
+          ...operationsPermissions,
+          dashboardPermission,
+          ...catalogPermissions,
+          reportsPermission,
+        ];
+
+        for (const perm of allRequiredOperationsEditorPermissions) {
+          const permissionKey = `${perm.entity}:${perm.action}`;
+          if (!existingOperationsEditorPermissionsSet.has(permissionKey)) {
+            operationsEditorPermissions.push({
+              roleId: operationsEditorRole.id,
+              entity: perm.entity,
+              action: perm.action,
+              allowed: true,
+            });
+          }
+        }
+
+        if (operationsEditorPermissions.length > 0) {
+          await prisma.rolePermission.createMany({
+            data: operationsEditorPermissions,
+            skipDuplicates: true,
           });
         }
 
-        // Для отчетов: только read (без export)
-        operationsEditorPermissions.push({
-          roleId: operationsEditorRole.id,
-          entity: 'reports',
-          action: 'read',
-          allowed: true,
-        });
-
-        await prisma.rolePermission.createMany({
-          data: operationsEditorPermissions,
+        // Убеждаемся, что все права установлены в allowed: true
+        await prisma.rolePermission.updateMany({
+          where: {
+            roleId: operationsEditorRole.id,
+            allowed: false,
+          },
+          data: {
+            allowed: true,
+          },
         });
 
         totalRolesCreated += 1;
         logger.info(
-          '[migrateExistingUsers] Создана роль "Добавление операций" с правами:',
+          '[migrateExistingUsers] Создана роль "Внесение операций" с правами:',
           {
             roleId: operationsEditorRole.id,
             permissionsCount: operationsEditorPermissions.length,
           }
         );
+      } else {
+        // Обновляем права для существующей роли
+        const existingOperationsEditorPermissions =
+          await prisma.rolePermission.findMany({
+            where: {
+              roleId: operationsEditorRole.id,
+            },
+          });
+
+        const existingOperationsEditorPermissionsSet = new Set(
+          existingOperationsEditorPermissions.map(
+            (p) => `${p.entity}:${p.action}`
+          )
+        );
+
+        const operationsEditorPermissions = [];
+
+        const operationsPermissions = [
+          { entity: 'operations', action: 'create' },
+          { entity: 'operations', action: 'read' },
+        ];
+
+        const dashboardPermission = { entity: 'dashboard', action: 'read' };
+
+        const catalogEntities = [
+          'articles',
+          'accounts',
+          'counterparties',
+          'departments',
+          'deals',
+        ];
+        const catalogPermissions = catalogEntities.map((entityName) => ({
+          entity: entityName,
+          action: 'read' as const,
+        }));
+
+        const reportsPermission = {
+          entity: 'reports',
+          action: 'read' as const,
+        };
+
+        const allRequiredOperationsEditorPermissions = [
+          ...operationsPermissions,
+          dashboardPermission,
+          ...catalogPermissions,
+          reportsPermission,
+        ];
+
+        for (const perm of allRequiredOperationsEditorPermissions) {
+          const permissionKey = `${perm.entity}:${perm.action}`;
+          if (!existingOperationsEditorPermissionsSet.has(permissionKey)) {
+            operationsEditorPermissions.push({
+              roleId: operationsEditorRole.id,
+              entity: perm.entity,
+              action: perm.action,
+              allowed: true,
+            });
+          }
+        }
+
+        if (operationsEditorPermissions.length > 0) {
+          await prisma.rolePermission.createMany({
+            data: operationsEditorPermissions,
+            skipDuplicates: true,
+          });
+        }
+
+        await prisma.rolePermission.updateMany({
+          where: {
+            roleId: operationsEditorRole.id,
+            allowed: false,
+          },
+          data: {
+            allowed: true,
+          },
+        });
       }
 
       // Получаем всех пользователей компании, у которых нет ролей
@@ -305,7 +538,7 @@ export async function migrateExistingUsers(): Promise<void> {
         );
       }
 
-      // Назначаем роль "Добавление операций" остальным пользователям
+      // Назначаем роль "Внесение операций" остальным пользователям
       const remainingUsers = usersWithoutRoles.slice(1);
       if (remainingUsers.length > 0 && operationsEditorRole) {
         const userRoles = remainingUsers.map((user) => ({
@@ -320,7 +553,7 @@ export async function migrateExistingUsers(): Promise<void> {
 
         totalUsersMigrated += remainingUsers.length;
         logger.info(
-          '[migrateExistingUsers] Назначена роль "Добавление операций" остальным пользователям:',
+          '[migrateExistingUsers] Назначена роль "Внесение операций" остальным пользователям:',
           {
             companyId: company.id,
             usersCount: remainingUsers.length,

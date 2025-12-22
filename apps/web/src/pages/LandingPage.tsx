@@ -11,20 +11,17 @@ import {
 import { Button } from '../shared/ui/Button';
 import { SmartLoginButton } from '../components/SmartLoginButton';
 import { DemoRequestModal } from '../components/DemoRequestModal';
-import { useIsDarkMode } from '../shared/hooks/useIsDarkMode';
 
-// Функция для получения пути к скриншоту в зависимости от темы
-const getScreenshot = (name: string, isDark: boolean): string => {
-  const theme = isDark ? 'dark' : 'light';
-  return `/images/landing/${theme}/${name}`;
+// Функция для получения пути к скриншоту (только светлая тема)
+const getScreenshot = (name: string): string => {
+  return `/images/landing/light/${name}`;
 };
 
 export const LandingPage = () => {
-  const isDark = useIsDarkMode();
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-gray-100 to-white dark:from-gray-950 dark:via-gray-900 dark:to-gray-800 text-gray-900 dark:text-white scroll-smooth">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-gray-100 to-white text-gray-900 scroll-smooth">
       {/* Header */}
       <header className="container mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <nav className="flex items-center justify-between">
@@ -77,7 +74,7 @@ export const LandingPage = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-6 sm:mb-10 max-w-2xl mx-auto"
+          className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-10 max-w-2xl mx-auto"
         >
           Vect-a помогает предпринимателям видеть денежный поток, планировать
           бюджеты и принимать решения на основе данных.
@@ -100,7 +97,7 @@ export const LandingPage = () => {
           </Link>
           <button
             onClick={() => setIsDemoModalOpen(true)}
-            className="w-full sm:w-auto px-6 py-3 sm:px-8 sm:py-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 active:bg-gray-100 dark:active:bg-gray-600 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-100 font-medium"
+            className="w-full sm:w-auto px-6 py-3 sm:px-8 sm:py-4 rounded-lg border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 active:bg-gray-100 transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-105 active:scale-100 font-medium"
           >
             Запросить демонстрацию
           </button>
@@ -148,15 +145,15 @@ export const LandingPage = () => {
                 viewport={{ once: true, margin: '-100px' }}
                 transition={{ delay: index * 0.1 }}
                 whileHover={{ y: -5, scale: 1.02 }}
-                className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-md rounded-xl md:rounded-2xl shadow-lg p-6 transition-all"
+                className="bg-white/80 backdrop-blur-md rounded-xl md:rounded-2xl shadow-lg p-6 transition-all"
               >
-                <div className="flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-500/10 dark:bg-blue-400/10">
-                  <IconComponent className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <div className="flex items-center justify-center w-12 h-12 mb-4 rounded-lg bg-blue-500/10">
+                  <IconComponent className="w-6 h-6 text-blue-600" />
                 </div>
                 <h3 className="font-semibold text-lg sm:text-xl mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                <p className="text-sm sm:text-base text-gray-600">
                   {feature.description}
                 </p>
               </motion.div>
@@ -166,7 +163,7 @@ export const LandingPage = () => {
       </section>
 
       {/* How It Works Block */}
-      <section className="relative bg-gradient-to-r from-indigo-50 via-sky-50 to-transparent dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-12 sm:py-16 md:py-24">
+      <section className="relative bg-gradient-to-r from-indigo-50 via-sky-50 to-transparent py-12 sm:py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-8 sm:mb-12 md:mb-16 px-4">
             Как это работает
@@ -201,9 +198,7 @@ export const LandingPage = () => {
                 align: 'left' as const,
               },
             ].map((item, index) => {
-              const screenshotPath = isDark
-                ? getScreenshot(item.screenshot, true)
-                : getScreenshot(item.screenshotLight, false);
+              const screenshotPath = getScreenshot(item.screenshotLight);
               return (
                 <motion.div
                   key={item.step}
@@ -226,11 +221,11 @@ export const LandingPage = () => {
                         {item.title}
                       </h3>
                     </div>
-                    <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300">
+                    <p className="text-base sm:text-lg text-gray-600">
                       {item.description}
                     </p>
                   </div>
-                  <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-lg">
+                  <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 shadow-lg">
                     <img
                       src={screenshotPath}
                       alt={item.title}
@@ -280,9 +275,7 @@ export const LandingPage = () => {
                 'Детальные отчёты о движении денежных средств с графиками и возможностью экспорта.',
             },
           ].map((item, index) => {
-            const screenshotPath = isDark
-              ? getScreenshot(item.screenshot, true)
-              : getScreenshot(item.screenshotLight, false);
+            const screenshotPath = getScreenshot(item.screenshotLight);
             return (
               <motion.div
                 key={item.title}
@@ -290,7 +283,7 @@ export const LandingPage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-100px' }}
                 transition={{ delay: index * 0.1 }}
-                className="bg-white/80 dark:bg-gray-800/50 backdrop-blur-md rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
+                className="bg-white/80 backdrop-blur-md rounded-xl md:rounded-2xl shadow-lg overflow-hidden"
               >
                 <div className="aspect-video overflow-hidden">
                   <img
@@ -303,7 +296,7 @@ export const LandingPage = () => {
                   <h3 className="font-semibold text-lg sm:text-xl mb-2">
                     {item.title}
                   </h3>
-                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
+                  <p className="text-sm sm:text-base text-gray-600">
                     {item.description}
                   </p>
                 </div>
@@ -314,7 +307,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Mobile Version Block */}
-      <section className="relative bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 py-12 sm:py-16 md:py-24 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-gray-100 to-gray-200 py-12 sm:py-16 md:py-24 overflow-hidden">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 max-w-6xl mx-auto">
             <motion.div
@@ -324,12 +317,12 @@ export const LandingPage = () => {
               className="flex-1 text-center md:text-left"
             >
               <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
-                <Smartphone className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                <Smartphone className="w-8 h-8 text-blue-600" />
                 <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">
                   Финансовый учёт в вашем телефоне
                 </h2>
               </div>
-              <p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-base sm:text-lg text-gray-600 mb-6">
                 Все функции доступны в мобильной версии: фиксация операций,
                 просмотр отчётов, планирование бюджетов. Управляйте финансами
                 бизнеса из любой точки мира.
@@ -352,13 +345,9 @@ export const LandingPage = () => {
             >
               <div className="relative max-w-sm">
                 <div className="bg-gray-800 rounded-[3rem] p-4 shadow-2xl">
-                  <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] overflow-hidden aspect-[9/19]">
+                  <div className="bg-white rounded-[2.5rem] overflow-hidden aspect-[9/19]">
                     <img
-                      src={
-                        isDark
-                          ? getScreenshot('mobile_d.png', true)
-                          : getScreenshot('mobile_l.png', false)
-                      }
+                      src={getScreenshot('mobile_l.png')}
                       alt="Мобильная версия"
                       className="w-full h-full object-cover"
                     />
@@ -419,7 +408,7 @@ export const LandingPage = () => {
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-10 border-t border-gray-200 dark:border-gray-700 text-center md:text-left">
+      <footer className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 md:py-10 border-t border-gray-200 text-center md:text-left">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
             <img
@@ -428,7 +417,7 @@ export const LandingPage = () => {
               className="h-7 sm:h-8 w-auto"
             />
           </div>
-          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-xs sm:text-sm text-gray-600">
             © 2025 Vect-a. Финансовый учёт
           </div>
         </div>

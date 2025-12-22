@@ -13,6 +13,7 @@ import {
 } from '../store/api/reportsApi';
 import { useGetOperationsQuery } from '../store/api/operationsApi';
 import { formatMoney } from '../shared/lib/money';
+import { toISODate } from '../shared/lib/date';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { PeriodFiltersState, PeriodFormat } from '@fin-u-ch/shared';
 import {
@@ -129,10 +130,10 @@ export const DashboardPage = () => {
     const end = new Date(endDate);
     end.setHours(0, 0, 0, 0);
 
-    // Отправляем даты в формате YYYY-MM-DD
+    // Отправляем даты в формате YYYY-MM-DD (используем локальное время, а не UTC)
     const newRange = {
-      from: start.toISOString().split('T')[0],
-      to: end.toISOString().split('T')[0],
+      from: toISODate(start),
+      to: toISODate(end),
     };
     const format = detectPeriodFormat(newRange.from, newRange.to);
     setPeriodFilters({
