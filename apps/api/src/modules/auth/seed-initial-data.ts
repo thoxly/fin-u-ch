@@ -268,24 +268,51 @@ export async function seedInitialData(
   // =========================================================
 
   // 7.1. Роль "Полный доступ" - все права кроме администрирования
-  const fullAccessRole = await tx.role.create({
-    data: {
+  let fullAccessRole = await tx.role.findFirst({
+    where: {
       companyId,
       name: 'Полный доступ',
-      description:
-        'Полный доступ ко всем функциям системы кроме управления пользователями и ролями',
       category: 'Предустановленные',
-      isSystem: false,
-      isActive: true,
     },
   });
 
-  logger.debug('Created "Full Access" role', {
-    roleId: fullAccessRole.id,
-    companyId,
-    name: fullAccessRole.name,
-    isSystem: fullAccessRole.isSystem,
+  if (!fullAccessRole) {
+    fullAccessRole = await tx.role.create({
+      data: {
+        companyId,
+        name: 'Полный доступ',
+        description:
+          'Полный доступ ко всем функциям системы кроме управления пользователями и ролями',
+        category: 'Предустановленные',
+        isSystem: false,
+        isActive: true,
+      },
+    });
+
+    logger.debug('Created "Full Access" role', {
+      roleId: fullAccessRole.id,
+      companyId,
+      name: fullAccessRole.name,
+      isSystem: fullAccessRole.isSystem,
+    });
+  } else {
+    logger.debug('"Full Access" role already exists, updating permissions', {
+      roleId: fullAccessRole.id,
+      companyId,
+    });
+  }
+
+  // Получаем все существующие права роли "Полный доступ"
+  const existingFullAccessPermissions = await tx.rolePermission.findMany({
+    where: {
+      roleId: fullAccessRole.id,
+    },
   });
+
+  // Создаём Set для быстрой проверки существующих прав
+  const existingFullAccessPermissionsSet = new Set(
+    existingFullAccessPermissions.map((p) => `${p.entity}:${p.action}`)
+  );
 
   // Создаем права: все действия кроме сущностей категории "Администрирование"
   const fullAccessPermissions = [];
@@ -295,70 +322,128 @@ export async function seedInitialData(
     // Исключаем сущности категории "Администрирование"
     if (entityConfig?.category !== 'Администрирование') {
       for (const action of entity.actions) {
-        fullAccessPermissions.push({
-          roleId: fullAccessRole.id,
-          entity: entity.name,
-          action,
-          allowed: true,
-        });
+        const permissionKey = `${entity.name}:${action}`;
+        if (!existingFullAccessPermissionsSet.has(permissionKey)) {
+          fullAccessPermissions.push({
+            roleId: fullAccessRole.id,
+            entity: entity.name,
+            action,
+            allowed: true,
+          });
+        }
       }
     }
   }
 
-  await tx.rolePermission.createMany({
-    data: fullAccessPermissions,
-  });
+  if (fullAccessPermissions.length > 0) {
+    await tx.rolePermission.createMany({
+      data: fullAccessPermissions,
+      skipDuplicates: true,
+    });
+  }
 
-  logger.debug('Created permissions for "Full Access" role', {
-    roleId: fullAccessRole.id,
-    permissionsCount: fullAccessPermissions.length,
-    permissions: fullAccessPermissions.map((p) => `${p.entity}:${p.action}`),
-  });
-
-  // 7.2. Роль "Добавление операций" - создание операций + просмотр справочников
-  const operationsEditorRole = await tx.role.create({
+  // Убеждаемся, что все права установлены в allowed: true
+  await tx.rolePermission.updateMany({
+    where: {
+      roleId: fullAccessRole.id,
+      allowed: false,
+    },
     data: {
-      companyId,
-      name: 'Добавление операций',
-      description:
-        'Возможность создавать и просматривать операции, а также просматривать справочники',
-      category: 'Предустановленные',
-      isSystem: false,
-      isActive: true,
+      allowed: true,
     },
   });
 
-  logger.debug('Created "Operations Editor" role', {
-    roleId: operationsEditorRole.id,
-    companyId,
-    name: operationsEditorRole.name,
-    isSystem: operationsEditorRole.isSystem,
+  logger.debug('Updated permissions for "Full Access" role', {
+    roleId: fullAccessRole.id,
+    addedCount: fullAccessPermissions.length,
+    permissions: fullAccessPermissions.map((p) => `${p.entity}:${p.action}`),
   });
 
-  // Создаем права для роли "Добавление операций"
+  // 7.2. Роль "Внесение операций" - создание операций + просмотр справочников
+  let operationsEditorRole = await tx.role.findFirst({
+    where: {
+      companyId,
+      name: 'Внесение операций',
+      category: 'Предустановленные',
+    },
+  });
+
+  // Если роль с названием "Добавление операций" существует, переименовываем её
+  if (!operationsEditorRole) {
+    const oldOperationsEditorRole = await tx.role.findFirst({
+      where: {
+        companyId,
+        name: 'Добавление операций',
+        category: 'Предустановленные',
+      },
+    });
+
+    if (oldOperationsEditorRole) {
+      operationsEditorRole = await tx.role.update({
+        where: { id: oldOperationsEditorRole.id },
+        data: {
+          name: 'Внесение операций',
+        },
+      });
+      logger.debug('Renamed "Добавление операций" to "Внесение операций"', {
+        roleId: operationsEditorRole.id,
+        companyId,
+      });
+    }
+  }
+
+  if (!operationsEditorRole) {
+    operationsEditorRole = await tx.role.create({
+      data: {
+        companyId,
+        name: 'Внесение операций',
+        description:
+          'Возможность создавать и просматривать операции, а также просматривать справочники',
+        category: 'Предустановленные',
+        isSystem: false,
+        isActive: true,
+      },
+    });
+
+    logger.debug('Created "Operations Editor" role', {
+      roleId: operationsEditorRole.id,
+      companyId,
+      name: operationsEditorRole.name,
+      isSystem: operationsEditorRole.isSystem,
+    });
+  } else {
+    logger.debug(
+      '"Operations Editor" role already exists, updating permissions',
+      {
+        roleId: operationsEditorRole.id,
+        companyId,
+      }
+    );
+  }
+
+  // Получаем все существующие права роли "Внесение операций"
+  const existingOperationsEditorPermissions = await tx.rolePermission.findMany({
+    where: {
+      roleId: operationsEditorRole.id,
+    },
+  });
+
+  // Создаём Set для быстрой проверки существующих прав
+  const existingOperationsEditorPermissionsSet = new Set(
+    existingOperationsEditorPermissions.map((p) => `${p.entity}:${p.action}`)
+  );
+
+  // Создаем права для роли "Внесение операций"
   const operationsEditorPermissions = [];
 
   // Для операций: create и read
-  operationsEditorPermissions.push({
-    roleId: operationsEditorRole.id,
-    entity: 'operations',
-    action: 'create',
-    allowed: true,
-  });
-  operationsEditorPermissions.push({
-    roleId: operationsEditorRole.id,
-    entity: 'operations',
-    action: 'read',
-    allowed: true,
-  });
+  const operationsPermissions = [
+    { entity: 'operations', action: 'create' },
+    { entity: 'operations', action: 'read' },
+  ];
 
   // Для dashboard: read
-  operationsEditorPermissions.push({
-    roleId: operationsEditorRole.id,
-    entity: 'dashboard',
-    action: 'read',
-    allowed: true,
-  });
+  const dashboardPermission = { entity: 'dashboard', action: 'read' };
 
   // Для всех справочников (кроме администрирования): только read
   const catalogEntities = [
@@ -368,30 +453,55 @@ export async function seedInitialData(
     'departments',
     'deals',
   ];
-  for (const entityName of catalogEntities) {
-    operationsEditorPermissions.push({
-      roleId: operationsEditorRole.id,
-      entity: entityName,
-      action: 'read',
-      allowed: true,
+  const catalogPermissions = catalogEntities.map((entityName) => ({
+    entity: entityName,
+    action: 'read' as const,
+  }));
+
+  // Для отчетов: только read (без export)
+  const reportsPermission = { entity: 'reports', action: 'read' as const };
+
+  // Объединяем все права
+  const allRequiredOperationsEditorPermissions = [
+    ...operationsPermissions,
+    dashboardPermission,
+    ...catalogPermissions,
+    reportsPermission,
+  ];
+
+  for (const perm of allRequiredOperationsEditorPermissions) {
+    const permissionKey = `${perm.entity}:${perm.action}`;
+    if (!existingOperationsEditorPermissionsSet.has(permissionKey)) {
+      operationsEditorPermissions.push({
+        roleId: operationsEditorRole.id,
+        entity: perm.entity,
+        action: perm.action,
+        allowed: true,
+      });
+    }
+  }
+
+  if (operationsEditorPermissions.length > 0) {
+    await tx.rolePermission.createMany({
+      data: operationsEditorPermissions,
+      skipDuplicates: true,
     });
   }
 
-  // Для отчетов: только read (без export)
-  operationsEditorPermissions.push({
-    roleId: operationsEditorRole.id,
-    entity: 'reports',
-    action: 'read',
-    allowed: true,
+  // Убеждаемся, что все права установлены в allowed: true
+  await tx.rolePermission.updateMany({
+    where: {
+      roleId: operationsEditorRole.id,
+      allowed: false,
+    },
+    data: {
+      allowed: true,
+    },
   });
 
-  await tx.rolePermission.createMany({
-    data: operationsEditorPermissions,
-  });
-
-  logger.debug('Created permissions for "Operations Editor" role', {
+  logger.debug('Updated permissions for "Operations Editor" role', {
     roleId: operationsEditorRole.id,
-    permissionsCount: operationsEditorPermissions.length,
+    addedCount: operationsEditorPermissions.length,
     permissions: operationsEditorPermissions.map(
       (p) => `${p.entity}:${p.action}`
     ),

@@ -16,6 +16,7 @@ import { ExportRow } from '../lib/exportData';
 import { ExportMenu } from './ExportMenu';
 import { InfoHint } from './InfoHint';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
+import { useIsWideScreen } from '../hooks/useIsWideScreen';
 
 interface Operation {
   id: string;
@@ -48,6 +49,7 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
   className = '',
 }) => {
   const isSmall = useIsSmallScreen();
+  const isWide = useIsWideScreen();
 
   // Определяем текущую дату (сегодня, без времени)
   const today = new Date();
@@ -301,9 +303,15 @@ export const IncomeExpenseChart: React.FC<IncomeExpenseChartProps> = ({
                     : filteredData.length <= 20
                       ? 1 // Каждую вторую
                       : 2 // Каждую третью (для 31 точки = ~10 меток)
-                  : filteredData.length <= 31
-                    ? 0 // На десктопе показываем все до 31
-                    : 'preserveStartEnd'
+                  : isWide
+                    ? filteredData.length <= 31
+                      ? 0 // На широкоформатном десктопе показываем все до 31
+                      : 'preserveStartEnd'
+                    : filteredData.length <= 10
+                      ? 0 // На неширокоформатном десктопе показываем все до 10
+                      : filteredData.length <= 20
+                        ? 1 // Каждую вторую
+                        : 2 // Каждую третью (для 31 точки = ~10 меток)
               }
             />
             <YAxis

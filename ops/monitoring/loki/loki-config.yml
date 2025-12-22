@@ -32,6 +32,7 @@ ruler:
 # Retention
 limits_config:
   retention_period: ${LOKI_RETENTION:-720h} # 30 days default
+  volume_enabled: true # Enable log volume feature for Grafana
 
 # Query limits
 query_scheduler:
