@@ -33,6 +33,7 @@ ruler:
 limits_config:
   retention_period: ${LOKI_RETENTION:-720h} # 30 days default
   volume_enabled: true # Enable log volume feature for Grafana
+  allow_structured_metadata: false
 
 # Query limits
 query_scheduler:
@@ -40,6 +41,3 @@ query_scheduler:
 
 frontend:
   max_outstanding_per_tenant: 2048
-
-querier:
-  query_timeout: 300s
