@@ -532,7 +532,7 @@ export const RolesTab = () => {
         title={editingRole ? 'Редактировать роль' : 'Создать роль'}
         size="md"
       >
-        <div className="space-y-4">
+        <div className="space-y-4 p-6">
           <Input
             label="Название роли"
             value={roleName}

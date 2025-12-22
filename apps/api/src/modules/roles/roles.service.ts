@@ -46,7 +46,7 @@ export class RolesService {
         include: {
           _count: {
             select: {
-              userRoles: true,
+              user_roles: true,
             },
           },
           permissions: {
@@ -67,7 +67,7 @@ export class RolesService {
           id: r.id,
           name: r.name,
           category: r.category,
-          usersCount: r._count?.userRoles || 0,
+          usersCount: r._count?.user_roles || 0,
         })),
       });
 
@@ -110,7 +110,7 @@ export class RolesService {
         },
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -130,7 +130,7 @@ export class RolesService {
       name: role.name,
       isSystem: role.isSystem,
       permissionsCount: role.permissions.length,
-      usersCount: role._count.userRoles,
+      usersCount: role._count.user_roles,
     });
 
     return role;
@@ -186,7 +186,7 @@ export class RolesService {
         permissions: true,
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -269,7 +269,7 @@ export class RolesService {
         permissions: true,
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
@@ -603,7 +603,7 @@ export class RolesService {
       include: {
         _count: {
           select: {
-            userRoles: true,
+            user_roles: true,
           },
         },
       },
