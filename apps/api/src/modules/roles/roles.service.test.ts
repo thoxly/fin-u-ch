@@ -56,7 +56,7 @@ describe('RolesService', () => {
           companyId,
           isActive: true,
           _count: { user_roles: 2 },
-          permissions: [],
+          role_permissions: [],
         },
       ];
 
@@ -64,7 +64,12 @@ describe('RolesService', () => {
 
       const result = await rolesService.getAllRoles(companyId);
 
-      expect(result).toEqual(mockRoles);
+      expect(result).toEqual([
+        {
+          ...mockRoles[0],
+          permissions: [],
+        },
+      ]);
       expect(mockedPrisma.role.findMany).toHaveBeenCalledWith({
         where: {
           companyId,
@@ -85,7 +90,7 @@ describe('RolesService', () => {
         id: roleId,
         name: 'Role 1',
         companyId,
-        permissions: [],
+        role_permissions: [],
         _count: { user_roles: 0 },
       };
 
@@ -93,7 +98,10 @@ describe('RolesService', () => {
 
       const result = await rolesService.getRoleById(roleId, companyId);
 
-      expect(result).toEqual(mockRole);
+      expect(result).toEqual({
+        ...mockRole,
+        permissions: [],
+      });
       expect(mockedPrisma.role.findFirst).toHaveBeenCalledWith({
         where: {
           id: roleId,

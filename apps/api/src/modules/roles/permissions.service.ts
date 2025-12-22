@@ -292,7 +292,7 @@ export class PermissionsService {
           roleId: ur.roleId,
           roleName: ur.role.name,
           isSystem: ur.role.isSystem,
-          permissionsCount: ur.role.role_permissions.length,
+          permissionsCount: ur.role.role_permissions?.length || 0,
           assignedAt: ur.assignedAt,
         })),
       }
