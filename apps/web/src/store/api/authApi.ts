@@ -211,7 +211,8 @@ export const authApi = apiSlice.injectEndpoints({
         url: '/users/me',
         method: 'DELETE',
       }),
-      invalidatesTags: ['User'],
+      // Не инвалидируем теги, так как после удаления аккаунта пользователь будет разлогинен
+      // и перенаправлен на страницу входа, поэтому обновление кэша не нужно
     }),
     logout: builder.mutation<void, void>({
       query: () => ({
