@@ -5,7 +5,6 @@ import { Button } from '../../shared/ui/Button';
 import {
   useGetMeQuery,
   useDeleteMyAccountMutation,
-  useLogoutMutation,
 } from '../../store/api/authApi';
 import { PersonalSettingsSection } from '../../features/user-profile/PersonalSettingsSection';
 import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';
@@ -77,8 +76,10 @@ export const SettingsPage = () => {
         onConfirm={async () => {
           try {
             await deleteMyAccount().unwrap();
-            showSuccess('Ваш аккаунт был успешно удален');
-            await logout();
+            // Очищаем токены вручную перед редиректом, чтобы избежать запросов к API
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            // Сразу делаем редирект, не дожидаясь logout, чтобы избежать запросов к /api/users/me
             window.location.href = '/login';
           } catch (error) {
             console.error('Failed to delete account:', error);

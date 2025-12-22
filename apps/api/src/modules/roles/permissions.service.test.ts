@@ -514,7 +514,7 @@ describe('PermissionsService', () => {
             permissions: [
               { entity: 'operations', action: 'create', allowed: true },
             ],
-            _count: { userRoles: 2 },
+            _count: { user_roles: 2 },
           },
         },
       ];

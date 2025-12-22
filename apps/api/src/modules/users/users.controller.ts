@@ -423,6 +423,28 @@ export class UsersController {
       next(error);
     }
   }
+
+  /**
+   * Удалить свой аккаунт
+   * DELETE /api/users/me
+   */
+  async deleteMyAccount(req: TenantRequest, res: Response, next: NextFunction) {
+    try {
+      console.log(
+        '[UsersController.deleteMyAccount] Удаление своего аккаунта',
+        {
+          userId: req.userId,
+          companyId: req.companyId,
+        }
+      );
+
+      await usersService.deleteMyAccount(req.userId!, req.companyId!);
+
+      res.status(200).json({ success: true });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new UsersController();

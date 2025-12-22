@@ -194,6 +194,22 @@ router.put('/me/preferences', usersController.updatePreferences);
 
 /**
  * @swagger
+ * /api/users/me:
+ *   delete:
+ *     summary: Delete current user account
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account deleted successfully
+ *       404:
+ *         description: User not found
+ */
+router.delete('/me', usersController.deleteMyAccount);
+
+/**
+ * @swagger
  * /api/users:
  *   get:
  *     summary: Get all users in company
