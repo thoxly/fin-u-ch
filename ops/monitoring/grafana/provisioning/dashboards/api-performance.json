@@ -1,0 +1,200 @@
+{
+  "dashboard": {
+    "title": "API Performance Metrics",
+    "tags": ["api", "performance", "latency"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Report Execution Duration (p50, p95, p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(api_report_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{report_type}} - p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(api_report_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{report_type}} - p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(api_report_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{report_type}} - p99"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration (seconds)"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+      },
+      {
+        "id": 2,
+        "title": "Report Requests Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(api_report_requests_total{status=\"success\"}[5m])",
+            "legendFormat": "{{report_type}} - Success"
+          },
+          {
+            "expr": "rate(api_report_requests_total{status=\"error\"}[5m])",
+            "legendFormat": "{{report_type}} - Error"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "reqps",
+            "label": "Requests per second"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+      },
+      {
+        "id": 3,
+        "title": "Database Query Duration (p50, p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(api_db_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{model}}/{{operation}} - p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(api_db_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{model}}/{{operation}} - p95"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration (seconds)"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+      },
+      {
+        "id": 4,
+        "title": "Slow Queries (>1s) Count",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(api_db_slow_queries_total[5m])",
+            "legendFormat": "{{model}}/{{operation}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ops",
+            "label": "Queries per second"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+      },
+      {
+        "id": 5,
+        "title": "Event Loop Lag",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "api_event_loop_lag_seconds",
+            "legendFormat": "Event Loop Lag"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Lag (seconds)"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+        "alert": {
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [0.1],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "last"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "10s",
+          "handler": 1,
+          "name": "High Event Loop Lag",
+          "noDataState": "no_data",
+          "notifications": []
+        }
+      },
+      {
+        "id": 6,
+        "title": "HTTP Request Duration (p50, p95, p99)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{project=\"fin-u-ch\"}[5m]))",
+            "legendFormat": "{{method}} {{path}} - p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{project=\"fin-u-ch\"}[5m]))",
+            "legendFormat": "{{method}} {{path}} - p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{project=\"fin-u-ch\"}[5m]))",
+            "legendFormat": "{{method}} {{path}} - p99"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "s",
+            "label": "Duration (seconds)"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+      },
+      {
+        "id": 7,
+        "title": "Top Slow Reports (last 5m)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, histogram_quantile(0.95, rate(api_report_duration_seconds_bucket[5m])))",
+            "format": "table"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+      },
+      {
+        "id": 8,
+        "title": "Top Slow DB Queries (last 5m)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "topk(10, histogram_quantile(0.95, rate(api_db_query_duration_seconds_bucket[5m])))",
+            "format": "table"
+          }
+        ],
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+      }
+    ],
+    "refresh": "30s",
+    "schemaVersion": 16,
+    "version": 1,
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    }
+  }
+}
