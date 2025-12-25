@@ -752,11 +752,27 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          
+          SSH_PORT="${{ secrets.VPS_SSH_PORT }}"
+          if [ -z "$SSH_PORT" ]; then
+            echo "Using default SSH port 22"
+            SSH_PORT=22
+          elif ! [[ "$SSH_PORT" =~ ^[0-9]+$ ]]; then
+            echo "❌ ERROR: SSH_PORT must be numeric, got: '$SSH_PORT'"
+            exit 1
+          elif [ "$SSH_PORT" -lt 1 ] || [ "$SSH_PORT" -gt 65535 ]; then
+            echo "❌ ERROR: SSH_PORT must be between 1 and 65535, got: $SSH_PORT"
+            exit 1
+          elif [ "$SSH_PORT" -lt 1024 ] && [ "$SSH_PORT" -ne 22 ]; then
+            echo "⚠️ WARNING: SSH_PORT $SSH_PORT is a privileged port"
+          fi
+          echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
+
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} -p $SSH_PORT >> ~/.ssh/known_hosts
 
       - name: Create backup before deployment
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
       - name: Replace yourdomain.com with actual domain
@@ -764,43 +780,58 @@ jobs:
           sed -i "s/yourdomain.com/${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
           sed -i "s/www.yourdomain.com/www.${{ secrets.SERVER_DOMAIN }}/g" ops/nginx/nginx-ssl.conf
 
+      - name: Prepend PROXY_IP to proxy-real-ip.conf
+        run: |
+          if [ -n "${{ secrets.PROXY_IP }}" ]; then
+            echo "Prepending PROXY_IP=${{ secrets.PROXY_IP }} to proxy-real-ip.conf"
+            
+            tmpfile=$(mktemp)
+            echo "set_real_ip_from ${{ secrets.PROXY_IP }};" > "$tmpfile"
+            cat ops/nginx/proxy-real-ip.conf >> "$tmpfile"
+            mv "$tmpfile" ops/nginx/proxy-real-ip.conf
+          else
+            echo "PROXY_IP secret is not set, skipping prepend"
+          fi
+
       - name: Copy docker-compose and scripts to VPS
         run: |
-          scp -i ~/.ssh/deploy_key ops/docker/docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/docker-compose.prod.yml
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
-          scp -i ~/.ssh/deploy_key ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
-          scp -i ~/.ssh/deploy_key ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/docker/docker-compose.prod.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/docker-compose.prod.yml
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx'
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/nginx.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx.conf || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/nginx-ssl.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/nginx-ssl.conf || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/conf.d'
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/nginx/proxy-real-ip.conf ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/conf.d/ || true
 
           # Copy monitoring configurations
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/{alertmanager,prometheus,grafana,loki,promtail,tempo}'
-          scp -i ~/.ssh/deploy_key ops/monitoring/alertmanager/alertmanager.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/alertmanager/alertmanager.yml || true
-          scp -i ~/.ssh/deploy_key ops/monitoring/prometheus/prometheus.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/prometheus.yml || true
-          scp -i ~/.ssh/deploy_key ops/monitoring/prometheus/alerts.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/alerts.yml || true
-          scp -i ~/.ssh/deploy_key ops/monitoring/loki/loki-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/loki/loki-config.yml || true
-          scp -i ~/.ssh/deploy_key ops/monitoring/promtail/promtail-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/promtail/promtail-config.yml || true
-          scp -i ~/.ssh/deploy_key ops/monitoring/tempo/tempo.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/tempo/tempo.yml || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/{alertmanager,prometheus,grafana,loki,promtail,tempo}'
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/alertmanager/alertmanager.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/alertmanager/alertmanager.yml || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/prometheus/prometheus.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/prometheus.yml || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/prometheus/alerts.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/prometheus/alerts.yml || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/loki/loki-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/loki/loki-config.yml || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/promtail/promtail-config.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/promtail/promtail-config.yml || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/monitoring/tempo/tempo.yml ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/tempo/tempo.yml || true
           # Copy Grafana provisioning
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/grafana/provisioning/{datasources,dashboards}'
-          scp -i ~/.ssh/deploy_key -r ops/monitoring/grafana/provisioning/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/grafana/provisioning/ || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/monitoring/grafana/provisioning/{datasources,dashboards}'
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} -r ops/monitoring/grafana/provisioning/* ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/monitoring/grafana/provisioning/ || true
 
           # Copy diagnostic scripts
-          scp -i ~/.ssh/deploy_key ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
-          scp -i ~/.ssh/deploy_key ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
-          scp -i ~/.ssh/deploy_key ops/scripts/test-monitoring.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/test-monitoring.sh || true
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh /opt/fin-u-ch/test-monitoring.sh' || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/diagnose-deploy.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/diagnose-deploy.sh || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/fix-deployment.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/fix-deployment.sh || true
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} ops/scripts/test-monitoring.sh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/test-monitoring.sh || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'chmod +x /opt/fin-u-ch/diagnose-deploy.sh /opt/fin-u-ch/fix-deployment.sh /opt/fin-u-ch/test-monitoring.sh' || true
 
       - name: Upload SSL certificate
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/ssl'
-          scp -i ~/.ssh/deploy_key -r ops/nginx/ssl/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/ssl || true
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'mkdir -p /opt/fin-u-ch/nginx/ssl'
+          scp -i ~/.ssh/deploy_key -P ${{ env.SSH_PORT }} -r ops/nginx/ssl/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/fin-u-ch/nginx/ssl || true
           if [ -n "${{ secrets.SSL_FULLCHAIN_B64 }}" ] && [ -n "${{ secrets.SSL_PRIVKEY_B64 }}" ]; then
-            echo "${{ secrets.SSL_FULLCHAIN_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/fullchain.pem'
-            echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
+            echo "${{ secrets.SSL_FULLCHAIN_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/fullchain.pem'
+            echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
           fi
 
       - name: Ensure VPS environment variables
         run: |
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/fin-u-ch
             # Убедимся, что DOCKER_IMAGE_PREFIX установлен правильно
             if ! grep -q "DOCKER_IMAGE_PREFIX" .env 2>/dev/null; then
@@ -821,7 +852,7 @@ jobs:
       - name: Deploy to VPS
         run: |
           # Create deploy script on VPS
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /opt/fin-u-ch/deploy.sh" << 'DEPLOY_SCRIPT'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cat > /opt/fin-u-ch/deploy.sh" << 'DEPLOY_SCRIPT'
           #!/bin/bash
           set -e
 
@@ -901,11 +932,11 @@ jobs:
           DEPLOY_SCRIPT
 
           # Make script executable
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /opt/fin-u-ch/deploy.sh"
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "chmod +x /opt/fin-u-ch/deploy.sh"
 
           # Execute deploy script with environment variables
           echo "🚀 Executing deployment script..."
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
             "GHCR_TOKEN='${{ secrets.GHCR_TOKEN }}' GITHUB_OWNER='${{ github.repository_owner }}' /opt/fin-u-ch/deploy.sh"
 
       - name: Health check
@@ -913,15 +944,14 @@ jobs:
           echo "Waiting for services to start (45 seconds)..."
           sleep 45
 
-          # Use IP address directly to avoid DNS propagation issues
-          # Once DNS is fully propagated, can switch back to domain name
-          SERVER_IP="${{ secrets.VPS_HOST }}"
+          # Checking availability by domain name
+          SERVER_DOMAIN="${{ secrets.SERVER_DOMAIN }}"
 
           # Retry health check up to 5 times with 10 second intervals
           for i in {1..5}; do
             echo "Health check attempt $i/5..."
-            echo "Checking: http://${SERVER_IP}/api/health"
-            if curl -L --max-redirs 3 -f http://${SERVER_IP}/api/health; then
+            echo "Checking: http://${SERVER_DOMAIN}/api/health"
+            if curl -L --max-redirs 3 -f http://${SERVER_DOMAIN}/api/health; then
               echo "✅ Health check passed!"
               exit 0
             fi
@@ -934,7 +964,7 @@ jobs:
           echo "❌ Health check failed after 5 attempts"
           echo ""
           echo "=== Starting diagnostic... ==="
-          ssh -i ~/.ssh/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAGNOSTIC'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'DIAGNOSTIC'
             echo "1. Container status:"
             docker ps --filter name=fin-u-ch --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
