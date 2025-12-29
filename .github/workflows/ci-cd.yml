@@ -860,10 +860,20 @@ jobs:
             echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
           fi
 
+      - name: Copy .env file from home directory
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'if [ -f ~/.env ]; then cp ~/.env /opt/fin-u-ch/.env && echo "✅ .env file copied from home directory"; else echo "⚠️ ~/.env not found, will create minimal .env"; fi'
+
       - name: Ensure VPS environment variables
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/fin-u-ch
+            # Создаем минимальный .env если его нет
+            if [ ! -f .env ]; then
+              echo "Creating minimal .env file..."
+              touch .env
+            fi
             # Убедимся, что DOCKER_IMAGE_PREFIX установлен правильно
             if ! grep -q "DOCKER_IMAGE_PREFIX" .env 2>/dev/null; then
               echo "DOCKER_IMAGE_PREFIX=${{ github.repository_owner }}" >> .env
