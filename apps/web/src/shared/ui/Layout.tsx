@@ -247,7 +247,18 @@ export const Layout = ({ children }: LayoutProps): JSX.Element => {
     editingData?: unknown; // Данные для редактирования
   }>({ isOpen: false, title: '', catalogType: '' });
 
-  const isActive = (href: string): boolean => location.pathname === href;
+  const isActive = (href: string): boolean => {
+    // Точное совпадение
+    if (location.pathname === href) {
+      return true;
+    }
+    // Для вложенных маршрутов проверяем, начинается ли путь с href + "/"
+    // Например, /budgets/123 должен быть активным для href="/budgets"
+    if (href !== '/' && location.pathname.startsWith(href + '/')) {
+      return true;
+    }
+    return false;
+  };
 
   const isPopoverActive = (itemName: string): boolean =>
     menuPopoverState.isOpen && menuPopoverState.activeParentName === itemName;
