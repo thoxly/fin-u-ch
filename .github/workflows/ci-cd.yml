@@ -741,7 +741,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: http://83.166.244.139
+      url: http://176.124.200.188
 
     steps:
       - name: Checkout code
@@ -752,7 +752,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          
+
           SSH_PORT="${{ secrets.VPS_SSH_PORT }}"
           if [ -z "$SSH_PORT" ]; then
             echo "Using default SSH port 22"
@@ -768,7 +768,11 @@ jobs:
           fi
           echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
 
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} -p $SSH_PORT >> ~/.ssh/known_hosts
+          # Use validated SSH_PORT with proper quoting
+          echo "Scanning SSH host keys on port $SSH_PORT..."
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" -p "$SSH_PORT" >> ~/.ssh/known_hosts 2>&1 || {
+            echo "⚠️ Warning: ssh-keyscan failed, but continuing..."
+          }
 
       - name: Create backup before deployment
         run: |
