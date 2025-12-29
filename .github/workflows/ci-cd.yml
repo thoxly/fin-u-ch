@@ -799,7 +799,7 @@ jobs:
       - name: Create backup before deployment
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+            'mkdir -p /opt/fin-u-ch/backups && cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
       - name: Replace yourdomain.com with actual domain
         run: |
@@ -818,6 +818,11 @@ jobs:
           else
             echo "PROXY_IP secret is not set, skipping prepend"
           fi
+
+      - name: Ensure deployment directory exists
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'mkdir -p /opt/fin-u-ch/{nginx/conf.d,nginx/ssl,monitoring/{alertmanager,prometheus,grafana/provisioning/{datasources,dashboards},loki,promtail,tempo},backups}'
 
       - name: Copy docker-compose and scripts to VPS
         run: |
