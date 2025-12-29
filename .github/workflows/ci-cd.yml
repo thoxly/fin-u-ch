@@ -862,8 +862,17 @@ jobs:
 
       - name: Copy .env file from home directory
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'if [ -f ~/.env ]; then cp ~/.env /opt/fin-u-ch/.env && echo "✅ .env file copied from home directory"; else echo "⚠️ ~/.env not found, will create minimal .env"; fi'
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            if [ -f ~/.env ]; then
+              cp ~/.env /opt/fin-u-ch/.env
+              chmod 600 /opt/fin-u-ch/.env
+              echo "✅ .env file copied from home directory"
+              echo "📋 Checking .env file (first 5 lines, no secrets):"
+              head -n 5 /opt/fin-u-ch/.env | sed 's/=.*/=***/' || true
+            else
+              echo "⚠️ ~/.env not found, will create minimal .env"
+            fi
+          EOF
 
       - name: Ensure VPS environment variables
         run: |
@@ -899,6 +908,25 @@ jobs:
 
           echo "=== Starting deployment at $(date) ==="
           cd /opt/fin-u-ch
+
+          # Check .env file
+          echo "=== Checking .env file ==="
+          if [ ! -f .env ]; then
+            echo "❌ ERROR: .env file not found in /opt/fin-u-ch/"
+            echo "Please ensure .env file exists in /opt/fin-u-ch/ or in ~/.env"
+            exit 1
+          fi
+          echo "✅ .env file exists"
+          echo "📋 .env file variables (masked):"
+          grep -E "^[A-Z_]+=" .env | sed 's/=.*/=***/' | head -n 10 || echo "No variables found"
+
+          # Verify critical variables
+          if ! grep -q "POSTGRES_PASSWORD" .env; then
+            echo "⚠️ WARNING: POSTGRES_PASSWORD not found in .env"
+          fi
+          if ! grep -q "DATABASE_URL" .env; then
+            echo "⚠️ WARNING: DATABASE_URL not found in .env"
+          fi
 
           # Login to GHCR
           echo "📦 Logging into GHCR..."
