@@ -799,7 +799,7 @@ jobs:
       - name: Create backup before deployment
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'mkdir -p /opt/fin-u-ch/backups && cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+            'mkdir -p /opt/fin-u-ch/backups && cd /opt/fin-u-ch && docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
       - name: Replace yourdomain.com with actual domain
         run: |
@@ -938,7 +938,7 @@ jobs:
 
           # Pull new images
           echo "=== Pulling new images ==="
-          docker compose -f docker-compose.prod.yml pull api web worker nginx
+          docker compose -f docker-compose.prod.yml --env-file .env pull api web worker nginx
 
           # Check available images
           echo "=== Available images ==="
@@ -946,7 +946,7 @@ jobs:
 
           # Check for failed migrations and resolve if needed
           echo "=== Checking for failed migrations ==="
-          docker compose -f docker-compose.prod.yml run --rm api sh -c "
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api sh -c "
             if npx prisma migrate status 2>&1 | grep -q 'failed migration'; then
               echo '⚠️  Found failed migrations, attempting to resolve...'
               # Resolve known failed migrations that were removed from code
@@ -962,27 +962,27 @@ jobs:
 
           # Apply database migrations
           echo "=== Applying database migrations ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx prisma migrate deploy
 
           # Create demo user for production
           echo "=== Creating demo user for production ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx tsx /app/scripts/setup-production-demo.ts || echo "Demo user creation failed, continuing deployment..."
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx tsx /app/scripts/setup-production-demo.ts || echo "Demo user creation failed, continuing deployment..."
 
           # Stop and remove old containers (including manually created ones)
           echo "=== Stopping and removing old containers ==="
           # Force remove containers by name (works for both compose and manually created)
           docker rm -f fin-u-ch-api fin-u-ch-web fin-u-ch-worker fin-u-ch-nginx 2>/dev/null || true
           # Also try through compose
-          docker compose -f docker-compose.prod.yml stop api web worker nginx 2>/dev/null || true
-          docker compose -f docker-compose.prod.yml rm -f api web worker nginx 2>/dev/null || true
+          docker compose -f docker-compose.prod.yml --env-file .env stop api web worker nginx 2>/dev/null || true
+          docker compose -f docker-compose.prod.yml --env-file .env rm -f api web worker nginx 2>/dev/null || true
 
           # Start with new images (including monitoring services)
           echo "=== Starting containers with new images ==="
-          docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker nginx
+          docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate --pull always api web worker nginx
 
           # Start monitoring services (if not already running)
           echo "=== Starting monitoring services ==="
-          docker compose -f docker-compose.prod.yml up -d uptime-kuma prometheus alertmanager grafana loki promtail tempo node-exporter cadvisor postgres-exporter redis-exporter || true
+          docker compose -f docker-compose.prod.yml --env-file .env up -d uptime-kuma prometheus alertmanager grafana loki promtail tempo node-exporter cadvisor postgres-exporter redis-exporter || true
 
           # Wait for health checks
           echo "=== Waiting for services to be healthy (30 seconds) ==="
