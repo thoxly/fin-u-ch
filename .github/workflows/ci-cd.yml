@@ -741,7 +741,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: http://${{ secrets.SERVER_DOMAIN }}
+      url: http://176.124.200.188
 
     steps:
       - name: Checkout code
