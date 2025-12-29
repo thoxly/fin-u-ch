@@ -769,10 +769,32 @@ jobs:
           echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
 
           # Use validated SSH_PORT with proper quoting
+          # Try to scan host keys with retry
           echo "Scanning SSH host keys on port $SSH_PORT..."
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" -p "$SSH_PORT" >> ~/.ssh/known_hosts 2>&1 || {
-            echo "⚠️ Warning: ssh-keyscan failed, but continuing..."
-          }
+          for i in {1..5}; do
+            if ssh-keyscan -H "${{ secrets.VPS_HOST }}" -p "$SSH_PORT" >> ~/.ssh/known_hosts 2>&1; then
+              echo "✅ SSH host key added successfully"
+              break
+            else
+              echo "⚠️ Attempt $i/5 failed, retrying in 2 seconds..."
+              if [ $i -eq 5 ]; then
+                echo "❌ Failed to add SSH host key after 5 attempts"
+                echo "Will use StrictHostKeyChecking=accept-new for SSH connections"
+              else
+                sleep 2
+              fi
+            fi
+          done
+
+          # Configure SSH to accept new host keys automatically
+          {
+            echo "Host ${{ secrets.VPS_HOST }}"
+            echo "  StrictHostKeyChecking accept-new"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  Port $SSH_PORT"
+          } >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Create backup before deployment
         run: |
