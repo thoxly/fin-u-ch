@@ -741,7 +741,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: production
-      url: http://83.166.244.139
+      url: http://176.124.200.188
 
     steps:
       - name: Checkout code
@@ -752,7 +752,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          
+
           SSH_PORT="${{ secrets.VPS_SSH_PORT }}"
           if [ -z "$SSH_PORT" ]; then
             echo "Using default SSH port 22"
@@ -768,12 +768,38 @@ jobs:
           fi
           echo "SSH_PORT=$SSH_PORT" >> $GITHUB_ENV
 
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} -p $SSH_PORT >> ~/.ssh/known_hosts
+          # Use validated SSH_PORT with proper quoting
+          # Try to scan host keys with retry
+          echo "Scanning SSH host keys on port $SSH_PORT..."
+          for i in {1..5}; do
+            if ssh-keyscan -H "${{ secrets.VPS_HOST }}" -p "$SSH_PORT" >> ~/.ssh/known_hosts 2>&1; then
+              echo "✅ SSH host key added successfully"
+              break
+            else
+              echo "⚠️ Attempt $i/5 failed, retrying in 2 seconds..."
+              if [ $i -eq 5 ]; then
+                echo "❌ Failed to add SSH host key after 5 attempts"
+                echo "Will use StrictHostKeyChecking=accept-new for SSH connections"
+              else
+                sleep 2
+              fi
+            fi
+          done
+
+          # Configure SSH to accept new host keys automatically
+          {
+            echo "Host ${{ secrets.VPS_HOST }}"
+            echo "  StrictHostKeyChecking accept-new"
+            echo "  UserKnownHostsFile ~/.ssh/known_hosts"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  Port $SSH_PORT"
+          } >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Create backup before deployment
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-            'cd /opt/fin-u-ch && docker compose exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
+            'mkdir -p /opt/fin-u-ch/backups && cd /opt/fin-u-ch && docker compose -f docker-compose.prod.yml --env-file .env exec -T postgres pg_dump -U postgres fin_u_ch > backups/backup-$(date +%Y%m%d-%H%M%S).sql' || true
 
       - name: Replace yourdomain.com with actual domain
         run: |
@@ -792,6 +818,11 @@ jobs:
           else
             echo "PROXY_IP secret is not set, skipping prepend"
           fi
+
+      - name: Ensure deployment directory exists
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+            'mkdir -p /opt/fin-u-ch/{nginx/conf.d,nginx/ssl,monitoring/{alertmanager,prometheus,grafana/provisioning/{datasources,dashboards},loki,promtail,tempo},backups}'
 
       - name: Copy docker-compose and scripts to VPS
         run: |
@@ -829,10 +860,29 @@ jobs:
             echo "${{ secrets.SSL_PRIVKEY_B64 }}" | ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} 'base64 -d > /opt/fin-u-ch/nginx/ssl/privkey.pem'
           fi
 
+      - name: Copy .env file from home directory
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            if [ -f ~/.env ]; then
+              cp ~/.env /opt/fin-u-ch/.env
+              chmod 600 /opt/fin-u-ch/.env
+              echo "✅ .env file copied from home directory"
+              echo "📋 Checking .env file (first 5 lines, no secrets):"
+              head -n 5 /opt/fin-u-ch/.env | sed 's/=.*/=***/' || true
+            else
+              echo "⚠️ ~/.env not found, will create minimal .env"
+            fi
+          EOF
+
       - name: Ensure VPS environment variables
         run: |
           ssh -i ~/.ssh/deploy_key -p ${{ env.SSH_PORT }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/fin-u-ch
+            # Создаем минимальный .env если его нет
+            if [ ! -f .env ]; then
+              echo "Creating minimal .env file..."
+              touch .env
+            fi
             # Убедимся, что DOCKER_IMAGE_PREFIX установлен правильно
             if ! grep -q "DOCKER_IMAGE_PREFIX" .env 2>/dev/null; then
               echo "DOCKER_IMAGE_PREFIX=${{ github.repository_owner }}" >> .env
@@ -859,6 +909,25 @@ jobs:
           echo "=== Starting deployment at $(date) ==="
           cd /opt/fin-u-ch
 
+          # Check .env file
+          echo "=== Checking .env file ==="
+          if [ ! -f .env ]; then
+            echo "❌ ERROR: .env file not found in /opt/fin-u-ch/"
+            echo "Please ensure .env file exists in /opt/fin-u-ch/ or in ~/.env"
+            exit 1
+          fi
+          echo "✅ .env file exists"
+          echo "📋 .env file variables (masked):"
+          grep -E "^[A-Z_]+=" .env | sed 's/=.*/=***/' | head -n 10 || echo "No variables found"
+
+          # Verify critical variables
+          if ! grep -q "POSTGRES_PASSWORD" .env; then
+            echo "⚠️ WARNING: POSTGRES_PASSWORD not found in .env"
+          fi
+          if ! grep -q "DATABASE_URL" .env; then
+            echo "⚠️ WARNING: DATABASE_URL not found in .env"
+          fi
+
           # Login to GHCR
           echo "📦 Logging into GHCR..."
           echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_OWNER" --password-stdin
@@ -869,7 +938,7 @@ jobs:
 
           # Pull new images
           echo "=== Pulling new images ==="
-          docker compose -f docker-compose.prod.yml pull api web worker nginx
+          docker compose -f docker-compose.prod.yml --env-file .env pull api web worker nginx
 
           # Check available images
           echo "=== Available images ==="
@@ -877,7 +946,7 @@ jobs:
 
           # Check for failed migrations and resolve if needed
           echo "=== Checking for failed migrations ==="
-          docker compose -f docker-compose.prod.yml run --rm api sh -c "
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api sh -c "
             if npx prisma migrate status 2>&1 | grep -q 'failed migration'; then
               echo '⚠️  Found failed migrations, attempting to resolve...'
               # Resolve known failed migrations that were removed from code
@@ -893,27 +962,27 @@ jobs:
 
           # Apply database migrations
           echo "=== Applying database migrations ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx prisma migrate deploy
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx prisma migrate deploy
 
           # Create demo user for production
           echo "=== Creating demo user for production ==="
-          docker compose -f docker-compose.prod.yml run --rm api npx tsx /app/scripts/setup-production-demo.ts || echo "Demo user creation failed, continuing deployment..."
+          docker compose -f docker-compose.prod.yml --env-file .env run --rm api npx tsx /app/scripts/setup-production-demo.ts || echo "Demo user creation failed, continuing deployment..."
 
           # Stop and remove old containers (including manually created ones)
           echo "=== Stopping and removing old containers ==="
           # Force remove containers by name (works for both compose and manually created)
           docker rm -f fin-u-ch-api fin-u-ch-web fin-u-ch-worker fin-u-ch-nginx 2>/dev/null || true
           # Also try through compose
-          docker compose -f docker-compose.prod.yml stop api web worker nginx 2>/dev/null || true
-          docker compose -f docker-compose.prod.yml rm -f api web worker nginx 2>/dev/null || true
+          docker compose -f docker-compose.prod.yml --env-file .env stop api web worker nginx 2>/dev/null || true
+          docker compose -f docker-compose.prod.yml --env-file .env rm -f api web worker nginx 2>/dev/null || true
 
           # Start with new images (including monitoring services)
           echo "=== Starting containers with new images ==="
-          docker compose -f docker-compose.prod.yml up -d --force-recreate --pull always api web worker nginx
+          docker compose -f docker-compose.prod.yml --env-file .env up -d --force-recreate --pull always api web worker nginx
 
           # Start monitoring services (if not already running)
           echo "=== Starting monitoring services ==="
-          docker compose -f docker-compose.prod.yml up -d uptime-kuma prometheus alertmanager grafana loki promtail tempo node-exporter cadvisor postgres-exporter redis-exporter || true
+          docker compose -f docker-compose.prod.yml --env-file .env up -d uptime-kuma prometheus alertmanager grafana loki promtail tempo node-exporter cadvisor postgres-exporter redis-exporter || true
 
           # Wait for health checks
           echo "=== Waiting for services to be healthy (30 seconds) ==="

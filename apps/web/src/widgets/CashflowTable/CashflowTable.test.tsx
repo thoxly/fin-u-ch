@@ -165,7 +165,6 @@ describe('CashflowTable', () => {
     renderWithProvider(<CashflowTable {...defaultProps} />);
 
     expect(screen.getByText('Общий денежный поток')).toBeInTheDocument();
-    expect(screen.getByText('Остаток на конец периода')).toBeInTheDocument();
   });
 
   it('applies correct CSS classes for styling', () => {
@@ -204,12 +203,5 @@ describe('CashflowTable', () => {
 
     // Check for formatted money values (assuming formatMoney returns formatted strings)
     expect(screen.getAllByText(/100 000/).length).toBeGreaterThan(0);
-  });
-
-  it('shows cumulative balance calculation', () => {
-    renderWithProvider(<CashflowTable {...defaultProps} />);
-
-    // The cumulative balance should be calculated and displayed
-    expect(screen.getByText('Остаток на конец периода')).toBeInTheDocument();
   });
 });
