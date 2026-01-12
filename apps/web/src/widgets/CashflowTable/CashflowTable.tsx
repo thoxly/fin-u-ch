@@ -362,40 +362,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
     return showPlan ? columnWidths.month / 2 : columnWidths.month;
   }, [columnWidths.month, showPlan]);
 
-  const cumulativeBalances = useMemo(() => {
-    let balance = 0;
-    return allMonths.map((month) => {
-      const monthTotal = data.activities.reduce((sum, activity) => {
-        const incomeTotal = activity.incomeGroups.reduce((incomeSum, group) => {
-          const monthData = group.months.find((m) => m.month === month);
-          return incomeSum + (monthData?.amount || 0);
-        }, 0);
-        const expenseTotal = activity.expenseGroups.reduce(
-          (expenseSum, group) => {
-            const monthData = group.months.find((m) => m.month === month);
-            return expenseSum + (monthData?.amount || 0);
-          },
-          0
-        );
-        return sum + (incomeTotal - expenseTotal);
-      }, 0);
-      balance += monthTotal;
-      return { month, balance };
-    });
-  }, [allMonths, data.activities]);
-
-  const planCumulativeBalances = useMemo(() => {
-    if (!planData || !planData.activities || allMonths.length === 0) {
-      return [] as Array<{ month: string; balance: number }>;
-    }
-
-    let balance = 0;
-    return allMonths.map((month) => {
-      balance += getPlanMonthNet(month);
-      return { month, balance };
-    });
-  }, [planData, allMonths, getPlanMonthNet]);
-
   const totalNetCashflow = data.activities.reduce(
     (sum, activity) => sum + activity.netCashflow,
     0
@@ -1333,81 +1299,6 @@ export const CashflowTable: React.FC<CashflowTableProps> = ({
                   )}
                 </td>
               )}
-            </tr>
-
-            <tr className="bg-zinc-50 dark:bg-[#202020] border-t border-gray-300 dark:border-t dark:border-white/8 sticky bottom-0 z-20">
-              <td
-                className="px-4 py-2 font-normal text-sm text-zinc-400 dark:text-zinc-400 sticky left-0 bg-zinc-50 dark:bg-[#202020] z-30 shadow-[4px_0_6px_-1px_rgba(0,0,0,0.2)] dark:shadow-[4px_0_6px_-1px_rgba(0,0,0,0.5)]"
-                style={{
-                  width: `${columnWidths.article}px`,
-                  color: '#A1A1AA',
-                }}
-              >
-                Остаток на конец периода
-              </td>
-              {cumulativeBalances.map(({ month, balance }, idx) => {
-                const planBalance = planCumulativeBalances[idx]?.balance ?? 0;
-                const isPositive = balance >= 0;
-
-                if (showPlan) {
-                  const deviation = balance - planBalance;
-                  return (
-                    <React.Fragment key={`balance-${month}`}>
-                      <td
-                        className={`px-3 py-2 text-right text-[13px] font-normal text-zinc-400 dark:text-zinc-400 border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] align-top ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
-                        style={{ minWidth: `${subColumnWidth}px` }}
-                      >
-                        {formatNumber(planBalance)}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] align-top ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'} ${showDeviation && deviation !== 0 ? 'pb-5' : ''}`}
-                        style={{ minWidth: `${subColumnWidth}px` }}
-                      >
-                        <div>{formatNumber(balance)}</div>
-                        {showDeviation && deviation !== 0 && (
-                          <div
-                            className={`text-[11px] mt-1 leading-tight ${
-                              deviation > 0
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400'
-                            }`}
-                          >
-                            {deviation > 0 ? '+' : ''}
-                            {formatNumber(deviation)}
-                          </div>
-                        )}
-                      </td>
-                    </React.Fragment>
-                  );
-                }
-
-                return (
-                  <td
-                    key={`balance-${month}`}
-                    className={`px-3 py-2 text-right text-[13px] font-normal border-l border-gray-300 dark:border-gray-700 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${isPositive ? 'text-zinc-400 dark:text-zinc-400' : 'text-red-700 dark:text-red-400'}`}
-                    style={{ minWidth: `${columnWidths.month}px` }}
-                  >
-                    {formatNumber(balance)}
-                  </td>
-                );
-              })}
-              <td
-                className={`px-4 py-2 text-right text-[13px] font-normal border-l-2 border-gray-300 dark:border-l dark:border-white/10 whitespace-nowrap tabular-nums bg-zinc-50 dark:bg-[#202020] ${
-                  (cumulativeBalances[cumulativeBalances.length - 1]?.balance ||
-                    0) >= 0
-                    ? 'text-zinc-400 dark:text-zinc-400'
-                    : 'text-red-700 dark:text-red-400'
-                }`}
-                style={{ minWidth: `${columnWidths.total}px` }}
-              >
-                {formatNumber(
-                  hasFactData
-                    ? cumulativeBalances[cumulativeBalances.length - 1]
-                        ?.balance || 0
-                    : planCumulativeBalances[planCumulativeBalances.length - 1]
-                        ?.balance || 0
-                )}
-              </td>
             </tr>
           </tbody>
         </table>
