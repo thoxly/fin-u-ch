@@ -8,6 +8,12 @@ import {
 import { Deal } from '@shared/types/catalogs';
 import { useState, useEffect } from 'react';
 
+interface MutationResult {
+  id?: string | number;
+  _id?: string | number;
+  data?: { id?: string | number };
+}
+
 export const DealForm = ({
   deal,
   onClose,
@@ -49,9 +55,23 @@ export const DealForm = ({
         await update({ id: deal.id, data }).unwrap();
         onClose();
       } else {
-        const result = await create(data).unwrap();
-        if (onSuccess && result.id) {
-          onSuccess(result.id);
+        const result = (await create(data).unwrap()) as
+          | MutationResult
+          | string
+          | number;
+
+        let createdId: string | undefined;
+
+        if (typeof result === 'string' || typeof result === 'number') {
+          createdId = String(result);
+        } else if (typeof result === 'object' && result !== null) {
+          createdId = String(
+            result.id || result._id || result.data?.id || ''
+          ).replace(/^undefined$/, '');
+        }
+
+        if (onSuccess && createdId) {
+          onSuccess(createdId);
         } else {
           onClose();
         }

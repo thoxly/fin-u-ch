@@ -5,6 +5,7 @@ import { Button } from '../../shared/ui/Button';
 import {
   useGetMeQuery,
   useDeleteMyAccountMutation,
+  useLogoutMutation,
 } from '../../store/api/authApi';
 import { PersonalSettingsSection } from '../../features/user-profile/PersonalSettingsSection';
 import { ConfirmDeleteModal } from '../../shared/ui/ConfirmDeleteModal';

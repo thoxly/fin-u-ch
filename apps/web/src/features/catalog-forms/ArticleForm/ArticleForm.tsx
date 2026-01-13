@@ -17,6 +17,12 @@ interface ArticleFormProps {
   initialParentId?: string;
 }
 
+interface MutationResult {
+  id?: string | number;
+  _id?: string | number;
+  data?: { id?: string | number };
+}
+
 export const ArticleForm = ({
   article,
   onClose,
@@ -69,16 +75,27 @@ export const ArticleForm = ({
           },
         }).unwrap();
       } else {
-        const result = await create({
+        const result = (await create({
           name,
           type,
           activity,
           parentId: parentId || undefined,
           isActive: true,
           counterpartyId: counterpartyId || undefined,
-        }).unwrap();
-        if (onSuccess && result.id) {
-          onSuccess(result.id);
+        }).unwrap()) as MutationResult | string | number;
+
+        let createdId: string | undefined;
+
+        if (typeof result === 'string' || typeof result === 'number') {
+          createdId = String(result);
+        } else if (typeof result === 'object' && result !== null) {
+          createdId = String(
+            result.id || result._id || result.data?.id || ''
+          ).replace(/^undefined$/, '');
+        }
+
+        if (onSuccess && createdId) {
+          onSuccess(createdId);
         } else {
           onClose();
         }
@@ -102,7 +119,9 @@ export const ArticleForm = ({
       <Select
         label="Тип"
         value={type}
-        onChange={(value) => setType(value)}
+        onChange={(value) =>
+          setType(value as 'income' | 'expense' | 'transfer')
+        }
         options={[
           { value: 'income', label: 'Поступления' },
           { value: 'expense', label: 'Списания' },
@@ -112,7 +131,9 @@ export const ArticleForm = ({
       <Select
         label="Деятельность"
         value={activity}
-        onChange={(value) => setActivity(value)}
+        onChange={(value) =>
+          setActivity(value as 'operating' | 'investing' | 'financing')
+        }
         options={[
           { value: 'operating', label: 'Операционная' },
           { value: 'investing', label: 'Инвестиционная' },
@@ -124,7 +145,7 @@ export const ArticleForm = ({
         label="Группа"
         value={parentId}
         onChange={(value) => setParentId(value)}
-        articleType={type}
+        articleType={type === 'transfer' ? 'expense' : type}
         excludeArticleId={article?.id}
         placeholder="Без группы"
       />

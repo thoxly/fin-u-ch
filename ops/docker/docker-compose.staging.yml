@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -36,17 +38,17 @@ services:
       retries: 5
 
   api:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly}/fin-u-ch-api:${IMAGE_TAG:-latest}
+    image: fin-u-ch-api:latest
     container_name: fin-u-ch-api
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fin_u_ch}
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       NODE_ENV: production
       PORT: 4000
-      FRONTEND_URL: ${FRONTEND_URL}
+      FRONTEND_URL: http://localhost:80
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USER: ${SMTP_USER}
@@ -73,7 +75,7 @@ services:
       start_period: 40s
 
   web:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly}/fin-u-ch-web:${IMAGE_TAG:-latest}
+    image: fin-u-ch-web:latest
     container_name: fin-u-ch-web
     networks:
       - fin-u-ch-network
@@ -90,10 +92,10 @@ services:
       start_period: 10s
 
   worker:
-    image: ${DOCKER_REGISTRY:-ghcr.io}/${DOCKER_IMAGE_PREFIX:-thoxly}/fin-u-ch-worker:${IMAGE_TAG:-latest}
+    image: fin-u-ch-worker:latest
     container_name: fin-u-ch-worker
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fin_u_ch}
       REDIS_URL: redis://redis:6379
       NODE_ENV: production
       WORKER_METRICS_PORT: ${WORKER_METRICS_PORT:-4001}
@@ -122,11 +124,8 @@ services:
     container_name: fin-u-ch-nginx
     ports:
       - '80:80'
-      - '443:443'
     volumes:
-      - /opt/fin-u-ch/nginx/${NGINX_CONFIG:-nginx.conf}:/etc/nginx/conf.d/default.conf:ro
-      - ${SSL_CERT_PATH:-/opt/fin-u-ch/nginx/ssl}:/etc/nginx/ssl:ro
-      - certbot_www:/var/www/certbot:ro
+      - ../nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - api
       - web
@@ -143,41 +142,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # Optional: Certbot for SSL certificates
-  certbot:
-    image: certbot/certbot
-    container_name: fin-u-ch-certbot
-    volumes:
-      - ${SSL_CERT_PATH:-/opt/fin-u-ch/nginx/ssl}:/etc/letsencrypt
-      - certbot_www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-    networks:
-      - fin-u-ch-network
-    profiles:
-      - ssl
-
-  # Uptime Kuma - Uptime monitoring
-  uptime-kuma:
-    image: louislam/uptime-kuma:latest
-    container_name: fin-u-ch-uptime-kuma
-    volumes:
-      - uptime_kuma_data:/app/data
-    ports:
-      - '3001:3001'
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'wget --quiet --tries=1 --spider http://localhost:3001 || exit 1',
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Prometheus - Metrics collection
+  # Metrics and Monitoring
   prometheus:
     image: prom/prometheus:latest
     container_name: fin-u-ch-prometheus
@@ -187,7 +152,6 @@ services:
       - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-remote-write-receiver'
     volumes:
       - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -197,33 +161,7 @@ services:
     networks:
       - fin-u-ch-network
     restart: unless-stopped
-    depends_on:
-      - alertmanager
 
-  # Alertmanager - Alert routing
-  alertmanager:
-    image: prom/alertmanager:latest
-    container_name: fin-u-ch-alertmanager
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        envsubst '$$TELEGRAM_BOT_TOKEN $$TELEGRAM_CHAT_ID' < /etc/alertmanager/alertmanager.yml.template > /etc/alertmanager/alertmanager.yml
-        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
-    command: []
-    volumes:
-      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.template:ro
-      - alertmanager_data:/alertmanager
-    ports:
-      - '9093:9093'
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-    environment:
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-
-  # Grafana - Visualization
   grafana:
     image: grafana/grafana:latest
     container_name: fin-u-ch-grafana
@@ -233,7 +171,7 @@ services:
       - GF_SERVER_ROOT_URL=http://localhost:3000
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
       - '3000:3000'
     networks:
@@ -242,25 +180,6 @@ services:
     depends_on:
       - prometheus
 
-  # Node Exporter - Host metrics
-  node-exporter:
-    image: prom/node-exporter:latest
-    container_name: fin-u-ch-node-exporter
-    command:
-      - '--path.procfs=/host/proc'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
-    volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
-    ports:
-      - '9100:9100'
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-
-  # cAdvisor - Container metrics
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: fin-u-ch-cadvisor
@@ -279,54 +198,6 @@ services:
       - fin-u-ch-network
     restart: unless-stopped
 
-  # Loki - Log aggregation
-  loki:
-    image: grafana/loki:latest
-    container_name: fin-u-ch-loki
-    command: -config.file=/etc/loki/loki-config.yml -config.expand-env=true
-    volumes:
-      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
-      - loki_data:/loki
-    ports:
-      - '3100:3100'
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-    environment:
-      - LOKI_RETENTION=${LOKI_RETENTION:-720h}
-
-  # Promtail - Log collection
-  promtail:
-    image: grafana/promtail:latest
-    container_name: fin-u-ch-promtail
-    command: -config.file=/etc/promtail/promtail-config.yml
-    volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-    depends_on:
-      - loki
-
-  # Tempo - Distributed tracing
-  tempo:
-    image: grafana/tempo:latest
-    container_name: fin-u-ch-tempo
-    command: ['-config.file=/etc/tempo/tempo.yml']
-    volumes:
-      - ./monitoring/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
-      - tempo_data:/var/tempo
-    ports:
-      - '4317:4317' # OTLP gRPC receiver
-      - '4318:4318' # OTLP HTTP receiver
-      - '3200:3200' # Tempo HTTP API
-    networks:
-      - fin-u-ch-network
-    restart: unless-stopped
-
-  # PostgreSQL Exporter
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
     container_name: fin-u-ch-postgres-exporter
@@ -340,7 +211,6 @@ services:
     depends_on:
       - postgres
 
-  # Redis Exporter
   redis-exporter:
     image: oliver006/redis_exporter:latest
     container_name: fin-u-ch-redis-exporter
@@ -356,13 +226,8 @@ services:
 
 volumes:
   postgres_data:
-  certbot_www:
-  uptime_kuma_data:
   prometheus_data:
-  alertmanager_data:
   grafana_data:
-  loki_data:
-  tempo_data:
 
 networks:
   fin-u-ch-network:

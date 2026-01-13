@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { classNames } from '../lib/utils';
 
 interface OffCanvasProps {
@@ -32,10 +33,17 @@ export const OffCanvas = ({
     };
   }, [isOpen, onClose]);
 
-  return (
+  // Не рендерим ничего, если компонент не открыт, чтобы не засорять DOM
+  // Но нам нужна анимация... OffCanvas использует opacity transition.
+  // Если мы используем Portal, мы можем рендерить всегда, но управлять видимостью.
+
+  // Для портала нам нужен document.body (доступен в браузере)
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       className={classNames(
-        'fixed inset-0 z-50 transition-opacity duration-300',
+        'fixed inset-0 z-[60] transition-opacity duration-300', // Increased z-index to be above modals (z-50)
         isOpen
           ? 'opacity-100 visible'
           : 'opacity-0 invisible pointer-events-none'
@@ -55,7 +63,7 @@ export const OffCanvas = ({
           // Фон и тень — с поддержкой темы
           'bg-white shadow-xl dark:bg-gray-800 dark:shadow-gray-900/50',
           // Общие стили
-          'transform transition-transform duration-300 ease-in-out z-50 flex flex-col'
+          'transform transition-transform duration-300 ease-in-out z-[60] flex flex-col'
         )}
         role="dialog"
         aria-modal="true"
@@ -99,6 +107,7 @@ export const OffCanvas = ({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

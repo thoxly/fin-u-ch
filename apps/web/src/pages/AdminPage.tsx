@@ -5,6 +5,7 @@ import { Card } from '../shared/ui/Card';
 import { usePermissions } from '../shared/hooks/usePermissions';
 import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
+import { withFeatureAccess } from '../shared/ui/FeatureBlocker';
 import { AuditLogsTab } from './admin/AuditLogsTab';
 
 type TabType = 'users' | 'roles' | 'audit';
@@ -119,8 +120,32 @@ export const AdminPage = () => {
 
         {/* Tab Content */}
         <div>
-          {activeTab === 'users' && <UsersTab />}
-          {activeTab === 'roles' && <RolesTab />}
+          {activeTab === 'users' && (
+            <>
+              {/* Users require TEAM or higher */}
+              {(() => {
+                const UsersTabWithAccess = withFeatureAccess(
+                  UsersTab,
+                  'roles',
+                  'TEAM'
+                );
+                return <UsersTabWithAccess />;
+              })()}
+            </>
+          )}
+          {activeTab === 'roles' && (
+            <>
+              {/* Roles require TEAM or higher */}
+              {(() => {
+                const RolesTabWithAccess = withFeatureAccess(
+                  RolesTab,
+                  'roles',
+                  'TEAM'
+                );
+                return <RolesTabWithAccess />;
+              })()}
+            </>
+          )}
           {activeTab === 'audit' && <AuditLogsTab />}
         </div>
       </div>
