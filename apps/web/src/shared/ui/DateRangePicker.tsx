@@ -24,6 +24,7 @@ interface DateRangePickerProps {
   startDate?: Date;
   endDate?: Date;
   onChange: (startDate: Date, endDate: Date) => void;
+  onReset?: () => void;
   label?: string;
   placeholder?: string;
   className?: string;
@@ -42,8 +43,8 @@ export const DateRangePicker = ({
   const [isOpen, setIsOpen] = useState(false);
   const today = new Date();
   const [range, setRange] = useState<Range>({
-    startDate: startDate || today,
-    endDate: endDate || today,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
     key: 'selection',
   });
   const [monthsCount, setMonthsCount] = useState(2);
@@ -234,14 +235,19 @@ export const DateRangePicker = ({
   ];
 
   useEffect(() => {
+    // Если заданы оба пропса - используем их
     if (startDate && endDate) {
-      setRange({
-        startDate,
-        endDate,
-        key: 'selection',
-      });
+      setRange({ startDate, endDate, key: 'selection' });
+      setFocusedRange([0, 0]);
+      return;
+    }
+
+    // Если оба пропса не заданы - очищаем внутренний диапазон (покажем placeholder)
+    if (!startDate && !endDate) {
+      setRange({ startDate: undefined, endDate: undefined, key: 'selection' });
       setFocusedRange([0, 0]);
     }
+    // В других случаях (один из пропсов задан) не меняем внутренний диапазон
   }, [startDate, endDate]);
 
   // При открытии календаря обновляем ключ, чтобы календарь показал правильный месяц
@@ -636,6 +642,26 @@ export const DateRangePicker = ({
                     </button>
                     <button
                       type="button"
+                      className="date-range-picker-close-btn"
+                      onClick={() => {
+                        if (typeof onReset === 'function') {
+                          onReset();
+                        } else {
+                          // Очистим внутренний диапазон
+                          setRange({
+                            startDate: undefined,
+                            endDate: undefined,
+                            key: 'selection',
+                          });
+                          setFocusedRange([0, 0]);
+                        }
+                        setIsOpen(false);
+                      }}
+                    >
+                      Сбросить
+                    </button>
+                    <button
+                      type="button"
                       className={classNames(
                         'date-range-picker-apply-btn',
                         (!range.startDate ||
@@ -744,7 +770,21 @@ export const DateRangePicker = ({
                     <button
                       type="button"
                       className="date-range-picker-desktop-reset-btn"
-                      onClick={handleClose}
+                      onClick={() => {
+                        if (typeof onReset === 'function') {
+                          onReset();
+                        } else {
+                          // Очистим внутренний диапазон
+                          setRange({
+                            startDate: undefined,
+                            endDate: undefined,
+                            key: 'selection',
+                          });
+                          setFocusedRange([0, 0]);
+                        }
+                        // Закрываем пикер после сброса
+                        setIsOpen(false);
+                      }}
                     >
                       Сбросить
                     </button>

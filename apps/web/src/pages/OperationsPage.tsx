@@ -828,6 +828,17 @@ export const OperationsPage = () => {
                     startDate={dateRangeStart}
                     endDate={dateRangeEnd}
                     onChange={handleDateRangeChange}
+                    onReset={async () => {
+                      setDateFromFilter('');
+                      setDateToFilter('');
+                      setDateRangeStart(undefined);
+                      setDateRangeEnd(undefined);
+                      try {
+                        await reloadOperationsData();
+                      } catch (e) {
+                        // ignore
+                      }
+                    }}
                     placeholder="Период"
                   />
                 </div>

@@ -10,6 +10,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
+import { apiSlice } from '../../store/api/apiSlice';
 import { usePermissions } from '../../shared/hooks/usePermissions';
 import { useGetMeQuery } from '../../store/api/authApi';
 import { useGetSubscriptionQuery } from '../../store/api/subscriptionApi';
@@ -52,6 +53,8 @@ export const UserMenu = ({ userEmail }: UserMenuProps): JSX.Element => {
   const canAccessCompany = isSuperAdmin || hasAdminAccess;
 
   const handleLogout = (): void => {
+    // Очистим кэш RTK Query и состояние, чтобы не осталось данных демо-сессии
+    dispatch(apiSlice.util.resetApiState());
     dispatch(logout());
     navigate('/login');
   };

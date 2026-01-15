@@ -9,6 +9,12 @@ import { Account } from '@shared/types/catalogs';
 import { useEffect, useState } from 'react';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
+interface MutationResult {
+  id?: string | number;
+  _id?: string | number;
+  data?: { id?: string | number };
+}
+
 export const AccountForm = ({
   account,
   onClose,
@@ -67,9 +73,23 @@ export const AccountForm = ({
         await update({ id: account.id, data }).unwrap();
         onClose();
       } else {
-        const result = await create(data).unwrap();
-        if (onSuccess && result.id) {
-          onSuccess(result.id);
+        const result = (await create(data).unwrap()) as
+          | MutationResult
+          | string
+          | number;
+
+        let createdId: string | undefined;
+
+        if (typeof result === 'string' || typeof result === 'number') {
+          createdId = String(result);
+        } else if (typeof result === 'object' && result !== null) {
+          createdId = String(
+            result.id || result._id || result.data?.id || ''
+          ).replace(/^undefined$/, '');
+        }
+
+        if (onSuccess && createdId) {
+          onSuccess(createdId);
         } else {
           onClose();
         }

@@ -12,7 +12,13 @@ interface CounterpartyFormProps {
   onSuccess?: (createdId: string) => void;
   initialName?: string;
   initialInn?: string;
-  initialAccountId?: string; // ID счета для автоматической установки после создания
+  _initialAccountId?: string; // Unused but kept for interface compatibility
+}
+
+interface MutationResult {
+  id?: string | number;
+  _id?: string | number;
+  data?: { id?: string | number };
 }
 
 export const CounterpartyForm = ({
@@ -21,7 +27,7 @@ export const CounterpartyForm = ({
   onSuccess,
   initialName = '',
   initialInn = '',
-  initialAccountId,
+  _initialAccountId,
 }: CounterpartyFormProps) => {
   const [name, setName] = useState(counterparty?.name || initialName);
   const [inn, setInn] = useState(counterparty?.inn || initialInn);
@@ -44,9 +50,23 @@ export const CounterpartyForm = ({
           data: { name, inn, category },
         }).unwrap();
       } else {
-        const result = await create({ name, inn, category }).unwrap();
-        if (onSuccess && result.id) {
-          onSuccess(result.id);
+        const result = (await create({ name, inn, category }).unwrap()) as
+          | MutationResult
+          | string
+          | number;
+
+        let createdId: string | undefined;
+
+        if (typeof result === 'string' || typeof result === 'number') {
+          createdId = String(result);
+        } else if (typeof result === 'object' && result !== null) {
+          createdId = String(
+            result.id || result._id || result.data?.id || ''
+          ).replace(/^undefined$/, '');
+        }
+
+        if (onSuccess && createdId) {
+          onSuccess(createdId);
         } else {
           onClose();
         }
@@ -71,7 +91,11 @@ export const CounterpartyForm = ({
       <Select
         label="Категория"
         value={category}
-        onChange={(value) => setCategory(value)}
+        onChange={(value) =>
+          setCategory(
+            value as 'supplier' | 'customer' | 'gov' | 'employee' | 'other'
+          )
+        }
         options={[
           { value: 'supplier', label: 'Поставщик' },
           { value: 'customer', label: 'Клиент' },

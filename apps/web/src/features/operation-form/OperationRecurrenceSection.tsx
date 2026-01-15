@@ -9,18 +9,18 @@ interface OperationRecurrenceSectionProps {
   repeat: Periodicity;
   recurrenceEndDate: string;
   onDescriptionChange: (value: string) => void;
-  onRepeatChange: (value: string) => void;
+  onRepeatChange: (value: Periodicity) => void;
   onEndDateChange: (value: string) => void;
 }
 
 const repeatOptions = [
-  { value: 'none', label: 'Не повторяется' },
-  { value: 'daily', label: 'Ежедневно' },
-  { value: 'weekly', label: 'Еженедельно' },
-  { value: 'monthly', label: 'Ежемесячно' },
-  { value: 'quarterly', label: 'Ежеквартально' },
-  { value: 'semiannual', label: 'Раз в полгода' },
-  { value: 'annual', label: 'Ежегодно' },
+  { value: Periodicity.NONE, label: 'Не повторяется' },
+  { value: Periodicity.DAILY, label: 'Ежедневно' },
+  { value: Periodicity.WEEKLY, label: 'Еженедельно' },
+  { value: Periodicity.MONTHLY, label: 'Ежемесячно' },
+  { value: Periodicity.QUARTERLY, label: 'Ежеквартально' },
+  { value: Periodicity.SEMIANNUAL, label: 'Раз в полгода' },
+  { value: Periodicity.ANNUAL, label: 'Ежегодно' },
 ];
 
 export const OperationRecurrenceSection = ({
@@ -98,7 +98,7 @@ export const OperationRecurrenceSection = ({
             <Select
               label=""
               value={repeat}
-              onChange={(value) => onRepeatChange(value)}
+              onChange={(value) => onRepeatChange(value as Periodicity)}
               options={repeatOptions}
             />
           </div>
