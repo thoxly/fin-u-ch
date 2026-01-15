@@ -78,13 +78,13 @@ export const DashboardPage = () => {
   const { canRead } = usePermissions();
 
   // Инициализируем фильтры периода с текущим месяцем
-  const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
-    const currentMonth = getPeriodRange(today, 'month');
-    return {
+  const initialMonth = getPeriodRange(today, 'month');
+  const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(
+    () => ({
       format: 'month',
-      range: currentMonth,
-    };
-  });
+      range: initialMonth,
+    })
+  );
 
   // Проверяем права на просмотр различных виджетов
   const canViewOperations = canRead('operations');
@@ -301,6 +301,9 @@ export const DashboardPage = () => {
                 startDate={startDate}
                 endDate={endDate}
                 onChange={handleDateRangeChange}
+                onReset={() => {
+                  setPeriodFilters({ format: 'month', range: initialMonth });
+                }}
               />
             </div>
 

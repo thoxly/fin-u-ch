@@ -367,7 +367,7 @@ const ImportMappingRowComponent = ({
 
     return (
       <div
-        className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${badgeColor} ${
+        className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium leading-none whitespace-nowrap ${badgeColor} ${
           disabled
             ? 'opacity-60 cursor-not-allowed'
             : 'cursor-pointer hover:opacity-80'

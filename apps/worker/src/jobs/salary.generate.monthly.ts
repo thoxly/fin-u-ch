@@ -2,10 +2,11 @@ import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 
 // Type helper for Prisma transaction client
-type TransactionClient = Omit<
-  typeof prisma,
-  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
->;
+type TransactionClient = Parameters<typeof prisma.$transaction>[0] extends (
+  tx: infer T
+) => any
+  ? T
+  : never;
 
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM

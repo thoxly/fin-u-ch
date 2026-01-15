@@ -255,7 +255,7 @@ export const BankImportModal = ({ isOpen, onClose }: BankImportModalProps) => {
         showSuccess(message);
 
         // Сбрасываем прогресс через небольшую задержку
-        setTimeout(() => setUploadProgress(null), 2000);
+        // setTimeout(() => setUploadProgress(null), 2000);
       } catch (error: unknown) {
         // RTK Query возвращает ошибку в формате { error: { status, data } }
         // где data это ответ сервера { status: 'error', message: '...' }

@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { useLoginMutation } from '../../store/api/authApi';
 import { useStartDemoSessionMutation } from '../../store/api/demoApi';
 import { setCredentials } from '../../store/slices/authSlice';
+import { apiSlice } from '../../store/api/apiSlice';
 import { Input } from '../../shared/ui/Input';
 import { Button } from '../../shared/ui/Button';
 import { useNotification } from '../../shared/hooks/useNotification';
@@ -28,6 +29,8 @@ export const LoginPage = () => {
     try {
       const response = await login({ email, password }).unwrap();
       dispatch(setCredentials(response));
+      // Очистим кэш RTK Query от предыдущих сессий (например, демо)
+      dispatch(apiSlice.util.resetApiState());
       showSuccess(NOTIFICATION_MESSAGES.AUTH.LOGIN_SUCCESS);
       // Редирект будет выполнен компонентом RedirectToFirstAvailable
       // после загрузки прав пользователя
@@ -72,6 +75,8 @@ export const LoginPage = () => {
           refreshToken: response.refreshToken,
         })
       );
+      // После авторизации в демо очищаем кэш, чтобы данные загрузились заново
+      dispatch(apiSlice.util.resetApiState());
 
       showSuccess('🎉 Добро пожаловать в демо-режим!');
       navigate('/redirect', { replace: true });

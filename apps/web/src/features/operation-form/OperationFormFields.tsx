@@ -60,7 +60,7 @@ interface OperationFormFieldsProps {
   onDealChange: (value: string) => void;
   onDepartmentChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
-  onRepeatChange: (value: string) => void;
+  onRepeatChange: (value: Periodicity) => void;
   onEndDateChange: (value: string) => void;
   onValidationErrorClear: (field: string) => void;
   onOpenCreateModal?: (

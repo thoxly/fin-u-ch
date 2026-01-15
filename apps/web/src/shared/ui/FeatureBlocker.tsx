@@ -26,7 +26,7 @@ const featureDescriptions: Record<
   roles: {
     title: 'Управление ролями',
     description:
-      'Создание и управление кастомными ролями доступно только на тарифе TEAM и выше.',
+      'Создание и управление ролями доступно только на тарифе TEAM и выше.',
   },
   api_access: {
     title: 'API Access',
@@ -65,7 +65,7 @@ export const FeatureBlocker = ({
 
   const handleUpgrade = () => {
     // Перейти на страницу тарифов компании
-    navigate('/company/tarif');
+    navigate('/company/tariff');
   };
 
   return (
@@ -106,17 +106,25 @@ export function withFeatureAccess<P extends object>(
 ) {
   return function WrappedComponent(props: P) {
     // Используем tolerant selector — в тестах стор может быть без subscription
-    const subscriptionData = useSelector(
-      (state: RootState) => state.subscription?.data ?? null
+    const subscriptionState = useSelector((state: RootState) =>
+      state.subscription
+        ? { data: state.subscription.data, loading: state.subscription.loading }
+        : { data: null, loading: false }
     );
 
-    // Если подписка не загружена, показываем лоадер
-    if (!subscriptionData) {
+    // Если подписка загружается — показываем индикатор загрузки
+    if (subscriptionState.loading) {
       return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-600">Загрузка...</div>
+        <div className="flex items-center justify-center min-h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600" />
         </div>
       );
+    }
+
+    // Если данных о подписке нет — показываем заглушку (предполагаем START)
+    const subscriptionData = subscriptionState.data;
+    if (!subscriptionData) {
+      return <FeatureBlocker feature={feature} requiredPlan={requiredPlan} />;
     }
 
     // Проверяем доступ к фиче

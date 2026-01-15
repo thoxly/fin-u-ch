@@ -97,13 +97,13 @@ export const ReportsPage = () => {
   void reportType;
 
   // Инициализируем фильтры периода
-  const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(() => {
-    const currentYear = getPeriodRange(today, 'year');
-    return {
+  const initialYear = getPeriodRange(today, 'year');
+  const [periodFilters, setPeriodFilters] = useState<PeriodFiltersState>(
+    () => ({
       format: 'year',
-      range: currentYear,
-    };
-  });
+      range: initialYear,
+    })
+  );
 
   const [reportMode, setReportMode] = useState<ReportMode>('fact');
   const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
@@ -362,6 +362,9 @@ export const ReportsPage = () => {
                 startDate={new Date(periodFilters.range.from)}
                 endDate={new Date(periodFilters.range.to)}
                 onChange={handleDateRangeChange}
+                onReset={() =>
+                  setPeriodFilters({ format: 'year', range: initialYear })
+                }
               />
             </div>
 
