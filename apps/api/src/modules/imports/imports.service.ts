@@ -52,6 +52,13 @@ export class ImportsService {
     fileName: string,
     fileBuffer: Buffer
   ) {
+    logger.info('[ЗАГРУЗКА ФАЙЛА] Начало загрузки банковской выписки', {
+      companyId,
+      userId,
+      fileName,
+      fileSize: fileBuffer.length,
+    });
+
     // Валидация размера файла (10MB)
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (fileBuffer.length > maxSize) {
@@ -114,6 +121,12 @@ export class ImportsService {
     });
 
     // Создаем черновики операций батчами
+    logger.info('[ЗАГРУЗКА ФАЙЛА] Начало создания операций из документов', {
+      sessionId: importSession.id,
+      documentsCount: documents.length,
+      companyAccountNumber,
+    });
+
     const importedOperations = await withSpan(
       'imports.create_operations',
       async (span) => {
@@ -128,6 +141,11 @@ export class ImportsService {
         return result;
       }
     );
+
+    logger.info('[ЗАГРУЗКА ФАЙЛА] Завершено создание операций', {
+      sessionId: importSession.id,
+      createdCount: importedOperations.length,
+    });
 
     logger.info('Upload statement processing completed', {
       sessionId: importSession.id,
@@ -220,11 +238,12 @@ export class ImportsService {
     });
 
     // Применяем автосопоставление и создаем черновики операций
-    // Используем батчинг для больших файлов (по 100 операций за раз)
+    // Используем батчинг для больших файлов (по 50 операций за раз)
+    // Уменьшен размер батча для предотвращения таймаутов транзакций
     const importedOperations: Prisma.ImportedOperationGetPayload<
       Record<string, never>
     >[] = [];
-    const BATCH_SIZE = 100;
+    const BATCH_SIZE = 50;
     const batches = [];
 
     // Разбиваем документы на батчи
@@ -235,75 +254,141 @@ export class ImportsService {
     // Обрабатываем каждый батч в транзакции
     for (const batch of batches) {
       try {
-        await prisma.$transaction(async (tx) => {
-          for (const doc of batch) {
-            try {
-              // Автосопоставление
-              const matchingResult = await autoMatch(
-                companyId,
-                doc,
-                company?.inn || companyInn || null,
-                companyAccountNumber
-              );
+        // Увеличиваем таймаут транзакции до 5 минут для обработки больших батчей с автосопоставлением
+        // maxWait - время ожидания начала транзакции (30 секунд)
+        // timeout - максимальное время выполнения транзакции (5 минут)
+        // Для файлов с несколькими тысячами операций требуется больше времени
+        await prisma.$transaction(
+          async (tx) => {
+            for (const doc of batch) {
+              try {
+                // Автосопоставление
+                logger.debug(
+                  '[ЗАГРУЗКА ФАЙЛА] Начало автосопоставления для операции',
+                  {
+                    sessionId,
+                    document: {
+                      date: doc.date,
+                      number: doc.number,
+                      amount: doc.amount,
+                      purpose: doc.purpose,
+                      payer: doc.payer,
+                      receiver: doc.receiver,
+                    },
+                  }
+                );
 
-              // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
-              // Валюта по умолчанию RUB, но для полного сопоставления нужны все поля
-              const isFullyMatched = !!(
-                matchingResult.matchedArticleId &&
-                matchingResult.matchedAccountId &&
-                matchingResult.direction // направление обязательно
-              );
+                const matchingResult = await autoMatch(
+                  companyId,
+                  doc,
+                  company?.inn || companyInn || null,
+                  companyAccountNumber
+                );
 
-              // Создаем черновик операции
-              const operationData = {
-                importSessionId: sessionId,
-                companyId,
-                date: doc.date,
-                number: doc.number,
-                amount: doc.amount,
-                description: doc.purpose || '',
-                direction: matchingResult.direction || null,
-                payer: doc.payer,
-                payerInn: doc.payerInn,
-                payerAccount: doc.payerAccount,
-                receiver: doc.receiver,
-                receiverInn: doc.receiverInn,
-                receiverAccount: doc.receiverAccount,
-                matchedArticleId: matchingResult.matchedArticleId,
-                matchedCounterpartyId: matchingResult.matchedCounterpartyId,
-                matchedAccountId: matchingResult.matchedAccountId,
-                currency: 'RUB', // По умолчанию RUB
-                // Устанавливаем matchedBy только если операция полностью сопоставлена
-                matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
-                matchedRuleId: isFullyMatched
-                  ? matchingResult.matchedRuleId
-                  : null,
-                confirmed: false,
-                processed: false,
-                draft: true,
-              };
+                // Логируем результат автосопоставления при создании операции
+                if (matchingResult.matchedRuleId) {
+                  logger.info(
+                    '[ЗАГРУЗКА ФАЙЛА] ✅ Правило применено при загрузке файла',
+                    {
+                      sessionId,
+                      ruleId: matchingResult.matchedRuleId,
+                      matchedBy: matchingResult.matchedBy,
+                      direction: matchingResult.direction,
+                      matchedArticleId: matchingResult.matchedArticleId,
+                      matchedCounterpartyId:
+                        matchingResult.matchedCounterpartyId,
+                      matchedAccountId: matchingResult.matchedAccountId,
+                      document: {
+                        date: doc.date,
+                        number: doc.number,
+                        amount: doc.amount,
+                        purpose: doc.purpose,
+                      },
+                    }
+                  );
+                } else {
+                  logger.debug(
+                    '[ЗАГРУЗКА ФАЙЛА] Результат автосопоставления (без правил)',
+                    {
+                      sessionId,
+                      matchedBy: matchingResult.matchedBy || null,
+                      direction: matchingResult.direction || null,
+                      matchedArticleId: matchingResult.matchedArticleId || null,
+                      matchedCounterpartyId:
+                        matchingResult.matchedCounterpartyId || null,
+                      matchedAccountId: matchingResult.matchedAccountId || null,
+                      document: {
+                        date: doc.date,
+                        number: doc.number,
+                        purpose: doc.purpose,
+                      },
+                    }
+                  );
+                }
 
-              const importedOp = await tx.importedOperation.create({
-                data: operationData,
-              });
+                // Проверяем, что операция полностью сопоставлена (статья, счет, валюта)
+                // Валюта по умолчанию RUB, но для полного сопоставления нужны все поля
+                const isFullyMatched = !!(
+                  matchingResult.matchedArticleId &&
+                  matchingResult.matchedAccountId &&
+                  matchingResult.direction // направление обязательно
+                );
 
-              importedOperations.push(importedOp);
-            } catch (error: any) {
-              // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
-              logger.error('Failed to process document during import', {
-                sessionId,
-                document: {
+                // Создаем черновик операции
+                const operationData = {
+                  importSessionId: sessionId,
+                  companyId,
                   date: doc.date,
-                  amount: doc.amount,
                   number: doc.number,
-                  purpose: doc.purpose,
-                },
-                error: error?.message || String(error),
-                stack: error?.stack,
-              });
+                  amount: doc.amount,
+                  description: doc.purpose || '',
+                  direction: matchingResult.direction || null,
+                  payer: doc.payer,
+                  payerInn: doc.payerInn,
+                  payerAccount: doc.payerAccount,
+                  receiver: doc.receiver,
+                  receiverInn: doc.receiverInn,
+                  receiverAccount: doc.receiverAccount,
+                  matchedArticleId: matchingResult.matchedArticleId,
+                  matchedCounterpartyId: matchingResult.matchedCounterpartyId,
+                  matchedAccountId: matchingResult.matchedAccountId,
+                  currency: 'RUB', // По умолчанию RUB
+                  // Устанавливаем matchedBy только если операция полностью сопоставлена
+                  matchedBy: isFullyMatched ? matchingResult.matchedBy : null,
+                  matchedRuleId: isFullyMatched
+                    ? matchingResult.matchedRuleId
+                    : null,
+                  confirmed: false,
+                  processed: false,
+                  draft: true,
+                };
+
+                const importedOp = await tx.importedOperation.create({
+                  data: operationData,
+                });
+
+                importedOperations.push(importedOp);
+              } catch (error: any) {
+                // Логируем ошибку с деталями, но продолжаем обработку остальных операций в батче
+                logger.error('Failed to process document during import', {
+                  sessionId,
+                  document: {
+                    date: doc.date,
+                    amount: doc.amount,
+                    number: doc.number,
+                    purpose: doc.purpose,
+                  },
+                  error: error?.message || String(error),
+                  stack: error?.stack,
+                });
+              }
             }
+          },
+          {
+            maxWait: 30000, // 30 секунд ожидания начала транзакции
+            timeout: 300000, // 5 минут на выполнение транзакции (для больших файлов с несколькими тысячами операций)
           }
-        });
+        );
       } catch (error: any) {
         // Логируем ошибку батча, но продолжаем обработку следующих батчей
         logger.error('Failed to process batch during import', {
@@ -827,342 +912,355 @@ export class ImportsService {
     // Обрабатываем каждый батч в транзакции
     for (const batch of batches) {
       try {
-        await prisma.$transaction(async (tx) => {
-          for (const op of batch) {
-            try {
-              // Логируем начало обработки операции
-              logger.info('Processing operation for import', {
-                operationId: op.id,
-                operationNumber: op.number,
-                direction: op.direction,
-                date: op.date,
-                amount: op.amount,
-                companyId,
-              });
-
-              // Проверяем обязательные поля
-              if (!op.direction) {
-                throw new AppError(`Operation ${op.id} has no direction`, 400);
-              }
-
-              if (
-                op.direction !== 'transfer' &&
-                (!op.matchedArticleId || !op.matchedAccountId)
-              ) {
-                throw new AppError(
-                  `Operation ${op.id} is missing required fields`,
-                  400
-                );
-              }
-
-              if (
-                op.direction === 'transfer' &&
-                (!op.payerAccount || !op.receiverAccount)
-              ) {
-                logger.warn('Transfer operation missing account numbers', {
+        // Увеличиваем таймаут транзакции до 5 минут для обработки больших батчей
+        // maxWait - время ожидания начала транзакции (30 секунд)
+        // timeout - максимальное время выполнения транзакции (5 минут)
+        // Для файлов с несколькими тысячами операций требуется больше времени
+        await prisma.$transaction(
+          async (tx) => {
+            for (const op of batch) {
+              try {
+                // Логируем начало обработки операции
+                logger.info('Processing operation for import', {
                   operationId: op.id,
                   operationNumber: op.number,
-                  payerAccount: op.payerAccount,
-                  receiverAccount: op.receiverAccount,
-                });
-                throw new AppError(
-                  `Operation ${op.id} is missing account information for transfer`,
-                  400
-                );
-              }
-
-              // Создаем операцию
-              const operationData: any = {
-                type: op.direction,
-                operationDate: op.date,
-                amount: op.amount,
-                currency: op.currency || 'RUB',
-                description: op.description,
-                repeat: op.repeat || 'none',
-              };
-
-              if (op.direction === 'transfer') {
-                // Логируем данные перевода
-                logger.info('Processing transfer operation', {
-                  operationId: op.id,
-                  operationNumber: op.number,
-                  payerAccount: op.payerAccount,
-                  receiverAccount: op.receiverAccount,
+                  direction: op.direction,
+                  date: op.date,
+                  amount: op.amount,
                   companyId,
                 });
 
-                // Для переводов нужно найти счета по номерам
-                // Если счет не найден по номеру, используем выбранный счет (matchedAccountId) как fallback
-                let sourceAccount = op.payerAccount
-                  ? await tx.account.findFirst({
-                      where: {
-                        companyId,
-                        number: op.payerAccount,
-                        isActive: true,
-                      },
-                    })
-                  : null;
-
-                let targetAccount = op.receiverAccount
-                  ? await tx.account.findFirst({
-                      where: {
-                        companyId,
-                        number: op.receiverAccount,
-                        isActive: true,
-                      },
-                    })
-                  : null;
-
-                // Если счет не найден по номеру, используем выбранный счет как fallback
-                // Но только для одного недостающего счета, чтобы избежать одинаковых счетов
-                const matchedAccount = op.matchedAccountId
-                  ? await tx.account.findFirst({
-                      where: {
-                        id: op.matchedAccountId,
-                        companyId,
-                        isActive: true,
-                      },
-                    })
-                  : null;
-
-                // Используем выбранный счет только если один счет найден, а другой нет
-                // и выбранный счет отличается от найденного
-                if (matchedAccount) {
-                  if (
-                    !sourceAccount &&
-                    targetAccount &&
-                    targetAccount.id !== matchedAccount.id
-                  ) {
-                    // sourceAccount не найден, targetAccount найден и отличается от выбранного
-                    sourceAccount = matchedAccount;
-                    logger.info(
-                      'Using matchedAccountId as fallback for source account',
-                      {
-                        operationId: op.id,
-                        operationNumber: op.number,
-                        matchedAccountId: op.matchedAccountId,
-                      }
-                    );
-                  } else if (
-                    !targetAccount &&
-                    sourceAccount &&
-                    sourceAccount.id !== matchedAccount.id
-                  ) {
-                    // targetAccount не найден, sourceAccount найден и отличается от выбранного
-                    targetAccount = matchedAccount;
-                    logger.info(
-                      'Using matchedAccountId as fallback for target account',
-                      {
-                        operationId: op.id,
-                        operationNumber: op.number,
-                        matchedAccountId: op.matchedAccountId,
-                      }
-                    );
-                  }
+                // Проверяем обязательные поля
+                if (!op.direction) {
+                  throw new AppError(
+                    `Operation ${op.id} has no direction`,
+                    400
+                  );
                 }
 
-                // Логируем результаты поиска счетов
-                logger.info('Account lookup results for transfer', {
-                  operationId: op.id,
-                  operationNumber: op.number,
-                  payerAccount: op.payerAccount,
-                  receiverAccount: op.receiverAccount,
-                  matchedAccountId: op.matchedAccountId,
-                  sourceAccountFound: !!sourceAccount,
-                  sourceAccountId: sourceAccount?.id,
-                  targetAccountFound: !!targetAccount,
-                  targetAccountId: targetAccount?.id,
-                });
+                if (
+                  op.direction !== 'transfer' &&
+                  (!op.matchedArticleId || !op.matchedAccountId)
+                ) {
+                  throw new AppError(
+                    `Operation ${op.id} is missing required fields`,
+                    400
+                  );
+                }
 
-                if (!sourceAccount || !targetAccount) {
-                  const missingAccounts: string[] = [];
-                  if (!sourceAccount) {
-                    if (op.payerAccount) {
-                      missingAccounts.push(
-                        `счет плательщика: ${op.payerAccount}`
+                if (
+                  op.direction === 'transfer' &&
+                  (!op.payerAccount || !op.receiverAccount)
+                ) {
+                  logger.warn('Transfer operation missing account numbers', {
+                    operationId: op.id,
+                    operationNumber: op.number,
+                    payerAccount: op.payerAccount,
+                    receiverAccount: op.receiverAccount,
+                  });
+                  throw new AppError(
+                    `Operation ${op.id} is missing account information for transfer`,
+                    400
+                  );
+                }
+
+                // Создаем операцию
+                const operationData: any = {
+                  type: op.direction,
+                  operationDate: op.date,
+                  amount: op.amount,
+                  currency: op.currency || 'RUB',
+                  description: op.description,
+                  repeat: op.repeat || 'none',
+                };
+
+                if (op.direction === 'transfer') {
+                  // Логируем данные перевода
+                  logger.info('Processing transfer operation', {
+                    operationId: op.id,
+                    operationNumber: op.number,
+                    payerAccount: op.payerAccount,
+                    receiverAccount: op.receiverAccount,
+                    companyId,
+                  });
+
+                  // Для переводов нужно найти счета по номерам
+                  // Если счет не найден по номеру, используем выбранный счет (matchedAccountId) как fallback
+                  let sourceAccount = op.payerAccount
+                    ? await tx.account.findFirst({
+                        where: {
+                          companyId,
+                          number: op.payerAccount,
+                          isActive: true,
+                        },
+                      })
+                    : null;
+
+                  let targetAccount = op.receiverAccount
+                    ? await tx.account.findFirst({
+                        where: {
+                          companyId,
+                          number: op.receiverAccount,
+                          isActive: true,
+                        },
+                      })
+                    : null;
+
+                  // Если счет не найден по номеру, используем выбранный счет как fallback
+                  // Но только для одного недостающего счета, чтобы избежать одинаковых счетов
+                  const matchedAccount = op.matchedAccountId
+                    ? await tx.account.findFirst({
+                        where: {
+                          id: op.matchedAccountId,
+                          companyId,
+                          isActive: true,
+                        },
+                      })
+                    : null;
+
+                  // Используем выбранный счет только если один счет найден, а другой нет
+                  // и выбранный счет отличается от найденного
+                  if (matchedAccount) {
+                    if (
+                      !sourceAccount &&
+                      targetAccount &&
+                      targetAccount.id !== matchedAccount.id
+                    ) {
+                      // sourceAccount не найден, targetAccount найден и отличается от выбранного
+                      sourceAccount = matchedAccount;
+                      logger.info(
+                        'Using matchedAccountId as fallback for source account',
+                        {
+                          operationId: op.id,
+                          operationNumber: op.number,
+                          matchedAccountId: op.matchedAccountId,
+                        }
                       );
-                    } else {
-                      missingAccounts.push('счет плательщика не указан');
+                    } else if (
+                      !targetAccount &&
+                      sourceAccount &&
+                      sourceAccount.id !== matchedAccount.id
+                    ) {
+                      // targetAccount не найден, sourceAccount найден и отличается от выбранного
+                      targetAccount = matchedAccount;
+                      logger.info(
+                        'Using matchedAccountId as fallback for target account',
+                        {
+                          operationId: op.id,
+                          operationNumber: op.number,
+                          matchedAccountId: op.matchedAccountId,
+                        }
+                      );
                     }
                   }
-                  if (!targetAccount) {
-                    if (op.receiverAccount) {
-                      missingAccounts.push(
-                        `счет получателя: ${op.receiverAccount}`
-                      );
-                    } else {
-                      missingAccounts.push('счет получателя не указан');
-                    }
-                  }
 
-                  // Логируем детали ошибки
-                  logger.error('Transfer operation: accounts not found', {
+                  // Логируем результаты поиска счетов
+                  logger.info('Account lookup results for transfer', {
                     operationId: op.id,
                     operationNumber: op.number,
                     payerAccount: op.payerAccount,
                     receiverAccount: op.receiverAccount,
                     matchedAccountId: op.matchedAccountId,
                     sourceAccountFound: !!sourceAccount,
+                    sourceAccountId: sourceAccount?.id,
                     targetAccountFound: !!targetAccount,
-                    missingAccounts,
-                    companyId,
+                    targetAccountId: targetAccount?.id,
                   });
 
-                  // Формируем понятное сообщение об ошибке
-                  let errorMessage = `Операция ${op.number || op.id}: не найдены счета для перевода. `;
-                  if (missingAccounts.length > 0) {
-                    errorMessage += `Не найдены: ${missingAccounts.join(', ')}. `;
+                  if (!sourceAccount || !targetAccount) {
+                    const missingAccounts: string[] = [];
+                    if (!sourceAccount) {
+                      if (op.payerAccount) {
+                        missingAccounts.push(
+                          `счет плательщика: ${op.payerAccount}`
+                        );
+                      } else {
+                        missingAccounts.push('счет плательщика не указан');
+                      }
+                    }
+                    if (!targetAccount) {
+                      if (op.receiverAccount) {
+                        missingAccounts.push(
+                          `счет получателя: ${op.receiverAccount}`
+                        );
+                      } else {
+                        missingAccounts.push('счет получателя не указан');
+                      }
+                    }
+
+                    // Логируем детали ошибки
+                    logger.error('Transfer operation: accounts not found', {
+                      operationId: op.id,
+                      operationNumber: op.number,
+                      payerAccount: op.payerAccount,
+                      receiverAccount: op.receiverAccount,
+                      matchedAccountId: op.matchedAccountId,
+                      sourceAccountFound: !!sourceAccount,
+                      targetAccountFound: !!targetAccount,
+                      missingAccounts,
+                      companyId,
+                    });
+
+                    // Формируем понятное сообщение об ошибке
+                    let errorMessage = `Операция ${op.number || op.id}: не найдены счета для перевода. `;
+                    if (missingAccounts.length > 0) {
+                      errorMessage += `Не найдены: ${missingAccounts.join(', ')}. `;
+                    }
+
+                    // Если оба счета не найдены, объясняем что нужно
+                    if (!sourceAccount && !targetAccount) {
+                      errorMessage +=
+                        'Для перевода нужны два разных счета. Добавьте счета с указанными номерами в справочник или убедитесь, что хотя бы один из счетов найден по номеру из выписки.';
+                    } else {
+                      errorMessage +=
+                        'Выберите счет в таблице (он будет использован для недостающего счета) или добавьте счет с указанным номером в справочник.';
+                    }
+
+                    throw new AppError(errorMessage, 400);
                   }
 
-                  // Если оба счета не найдены, объясняем что нужно
-                  if (!sourceAccount && !targetAccount) {
-                    errorMessage +=
-                      'Для перевода нужны два разных счета. Добавьте счета с указанными номерами в справочник или убедитесь, что хотя бы один из счетов найден по номеру из выписки.';
-                  } else {
-                    errorMessage +=
-                      'Выберите счет в таблице (он будет использован для недостающего счета) или добавьте счет с указанным номером в справочник.';
+                  // Проверяем, что счета разные
+                  if (sourceAccount.id === targetAccount.id) {
+                    throw new AppError(
+                      `Операция ${op.number || op.id}: счета плательщика и получателя не могут быть одинаковыми для перевода. Для перевода нужны два разных счета.`,
+                      400
+                    );
                   }
 
-                  throw new AppError(errorMessage, 400);
+                  operationData.sourceAccountId = sourceAccount.id;
+                  operationData.targetAccountId = targetAccount.id;
+
+                  logger.info('Transfer operation data prepared', {
+                    operationId: op.id,
+                    operationNumber: op.number,
+                    sourceAccountId: sourceAccount.id,
+                    targetAccountId: targetAccount.id,
+                    operationData,
+                  });
+                } else {
+                  operationData.accountId = op.matchedAccountId;
+                  operationData.articleId = op.matchedArticleId;
                 }
 
-                // Проверяем, что счета разные
-                if (sourceAccount.id === targetAccount.id) {
-                  throw new AppError(
-                    `Операция ${op.number || op.id}: счета плательщика и получателя не могут быть одинаковыми для перевода. Для перевода нужны два разных счета.`,
-                    400
-                  );
+                if (op.matchedCounterpartyId) {
+                  operationData.counterpartyId = op.matchedCounterpartyId;
                 }
 
-                operationData.sourceAccountId = sourceAccount.id;
-                operationData.targetAccountId = targetAccount.id;
+                if (op.matchedDealId) {
+                  operationData.dealId = op.matchedDealId;
+                }
 
-                logger.info('Transfer operation data prepared', {
+                if (op.matchedDepartmentId) {
+                  operationData.departmentId = op.matchedDepartmentId;
+                }
+
+                // Логируем данные перед созданием операции
+                logger.info('Creating operation', {
                   operationId: op.id,
                   operationNumber: op.number,
-                  sourceAccountId: sourceAccount.id,
-                  targetAccountId: targetAccount.id,
+                  direction: op.direction,
                   operationData,
-                });
-              } else {
-                operationData.accountId = op.matchedAccountId;
-                operationData.articleId = op.matchedArticleId;
-              }
-
-              if (op.matchedCounterpartyId) {
-                operationData.counterpartyId = op.matchedCounterpartyId;
-              }
-
-              if (op.matchedDealId) {
-                operationData.dealId = op.matchedDealId;
-              }
-
-              if (op.matchedDepartmentId) {
-                operationData.departmentId = op.matchedDepartmentId;
-              }
-
-              // Логируем данные перед созданием операции
-              logger.info('Creating operation', {
-                operationId: op.id,
-                operationNumber: op.number,
-                direction: op.direction,
-                operationData,
-                companyId,
-              });
-
-              // Создаем операцию через prisma напрямую
-              const createdOperation = await tx.operation.create({
-                data: {
-                  ...operationData,
                   companyId,
-                  isTemplate: false,
-                  isConfirmed: true,
-                },
-              });
+                });
 
-              logger.info('Operation created successfully', {
-                operationId: op.id,
-                operationNumber: op.number,
-                createdOperationId: createdOperation.id,
-                direction: op.direction,
-              });
+                // Создаем операцию через prisma напрямую
+                const createdOperation = await tx.operation.create({
+                  data: {
+                    ...operationData,
+                    companyId,
+                    isTemplate: false,
+                    isConfirmed: true,
+                  },
+                });
 
-              // Помечаем как обработанную
-              await tx.importedOperation.update({
-                where: { id: op.id },
-                data: { processed: true },
-              });
+                logger.info('Operation created successfully', {
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  createdOperationId: createdOperation.id,
+                  direction: op.direction,
+                });
 
-              // Сохраняем правила для этой операции, если она в списке saveRulesForIds
-              if (saveRulesForIds && saveRulesForIds.includes(op.id)) {
-                try {
-                  // Сохраняем правила для всех сопоставленных полей
-                  if (op.matchedCounterpartyId) {
-                    const pattern =
-                      op.direction === 'expense' ? op.receiver : op.payer;
-                    if (pattern) {
+                // Помечаем как обработанную
+                await tx.importedOperation.update({
+                  where: { id: op.id },
+                  data: { processed: true },
+                });
+
+                // Сохраняем правила для этой операции, если она в списке saveRulesForIds
+                if (saveRulesForIds && saveRulesForIds.includes(op.id)) {
+                  try {
+                    // Сохраняем правила для всех сопоставленных полей
+                    if (op.matchedCounterpartyId) {
+                      const pattern =
+                        op.direction === 'expense' ? op.receiver : op.payer;
+                      if (pattern) {
+                        await this.createMappingRule(companyId, userId, {
+                          ruleType: 'contains',
+                          pattern,
+                          targetType: 'counterparty',
+                          targetId: op.matchedCounterpartyId,
+                          sourceField:
+                            op.direction === 'expense' ? 'receiver' : 'payer',
+                        });
+                      }
+                    }
+
+                    if (op.matchedArticleId && op.description) {
                       await this.createMappingRule(companyId, userId, {
                         ruleType: 'contains',
-                        pattern,
-                        targetType: 'counterparty',
-                        targetId: op.matchedCounterpartyId,
-                        sourceField:
-                          op.direction === 'expense' ? 'receiver' : 'payer',
+                        pattern: op.description,
+                        targetType: 'article',
+                        targetId: op.matchedArticleId,
+                        sourceField: 'description',
                       });
                     }
-                  }
 
-                  if (op.matchedArticleId && op.description) {
-                    await this.createMappingRule(companyId, userId, {
-                      ruleType: 'contains',
-                      pattern: op.description,
-                      targetType: 'article',
-                      targetId: op.matchedArticleId,
-                      sourceField: 'description',
-                    });
+                    if (op.matchedAccountId && op.description) {
+                      await this.createMappingRule(companyId, userId, {
+                        ruleType: 'contains',
+                        pattern: op.description,
+                        targetType: 'account',
+                        targetId: op.matchedAccountId,
+                        sourceField: 'description',
+                      });
+                    }
+                  } catch (error: any) {
+                    // Логируем ошибку, но не прерываем импорт
+                    console.error(
+                      `Failed to save rules for operation ${op.id}:`,
+                      error.message
+                    );
                   }
-
-                  if (op.matchedAccountId && op.description) {
-                    await this.createMappingRule(companyId, userId, {
-                      ruleType: 'contains',
-                      pattern: op.description,
-                      targetType: 'account',
-                      targetId: op.matchedAccountId,
-                      sourceField: 'description',
-                    });
-                  }
-                } catch (error: any) {
-                  // Логируем ошибку, но не прерываем импорт
-                  console.error(
-                    `Failed to save rules for operation ${op.id}:`,
-                    error.message
-                  );
                 }
+
+                created++;
+              } catch (error: any) {
+                errors++;
+                const errorMessage = error?.message || String(error);
+
+                // Сохраняем детальное сообщение об ошибке
+                errorMessages.push(
+                  `Операция ${op.number || op.id}: ${errorMessage}`
+                );
+
+                logger.error('Failed to import operation', {
+                  sessionId,
+                  companyId,
+                  operationId: op.id,
+                  operationNumber: op.number,
+                  operationDate: op.date,
+                  error: errorMessage,
+                  stack: error?.stack,
+                });
+                // Продолжаем обработку остальных операций в батче
               }
-
-              created++;
-            } catch (error: any) {
-              errors++;
-              const errorMessage = error?.message || String(error);
-
-              // Сохраняем детальное сообщение об ошибке
-              errorMessages.push(
-                `Операция ${op.number || op.id}: ${errorMessage}`
-              );
-
-              logger.error('Failed to import operation', {
-                sessionId,
-                companyId,
-                operationId: op.id,
-                operationNumber: op.number,
-                operationDate: op.date,
-                error: errorMessage,
-                stack: error?.stack,
-              });
-              // Продолжаем обработку остальных операций в батче
             }
+          },
+          {
+            maxWait: 30000, // 30 секунд ожидания начала транзакции
+            timeout: 300000, // 5 минут на выполнение транзакции (для больших файлов с несколькими тысячами операций)
           }
-        });
+        );
       } catch (error: any) {
         // Логируем ошибку батча, но продолжаем обработку следующих батчей
         const errorMessage = error?.message || String(error);

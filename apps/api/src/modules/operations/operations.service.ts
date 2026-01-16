@@ -25,6 +25,7 @@ export interface OperationFilters {
   accountId?: string;
   isConfirmed?: boolean;
   isTemplate?: boolean;
+  repeat?: string; // Фильтр по полю repeat (например, 'none' для исключения повторяющихся)
   limit?: number;
   offset?: number;
 }
@@ -197,6 +198,20 @@ export class OperationsService {
     if (filters.counterpartyId) where.counterpartyId = filters.counterpartyId;
     if (filters.isConfirmed !== undefined)
       where.isConfirmed = filters.isConfirmed;
+
+    // Фильтр по полю repeat
+    // Если указан 'none', фильтруем только операции без повторения
+    // Если указано 'not_none', фильтруем только операции с повторением (repeat !== 'none')
+    // Если указано другое значение, фильтруем по конкретному значению
+    if (filters.repeat !== undefined) {
+      if (filters.repeat === 'not_none') {
+        where.repeat = { not: 'none' };
+      } else if (filters.repeat === 'none') {
+        where.repeat = 'none';
+      } else {
+        where.repeat = filters.repeat;
+      }
+    }
 
     // Фильтр по счету: для income/expense проверяем accountId,
     // для transfer проверяем sourceAccountId или targetAccountId

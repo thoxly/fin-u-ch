@@ -1,25 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import logger from './logger';
 
-// Determine project root: go up from apps/api/src/config to apps/api, then to root
-// From apps/api/src/config -> apps/api/src -> apps/api -> root
-//
-// For Jest tests, __dirname is available (CommonJS mode in tests)
-// For production, use import.meta.url (ES modules)
-let projectRoot: string;
-if (typeof __dirname !== 'undefined') {
-  // Jest / CommonJS environment
-  projectRoot = path.resolve(__dirname, '../..');
-} else {
-  // ES modules environment (production)
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  projectRoot = path.resolve(__dirname, '../..');
-}
+// Determine project root. Use __dirname (CommonJS/Jest). Avoid import.meta to
+// stay compatible with TypeScript compilation settings used in tests.
+// Path: apps/api/src/config -> apps/api/src -> apps/api -> ../../..
+const projectRoot = path.resolve(__dirname, '../..');
 
 // Load .env before initializing Prisma
 dotenv.config({ path: path.resolve(projectRoot, '.env') });

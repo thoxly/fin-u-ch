@@ -45,7 +45,7 @@ export async function determineDirection(
   );
 
   if (result.direction) {
-    logger.debug('determineDirection: Direction detected', {
+    logger.debug('[ОПРЕДЕЛЕНИЕ НАПРАВЛЕНИЯ] Направление определено', {
       direction: result.direction,
       confidence: result.confidence,
       reasons: result.reasons,
@@ -53,11 +53,22 @@ export async function determineDirection(
       receiverInn,
       payerAccount,
       receiverAccount,
+      companyInn,
     });
     return result.direction;
   }
 
   // Не удалось определить
+  logger.warn('[ОПРЕДЕЛЕНИЕ НАПРАВЛЕНИЯ] Не удалось определить направление', {
+    payerInn,
+    receiverInn,
+    payerAccount,
+    receiverAccount,
+    companyInn,
+    companyAccountNumbers: companyAccountNumbers?.length || 0,
+    purpose,
+    reasons: result.reasons,
+  });
   return null;
 }
 
@@ -96,11 +107,47 @@ export async function matchCounterparty(
   }
 
   // 2. Сопоставление по правилам маппинга
-  const nameToSearch =
-    direction === 'expense' ? operation.receiver : operation.payer;
+  // Если direction не определен, пробуем оба варианта
+  let nameToSearch: string | undefined;
+  let sourceField: 'payer' | 'receiver' | undefined;
 
-  if (nameToSearch) {
-    const sourceField = direction === 'expense' ? 'receiver' : 'payer';
+  if (direction === 'expense') {
+    nameToSearch = operation.receiver;
+    sourceField = 'receiver';
+  } else if (direction === 'income') {
+    nameToSearch = operation.payer;
+    sourceField = 'payer';
+  } else {
+    // Если direction не определен, пробуем оба поля
+    // Сначала пробуем receiver, потом payer
+    nameToSearch = operation.receiver || operation.payer;
+    sourceField = operation.receiver ? 'receiver' : 'payer';
+  }
+
+  // Если direction = null, пробуем оба поля последовательно
+  const fieldsToCheck: Array<{
+    field: 'payer' | 'receiver';
+    name: string | null | undefined;
+  }> = [];
+
+  if (direction === null) {
+    // При direction = null проверяем оба поля
+    if (operation.receiver) {
+      fieldsToCheck.push({ field: 'receiver', name: operation.receiver });
+    }
+    if (operation.payer) {
+      fieldsToCheck.push({ field: 'payer', name: operation.payer });
+    }
+  } else {
+    // При известном направлении проверяем только нужное поле
+    if (nameToSearch) {
+      fieldsToCheck.push({ field: sourceField!, name: nameToSearch });
+    }
+  }
+
+  // Проверяем каждое поле для всех типов правил
+  for (const { field, name } of fieldsToCheck) {
+    if (!name) continue;
 
     // Приоритет 1: equals (самый точный)
     const equalsRules = await prisma.mappingRule.findMany({
@@ -108,21 +155,43 @@ export async function matchCounterparty(
         companyId,
         targetType: 'counterparty',
         ruleType: 'equals',
-        sourceField,
+        sourceField: field,
       },
     });
 
+    logger.debug('[ПОИСК ПРАВИЛ] Контрагент (equals)', {
+      companyId,
+      nameToSearch: name,
+      sourceField: field,
+      direction,
+      rulesCount: equalsRules.length,
+      rules: equalsRules.map((r) => ({
+        id: r.id,
+        pattern: r.pattern,
+        targetId: r.targetId,
+        targetName: r.targetName,
+      })),
+    });
+
     for (const rule of equalsRules) {
-      if (
-        nameToSearch.toLowerCase() === rule.pattern.toLowerCase() &&
-        rule.targetId
-      ) {
+      if (name.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
         await prisma.mappingRule.update({
           where: { id: rule.id },
           data: {
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
           },
+        });
+
+        logger.info('[ПРАВИЛО ПРИМЕНЕНО] Контрагент (equals)', {
+          ruleId: rule.id,
+          rulePattern: rule.pattern,
+          ruleType: rule.ruleType,
+          targetId: rule.targetId,
+          targetName: rule.targetName,
+          sourceField: field,
+          operationName: name,
+          direction,
         });
 
         return {
@@ -139,13 +208,27 @@ export async function matchCounterparty(
         companyId,
         targetType: 'counterparty',
         ruleType: 'alias',
-        sourceField,
+        sourceField: field,
       },
+    });
+
+    logger.debug('[ПОИСК ПРАВИЛ] Контрагент (alias)', {
+      companyId,
+      nameToSearch: name,
+      sourceField: field,
+      direction,
+      rulesCount: aliasRules.length,
+      rules: aliasRules.map((r) => ({
+        id: r.id,
+        pattern: r.pattern,
+        targetId: r.targetId,
+        targetName: r.targetName,
+      })),
     });
 
     for (const rule of aliasRules) {
       if (
-        nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) &&
+        name.toLowerCase().includes(rule.pattern.toLowerCase()) &&
         rule.targetId
       ) {
         await prisma.mappingRule.update({
@@ -154,6 +237,17 @@ export async function matchCounterparty(
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
           },
+        });
+
+        logger.info('[ПРАВИЛО ПРИМЕНЕНО] Контрагент (alias)', {
+          ruleId: rule.id,
+          rulePattern: rule.pattern,
+          ruleType: rule.ruleType,
+          targetId: rule.targetId,
+          targetName: rule.targetName,
+          sourceField: field,
+          operationName: name,
+          direction,
         });
 
         return {
@@ -170,13 +264,27 @@ export async function matchCounterparty(
         companyId,
         targetType: 'counterparty',
         ruleType: 'contains',
-        sourceField,
+        sourceField: field,
       },
+    });
+
+    logger.debug('[ПОИСК ПРАВИЛ] Контрагент (contains)', {
+      companyId,
+      nameToSearch: name,
+      sourceField: field,
+      direction,
+      rulesCount: containsRules.length,
+      rules: containsRules.map((r) => ({
+        id: r.id,
+        pattern: r.pattern,
+        targetId: r.targetId,
+        targetName: r.targetName,
+      })),
     });
 
     for (const rule of containsRules) {
       if (
-        nameToSearch.toLowerCase().includes(rule.pattern.toLowerCase()) &&
+        name.toLowerCase().includes(rule.pattern.toLowerCase()) &&
         rule.targetId
       ) {
         await prisma.mappingRule.update({
@@ -185,6 +293,17 @@ export async function matchCounterparty(
             usageCount: { increment: 1 },
             lastUsedAt: new Date(),
           },
+        });
+
+        logger.info('[ПРАВИЛО ПРИМЕНЕНО] Контрагент (contains)', {
+          ruleId: rule.id,
+          rulePattern: rule.pattern,
+          ruleType: rule.ruleType,
+          targetId: rule.targetId,
+          targetName: rule.targetName,
+          sourceField: field,
+          operationName: name,
+          direction,
         });
 
         return {
@@ -246,14 +365,19 @@ export async function matchArticle(
   ruleId?: string;
 } | null> {
   // Определяем тип статьи на основе направления
-  const articleType =
-    direction === 'income'
-      ? 'income'
-      : direction === 'expense'
-        ? 'expense'
-        : null;
+  // Если direction = null, пробуем оба типа
+  const articleTypes: Array<'income' | 'expense'> = [];
 
-  if (!articleType) {
+  if (direction === 'income') {
+    articleTypes.push('income');
+  } else if (direction === 'expense') {
+    articleTypes.push('expense');
+  } else {
+    // Если direction не определен, пробуем оба типа
+    articleTypes.push('expense', 'income');
+  }
+
+  if (articleTypes.length === 0) {
     return null;
   }
 
@@ -271,49 +395,24 @@ export async function matchArticle(
     },
   });
 
-  for (const rule of equalsRules) {
-    if (purpose.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
-      const article = await prisma.article.findFirst({
-        where: {
-          id: rule.targetId,
-          companyId,
-          type: articleType,
-          isActive: true,
-        },
-      });
-
-      if (article) {
-        await prisma.mappingRule.update({
-          where: { id: rule.id },
-          data: {
-            usageCount: { increment: 1 },
-            lastUsedAt: new Date(),
-          },
-        });
-
-        return {
-          id: article.id,
-          matchedBy: 'rule',
-          ruleId: rule.id,
-        };
-      }
-    }
-  }
-
-  // Приоритет 2: regex (гибкий, но точный)
-  const regexRules = await prisma.mappingRule.findMany({
-    where: {
-      companyId,
-      targetType: 'article',
-      sourceField: 'description',
-      ruleType: 'regex',
-    },
+  logger.debug('[ПОИСК ПРАВИЛ] Статья (equals)', {
+    companyId,
+    purpose,
+    articleTypes,
+    direction,
+    rulesCount: equalsRules.length,
+    rules: equalsRules.map((r) => ({
+      id: r.id,
+      pattern: r.pattern,
+      targetId: r.targetId,
+      targetName: r.targetName,
+    })),
   });
 
-  for (const rule of regexRules) {
-    try {
-      const regex = new RegExp(rule.pattern, 'i');
-      if (regex.test(purpose) && rule.targetId) {
+  for (const rule of equalsRules) {
+    if (purpose.toLowerCase() === rule.pattern.toLowerCase() && rule.targetId) {
+      // Пробуем найти статью для каждого типа
+      for (const articleType of articleTypes) {
         const article = await prisma.article.findFirst({
           where: {
             id: rule.targetId,
@@ -332,6 +431,19 @@ export async function matchArticle(
             },
           });
 
+          logger.info('[ПРАВИЛО ПРИМЕНЕНО] Статья (equals)', {
+            ruleId: rule.id,
+            rulePattern: rule.pattern,
+            ruleType: rule.ruleType,
+            targetId: rule.targetId,
+            targetName: rule.targetName,
+            articleId: article.id,
+            articleName: article.name,
+            articleType: article.type,
+            purpose: purpose,
+            direction,
+          });
+
           return {
             id: article.id,
             matchedBy: 'rule',
@@ -339,8 +451,85 @@ export async function matchArticle(
           };
         }
       }
+    }
+  }
+
+  // Приоритет 2: regex (гибкий, но точный)
+  const regexRules = await prisma.mappingRule.findMany({
+    where: {
+      companyId,
+      targetType: 'article',
+      sourceField: 'description',
+      ruleType: 'regex',
+    },
+  });
+
+  logger.debug('[ПОИСК ПРАВИЛ] Статья (regex)', {
+    companyId,
+    purpose,
+    articleTypes,
+    direction,
+    rulesCount: regexRules.length,
+    rules: regexRules.map((r) => ({
+      id: r.id,
+      pattern: r.pattern,
+      targetId: r.targetId,
+      targetName: r.targetName,
+    })),
+  });
+
+  for (const rule of regexRules) {
+    try {
+      const regex = new RegExp(rule.pattern, 'i');
+      if (regex.test(purpose) && rule.targetId) {
+        // Пробуем найти статью для каждого типа
+        for (const articleType of articleTypes) {
+          const article = await prisma.article.findFirst({
+            where: {
+              id: rule.targetId,
+              companyId,
+              type: articleType,
+              isActive: true,
+            },
+          });
+
+          if (article) {
+            await prisma.mappingRule.update({
+              where: { id: rule.id },
+              data: {
+                usageCount: { increment: 1 },
+                lastUsedAt: new Date(),
+              },
+            });
+
+            logger.info('[ПРАВИЛО ПРИМЕНЕНО] Статья (regex)', {
+              ruleId: rule.id,
+              rulePattern: rule.pattern,
+              ruleType: rule.ruleType,
+              targetId: rule.targetId,
+              targetName: rule.targetName,
+              articleId: article.id,
+              articleName: article.name,
+              articleType: article.type,
+              purpose: purpose,
+              direction,
+            });
+
+            return {
+              id: article.id,
+              matchedBy: 'rule',
+              ruleId: rule.id,
+            };
+          }
+        }
+      }
     } catch (e) {
       // Невалидное регулярное выражение - пропускаем
+      logger.warn('[ПРАВИЛО ОШИБКА] Невалидное regex правило', {
+        ruleId: rule.id,
+        rulePattern: rule.pattern,
+        error: e instanceof Error ? e.message : String(e),
+      });
       continue;
     }
   }
@@ -355,34 +544,64 @@ export async function matchArticle(
     },
   });
 
+  logger.debug('[ПОИСК ПРАВИЛ] Статья (contains)', {
+    companyId,
+    purpose,
+    articleTypes,
+    direction,
+    rulesCount: containsRules.length,
+    rules: containsRules.map((r) => ({
+      id: r.id,
+      pattern: r.pattern,
+      targetId: r.targetId,
+      targetName: r.targetName,
+    })),
+  });
+
   for (const rule of containsRules) {
     if (
       purpose.toLowerCase().includes(rule.pattern.toLowerCase()) &&
       rule.targetId
     ) {
-      const article = await prisma.article.findFirst({
-        where: {
-          id: rule.targetId,
-          companyId,
-          type: articleType,
-          isActive: true,
-        },
-      });
-
-      if (article) {
-        await prisma.mappingRule.update({
-          where: { id: rule.id },
-          data: {
-            usageCount: { increment: 1 },
-            lastUsedAt: new Date(),
+      // Пробуем найти статью для каждого типа
+      for (const articleType of articleTypes) {
+        const article = await prisma.article.findFirst({
+          where: {
+            id: rule.targetId,
+            companyId,
+            type: articleType,
+            isActive: true,
           },
         });
 
-        return {
-          id: article.id,
-          matchedBy: 'rule',
-          ruleId: rule.id,
-        };
+        if (article) {
+          await prisma.mappingRule.update({
+            where: { id: rule.id },
+            data: {
+              usageCount: { increment: 1 },
+              lastUsedAt: new Date(),
+            },
+          });
+
+          logger.info('[ПРАВИЛО ПРИМЕНЕНО] Статья (contains)', {
+            ruleId: rule.id,
+            rulePattern: rule.pattern,
+            ruleType: rule.ruleType,
+            targetId: rule.targetId,
+            targetName: rule.targetName,
+            articleId: article.id,
+            articleName: article.name,
+            articleType: article.type,
+            purpose: purpose,
+            direction,
+          });
+
+          return {
+            id: article.id,
+            matchedBy: 'rule',
+            ruleId: rule.id,
+          };
+        }
       }
     }
   }
@@ -693,21 +912,32 @@ export async function matchArticle(
       }
 
       // Ищем статью по любому из возможных названий (используем предзагруженные статьи)
-      for (const articleName of keywordRule.articleNames) {
-        const article = await prisma.article.findFirst({
-          where: {
-            companyId,
-            name: { contains: articleName, mode: 'insensitive' },
-            type: articleType,
-            isActive: true,
-          },
-        });
+      // Пробуем для каждого типа статьи
+      for (const articleType of articleTypes) {
+        for (const articleName of keywordRule.articleNames) {
+          const article = await prisma.article.findFirst({
+            where: {
+              companyId,
+              name: { contains: articleName, mode: 'insensitive' },
+              type: articleType,
+              isActive: true,
+            },
+          });
 
-        if (article) {
-          return {
-            id: article.id,
-            matchedBy: 'keyword',
-          };
+          if (article) {
+            logger.info('[ПРАВИЛО ПРИМЕНЕНО] Статья (keyword)', {
+              articleId: article.id,
+              articleName: article.name,
+              articleType: article.type,
+              keywordRule: keywordRule.keywords.join(', '),
+              purpose,
+              direction,
+            });
+            return {
+              id: article.id,
+              matchedBy: 'keyword',
+            };
+          }
         }
       }
     }
@@ -802,6 +1032,17 @@ export async function autoMatch(
     .filter((num): num is string => !!num);
 
   // 1. Определяем направление
+  logger.debug('[АВТОСОПОСТАВЛЕНИЕ] Попытка определить направление', {
+    companyId,
+    payerInn: operation.payerInn,
+    receiverInn: operation.receiverInn,
+    companyInn,
+    payerAccount: operation.payerAccount,
+    receiverAccount: operation.receiverAccount,
+    companyAccountNumbers: companyAccountNumbers?.length || 0,
+    purpose: operation.purpose,
+  });
+
   const direction = await determineDirection(
     operation.payerInn,
     operation.receiverInn,
@@ -811,6 +1052,14 @@ export async function autoMatch(
     operation.receiverAccount,
     companyAccountNumbers
   );
+
+  logger.debug('[АВТОСОПОСТАВЛЕНИЕ] Результат определения направления', {
+    companyId,
+    direction,
+    payerInn: operation.payerInn,
+    receiverInn: operation.receiverInn,
+    companyInn,
+  });
 
   // 2. Сопоставляем контрагента
   const counterpartyMatch = await matchCounterparty(
@@ -854,7 +1103,7 @@ export async function autoMatch(
     }
   }
 
-  return {
+  const result = {
     matchedArticleId: articleMatch?.id,
     matchedCounterpartyId: counterpartyMatch?.id,
     matchedAccountId: accountMatch?.id,
@@ -862,4 +1111,40 @@ export async function autoMatch(
     matchedRuleId,
     direction: direction || undefined,
   };
+
+  // Логируем применение правил
+  if (matchedRuleId) {
+    logger.info('[АВТОСОПОСТАВЛЕНИЕ] Правило применено к операции', {
+      matchedRuleId,
+      matchedBy,
+      direction: result.direction,
+      matchedArticleId: result.matchedArticleId,
+      matchedCounterpartyId: result.matchedCounterpartyId,
+      matchedAccountId: result.matchedAccountId,
+      operation: {
+        purpose: operation.purpose,
+        payer: operation.payer,
+        receiver: operation.receiver,
+        amount: operation.amount,
+        date: operation.date,
+      },
+    });
+  } else if (matchedBy) {
+    logger.debug('[АВТОСОПОСТАВЛЕНИЕ] Сопоставление без правил', {
+      matchedBy,
+      direction: result.direction,
+      matchedArticleId: result.matchedArticleId,
+      matchedCounterpartyId: result.matchedCounterpartyId,
+      matchedAccountId: result.matchedAccountId,
+      operation: {
+        purpose: operation.purpose,
+        payer: operation.payer,
+        receiver: operation.receiver,
+        amount: operation.amount,
+        date: operation.date,
+      },
+    });
+  }
+
+  return result;
 }
