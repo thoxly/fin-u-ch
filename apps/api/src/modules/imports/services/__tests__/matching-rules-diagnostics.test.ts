@@ -60,7 +60,7 @@ describe('Диагностика работы правил и импорта о�
   let testArticleId: string;
   let testCounterpartyId: string;
   let testAccountId: string;
-  let testCompanyInn: string;
+  let testCompanyInn: string | null;
   let testAccountNumber: string;
 
   beforeAll(async () => {
@@ -81,7 +81,7 @@ describe('Диагностика работы правил и импорта о�
     const user = await prisma.user.create({
       data: {
         email: `test-diagnostics-${Date.now()}@test.com`,
-        password: 'hashed',
+        passwordHash: 'hashed',
         companyId: testCompanyId,
         isActive: true,
       },
@@ -104,6 +104,7 @@ describe('Диагностика работы правил и импорта о�
       data: {
         name: 'ООО "ТЕСТОВЫЙ КОНТРАГЕНТ"',
         companyId: testCompanyId,
+        category: 'other',
       },
     });
     testCounterpartyId = counterparty.id;
@@ -155,7 +156,7 @@ describe('Диагностика работы правил и импорта о�
         date: new Date('2025-01-15'),
         amount: 1000,
         purpose: 'Тестовый платеж',
-        payerInn: testCompanyInn,
+        payerInn: testCompanyInn ?? undefined,
         receiverInn: '9876543210',
         payer: 'ООО "ТЕСТОВАЯ КОМПАНИЯ"',
         receiver: 'ООО "ПОЛУЧАТЕЛЬ"',
@@ -195,7 +196,7 @@ describe('Диагностика работы правил и импорта о�
         amount: 1000,
         purpose: 'Тестовый платеж',
         payerInn: '9876543210',
-        receiverInn: testCompanyInn,
+        receiverInn: testCompanyInn ?? undefined,
         payer: 'ООО "ПЛАТЕЛЬЩИК"',
         receiver: 'ООО "ТЕСТОВАЯ КОМПАНИЯ"',
       };
@@ -340,7 +341,7 @@ describe('Диагностика работы правил и импорта о�
         date: new Date('2025-01-15'),
         amount: 1000,
         purpose: 'Тестовый платеж',
-        payerInn: testCompanyInn,
+        payerInn: testCompanyInn ?? undefined,
         receiverInn: '9876543210',
         payer: 'ООО "ТЕСТОВАЯ КОМПАНИЯ"',
         receiver: 'ООО "ТЕСТОВЫЙ КОНТРАГЕНТ"',
@@ -459,7 +460,7 @@ describe('Диагностика работы правил и импорта о�
         date: new Date('2025-01-15'),
         amount: 1000,
         purpose: 'Тестовый платеж за услуги',
-        payerInn: testCompanyInn,
+        payerInn: testCompanyInn ?? undefined,
         receiverInn: '9876543210',
         payer: 'ООО "ТЕСТОВАЯ КОМПАНИЯ"',
         receiver: 'ООО "ПОЛУЧАТЕЛЬ"',
@@ -589,7 +590,7 @@ describe('Диагностика работы правил и импорта о�
         date: new Date('2025-01-15'),
         amount: 1000,
         purpose: 'Тестовый платеж за услуги',
-        payerInn: testCompanyInn,
+        payerInn: testCompanyInn ?? undefined,
         receiverInn: '9876543210',
         payerAccount: testAccountNumber,
         receiverAccount: '40817810098765432109',

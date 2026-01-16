@@ -1088,8 +1088,8 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
 
       // Добавляем хэш - оборачиваем в try-catch
       try {
-        doc.hash = createOperationHash(doc);
-        documents.push(doc);
+        doc.hash = createOperationHash(doc as ParsedDocument);
+        documents.push(doc as ParsedDocument);
       } catch (hashError) {
         // Если ошибка создания хэша, все равно добавляем документ
         logger.warn('[ПАРСЕР] Ошибка создания хэша документа', {
@@ -1098,7 +1098,7 @@ export function parseClientBankExchange(content: Buffer | string): ParsedFile {
           error:
             hashError instanceof Error ? hashError.message : String(hashError),
         });
-        documents.push(doc); // Добавляем документ без хэша
+        documents.push(doc as ParsedDocument); // Добавляем документ без хэша
       }
     } catch (error) {
       // Ловим любые неожиданные ошибки и продолжаем обработку
