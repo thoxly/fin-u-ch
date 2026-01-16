@@ -187,101 +187,112 @@ export class OperationImportService {
     }[] = [];
 
     try {
-      await prisma.$transaction(async (tx) => {
-        // Предзагружаем все счета для transfer операций
-        const accountsMap = await this.preloadAccounts(batch, companyId, tx);
+      // Увеличиваем таймаут транзакции до 5 минут для обработки больших батчей
+      // maxWait - время ожидания начала транзакции (30 секунд)
+      // timeout - максимальное время выполнения транзакции (5 минут)
+      // Для файлов с несколькими тысячами операций требуется больше времени
+      await prisma.$transaction(
+        async (tx) => {
+          // Предзагружаем все счета для transfer операций
+          const accountsMap = await this.preloadAccounts(batch, companyId, tx);
 
-        for (const op of batch) {
-          try {
-            // Валидация обязательных полей
-            this.validateOperation(op);
+          for (const op of batch) {
+            try {
+              // Валидация обязательных полей
+              this.validateOperation(op);
 
-            // Подготавливаем данные операции
-            const operationData = await this.prepareOperationData(
-              op,
-              accountsMap
-            );
+              // Подготавливаем данные операции
+              const operationData = await this.prepareOperationData(
+                op,
+                accountsMap
+              );
 
-            // Валидируем через Zod
-            const validationResult =
-              CreateOperationSchema.safeParse(operationData);
+              // Валидируем через Zod
+              const validationResult =
+                CreateOperationSchema.safeParse(operationData);
 
-            if (!validationResult.success) {
-              const errorMessage = formatZodErrors(validationResult.error);
-              logger.error('Operation validation failed', {
-                operationId: op.id,
-                operationData,
-                validationErrors: validationResult.error.errors,
+              if (!validationResult.success) {
+                const errorMessage = formatZodErrors(validationResult.error);
+                logger.error('Operation validation failed', {
+                  operationId: op.id,
+                  operationData,
+                  validationErrors: validationResult.error.errors,
+                });
+                throw new AppError(
+                  `Validation error for operation ${op.id}: ${errorMessage}`,
+                  400
+                );
+              }
+
+              const validatedData = validationResult.data;
+
+              // Создаем hash из исходных данных
+              const sourceHash = createOperationHash({
+                date: op.date,
+                number: op.number || undefined,
+                amount: op.amount,
+                payer: op.payer || undefined,
+                payerInn: op.payerInn || undefined,
+                payerAccount: op.payerAccount || undefined,
+                receiver: op.receiver || undefined,
+                receiverInn: op.receiverInn || undefined,
+                receiverAccount: op.receiverAccount || undefined,
+                purpose: op.description || undefined,
               });
-              throw new AppError(
-                `Validation error for operation ${op.id}: ${errorMessage}`,
-                400
-              );
-            }
 
-            const validatedData = validationResult.data;
+              // Создаем операцию
+              await tx.operation.create({
+                data: {
+                  ...validatedData,
+                  companyId,
+                  isTemplate: false,
+                  isConfirmed: true,
+                  sourceHash,
+                },
+              });
 
-            // Создаем hash из исходных данных
-            const sourceHash = createOperationHash({
-              date: op.date,
-              number: op.number || undefined,
-              amount: op.amount,
-              payer: op.payer || undefined,
-              payerInn: op.payerInn || undefined,
-              payerAccount: op.payerAccount || undefined,
-              receiver: op.receiver || undefined,
-              receiverInn: op.receiverInn || undefined,
-              receiverAccount: op.receiverAccount || undefined,
-              purpose: op.description || undefined,
-            });
+              // Помечаем как обработанную
+              await tx.importedOperation.update({
+                where: { id: op.id, companyId },
+                data: { processed: true },
+              });
 
-            // Создаем операцию
-            await tx.operation.create({
-              data: {
-                ...validatedData,
+              // Сохраняем правила если нужно
+              if (saveRulesForIds && saveRulesForIds.includes(op.id)) {
+                await mappingRulesService.saveRulesForOperation(
+                  tx,
+                  companyId,
+                  userId,
+                  op
+                );
+              }
+
+              results.push({ success: true, operationId: op.id });
+            } catch (error: unknown) {
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+              const errorStack =
+                error instanceof Error ? error.stack : undefined;
+
+              logger.error('Failed to import operation', {
                 companyId,
-                isTemplate: false,
-                isConfirmed: true,
-                sourceHash,
-              },
-            });
+                operationId: op.id,
+                operationNumber: op.number,
+                operationDate: op.date,
+                error: errorMessage,
+                stack: errorStack,
+              });
 
-            // Помечаем как обработанную
-            await tx.importedOperation.update({
-              where: { id: op.id, companyId },
-              data: { processed: true },
-            });
-
-            // Сохраняем правила если нужно
-            if (saveRulesForIds && saveRulesForIds.includes(op.id)) {
-              await mappingRulesService.saveRulesForOperation(
-                tx,
-                companyId,
-                userId,
-                op
-              );
+              results.push({ success: false, error: errorMessage });
+              // Продолжаем обработку остальных операций в батче
             }
-
-            results.push({ success: true, operationId: op.id });
-          } catch (error: unknown) {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : undefined;
-
-            logger.error('Failed to import operation', {
-              companyId,
-              operationId: op.id,
-              operationNumber: op.number,
-              operationDate: op.date,
-              error: errorMessage,
-              stack: errorStack,
-            });
-
-            results.push({ success: false, error: errorMessage });
-            // Продолжаем обработку остальных операций в батче
           }
+        },
+        {
+          maxWait: 30000, // 30 секунд ожидания начала транзакции
+          timeout: 300000, // 5 минут на выполнение транзакции (для больших файлов с несколькими тысячами операций)
         }
-      });
+      );
     } catch (error: unknown) {
       // Если транзакция упала, все операции в батче считаются ошибочными
       const errorMessage =
@@ -454,6 +465,11 @@ export class OperationImportService {
     applied: number;
     updated: number;
   }> {
+    logger.info('[ПРИМЕНЕНИЕ ПРАВИЛ] Начало применения правил к сессии', {
+      sessionId,
+      companyId,
+    });
+
     // Проверяем, что сессия принадлежит компании
     await sessionService.getSession(sessionId, companyId);
 
@@ -467,7 +483,13 @@ export class OperationImportService {
       },
     });
 
+    logger.info('[ПРИМЕНЕНИЕ ПРАВИЛ] Найдено операций для обработки', {
+      sessionId,
+      operationsCount: operations.length,
+    });
+
     if (operations.length === 0) {
+      logger.info('[ПРИМЕНЕНИЕ ПРАВИЛ] Нет операций для обработки');
       return { applied: 0, updated: 0 };
     }
 
@@ -557,6 +579,21 @@ export class OperationImportService {
               data: updateData,
             });
 
+            logger.info('[ПРИМЕНЕНИЕ ПРАВИЛ] Правило применено к операции', {
+              sessionId,
+              operationId: op.id,
+              operationNumber: op.number,
+              operationDate: op.date,
+              operationDescription: op.description,
+              matchedBy: matchingResult.matchedBy,
+              matchedRuleId: matchingResult.matchedRuleId,
+              matchedArticleId: matchingResult.matchedArticleId,
+              matchedCounterpartyId: matchingResult.matchedCounterpartyId,
+              matchedAccountId: matchingResult.matchedAccountId,
+              direction: matchingResult.direction,
+              isFullyMatched,
+            });
+
             updated++;
             results.push(true);
           } catch (error: unknown) {
@@ -582,6 +619,12 @@ export class OperationImportService {
         continueOnError: true,
       }
     );
+
+    logger.info('[ПРИМЕНЕНИЕ ПРАВИЛ] Завершено применение правил', {
+      sessionId,
+      applied: operations.length,
+      updated,
+    });
 
     return { applied: operations.length, updated };
   }

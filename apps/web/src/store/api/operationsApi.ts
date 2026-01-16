@@ -12,6 +12,7 @@ interface GetOperationsParams {
   accountId?: string;
   isConfirmed?: boolean;
   isTemplate?: boolean;
+  repeat?: string; // Фильтр по полю repeat (например, 'none' для исключения повторяющихся)
   limit?: number;
   offset?: number;
 }
