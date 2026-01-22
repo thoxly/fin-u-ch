@@ -1,15 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import logger from './logger';
 import { dbPoolSizeGauge } from './metrics';
 
-// Determine project root (works in ESM and CJS)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// Path: apps/api/src/config -> apps/api/src -> apps/api -> ../../..
-const projectRoot = path.resolve(__dirname, '../..');
+// Determine project root
+// Use process.cwd() which works in both CommonJS and ESM contexts
+// This assumes the process is started from the project root (apps/api)
+const projectRoot = process.cwd();
 
 // Load .env before initializing Prisma
 dotenv.config({ path: path.resolve(projectRoot, '.env') });

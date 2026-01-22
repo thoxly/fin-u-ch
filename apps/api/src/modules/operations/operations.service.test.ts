@@ -53,6 +53,24 @@ jest.mock('../currency/currency.service', () => ({
   },
 }));
 
+// Mock Redis to prevent connection errors in tests
+jest.mock('../../config/redis', () => {
+  const mockRedis = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    scan: jest.fn(),
+    quit: jest.fn(),
+    disconnect: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
+  };
+  return {
+    __esModule: true,
+    default: mockRedis,
+  };
+});
+
 import { OperationsService, CreateOperationDTO } from './operations.service';
 import { AppError } from '../../middlewares/error';
 import { OperationType } from '@fin-u-ch/shared';
@@ -66,6 +84,11 @@ describe('OperationsService', () => {
   beforeEach(() => {
     operationsService = new OperationsService();
     jest.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    // Clean up any async operations
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   describe('create validation', () => {

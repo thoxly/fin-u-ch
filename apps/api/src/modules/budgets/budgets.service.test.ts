@@ -39,6 +39,24 @@ jest.mock('../../config/db', () => ({
   },
 }));
 
+// Mock Redis to prevent connection errors in tests
+jest.mock('../../config/redis', () => {
+  const mockRedis = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+    scan: jest.fn(),
+    quit: jest.fn(),
+    disconnect: jest.fn(),
+    on: jest.fn(),
+    off: jest.fn(),
+  };
+  return {
+    __esModule: true,
+    default: mockRedis,
+  };
+});
+
 describe('BudgetsService', () => {
   let budgetsService: BudgetsService;
   const companyId = 'test-company-id';
@@ -46,6 +64,11 @@ describe('BudgetsService', () => {
   beforeEach(() => {
     budgetsService = new BudgetsService();
     jest.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    // Clean up any async operations
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   describe('getAll', () => {
