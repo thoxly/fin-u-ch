@@ -47,6 +47,32 @@ export const reportRequestCounter = new Counter({
   labelNames: ['report_type', 'status'],
 });
 
+// Redis cache metrics
+export const redisCacheHitCounter = new Counter({
+  name: 'api_redis_cache_hits_total',
+  help: 'Total number of Redis cache hits',
+  labelNames: ['cache_type'],
+});
+
+export const redisCacheMissCounter = new Counter({
+  name: 'api_redis_cache_misses_total',
+  help: 'Total number of Redis cache misses',
+  labelNames: ['cache_type'],
+});
+
+export const redisOperationDurationHistogram = new Histogram({
+  name: 'api_redis_operation_duration_seconds',
+  help: 'Duration of Redis operations in seconds',
+  labelNames: ['operation', 'status'],
+  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2],
+});
+
+// Redis connection status gauge
+export const redisConnectionStatusGauge = new Gauge({
+  name: 'api_redis_connection_status',
+  help: 'Redis connection status (1 = connected, 0 = disconnected)',
+});
+
 // Start monitoring event loop lag
 let eventLoopLagStart = performance.now();
 let eventLoopLagTimeout: NodeJS.Timeout | null = null;

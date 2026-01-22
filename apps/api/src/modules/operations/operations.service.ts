@@ -25,6 +25,7 @@ export interface OperationFilters {
   accountId?: string;
   isConfirmed?: boolean;
   isTemplate?: boolean;
+  repeat?: string; // Фильтр по полю repeat (например, 'none' для исключения повторяющихся)
   limit?: number;
   offset?: number;
 }
@@ -198,6 +199,20 @@ export class OperationsService {
     if (filters.isConfirmed !== undefined)
       where.isConfirmed = filters.isConfirmed;
 
+    // Фильтр по полю repeat
+    // Если указан 'none', фильтруем только операции без повторения
+    // Если указано 'not_none', фильтруем только операции с повторением (repeat !== 'none')
+    // Если указано другое значение, фильтруем по конкретному значению
+    if (filters.repeat !== undefined) {
+      if (filters.repeat === 'not_none') {
+        where.repeat = { not: 'none' };
+      } else if (filters.repeat === 'none') {
+        where.repeat = 'none';
+      } else {
+        where.repeat = filters.repeat;
+      }
+    }
+
     // Фильтр по счету: для income/expense проверяем accountId,
     // для transfer проверяем sourceAccountId или targetAccountId
     if (filters.accountId) {
@@ -244,24 +259,41 @@ export class OperationsService {
       throw new AppError('offset must be non-negative', 400);
     }
 
-    return prisma.operation.findMany({
-      where,
-      include: {
-        account: { select: { id: true, name: true } },
-        sourceAccount: { select: { id: true, name: true } },
-        targetAccount: { select: { id: true, name: true } },
-        article: { select: { id: true, name: true } },
-        counterparty: { select: { id: true, name: true } },
-        deal: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-        recurrenceParent: {
-          select: { id: true, repeat: true, operationDate: true },
+    // Получаем операции и общее количество параллельно для оптимизации
+    const [operations, total] = await Promise.all([
+      prisma.operation.findMany({
+        where,
+        include: {
+          account: { select: { id: true, name: true } },
+          sourceAccount: { select: { id: true, name: true } },
+          targetAccount: { select: { id: true, name: true } },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+          recurrenceParent: {
+            select: { id: true, repeat: true, operationDate: true },
+          },
         },
+        orderBy: { operationDate: 'desc' },
+        take,
+        skip,
+      }),
+      prisma.operation.count({ where }),
+    ]);
+
+    // Возвращаем данные с метаданными пагинации
+    return {
+      data: operations,
+      pagination: {
+        total,
+        limit: take,
+        offset: skip,
+        hasMore: skip + take < total,
+        totalPages: Math.ceil(total / take),
+        currentPage: Math.floor(skip / take) + 1,
       },
-      orderBy: { operationDate: 'desc' },
-      take,
-      skip,
-    });
+    };
   }
 
   async getById(id: string, companyId: string) {

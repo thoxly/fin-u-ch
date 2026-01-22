@@ -32,14 +32,27 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
     childrenCount: 0,
   });
 
-  // Получаем только шаблоны
-  const { data: allOperations = [] } = useGetOperationsQuery({
-    isTemplate: true,
+  // Получаем операции с повторением (repeat !== 'none') для счетчика
+  // Используем фильтр repeat='not_none' для эффективного запроса
+  const { data: recurringOperations = [] } = useGetOperationsQuery({
+    repeat: 'not_none',
   });
+
+  // Получаем все операции для проверки дочерних операций
+  const { data: allOperations = [] } = useGetOperationsQuery({});
+
   const [updateOperation] = useUpdateOperationMutation();
   const [deleteOperation] = useDeleteOperationMutation();
 
-  const recurringTemplates = allOperations;
+  // Количество операций с повторением для счетчика
+  const recurringOperationsCount = recurringOperations.length;
+
+  // Получаем только шаблоны для списка
+  const { data: templateOperations = [] } = useGetOperationsQuery({
+    isTemplate: true,
+  });
+
+  const recurringTemplates = templateOperations;
 
   // Закрытие при клике вне (только для десктопной версии)
   useEffect(() => {
@@ -123,9 +136,9 @@ export const RecurringOperations = ({ onEdit }: RecurringOperationsProps) => {
           size={18}
           className="text-primary-600 dark:text-primary-400"
         />
-        {recurringTemplates.length > 0 && (
+        {recurringOperationsCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 bg-primary-600 dark:bg-primary-500 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-            {recurringTemplates.length}
+            {recurringOperationsCount}
           </span>
         )}
       </button>

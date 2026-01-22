@@ -67,6 +67,12 @@ const authSlice = createSlice({
       // Удаляем из localStorage
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      // Устанавливаем маркер для синхронизации разлогина между вкладками
+      try {
+        localStorage.setItem('logout', String(Date.now()));
+      } catch (e) {
+        // ignore
+      }
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;

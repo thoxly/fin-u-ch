@@ -26,6 +26,7 @@ export class OperationsController {
         isTemplate: req.query.isTemplate
           ? req.query.isTemplate === 'true'
           : undefined,
+        repeat: req.query.repeat as string,
         limit: req.query.limit
           ? parseInt(req.query.limit as string, 10)
           : undefined,
@@ -35,6 +36,9 @@ export class OperationsController {
       };
 
       const result = await operationsService.getAll(req.companyId!, filters);
+
+      // Для обратной совместимости: если клиент не ожидает пагинацию, возвращаем только data
+      // Но лучше всегда возвращать с метаданными
       res.json(result);
     } catch (error) {
       next(error);

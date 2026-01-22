@@ -15,6 +15,7 @@ import type { ImportSession } from '@shared/types/imports';
 import { ImportMappingTable } from './ImportMappingTable';
 import TableSkeleton from '../../shared/ui/TableSkeleton';
 import { EmptyState } from '../../shared/ui/EmptyState';
+import { fixMojibake } from '../../shared/lib/encoding';
 
 interface ImportHistoryProps {
   onClose?: () => void;
@@ -157,7 +158,9 @@ export const ImportHistory = ({
       render: (session: ImportSession) => (
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-gray-400" />
-          <span className="truncate max-w-xs">{session.fileName}</span>
+          <span className="truncate max-w-xs">
+            {fixMojibake(session.fileName) ?? ''}
+          </span>
         </div>
       ),
     },

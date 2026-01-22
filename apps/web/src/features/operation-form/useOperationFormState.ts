@@ -58,11 +58,14 @@ export const useOperationFormState = (operation: Operation | null) => {
   const [description, setDescription] = useState(operation?.description || '');
 
   const [repeat, setRepeat] = useState<Periodicity>(
-    operation?.repeat || Periodicity.NONE
+    operation?.recurrenceParent?.repeat || operation?.repeat || Periodicity.NONE
   );
 
   const [recurrenceEndDate, setRecurrenceEndDate] = useState(
-    convertToDateString(operation?.recurrenceEndDate)
+    convertToDateString(
+      operation?.recurrenceParent?.recurrenceEndDate ||
+        operation?.recurrenceEndDate
+    )
   );
 
   const [updateScope, setUpdateScope] = useState<'current' | 'all'>('current');

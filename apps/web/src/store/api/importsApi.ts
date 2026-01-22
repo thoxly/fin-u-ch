@@ -285,7 +285,6 @@ export const importsApi = apiSlice.injectEndpoints({
       query: ({ sessionId }) => ({
         url: `/imports/sessions/${sessionId}/apply-rules`,
         method: 'POST',
-        body: data,
       }),
       invalidatesTags: ['Import'],
     }),

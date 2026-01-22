@@ -1,4 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useDispatch } from 'react-redux';
+import { logout } from './store/slices/authSlice';
+import { apiSlice } from './store/api/apiSlice';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
@@ -39,6 +43,22 @@ import { ThemeProvider } from './components/ThemeProvider';
 import { YandexMetrikaTracker } from './components/YandexMetrikaTracker';
 
 function App() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'logout') {
+        // Сбрасываем кэш RTK Query, чтобы не осталось данных демо-сессии
+        dispatch(apiSlice.util.resetApiState());
+        dispatch(logout());
+        navigate('/login');
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [dispatch, navigate]);
   return (
     <>
       <ThemeProvider />

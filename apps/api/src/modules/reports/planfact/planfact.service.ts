@@ -122,6 +122,7 @@ export class PlanFactService {
     });
 
     // Get fact data (только реальные операции, не шаблоны, не будущие)
+    // Используем select вместо include для оптимизации - загружаем только нужные поля
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -133,12 +134,27 @@ export class PlanFactService {
         isConfirmed: true,
         isTemplate: false,
       },
-      include: {
+      select: {
+        id: true,
+        type: true,
+        operationDate: true,
+        amount: true,
+        articleId: true,
+        dealId: true,
+        departmentId: true,
         article: { select: { id: true, name: true } },
         deal: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
       },
     });
+
+    // Защита от переполнения памяти при больших объемах данных
+    const MAX_OPERATIONS_WARNING = 10000;
+    if (operations.length > MAX_OPERATIONS_WARNING) {
+      logger.warn(
+        `PlanFact: Large number of operations (${operations.length}), consider using aggregation or smaller period`
+      );
+    }
 
     logger.info('PlanFact: operations fetched', {
       companyId,

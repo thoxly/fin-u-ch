@@ -33,6 +33,7 @@ model Account {
   updatedAt               DateTime            @updatedAt
   company                 Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   importedOperations      ImportedOperation[]
+  integrations            Integration[]
   accountOperations       Operation[]         @relation("operations_accountIdToaccounts")
   sourceAccountOperations Operation[]         @relation("operations_sourceAccountIdToaccounts")
   targetAccountOperations Operation[]         @relation("operations_targetAccountIdToaccounts")
@@ -60,6 +61,7 @@ model Article {
   parent             Article?            @relation("articlesToarticles", fields: [parentId], references: [id])
   children           Article[]           @relation("articlesToarticles")
   importedOperations ImportedOperation[]
+  integrations       Integration[]
   operations         Operation[]
   planItems          PlanItem[]
 
@@ -122,9 +124,11 @@ model Company {
   departments         Department[]
   import_sessions     ImportSession[]
   imported_operations ImportedOperation[]
+  integrations        Integration[]
   mapping_rules       MappingRule[]
   operations          Operation[]
   plan_items          PlanItem[]
+  salaries            Salary[]
   roles               Role[]
   subscription        Subscription?
   users               User[]
@@ -181,6 +185,7 @@ model Counterparty {
   deals               Deal[]
   imported_operations ImportedOperation[]
   operations          Operation[]
+  salaries            Salary[]
 
   @@index([companyId])
   @@map("counterparties")
@@ -218,6 +223,7 @@ model Department {
   company             Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   imported_operations ImportedOperation[]
   operations          Operation[]
+  salaries            Salary[]
 
   @@index([companyId])
   @@map("departments")
@@ -401,6 +407,50 @@ model PlanItem {
   @@index([companyId, budgetId, startDate])
   @@index([companyId, startDate, repeat])
   @@map("plan_items")
+}
+
+model Integration {
+  id              String   @id
+  companyId       String
+  type            String
+  clientKey       String
+  apiKey          String
+  paymentSchedule String
+  articleId       String
+  accountId       String
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+  account         Account  @relation(fields: [accountId], references: [id])
+  article         Article  @relation(fields: [articleId], references: [id])
+  company         Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type])
+  @@index([accountId])
+  @@index([articleId])
+  @@index([companyId])
+  @@map("integrations")
+}
+
+model Salary {
+  id                     String       @id
+  companyId              String
+  employeeCounterpartyId String
+  departmentId           String?
+  baseWage               Float
+  contributionsPct       Float        @default(30.0)
+  incomeTaxPct           Float        @default(13.0)
+  periodicity            String       @default("monthly")
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime
+  company                Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  department             Department?  @relation(fields: [departmentId], references: [id])
+  employeeCounterparty   Counterparty @relation(fields: [employeeCounterpartyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("salaries")
 }
 
 model RolePermission {

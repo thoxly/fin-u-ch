@@ -271,7 +271,7 @@ export const OperationForm = ({
           onDealChange={setDealId}
           onDepartmentChange={setDepartmentId}
           onDescriptionChange={setDescription}
-          onRepeatChange={(value) => setRepeat(value as Periodicity)}
+          onRepeatChange={setRepeat}
           onEndDateChange={setRecurrenceEndDate}
           onValidationErrorClear={clearValidationError}
           onOpenCreateModal={handleOpenCreateModal}

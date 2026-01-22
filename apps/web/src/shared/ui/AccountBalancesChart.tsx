@@ -17,6 +17,7 @@ import { InfoHint } from './InfoHint';
 import { useAccountBalancesChart } from '../hooks/useAccountBalancesChart';
 import { useIsSmallScreen } from '../hooks/useIsSmallScreen';
 import { useIsWideScreen } from '../hooks/useIsWideScreen';
+import { CustomTooltip } from './CustomTooltip';
 
 interface AccountBalancesChartProps {
   data: Array<
