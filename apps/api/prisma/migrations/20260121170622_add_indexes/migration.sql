@@ -60,9 +60,15 @@ CREATE INDEX IF NOT EXISTS "plan_items_accountId_idx" ON "plan_items"("accountId
 CREATE INDEX IF NOT EXISTS "plan_items_dealId_idx" ON "plan_items"("dealId");
 
 -- Integration indexes (new)
-CREATE INDEX IF NOT EXISTS "integrations_accountId_idx" ON "integrations"("accountId");
-CREATE INDEX IF NOT EXISTS "integrations_articleId_idx" ON "integrations"("articleId");
-CREATE INDEX IF NOT EXISTS "integrations_companyId_idx" ON "integrations"("companyId");
+-- Only create indexes if the table exists
+DO $$ 
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'integrations') THEN
+    CREATE INDEX IF NOT EXISTS "integrations_accountId_idx" ON "integrations"("accountId");
+    CREATE INDEX IF NOT EXISTS "integrations_articleId_idx" ON "integrations"("articleId");
+    CREATE INDEX IF NOT EXISTS "integrations_companyId_idx" ON "integrations"("companyId");
+  END IF;
+END $$;
 
 -- User indexes (new)
 CREATE INDEX IF NOT EXISTS "users_companyId_isActive_idx" ON "users"("companyId", "isActive");
