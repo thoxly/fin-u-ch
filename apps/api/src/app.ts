@@ -5,6 +5,7 @@ import swaggerUi from 'swagger-ui-express';
 import promBundle from 'express-prom-bundle';
 import { errorHandler } from './middlewares/error';
 import { requestIdMiddleware } from './middlewares/request-id';
+import { generalApiRateLimit } from './middlewares/rate-limit.middleware';
 import logger from './config/logger';
 import { swaggerSpec } from './config/swagger';
 
@@ -53,6 +54,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Request ID middleware (must be before request logging)
 app.use(requestIdMiddleware);
+
+// General API rate limiting (applied to all API routes)
+app.use('/api', generalApiRateLimit);
 
 // Request logging
 app.use((req, res, next) => {

@@ -158,6 +158,25 @@ export class DashboardService {
       periodFormat: params.periodFormat,
     });
 
+    // Валидация периода - ограничиваем максимальный период 1 годом для производительности
+    const MAX_PERIOD_DAYS = 365;
+    const periodDays =
+      (params.periodTo.getTime() - params.periodFrom.getTime()) /
+      (1000 * 60 * 60 * 24);
+
+    if (periodDays > MAX_PERIOD_DAYS) {
+      logger.warn('Dashboard: Period exceeds maximum allowed', {
+        companyId,
+        periodDays: Math.round(periodDays),
+        maxDays: MAX_PERIOD_DAYS,
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+      });
+      throw new Error(
+        `Period exceeds maximum allowed (${MAX_PERIOD_DAYS} days). Please use a smaller period.`
+      );
+    }
+
     const cacheKey = generateCacheKey(companyId, 'dashboard', params);
     const cached = await getCachedReport(cacheKey);
     if (cached) {
@@ -185,6 +204,7 @@ export class DashboardService {
     });
 
     // Получаем все операции за период (только реальные, не шаблоны, не будущие)
+    // Используем select вместо include для оптимизации - загружаем только нужные поля
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -195,7 +215,18 @@ export class DashboardService {
         isConfirmed: true,
         isTemplate: false,
       },
-      include: {
+      select: {
+        id: true,
+        type: true,
+        operationDate: true,
+        amount: true,
+        currency: true,
+        originalAmount: true,
+        originalCurrency: true,
+        accountId: true,
+        sourceAccountId: true,
+        targetAccountId: true,
+        articleId: true,
         account: { select: { id: true, name: true } },
         sourceAccount: { select: { id: true, name: true } },
         targetAccount: { select: { id: true, name: true } },
@@ -205,6 +236,34 @@ export class DashboardService {
         operationDate: 'asc',
       },
     });
+
+    // Защита от переполнения памяти при больших объемах данных
+    const MAX_OPERATIONS_WARNING = 10000;
+    const MAX_OPERATIONS_ERROR = 50000; // Жесткий лимит для предотвращения перегрузки
+
+    if (operations.length > MAX_OPERATIONS_ERROR) {
+      logger.error('Dashboard: Too many operations, rejecting request', {
+        companyId,
+        operationsCount: operations.length,
+        maxAllowed: MAX_OPERATIONS_ERROR,
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+      });
+      throw new Error(
+        `Too many operations (${operations.length}). Maximum allowed: ${MAX_OPERATIONS_ERROR}. Please use a smaller period or contact support.`
+      );
+    }
+
+    if (operations.length > MAX_OPERATIONS_WARNING) {
+      logger.warn('Dashboard: Large number of operations', {
+        companyId,
+        operationsCount: operations.length,
+        warningThreshold: MAX_OPERATIONS_WARNING,
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        recommendation: 'Consider using aggregation or smaller period',
+      });
+    }
 
     logger.info('Dashboard: operations fetched', {
       companyId,
@@ -453,6 +512,23 @@ export class DashboardService {
     companyId: string,
     params: DashboardParams
   ): Promise<CumulativeCashFlowResponse> {
+    // Валидация периода - ограничиваем максимальный период 1 годом
+    const MAX_PERIOD_DAYS = 365;
+    const periodDays =
+      (params.periodTo.getTime() - params.periodFrom.getTime()) /
+      (1000 * 60 * 60 * 24);
+
+    if (periodDays > MAX_PERIOD_DAYS) {
+      logger.warn('CumulativeCashFlow: Period exceeds maximum allowed', {
+        companyId,
+        periodDays: Math.round(periodDays),
+        maxDays: MAX_PERIOD_DAYS,
+      });
+      throw new Error(
+        `Period exceeds maximum allowed (${MAX_PERIOD_DAYS} days). Please use a smaller period.`
+      );
+    }
+
     const cacheKey = generateCacheKey(
       companyId,
       'cumulative-cash-flow',
@@ -481,6 +557,7 @@ export class DashboardService {
     });
 
     // Получаем все операции за период (только реальные, не шаблоны, не будущие)
+    // Используем select вместо include для оптимизации - загружаем только нужные поля
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -491,7 +568,12 @@ export class DashboardService {
         isConfirmed: true,
         isTemplate: false,
       },
-      include: {
+      select: {
+        id: true,
+        type: true,
+        operationDate: true,
+        amount: true,
+        articleId: true,
         article: {
           select: { id: true, name: true },
         },
@@ -500,6 +582,37 @@ export class DashboardService {
         operationDate: 'asc',
       },
     });
+
+    // Защита от переполнения памяти при больших объемах данных
+    const MAX_OPERATIONS_WARNING = 10000;
+    const MAX_OPERATIONS_ERROR = 50000; // Жесткий лимит для предотвращения перегрузки
+
+    if (operations.length > MAX_OPERATIONS_ERROR) {
+      logger.error(
+        'CumulativeCashFlow: Too many operations, rejecting request',
+        {
+          companyId,
+          operationsCount: operations.length,
+          maxAllowed: MAX_OPERATIONS_ERROR,
+          periodFrom: params.periodFrom.toISOString(),
+          periodTo: params.periodTo.toISOString(),
+        }
+      );
+      throw new Error(
+        `Too many operations (${operations.length}). Maximum allowed: ${MAX_OPERATIONS_ERROR}. Please use a smaller period or contact support.`
+      );
+    }
+
+    if (operations.length > MAX_OPERATIONS_WARNING) {
+      logger.warn('CumulativeCashFlow: Large number of operations', {
+        companyId,
+        operationsCount: operations.length,
+        warningThreshold: MAX_OPERATIONS_WARNING,
+        periodFrom: params.periodFrom.toISOString(),
+        periodTo: params.periodTo.toISOString(),
+        recommendation: 'Consider using aggregation or smaller period',
+      });
+    }
 
     // Получаем все активные счета с валютами
     const accountsRaw = await prisma.account.findMany({
@@ -858,6 +971,7 @@ export class DashboardService {
     const accountIdsSet = new Set(accountIds);
 
     // Получаем все операции с начала истории (для расчета начальных балансов, только реальные, не шаблоны)
+    // Используем select для оптимизации - загружаем только нужные поля
     const allOperationsRaw = await prisma.operation.findMany({
       where: {
         companyId,
@@ -871,6 +985,18 @@ export class DashboardService {
         },
         isConfirmed: true,
         isTemplate: false,
+      },
+      select: {
+        id: true,
+        type: true,
+        operationDate: true,
+        amount: true,
+        currency: true,
+        originalAmount: true,
+        originalCurrency: true,
+        accountId: true,
+        sourceAccountId: true,
+        targetAccountId: true,
       },
       orderBy: {
         operationDate: 'asc',

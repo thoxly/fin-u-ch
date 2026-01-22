@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../../middlewares/auth';
 import { extractTenant } from '../../../middlewares/tenant';
 import { requirePermission } from '../../../middlewares/permissions';
+import { reportsRateLimit } from '../../../middlewares/rate-limit.middleware';
 import dashboardController from './dashboard.controller';
 
 const router: Router = Router();
@@ -39,6 +40,7 @@ router.use(extractTenant);
  */
 router.get(
   '/',
+  reportsRateLimit,
   requirePermission('dashboard', 'read'),
   dashboardController.getDashboard
 );
@@ -78,6 +80,7 @@ router.get(
  */
 router.get(
   '/cumulative-cash-flow',
+  reportsRateLimit,
   requirePermission('dashboard', 'read'),
   dashboardController.getCumulativeCashFlow
 );
