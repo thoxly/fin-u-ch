@@ -42,8 +42,13 @@ jest.mock('../../config/db', () => ({
 // Mock Redis to prevent connection errors in tests
 jest.mock('../../config/redis', () => {
   // Create a simple mock stream without requiring stream module
-  const createMockStream = () => {
-    const stream = {
+  interface MockStream {
+    on: jest.Mock;
+    push: jest.Mock;
+  }
+
+  const createMockStream = (): MockStream => {
+    const stream: MockStream = {
       on: jest.fn((event: string, callback: () => void) => {
         if (event === 'end') {
           // Immediately call end callback
