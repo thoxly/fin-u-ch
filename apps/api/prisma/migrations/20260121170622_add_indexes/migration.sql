@@ -21,6 +21,17 @@ CREATE INDEX IF NOT EXISTS "deals_counterpartyId_idx" ON "deals"("counterpartyId
 CREATE INDEX IF NOT EXISTS "deals_departmentId_idx" ON "deals"("departmentId");
 
 -- ImportedOperation indexes (new)
+-- First, add missing columns if they don't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'imported_operations' AND column_name = 'isDuplicate') THEN
+    ALTER TABLE "imported_operations" ADD COLUMN "isDuplicate" BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'imported_operations' AND column_name = 'duplicateOfId') THEN
+    ALTER TABLE "imported_operations" ADD COLUMN "duplicateOfId" TEXT;
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "imported_operations_companyId_date_idx" ON "imported_operations"("companyId", "date");
 CREATE INDEX IF NOT EXISTS "imported_operations_companyId_draft_idx" ON "imported_operations"("companyId", "draft");
 CREATE INDEX IF NOT EXISTS "imported_operations_companyId_isDuplicate_idx" ON "imported_operations"("companyId", "isDuplicate");
