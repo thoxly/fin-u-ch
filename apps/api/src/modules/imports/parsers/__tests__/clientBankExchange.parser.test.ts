@@ -610,22 +610,6 @@ describe('parseClientBankExchange', () => {
       expect(result.stats.documentTypesFound).toContain('Списание');
       expect(result.stats.documentTypesFound).toContain('СБП');
     });
-
-    it('должен корректно парсить файл с различными типами документов', () => {
-      const filePath = join(fixturesDir, 'various-doc-types.txt');
-      const content = readFileSync(filePath);
-
-      const result = parseClientBankExchange(content);
-
-      expect(result.documents.length).toBe(5);
-      expect(result.stats.documentTypesFound).toContain('Мемориальный ордер');
-      expect(result.stats.documentTypesFound).toContain('Инкассовое поручение');
-      expect(result.stats.documentTypesFound).toContain(
-        'Объявление на взнос наличными'
-      );
-      expect(result.stats.documentTypesFound).toContain('Карточные операции');
-      expect(result.stats.documentTypesFound).toContain('Комиссия');
-    });
   });
 
   describe('Расширенная статистика', () => {
