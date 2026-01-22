@@ -573,7 +573,14 @@ export class DashboardService {
         type: true,
         operationDate: true,
         amount: true,
+        currency: true,
+        originalAmount: true,
+        originalCurrency: true,
+        accountId: true,
+        sourceAccountId: true,
+        targetAccountId: true,
         articleId: true,
+        description: true,
         article: {
           select: { id: true, name: true },
         },
@@ -807,7 +814,7 @@ export class DashboardService {
         cumulativeIncome,
         cumulativeExpense,
         cumulativeNetCashFlow: cumulativeIncome - cumulativeExpense,
-        operations: currentIntervalOps.map((op: PrismaOperation) => ({
+        operations: currentIntervalOps.map((op: any) => ({
           id: op.id,
           type: op.type,
           amount: op.amount,

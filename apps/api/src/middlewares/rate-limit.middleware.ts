@@ -43,7 +43,7 @@ export const createRateLimiter = (config: RateLimitConfig) => {
           max: config.maxRequests,
           path: req.path,
           method: req.method,
-          userId: (req as TenantRequest).user?.id,
+          userId: (req as TenantRequest).userId,
           companyId: (req as TenantRequest).companyId,
         });
         return next(
@@ -76,7 +76,7 @@ export const operationsRateLimit = createRateLimiter({
   maxRequests: 100,
   keyGenerator: (req) => {
     const tenantReq = req as TenantRequest;
-    const userId = tenantReq.user?.id || 'anonymous';
+    const userId = tenantReq.userId || 'anonymous';
     return `rate-limit:operations:${userId}`;
   },
   message: 'Too many operation requests. Please try again in a minute.',
@@ -91,7 +91,7 @@ export const createOperationRateLimit = createRateLimiter({
   maxRequests: 20,
   keyGenerator: (req) => {
     const tenantReq = req as TenantRequest;
-    const userId = tenantReq.user?.id || 'anonymous';
+    const userId = tenantReq.userId || 'anonymous';
     return `rate-limit:operations:create:${userId}`;
   },
   message:
@@ -107,7 +107,7 @@ export const reportsRateLimit = createRateLimiter({
   maxRequests: 30,
   keyGenerator: (req) => {
     const tenantReq = req as TenantRequest;
-    const userId = tenantReq.user?.id || 'anonymous';
+    const userId = tenantReq.userId || 'anonymous';
     return `rate-limit:reports:${userId}`;
   },
   message: 'Too many report requests. Please try again in a minute.',
@@ -122,7 +122,7 @@ export const updateOperationRateLimit = createRateLimiter({
   maxRequests: 50,
   keyGenerator: (req) => {
     const tenantReq = req as TenantRequest;
-    const userId = tenantReq.user?.id || 'anonymous';
+    const userId = tenantReq.userId || 'anonymous';
     return `rate-limit:operations:update:${userId}`;
   },
   message: 'Too many operation update requests. Please try again in a minute.',
@@ -137,7 +137,7 @@ export const deleteOperationRateLimit = createRateLimiter({
   maxRequests: 30,
   keyGenerator: (req) => {
     const tenantReq = req as TenantRequest;
-    const userId = tenantReq.user?.id || 'anonymous';
+    const userId = tenantReq.userId || 'anonymous';
     return `rate-limit:operations:delete:${userId}`;
   },
   message:
