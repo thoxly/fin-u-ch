@@ -2,6 +2,12 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
+import {
+  operationsRateLimit,
+  createOperationRateLimit,
+  updateOperationRateLimit,
+  deleteOperationRateLimit,
+} from '../../middlewares/rate-limit.middleware';
 import operationsController from './operations.controller';
 
 const router: Router = Router();
@@ -38,6 +44,7 @@ router.use(extractTenant);
  */
 router.get(
   '/',
+  operationsRateLimit,
   requirePermission('operations', 'read'),
   operationsController.getAll
 );
@@ -49,6 +56,7 @@ router.get(
 );
 router.post(
   '/',
+  createOperationRateLimit,
   requirePermission('operations', 'create'),
   operationsController.create
 );
@@ -59,11 +67,13 @@ router.patch(
 );
 router.patch(
   '/:id',
+  updateOperationRateLimit,
   requirePermission('operations', 'update'),
   operationsController.update
 );
 router.delete(
   '/:id',
+  deleteOperationRateLimit,
   requirePermission('operations', 'delete'),
   operationsController.delete
 );

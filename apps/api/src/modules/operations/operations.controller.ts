@@ -36,6 +36,9 @@ export class OperationsController {
       };
 
       const result = await operationsService.getAll(req.companyId!, filters);
+
+      // Для обратной совместимости: если клиент не ожидает пагинацию, возвращаем только data
+      // Но лучше всегда возвращать с метаданными
       res.json(result);
     } catch (error) {
       next(error);

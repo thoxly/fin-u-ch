@@ -259,24 +259,41 @@ export class OperationsService {
       throw new AppError('offset must be non-negative', 400);
     }
 
-    return prisma.operation.findMany({
-      where,
-      include: {
-        account: { select: { id: true, name: true } },
-        sourceAccount: { select: { id: true, name: true } },
-        targetAccount: { select: { id: true, name: true } },
-        article: { select: { id: true, name: true } },
-        counterparty: { select: { id: true, name: true } },
-        deal: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
-        recurrenceParent: {
-          select: { id: true, repeat: true, operationDate: true },
+    // Получаем операции и общее количество параллельно для оптимизации
+    const [operations, total] = await Promise.all([
+      prisma.operation.findMany({
+        where,
+        include: {
+          account: { select: { id: true, name: true } },
+          sourceAccount: { select: { id: true, name: true } },
+          targetAccount: { select: { id: true, name: true } },
+          article: { select: { id: true, name: true } },
+          counterparty: { select: { id: true, name: true } },
+          deal: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+          recurrenceParent: {
+            select: { id: true, repeat: true, operationDate: true },
+          },
         },
+        orderBy: { operationDate: 'desc' },
+        take,
+        skip,
+      }),
+      prisma.operation.count({ where }),
+    ]);
+
+    // Возвращаем данные с метаданными пагинации
+    return {
+      data: operations,
+      pagination: {
+        total,
+        limit: take,
+        offset: skip,
+        hasMore: skip + take < total,
+        totalPages: Math.ceil(total / take),
+        currentPage: Math.floor(skip / take) + 1,
       },
-      orderBy: { operationDate: 'desc' },
-      take,
-      skip,
-    });
+    };
   }
 
   async getById(id: string, companyId: string) {

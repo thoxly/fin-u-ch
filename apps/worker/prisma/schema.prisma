@@ -39,6 +39,7 @@ model Account {
   planItems               PlanItem[]
 
   @@index([companyId])
+  @@index([companyId, isActive])
   @@map("accounts")
 }
 
@@ -65,6 +66,9 @@ model Article {
 
   @@index([companyId])
   @@index([companyId, parentId])
+  @@index([companyId, type])
+  @@index([companyId, isActive])
+  @@index([counterpartyId])
   @@map("articles")
 }
 
@@ -101,6 +105,7 @@ model Budget {
   plan_items PlanItem[]
 
   @@index([companyId, status])
+  @@index([companyId, startDate, endDate])
   @@map("budgets")
 }
 
@@ -183,6 +188,7 @@ model Counterparty {
   operations          Operation[]
 
   @@index([companyId])
+  @@index([companyId, category])
   @@map("counterparties")
 }
 
@@ -204,6 +210,8 @@ model Deal {
   plan_items          PlanItem[]
 
   @@index([companyId])
+  @@index([counterpartyId])
+  @@index([departmentId])
   @@map("deals")
 }
 
@@ -258,6 +266,7 @@ model ImportSession {
 
   @@index([companyId, createdAt])
   @@index([companyId, status])
+  @@index([userId])
   @@map("import_sessions")
 }
 
@@ -305,6 +314,14 @@ model ImportedOperation {
   @@index([companyId, confirmed, processed])
   @@index([companyId, importSessionId])
   @@index([importSessionId])
+  @@index([companyId, date])
+  @@index([companyId, draft])
+  @@index([companyId, isDuplicate])
+  @@index([matchedAccountId])
+  @@index([matchedArticleId])
+  @@index([matchedCounterpartyId])
+  @@index([matchedDealId])
+  @@index([matchedDepartmentId])
   @@map("imported_operations")
 }
 
@@ -327,6 +344,7 @@ model MappingRule {
 
   @@index([companyId, ruleType, sourceField])
   @@index([companyId, targetType])
+  @@index([companyId, userId])
   @@map("mapping_rules")
 }
 
@@ -372,6 +390,14 @@ model Operation {
   @@index([companyId, repeat, isConfirmed])
   @@index([companyId, repeat, isTemplate])
   @@index([recurrenceParentId, operationDate])
+  @@index([companyId, type])
+  @@index([companyId, isConfirmed])
+  @@index([companyId, type, isConfirmed])
+  @@index([sourceAccountId])
+  @@index([targetAccountId])
+  @@index([counterpartyId])
+  @@index([dealId])
+  @@index([departmentId])
   @@map("operations")
 }
 
@@ -400,6 +426,12 @@ model PlanItem {
 
   @@index([companyId, budgetId, startDate])
   @@index([companyId, startDate, repeat])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@index([companyId, type, status])
+  @@index([articleId])
+  @@index([accountId])
+  @@index([dealId])
   @@map("plan_items")
 }
 
@@ -472,5 +504,6 @@ model User {
   company         Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
+  @@index([companyId, isActive])
   @@map("users")
 }
