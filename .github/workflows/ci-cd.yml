@@ -280,6 +280,12 @@ jobs:
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
             fi
+            # Resolve indexes migration (deadlock issue - indexes will be applied manually with CONCURRENTLY)
+            INDEXES_MIGRATION="20260121170622_add_indexes"
+            if npx prisma migrate status 2>&1 | grep -q "$INDEXES_MIGRATION"; then
+              echo "Resolving failed migration: $INDEXES_MIGRATION (deadlock - will apply indexes manually with CONCURRENTLY)"
+              npx prisma migrate resolve --applied "$INDEXES_MIGRATION" || echo "Could not resolve migration"
+            fi
             # Resolve removed subscription migration (marked as rolled back since it was removed from code)
             REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
             if npx prisma migrate status 2>&1 | grep -q "$REMOVED_MIGRATION"; then
@@ -454,6 +460,12 @@ jobs:
             if npx prisma migrate status 2>&1 | grep -q "$FAILED_MIGRATION"; then
               echo "Resolving failed migration: $FAILED_MIGRATION"
               npx prisma migrate resolve --applied "$FAILED_MIGRATION" || echo "Could not resolve migration"
+            fi
+            # Resolve indexes migration (deadlock issue - indexes will be applied manually with CONCURRENTLY)
+            INDEXES_MIGRATION="20260121170622_add_indexes"
+            if npx prisma migrate status 2>&1 | grep -q "$INDEXES_MIGRATION"; then
+              echo "Resolving failed migration: $INDEXES_MIGRATION (deadlock - will apply indexes manually with CONCURRENTLY)"
+              npx prisma migrate resolve --applied "$INDEXES_MIGRATION" || echo "Could not resolve migration"
             fi
             # Resolve removed subscription migration (marked as rolled back since it was removed from code)
             REMOVED_MIGRATION="20251215074023_add_subscriptions_and_promo_codes"
@@ -949,11 +961,19 @@ jobs:
           docker compose -f docker-compose.prod.yml --env-file .env run --rm api sh -c "
             if npx prisma migrate status 2>&1 | grep -q 'failed migration'; then
               echo '⚠️  Found failed migrations, attempting to resolve...'
+              
+              # Resolve indexes migration (deadlock issue - indexes will be applied manually with CONCURRENTLY)
+              INDEXES_MIGRATION='20260121170622_add_indexes'
+              if npx prisma migrate status 2>&1 | grep -q \"\$INDEXES_MIGRATION\"; then
+                echo \"Resolving failed migration: \$INDEXES_MIGRATION (deadlock - will apply indexes manually with CONCURRENTLY)\"
+                npx prisma migrate resolve --applied \"\$INDEXES_MIGRATION\" || echo \"Could not resolve migration\"
+              fi
+              
               # Resolve known failed migrations that were removed from code
-              FAILED_MIGRATION='20251215074023_add_subscriptions_and_promo_codes'
-              if npx prisma migrate status 2>&1 | grep -q \"\$FAILED_MIGRATION\"; then
-                echo \"Resolving failed migration: \$FAILED_MIGRATION (marked as rolled back)\"
-                npx prisma migrate resolve --rolled-back \"\$FAILED_MIGRATION\" || echo \"Could not resolve migration\"
+              REMOVED_MIGRATION='20251215074023_add_subscriptions_and_promo_codes'
+              if npx prisma migrate status 2>&1 | grep -q \"\$REMOVED_MIGRATION\"; then
+                echo \"Resolving failed migration: \$REMOVED_MIGRATION (marked as rolled back)\"
+                npx prisma migrate resolve --rolled-back \"\$REMOVED_MIGRATION\" || echo \"Could not resolve migration\"
               fi
             else
               echo '✅ No failed migrations found'
