@@ -142,31 +142,6 @@ export class CashflowService {
         breakdown,
       });
 
-      // Определяем, какие связи нужно включить в зависимости от разреза
-      const includeRelations: any = {
-        article: {
-          select: { id: true, name: true, activity: true, type: true },
-        },
-      };
-
-      if (breakdown === 'deal') {
-        includeRelations.deal = {
-          select: { id: true, name: true },
-        };
-      } else if (breakdown === 'account') {
-        includeRelations.account = {
-          select: { id: true, name: true },
-        };
-      } else if (breakdown === 'department') {
-        includeRelations.department = {
-          select: { id: true, name: true },
-        };
-      } else if (breakdown === 'counterparty') {
-        includeRelations.counterparty = {
-          select: { id: true, name: true },
-        };
-      }
-
       // Получаем текущую дату для фильтрации будущих операций
       const todayStart = this.getTodayStart();
       // Используем минимальное значение между концом периода и сегодняшним днем
@@ -182,6 +157,93 @@ export class CashflowService {
         maxDate: maxDate.toISOString(),
         breakdown,
       });
+
+      // Оптимизация: загружаем справочники отдельно, чтобы избежать JOIN для каждой операции
+      const [
+        articlesForMap,
+        dealsForMap,
+        accountsForMap,
+        departmentsForMap,
+        counterpartiesForMap,
+      ] = await Promise.all([
+        prisma.article.findMany({
+          where: {
+            companyId,
+            isActive: true,
+            ...(params.activity ? { activity: params.activity } : {}),
+            ...(articleIdsFilter ? { id: { in: articleIdsFilter } } : {}),
+          },
+          select: { id: true, name: true, activity: true, type: true },
+        }),
+        breakdown === 'deal'
+          ? prisma.deal.findMany({
+              where: { companyId },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        breakdown === 'account'
+          ? prisma.account.findMany({
+              where: { companyId, isActive: true },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        breakdown === 'department'
+          ? prisma.department.findMany({
+              where: { companyId },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        breakdown === 'counterparty'
+          ? prisma.counterparty.findMany({
+              where: { companyId },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      // Создаем Map для быстрого доступа к справочникам
+      const articlesMap = new Map(
+        articlesForMap.map(
+          (a: {
+            id: string;
+            name: string;
+            activity: string | null;
+            type: string;
+          }) => [
+            a.id,
+            {
+              id: a.id,
+              name: a.name,
+              activity: a.activity || 'unknown',
+              type: a.type,
+            },
+          ]
+        )
+      );
+      const dealsMap = new Map(
+        dealsForMap.map((d: { id: string; name: string }) => [
+          d.id,
+          { id: d.id, name: d.name },
+        ])
+      );
+      const accountsMap = new Map(
+        accountsForMap.map((a: { id: string; name: string }) => [
+          a.id,
+          { id: a.id, name: a.name },
+        ])
+      );
+      const departmentsMap = new Map(
+        departmentsForMap.map((d: { id: string; name: string }) => [
+          d.id,
+          { id: d.id, name: d.name },
+        ])
+      );
+      const counterpartiesMap = new Map(
+        counterpartiesForMap.map((c: { id: string; name: string }) => [
+          c.id,
+          { id: c.id, name: c.name },
+        ])
+      );
 
       // Формируем фильтр для операций в зависимости от разреза
       const whereClause: any = {
@@ -210,23 +272,55 @@ export class CashflowService {
         whereClause.counterpartyId = { not: null };
       }
 
+      // Загружаем операции БЕЗ JOINов - справочники маппим в памяти
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const operations = (await prisma.operation.findMany({
         where: whereClause,
-        include: includeRelations,
+        select: {
+          id: true,
+          type: true,
+          operationDate: true,
+          amount: true,
+          currency: true,
+          originalAmount: true,
+          originalCurrency: true,
+          articleId: true,
+          dealId: true,
+          accountId: true,
+          departmentId: true,
+          counterpartyId: true,
+          // Убрали JOINы - загружаем только ID, справочники маппим в памяти
+        },
       })) as any[];
 
-      // Получаем все активные счета с валютами для пересчета
-      const accountsRaw = await prisma.account.findMany({
-        where: { companyId, isActive: true },
-      });
-      const accounts = accountsRaw.map((acc) => ({
-        id: acc.id,
-        currency: acc.currency,
+      // Маппим справочники к операциям
+      const operationsWithRelations = operations.map((op) => ({
+        ...op,
+        article: op.articleId ? articlesMap.get(op.articleId) || null : null,
+        deal: op.dealId ? dealsMap.get(op.dealId) || null : null,
+        account: op.accountId ? accountsMap.get(op.accountId) || null : null,
+        department: op.departmentId
+          ? departmentsMap.get(op.departmentId) || null
+          : null,
+        counterparty: op.counterpartyId
+          ? counterpartiesMap.get(op.counterpartyId) || null
+          : null,
       }));
 
-      // Создаем Map счетов для быстрого доступа
-      const accountsMap = new Map(
-        accounts.map((acc) => [acc.id, { currency: acc.currency }])
+      // Загружаем счета для конвертации валют (всегда нужен currency)
+      // accountsForMap используется только для маппинга в breakdown === 'account'
+      // Для конвертации валют всегда загружаем отдельно с полем currency
+      const accountsForCurrency = await prisma.account.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, currency: true },
+      });
+
+      // Создаем Map счетов для быстрого доступа (для конвертации валют)
+      const accountsMapForCurrency = new Map<string, { currency: string }>(
+        accountsForCurrency.map((acc: { id: string; currency: string }) => [
+          acc.id,
+          { currency: acc.currency },
+        ])
       );
 
       // Пересчитываем суммы операций в базовую валюту
@@ -236,7 +330,7 @@ export class CashflowService {
         await import('../../../utils/currency-converter');
 
       const operationsWithConvertedAmounts = await Promise.all(
-        operations.map(async (op: any) => {
+        operationsWithRelations.map(async (op: any) => {
           // Если операция уже конвертирована (есть originalAmount), используем значения из БД
           if (op.originalAmount != null && op.originalCurrency) {
             return {
@@ -255,7 +349,7 @@ export class CashflowService {
               targetAccountId: op.targetAccountId,
               currency: op.currency,
             },
-            accountsMap
+            accountsMapForCurrency
           );
 
           const convertedAmount = await convertOperationAmountToBase(
@@ -721,7 +815,13 @@ export class CashflowService {
       };
 
       await withSpan('reports.cache', async (cacheSpan) => {
-        await cacheReport(cacheKey, response);
+        // Определяем, является ли период историческим (прошлые периоды кэшируем дольше)
+        const todayStart = this.getTodayStart();
+        const maxDate = new Date(
+          Math.min(params.periodTo.getTime(), todayStart.getTime())
+        );
+        const isHistorical = maxDate < todayStart;
+        await cacheReport(cacheKey, response, 300, isHistorical);
         cacheSpan.setAttribute('cache.key', cacheKey);
       });
 

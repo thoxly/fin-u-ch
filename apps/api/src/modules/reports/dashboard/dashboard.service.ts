@@ -203,8 +203,25 @@ export class DashboardService {
       periodFormat,
     });
 
-    // Получаем все операции за период (только реальные, не шаблоны, не будущие)
-    // Используем select вместо include для оптимизации - загружаем только нужные поля
+    // Оптимизация: загружаем справочники отдельно, чтобы избежать JOIN для каждой операции
+    const [accountsForMap, articlesForMap] = await Promise.all([
+      prisma.account.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true, currency: true },
+      }),
+      prisma.article.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    // Создаем Map для быстрого доступа к справочникам
+    const articlesMap = new Map(
+      articlesForMap.map((a) => [a.id, { id: a.id, name: a.name }])
+    );
+
+    // Получаем все операции за период БЕЗ JOINов - это значительно быстрее
+    // Справочники мы загрузили отдельно и будем маппить в памяти
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -227,10 +244,7 @@ export class DashboardService {
         sourceAccountId: true,
         targetAccountId: true,
         articleId: true,
-        account: { select: { id: true, name: true } },
-        sourceAccount: { select: { id: true, name: true } },
-        targetAccount: { select: { id: true, name: true } },
-        article: { select: { id: true, name: true } },
+        // Убрали JOINы - загружаем только ID, справочники маппим в памяти
       },
       orderBy: {
         operationDate: 'asc',
@@ -278,9 +292,10 @@ export class DashboardService {
       })),
     });
 
-    // Получаем все активные счета с валютами
+    // Получаем все активные счета с валютами (уже загружены выше, но нужны полные данные)
     const accountsRaw = await prisma.account.findMany({
       where: { companyId, isActive: true },
+      select: { id: true, name: true, currency: true, openingBalance: true },
       orderBy: { name: 'asc' },
     });
     const accounts = accountsRaw.map((acc) => ({
@@ -290,9 +305,12 @@ export class DashboardService {
       openingBalance: acc.openingBalance,
     }));
 
-    // Создаем Map счетов для быстрого доступа
+    // Создаем Map счетов для быстрого доступа (включая все счета для маппинга)
     const accountsMap = new Map(
-      accounts.map((acc) => [acc.id, { currency: acc.currency }])
+      accountsRaw.map((acc) => [
+        acc.id,
+        { id: acc.id, name: acc.name, currency: acc.currency },
+      ])
     );
 
     // Пересчитываем суммы операций в базовую валюту
@@ -300,6 +318,16 @@ export class DashboardService {
     // и мы используем amount и currency напрямую (они уже в базовой валюте)
     const operationsWithConvertedAmounts = await Promise.all(
       operations.map(async (op) => {
+        // Маппим справочники из Map (вместо JOIN)
+        const article = op.articleId ? articlesMap.get(op.articleId) : null;
+        const account = op.accountId ? accountsMap.get(op.accountId) : null;
+        const sourceAccount = op.sourceAccountId
+          ? accountsMap.get(op.sourceAccountId)
+          : null;
+        const targetAccount = op.targetAccountId
+          ? accountsMap.get(op.targetAccountId)
+          : null;
+
         // Если операция уже конвертирована (есть originalAmount), используем значения из БД
         if (op.originalAmount != null && op.originalCurrency) {
           return {
@@ -308,6 +336,11 @@ export class DashboardService {
             currency: op.currency, // Уже базовая валюта
             originalAmount: op.originalAmount,
             originalCurrency: op.originalCurrency,
+            // Добавляем справочники из Map
+            article: article || null,
+            account: account || null,
+            sourceAccount: sourceAccount || null,
+            targetAccount: targetAccount || null,
           };
         }
 
@@ -335,6 +368,11 @@ export class DashboardService {
           amount: convertedAmount,
           originalAmount: op.amount,
           originalCurrency: operationCurrency,
+          // Добавляем справочники из Map
+          article: article || null,
+          account: account || null,
+          sourceAccount: sourceAccount || null,
+          targetAccount: targetAccount || null,
         };
       })
     );
@@ -501,7 +539,9 @@ export class DashboardService {
       finalBalances,
     };
 
-    await cacheReport(cacheKey, result);
+    // Определяем, является ли период историческим (прошлые периоды кэшируем дольше)
+    const isHistorical = maxDate < todayStart;
+    await cacheReport(cacheKey, result, 300, isHistorical);
     return result;
   }
 
@@ -819,9 +859,7 @@ export class DashboardService {
           type: op.type,
           amount: op.amount,
           description: op.description,
-          article: op.article
-            ? { id: op.article.id, name: op.article.name }
-            : null,
+          article: op.article || null, // Уже маппится из articlesMap выше
         })),
         hasOperations: currentIntervalOps.length > 0,
       };
@@ -866,7 +904,9 @@ export class DashboardService {
       },
     };
 
-    await cacheReport(cacheKey, result);
+    // Определяем, является ли период историческим (прошлые периоды кэшируем дольше)
+    const isHistorical = maxDate < todayStart;
+    await cacheReport(cacheKey, result, 300, isHistorical);
     return result;
   }
 

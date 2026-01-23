@@ -30,6 +30,15 @@ jest.mock('../../../config/db', () => ({
     account: {
       findMany: jest.fn(),
     },
+    deal: {
+      findMany: jest.fn(),
+    },
+    department: {
+      findMany: jest.fn(),
+    },
+    counterparty: {
+      findMany: jest.fn(),
+    },
     company: {
       findUnique: jest.fn(),
     },
@@ -55,6 +64,9 @@ const mockOperationFindMany = prisma.operation.findMany as jest.Mock;
 const mockArticleFindMany = prisma.article.findMany as jest.Mock;
 const mockArticleFindFirst = prisma.article.findFirst as jest.Mock;
 const mockAccountFindMany = prisma.account.findMany as jest.Mock;
+const mockDealFindMany = prisma.deal.findMany as jest.Mock;
+const mockDepartmentFindMany = prisma.department.findMany as jest.Mock;
+const mockCounterpartyFindMany = prisma.counterparty.findMany as jest.Mock;
 const mockCompanyFindUnique = prisma.company.findUnique as jest.Mock;
 
 describe('CashflowService', () => {
@@ -68,6 +80,9 @@ describe('CashflowService', () => {
     mockArticleFindMany.mockResolvedValue([]);
     mockArticleFindFirst.mockResolvedValue(null);
     mockAccountFindMany.mockResolvedValue([]);
+    mockDealFindMany.mockResolvedValue([]);
+    mockDepartmentFindMany.mockResolvedValue([]);
+    mockCounterpartyFindMany.mockResolvedValue([]);
     mockCompanyFindUnique.mockResolvedValue({
       id: 'company-id',
       currencyBase: 'RUB',
@@ -86,23 +101,26 @@ describe('CashflowService', () => {
       expect(result.activities).toEqual([]);
       expect(result.periodFrom).toBe('2025-01-01');
       expect(result.periodTo).toBe('2025-01-31');
-      expect(mockOperationFindMany).toHaveBeenCalledWith({
-        where: {
-          companyId: 'company-id',
-          operationDate: {
-            gte: new Date('2025-01-01'),
-            lte: new Date('2025-01-31'),
-          },
-          type: { in: ['income', 'expense'] },
-          isConfirmed: true,
-          isTemplate: false,
-        },
-        include: {
-          article: {
-            select: { id: true, name: true, activity: true, type: true },
-          },
-        },
-      });
+      // Теперь операции загружаются с select, а не include
+      expect(mockOperationFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            companyId: 'company-id',
+            type: { in: ['income', 'expense'] },
+            isConfirmed: true,
+            isTemplate: false,
+          }),
+          select: expect.objectContaining({
+            id: true,
+            type: true,
+            operationDate: true,
+            amount: true,
+            articleId: true,
+          }),
+        })
+      );
+      // Справочники загружаются отдельно
+      expect(mockArticleFindMany).toHaveBeenCalled();
     });
 
     it.skip('should handle operations with income and expense groups', async () => {

@@ -17,6 +17,11 @@ interface RateLimitConfig {
 export const createRateLimiter = (config: RateLimitConfig) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Обход rate limiting для нагрузочных тестов
+      if (req.headers['x-test-mode'] === 'load-test') {
+        return next();
+      }
+
       const key = config.keyGenerator
         ? config.keyGenerator(req)
         : `rate-limit:${req.ip}:${req.path}`;

@@ -136,7 +136,10 @@ export class BDDSService {
     });
 
     const activities = Array.from(activitiesMap.values());
-    await cacheReport(cacheKey, activities);
+    // Определяем, является ли период историческим (прошлые периоды кэшируем дольше)
+    // Для BDDS обычно используются исторические данные
+    const isHistorical = true; // BDDS обычно для прошлых периодов
+    await cacheReport(cacheKey, activities, 300, isHistorical);
     return activities;
   }
 }
