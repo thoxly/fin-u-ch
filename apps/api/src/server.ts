@@ -54,7 +54,7 @@ async function applyMigrations() {
   try {
     logger.info('Applying database migrations...');
     // Use the script that loads .env variables
-    execSync('node ../../scripts/run-prisma-with-env.js migrate deploy', {
+    execSync('node ../../scripts/run-prisma-with-env.cjs migrate deploy', {
       stdio: 'inherit',
       cwd: path.resolve(apiRoot),
       env: {
