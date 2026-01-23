@@ -80,7 +80,9 @@ const cleanupDemoUsersTask = cron.schedule(
     try {
       const markedCount = await cleanupExpiredDemoUsers(24, 100); // Помечаем аккаунты старше 24 часов, максимум 100 за запуск
       if (markedCount > 0) {
-        logger.info(`✅ Cleanup completed. Marked ${markedCount} companies for deletion.`);
+        logger.info(
+          `✅ Cleanup completed. Marked ${markedCount} companies for deletion.`
+        );
       } else {
         logger.info('✅ Cleanup check completed. No expired users found.');
       }
@@ -103,12 +105,16 @@ const cleanupDemoUsersTask = cron.schedule(
 const hardDeleteMarkedCompaniesTask = cron.schedule(
   '*/15 * * * *', // Каждые 15 минут
   async () => {
-    logger.info('🔄 Running scheduled hard delete task for marked companies...');
+    logger.info(
+      '🔄 Running scheduled hard delete task for marked companies...'
+    );
 
     try {
       const deletedCount = await hardDeleteMarkedCompanies(1, 5); // Удаляем компании, помеченные более 1 часа назад, батч 5
       if (deletedCount > 0) {
-        logger.info(`✅ Hard delete completed. Deleted ${deletedCount} companies.`);
+        logger.info(
+          `✅ Hard delete completed. Deleted ${deletedCount} companies.`
+        );
       } else {
         logger.debug('✅ Hard delete check completed. No companies to delete.');
       }
@@ -147,6 +153,7 @@ const shutdown = async (signal: string) => {
   // Останавливаем cron задачи
   recurringOperationsTask.stop();
   cleanupDemoUsersTask.stop();
+  hardDeleteMarkedCompaniesTask.stop();
 
   // Закрываем HTTP сервер
   server.close(() => {

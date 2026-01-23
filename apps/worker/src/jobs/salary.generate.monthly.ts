@@ -1,12 +1,6 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
-
-// Type helper for Prisma transaction client
-type TransactionClient = Parameters<typeof prisma.$transaction>[0] extends (
-  tx: infer T
-) => any
-  ? T
-  : never;
 
 interface GenerateSalaryParams {
   month: string; // Format: YYYY-MM
@@ -89,9 +83,9 @@ export async function generateSalaryOperations(
         }
 
         // Создаем операции в транзакции
-        await prisma.$transaction(async (tx: TransactionClient) => {
+        await prisma.$transaction(async (tx) => {
           // 1. ФОТ (начисление зарплаты)
-          await tx.operation.create({
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
@@ -107,7 +101,7 @@ export async function generateSalaryOperations(
           });
 
           // 2. Взносы (страховые взносы)
-          await tx.operation.create({
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',
@@ -123,7 +117,7 @@ export async function generateSalaryOperations(
           });
 
           // 3. НДФЛ
-          await tx.operation.create({
+          await (tx as any).operation.create({
             data: {
               companyId: salary.companyId,
               type: 'expense',

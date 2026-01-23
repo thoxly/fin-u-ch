@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
@@ -7,9 +8,7 @@ import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
  * Использует raw SQL для массового обновления - быстрее чем Prisma ORM
  * @param companyIds Массив ID компаний для пометки как удаленных
  */
-async function markCompaniesForDeletion(
-  companyIds: string[]
-): Promise<number> {
+async function markCompaniesForDeletion(companyIds: string[]): Promise<number> {
   if (companyIds.length === 0) return 0;
 
   try {
@@ -17,9 +16,9 @@ async function markCompaniesForDeletion(
     // Используем Prisma.$queryRaw для правильной работы с массивами UUID
     const placeholders = companyIds.map((_, i) => `$${i + 1}`).join(',');
     const result = await prisma.$executeRawUnsafe(
-      `UPDATE companies 
-       SET "deletedAt" = NOW() 
-       WHERE id IN (${placeholders}) 
+      `UPDATE companies
+       SET "deletedAt" = NOW()
+       WHERE id IN (${placeholders})
        AND "deletedAt" IS NULL`,
       ...companyIds
     );
@@ -102,8 +101,8 @@ export async function cleanupExpiredDemoUsers(
     });
 
     // Собираем уникальные companyId (один пользователь = одна компания для демо)
-    const companyIds = Array.from(
-      new Set(expiredUsers.map((user) => user.companyId))
+    const companyIds: string[] = Array.from(
+      new Set(expiredUsers.map((user: { companyId: string }) => user.companyId))
     );
 
     // Помечаем компании как удаленные (soft delete) - БЫСТРО, без блокировок
@@ -171,7 +170,7 @@ export async function hardDeleteMarkedCompanies(
       return 0;
     }
 
-    const companyIds = companiesToDelete.map((c) => c.id);
+    const companyIds = companiesToDelete.map((c: { id: string }) => c.id);
 
     logger.info(`Hard deleting ${companyIds.length} marked companies`, {
       companyIdsCount: companyIds.length,
@@ -185,15 +184,15 @@ export async function hardDeleteMarkedCompanies(
     for (const companyId of companyIds) {
       try {
         await prisma.$transaction(
-          async (tx) => {
+          async (tx: Prisma.TransactionClient) => {
             // Используем raw SQL для быстрого удаления audit_logs
-            await tx.$executeRawUnsafe(
+            await (tx as any).$executeRawUnsafe(
               `DELETE FROM audit_logs WHERE "companyId" = $1`,
               companyId
             );
 
             // Удаляем компанию (каскадно удалит остальное через onDelete: Cascade)
-            await tx.$executeRawUnsafe(
+            await (tx as any).$executeRawUnsafe(
               `DELETE FROM companies WHERE id = $1`,
               companyId
             );
