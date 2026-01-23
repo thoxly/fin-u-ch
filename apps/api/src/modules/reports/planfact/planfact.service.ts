@@ -128,11 +128,11 @@ export class PlanFactService {
         select: { id: true, name: true },
       }),
       prisma.deal.findMany({
-        where: { companyId, isActive: true },
+        where: { companyId },
         select: { id: true, name: true },
       }),
       prisma.department.findMany({
-        where: { companyId, isActive: true },
+        where: { companyId },
         select: { id: true, name: true },
       }),
     ]);

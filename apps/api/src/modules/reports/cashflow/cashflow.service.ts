@@ -177,7 +177,7 @@ export class CashflowService {
         }),
         breakdown === 'deal'
           ? prisma.deal.findMany({
-              where: { companyId, isActive: true },
+              where: { companyId },
               select: { id: true, name: true },
             })
           : Promise.resolve([]),
@@ -189,13 +189,13 @@ export class CashflowService {
           : Promise.resolve([]),
         breakdown === 'department'
           ? prisma.department.findMany({
-              where: { companyId, isActive: true },
+              where: { companyId },
               select: { id: true, name: true },
             })
           : Promise.resolve([]),
         breakdown === 'counterparty'
           ? prisma.counterparty.findMany({
-              where: { companyId, isActive: true },
+              where: { companyId },
               select: { id: true, name: true },
             })
           : Promise.resolve([]),
@@ -283,15 +283,13 @@ export class CashflowService {
           : null,
       }));
 
-      // Используем уже загруженные счета из accountsForMap (если breakdown === 'account')
-      // или загружаем отдельно для конвертации валют
-      const accountsForCurrency =
-        breakdown === 'account'
-          ? accountsForMap
-          : await prisma.account.findMany({
-              where: { companyId, isActive: true },
-              select: { id: true, currency: true },
-            });
+      // Загружаем счета для конвертации валют (всегда нужен currency)
+      // accountsForMap используется только для маппинга в breakdown === 'account'
+      // Для конвертации валют всегда загружаем отдельно с полем currency
+      const accountsForCurrency = await prisma.account.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, currency: true },
+      });
 
       // Создаем Map счетов для быстрого доступа (для конвертации валют)
       const accountsMapForCurrency = new Map(
