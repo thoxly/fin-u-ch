@@ -3,7 +3,10 @@ import express, { Request, Response } from 'express';
 import { logger } from './config/logger';
 import { env } from './config/env';
 import { generateRecurringOperations } from './jobs/operations.generate.recurring';
-import { cleanupExpiredDemoUsers } from './jobs/cleanup-demo-users.job';
+import {
+  cleanupExpiredDemoUsers,
+  hardDeleteMarkedCompanies,
+} from './jobs/cleanup-demo-users.job';
 import { prisma } from './config/prisma';
 import { register } from './config/metrics';
 // import { jobCounter, jobDuration, jobLastSuccess } from './config/metrics'; // Reserved for future use
@@ -65,23 +68,52 @@ const recurringOperationsTask = cron.schedule(
 );
 
 /**
- * Задача очистки старых демо-пользователей
+ * Задача очистки старых демо-пользователей (soft delete)
  * Запускается каждый час в 15 минут
+ * Помечает компании как удаленные вместо физического удаления
  */
 const cleanupDemoUsersTask = cron.schedule(
   '15 * * * *',
   async () => {
-    logger.info('🔄 Running scheduled demo user cleanup task...');
+    logger.info('🔄 Running scheduled demo user cleanup task (soft delete)...');
 
     try {
-      const deletedCount = await cleanupExpiredDemoUsers(24); // Удаляем аккаунты старше 24 часов
-      if (deletedCount > 0) {
-        logger.info(`✅ Cleanup completed. Deleted ${deletedCount} users.`);
+      const markedCount = await cleanupExpiredDemoUsers(24, 100); // Помечаем аккаунты старше 24 часов, максимум 100 за запуск
+      if (markedCount > 0) {
+        logger.info(`✅ Cleanup completed. Marked ${markedCount} companies for deletion.`);
       } else {
         logger.info('✅ Cleanup check completed. No expired users found.');
       }
     } catch (error) {
       logger.error('❌ Demo user cleanup task failed:', error);
+      // Metrics are already recorded in the job function
+    }
+  },
+  {
+    scheduled: true,
+    timezone: 'Europe/Moscow',
+  }
+);
+
+/**
+ * Задача физического удаления помеченных компаний (hard delete)
+ * Запускается каждые 15 минут
+ * Удаляет компании, помеченные как удаленные более 1 часа назад
+ */
+const hardDeleteMarkedCompaniesTask = cron.schedule(
+  '*/15 * * * *', // Каждые 15 минут
+  async () => {
+    logger.info('🔄 Running scheduled hard delete task for marked companies...');
+
+    try {
+      const deletedCount = await hardDeleteMarkedCompanies(1, 5); // Удаляем компании, помеченные более 1 часа назад, батч 5
+      if (deletedCount > 0) {
+        logger.info(`✅ Hard delete completed. Deleted ${deletedCount} companies.`);
+      } else {
+        logger.debug('✅ Hard delete check completed. No companies to delete.');
+      }
+    } catch (error) {
+      logger.error('❌ Hard delete task failed:', error);
       // Metrics are already recorded in the job function
     }
   },

@@ -21,6 +21,11 @@ export const extractTenant = async (
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { companyId: true, isActive: true },
+      include: {
+        company: {
+          select: { deletedAt: true },
+        },
+      },
     });
 
     if (!user) {
@@ -29,6 +34,11 @@ export const extractTenant = async (
 
     if (!user.isActive) {
       throw new AppError('User account is inactive', 403);
+    }
+
+    // Проверяем, что компания не удалена (soft delete)
+    if (user.company?.deletedAt) {
+      throw new AppError('Company has been deleted', 403);
     }
 
     req.companyId = user.companyId;
