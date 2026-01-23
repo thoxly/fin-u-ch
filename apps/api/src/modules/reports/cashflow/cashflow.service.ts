@@ -203,22 +203,22 @@ export class CashflowService {
 
       // Создаем Map для быстрого доступа к справочникам
       const articlesMap = new Map(
-        articlesForMap.map((a) => [
+        articlesForMap.map((a: { id: string; name: string; activity: string; type: string }) => [
           a.id,
           { id: a.id, name: a.name, activity: a.activity, type: a.type },
         ])
       );
       const dealsMap = new Map(
-        dealsForMap.map((d) => [d.id, { id: d.id, name: d.name }])
+        dealsForMap.map((d: { id: string; name: string }) => [d.id, { id: d.id, name: d.name }])
       );
       const accountsMap = new Map(
-        accountsForMap.map((a) => [a.id, { id: a.id, name: a.name }])
+        accountsForMap.map((a: { id: string; name: string }) => [a.id, { id: a.id, name: a.name }])
       );
       const departmentsMap = new Map(
-        departmentsForMap.map((d) => [d.id, { id: d.id, name: d.name }])
+        departmentsForMap.map((d: { id: string; name: string }) => [d.id, { id: d.id, name: d.name }])
       );
       const counterpartiesMap = new Map(
-        counterpartiesForMap.map((c) => [c.id, { id: c.id, name: c.name }])
+        counterpartiesForMap.map((c: { id: string; name: string }) => [c.id, { id: c.id, name: c.name }])
       );
 
       // Формируем фильтр для операций в зависимости от разреза
@@ -292,8 +292,8 @@ export class CashflowService {
       });
 
       // Создаем Map счетов для быстрого доступа (для конвертации валют)
-      const accountsMapForCurrency = new Map(
-        accountsForCurrency.map((acc) => [acc.id, { currency: acc.currency }])
+      const accountsMapForCurrency = new Map<string, { currency: string }>(
+        accountsForCurrency.map((acc: { id: string; currency: string }) => [acc.id, { currency: acc.currency }])
       );
 
       // Пересчитываем суммы операций в базовую валюту
