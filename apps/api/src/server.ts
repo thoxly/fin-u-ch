@@ -41,6 +41,7 @@ import prisma from './config/db';
 import redis from './config/redis';
 // import demoUserService from './modules/demo/demo.service'; // Reserved for future use
 import { execSync } from 'child_process';
+import { Server } from 'http';
 
 const PORT = env.PORT;
 // Use 0.0.0.0 for Docker (allows container access), 127.0.0.1 for local dev
@@ -88,7 +89,7 @@ async function checkDatabaseConnection() {
 }
 
 // Функция запуска сервера
-async function startServer() {
+async function startServer(): Promise<Server> {
   try {
     // Проверяем подключение к базе данных
     await checkDatabaseConnection();
@@ -96,7 +97,7 @@ async function startServer() {
     // Применяем миграции перед запуском
     await applyMigrations();
 
-    const server = app.listen(PORT, HOST, async () => {
+    const server: Server = app.listen(PORT, HOST, async () => {
       logger.info(`API server running on ${HOST}:${PORT}`);
       logger.info(`Environment: ${env.NODE_ENV}`);
       logger.info(`Health check: http://localhost:${PORT}/api/health`);
@@ -141,7 +142,7 @@ async function startServer() {
 }
 
 // Запускаем сервер
-let server;
+let server: Server;
 try {
   server = await startServer();
 } catch (error) {
