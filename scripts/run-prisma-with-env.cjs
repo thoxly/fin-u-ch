@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 /**
  * Script to run Prisma commands with environment variables loaded from root .env file
- * Usage: node scripts/run-prisma-with-env.js <prisma-command> [args...]
- * Example: node scripts/run-prisma-with-env.js migrate deploy
+ * Usage: node scripts/run-prisma-with-env.cjs <prisma-command> [args...]
+ * Example: node scripts/run-prisma-with-env.cjs migrate deploy
  */
 
-import { execSync } from 'child_process';
-import { resolve } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { readFileSync } from 'fs';
+const { execSync } = require('child_process');
+const { resolve } = require('path');
+const { readFileSync } = require('fs');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// In CommonJS, __dirname is automatically available
+// No need to define it manually
 
 // Load .env from project root manually
 const projectRoot = resolve(__dirname, '..');
@@ -57,7 +55,7 @@ loadEnvFile(envPath);
 const [, , ...args] = process.argv;
 if (args.length === 0) {
   console.error('Error: Prisma command is required');
-  console.error('Usage: node scripts/run-prisma-with-env.js <prisma-command> [args...]');
+  console.error('Usage: node scripts/run-prisma-with-env.cjs <prisma-command> [args...]');
   process.exit(1);
 }
 
