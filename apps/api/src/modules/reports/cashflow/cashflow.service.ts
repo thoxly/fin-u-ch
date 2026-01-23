@@ -204,9 +204,19 @@ export class CashflowService {
       // Создаем Map для быстрого доступа к справочникам
       const articlesMap = new Map(
         articlesForMap.map(
-          (a: { id: string; name: string; activity: string; type: string }) => [
+          (a: {
+            id: string;
+            name: string;
+            activity: string | null;
+            type: string;
+          }) => [
             a.id,
-            { id: a.id, name: a.name, activity: a.activity, type: a.type },
+            {
+              id: a.id,
+              name: a.name,
+              activity: a.activity || 'unknown',
+              type: a.type,
+            },
           ]
         )
       );
