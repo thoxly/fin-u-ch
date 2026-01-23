@@ -21,11 +21,6 @@ export const extractTenant = async (
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
       select: { companyId: true, isActive: true },
-      include: {
-        company: {
-          select: { deletedAt: true },
-        },
-      },
     });
 
     if (!user) {
@@ -37,7 +32,16 @@ export const extractTenant = async (
     }
 
     // Проверяем, что компания не удалена (soft delete)
-    if (user.company?.deletedAt) {
+    const company = await prisma.company.findUnique({
+      where: { id: user.companyId },
+      select: { deletedAt: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404);
+    }
+
+    if (company.deletedAt) {
       throw new AppError('Company has been deleted', 403);
     }
 
