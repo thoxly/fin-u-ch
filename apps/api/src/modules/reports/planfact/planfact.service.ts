@@ -121,8 +121,35 @@ export class PlanFactService {
       level: params.level,
     });
 
+    // Оптимизация: загружаем справочники отдельно, чтобы избежать JOIN для каждой операции
+    const [articlesForMap, dealsForMap, departmentsForMap] = await Promise.all([
+      prisma.article.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true },
+      }),
+      prisma.deal.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true },
+      }),
+      prisma.department.findMany({
+        where: { companyId, isActive: true },
+        select: { id: true, name: true },
+      }),
+    ]);
+
+    // Создаем Map для быстрого доступа к справочникам
+    const articlesMap = new Map(
+      articlesForMap.map((a) => [a.id, { id: a.id, name: a.name }])
+    );
+    const dealsMap = new Map(
+      dealsForMap.map((d) => [d.id, { id: d.id, name: d.name }])
+    );
+    const departmentsMap = new Map(
+      departmentsForMap.map((d) => [d.id, { id: d.id, name: d.name }])
+    );
+
     // Get fact data (только реальные операции, не шаблоны, не будущие)
-    // Используем select вместо include для оптимизации - загружаем только нужные поля
+    // БЕЗ JOINов - справочники маппим в памяти
     const operations = await prisma.operation.findMany({
       where: {
         companyId,
@@ -142,27 +169,35 @@ export class PlanFactService {
         articleId: true,
         dealId: true,
         departmentId: true,
-        article: { select: { id: true, name: true } },
-        deal: { select: { id: true, name: true } },
-        department: { select: { id: true, name: true } },
+        // Убрали JOINы - загружаем только ID, справочники маппим в памяти
       },
     });
 
+    // Маппим справочники к операциям
+    const operationsWithReferences = operations.map((op) => ({
+      ...op,
+      article: op.articleId ? articlesMap.get(op.articleId) || null : null,
+      deal: op.dealId ? dealsMap.get(op.dealId) || null : null,
+      department: op.departmentId
+        ? departmentsMap.get(op.departmentId) || null
+        : null,
+    }));
+
     // Защита от переполнения памяти при больших объемах данных
     const MAX_OPERATIONS_WARNING = 10000;
-    if (operations.length > MAX_OPERATIONS_WARNING) {
+    if (operationsWithReferences.length > MAX_OPERATIONS_WARNING) {
       logger.warn(
-        `PlanFact: Large number of operations (${operations.length}), consider using aggregation or smaller period`
+        `PlanFact: Large number of operations (${operationsWithReferences.length}), consider using aggregation or smaller period`
       );
     }
 
     logger.info('PlanFact: operations fetched', {
       companyId,
-      operationsCount: operations.length,
+      operationsCount: operationsWithReferences.length,
       periodFrom: params.periodFrom.toISOString(),
       maxDate: maxDate.toISOString(),
       todayStart: todayStart.toISOString(),
-      sampleOperations: operations.slice(0, 3).map((op) => ({
+      sampleOperations: operationsWithReferences.slice(0, 3).map((op) => ({
         id: op.id,
         date: op.operationDate.toISOString(),
         type: op.type,
@@ -170,7 +205,7 @@ export class PlanFactService {
       })),
     });
 
-    for (const op of operations) {
+    for (const op of operationsWithReferences) {
       const month = getMonthKey(new Date(op.operationDate));
       let key = '';
       let name = '';
@@ -209,7 +244,9 @@ export class PlanFactService {
       (a, b) => a.month.localeCompare(b.month) || a.name.localeCompare(b.name)
     );
 
-    await cacheReport(cacheKey, result);
+    // Определяем, является ли период историческим (прошлые периоды кэшируем дольше)
+    const isHistorical = maxDate < todayStart;
+    await cacheReport(cacheKey, result, 300, isHistorical);
     return result;
   }
 }

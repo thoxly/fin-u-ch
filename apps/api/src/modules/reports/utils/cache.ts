@@ -7,15 +7,21 @@ import {
 } from '../../../config/metrics';
 
 const DEFAULT_TTL = 300; // 5 minutes
+// Разные TTL для разных типов данных
+const HISTORICAL_DATA_TTL = 3600; // 1 hour для исторических данных (прошлые периоды)
+const CURRENT_DATA_TTL = 300; // 5 minutes для текущих данных
 
 export const cacheReport = async (
   key: string,
   data: unknown,
-  ttl: number = DEFAULT_TTL
+  ttl: number = DEFAULT_TTL,
+  isHistorical: boolean = false
 ): Promise<void> => {
+  // Используем больший TTL для исторических данных (прошлые периоды)
+  const finalTtl = isHistorical ? HISTORICAL_DATA_TTL : ttl;
   const start = Date.now();
   try {
-    await redis.setex(key, ttl, JSON.stringify(data));
+    await redis.setex(key, finalTtl, JSON.stringify(data));
     const duration = (Date.now() - start) / 1000;
     redisOperationDurationHistogram.observe(
       { operation: 'set', status: 'success' },
