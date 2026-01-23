@@ -31,6 +31,20 @@ export const extractTenant = async (
       throw new AppError('User account is inactive', 403);
     }
 
+    // Проверяем, что компания не удалена (soft delete)
+    const company = await prisma.company.findUnique({
+      where: { id: user.companyId },
+      select: { deletedAt: true },
+    });
+
+    if (!company) {
+      throw new AppError('Company not found', 404);
+    }
+
+    if (company.deletedAt) {
+      throw new AppError('Company has been deleted', 403);
+    }
+
     req.companyId = user.companyId;
     next();
   } catch (error) {

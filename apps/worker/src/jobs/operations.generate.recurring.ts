@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
@@ -88,7 +89,7 @@ export async function generateRecurringOperations(
         // Создаем новую операцию-копию в транзакции для атомарности
         await prisma.$transaction(async (tx) => {
           // Дополнительная проверка на существование операции в транзакции
-          const existingInTx = await tx.operation.findFirst({
+          const existingInTx = await (tx as any).operation.findFirst({
             where: {
               recurrenceParentId: template.id,
               operationDate: today,
@@ -102,7 +103,7 @@ export async function generateRecurringOperations(
             return;
           }
 
-          await tx.operation.create({
+          await (tx as any).operation.create({
             data: {
               companyId: template.companyId,
               type: template.type,

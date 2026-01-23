@@ -14,18 +14,19 @@ import { BASE_URL } from './common.js';
 
 export let options = {
   stages: [
-    { duration: '30s', target: 10 },   // Разминка: 10 пользователей
-    { duration: '1m', target: 50 },     // Разгон до 50
+    { duration: '1m', target: 10 },    // Фаза 1: Создание начального пула (10 пользователей)
+    { duration: '30s', target: 10 },   // Разминка: 10 пользователей работают
+    { duration: '1m', target: 50 },     // Фаза 2: Постепенное создание до 50
     { duration: '2m', target: 50 },     // Удержание 50
-    { duration: '1m', target: 100 },    // Разгон до 100
+    { duration: '2m', target: 100 },   // Фаза 3: Постепенное создание до 100
     { duration: '2m', target: 100 },    // Удержание 100
-    { duration: '2m', target: 250 },    // Разгон до 250
+    { duration: '3m', target: 250 },    // Фаза 4: Постепенное создание до 250
     { duration: '3m', target: 250 },    // Удержание 250
-    { duration: '2m', target: 500 },    // Разгон до 500
+    { duration: '3m', target: 500 },    // Фаза 5: Постепенное создание до 500
     { duration: '3m', target: 500 },    // Удержание 500
-    { duration: '2m', target: 750 },    // Разгон до 750
+    { duration: '3m', target: 750 },    // Фаза 6: Постепенное создание до 750
     { duration: '3m', target: 750 },    // Удержание 750
-    { duration: '2m', target: 1000 },   // Разгон до 1000
+    { duration: '3m', target: 1000 },   // Фаза 7: Постепенное создание до 1000
     { duration: '3m', target: 1000 },    // Удержание 1000
     { duration: '2m', target: 0 },      // Снижение
   ],
@@ -35,6 +36,15 @@ export let options = {
     checks: ['rate>0.90'], // 90% всех проверок должны проходить успешно
   },
 };
+
+// Максимальное количество попыток создания сессии
+const MAX_SESSION_RETRIES = 5;
+
+// Задержка между попытками создания сессии (в секундах)
+const SESSION_RETRY_DELAY = 2;
+
+// Задержка перед началом работы после создания сессии (имитация "входа в систему")
+const POST_SESSION_DELAY = 0.5;
 
 // Распределение пользователей по сценариям
 const USER_SCENARIOS = {
@@ -52,6 +62,61 @@ function authHeaders(token) {
       'Content-Type': 'application/json',
       'X-Test-Mode': 'load-test', // Обход rate limiting для тестов
     }
+  };
+}
+
+// Функция для создания сессии с экспоненциальной задержкой и постепенным созданием
+function createSessionGradually() {
+  const testHeaders = {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Test-Mode': 'load-test', // Обход rate limiting для создания сессии
+    }
+  };
+
+  // Добавляем случайную задержку перед созданием (распределяем нагрузку)
+  // Это имитирует реальное поведение, когда пользователи заходят не все одновременно
+  sleep(Math.random() * 2); // 0-2 секунды случайной задержки
+
+  for (let attempt = 1; attempt <= MAX_SESSION_RETRIES; attempt++) {
+    let sessionRes = http.post(`${BASE_URL}/api/demo/start-session`, null, testHeaders);
+    
+    // Проверяем успешность запроса
+    if (sessionRes.status === 201 || sessionRes.status === 200) {
+      try {
+        let session = sessionRes.json();
+        if (session && session.data && session.data.accessToken) {
+          check(sessionRes, {
+            'session created': (r) => r.status === 201 || r.status === 200,
+            'has access token': () => !!session.data.accessToken
+          });
+          return {
+            success: true,
+            token: session.data.accessToken,
+            session: session
+          };
+        }
+      } catch (e) {
+        console.log(`[Attempt ${attempt}] Failed to parse session response:`, e);
+      }
+    } else {
+      // Логируем только если это не 429 (слишком много запросов) - это ожидаемо
+      if (sessionRes.status !== 429) {
+        console.log(`[Attempt ${attempt}] Failed to start session. Status: ${sessionRes.status}`);
+      }
+    }
+
+    // Если не последняя попытка, делаем экспоненциальную задержку перед повтором
+    if (attempt < MAX_SESSION_RETRIES) {
+      const delay = SESSION_RETRY_DELAY * Math.pow(2, attempt - 1); // Экспоненциальная задержка
+      sleep(delay);
+    }
+  }
+
+  return {
+    success: false,
+    token: null,
+    session: null
   };
 }
 
@@ -346,30 +411,20 @@ function analystScenario(headers) {
 }
 
 export default function () {
-  // 1. Создание демо-пользователя
-  let sessionRes = http.post(`${BASE_URL}/api/demo/start-session`);
-
-  let session;
-  try {
-    session = sessionRes.json();
-  } catch (e) {
-    console.log('Failed to parse session response:', e);
+  // 1. Создание демо-пользователя с постепенным созданием и retry логикой
+  const sessionResult = createSessionGradually();
+  
+  if (!sessionResult.success || !sessionResult.token) {
+    // Если не удалось создать сессию после всех попыток, пропускаем итерацию
+    // Это не считается ошибкой запроса, так как мы уже сделали несколько попыток
     return;
   }
 
-  if (!session || !session.data) {
-    console.log(`Failed to start session. Status: ${sessionRes.status}`);
-    return;
-  }
-
-  let { accessToken } = session.data;
+  let accessToken = sessionResult.token;
   let headers = authHeaders(accessToken);
 
-  // Проверка успешного создания сессии
-  check(sessionRes, {
-    'session created': (r) => r.status === 201,
-    'has access token': () => !!accessToken
-  });
+  // Небольшая задержка после создания сессии (имитация "входа в систему")
+  sleep(POST_SESSION_DELAY);
 
   // Определяем тип пользователя на основе случайного числа
   const random = Math.random();

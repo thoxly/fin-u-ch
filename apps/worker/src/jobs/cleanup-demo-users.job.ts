@@ -1,105 +1,40 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { logger } from '../config/logger';
 import { jobCounter, jobDuration, jobLastSuccess } from '../config/metrics';
 
 /**
- * Удаляет пользователя по ID (вместе с компанией)
- * Использует каскадное удаление для оптимизации производительности
- * @param userId ID пользователя для удаления
- * @param maxRetries Максимальное количество попыток при ошибках
+ * Помечает компании как удаленные (soft delete)
+ * Использует raw SQL для массового обновления - быстрее чем Prisma ORM
+ * @param companyIds Массив ID компаний для пометки как удаленных
  */
-async function deleteUser(
-  userId: string,
-  maxRetries: number = 3
-): Promise<void> {
-  // Проверяем существование пользователя перед удалением
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, companyId: true, email: true },
-  });
+async function markCompaniesForDeletion(companyIds: string[]): Promise<number> {
+  if (companyIds.length === 0) return 0;
 
-  if (!user) {
-    logger.warn(`Cleanup: User ${userId} not found (already deleted?)`);
-    return;
-  }
+  try {
+    // Используем raw SQL для массового обновления - в 10-100 раз быстрее
+    // Используем Prisma.$queryRaw для правильной работы с массивами UUID
+    const placeholders = companyIds.map((_, i) => `$${i + 1}`).join(',');
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE companies
+       SET "deletedAt" = NOW()
+       WHERE id IN (${placeholders})
+       AND "deletedAt" IS NULL`,
+      ...companyIds
+    );
 
-  const companyId = user.companyId;
+    logger.debug(`Marked ${result} companies for deletion`, {
+      companyIdsCount: companyIds.length,
+      markedCount: result,
+    });
 
-  // Retry логика с экспоненциальной задержкой
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      await prisma.$transaction(
-        async (tx) => {
-          // 1. Удаляем AuditLog вручную (ссылается на User БЕЗ onDelete: Cascade)
-          // Это нужно сделать перед удалением User, чтобы избежать foreign key constraint ошибки
-          await tx.auditLog.deleteMany({ where: { companyId } });
-
-          // 2. Удаляем Company - это автоматически удалит каскадно:
-          //    - User (удалит EmailToken, UserRole каскадно)
-          //    - Role (удалит RolePermission каскадно)
-          //    - Account, Article, Operation, PlanItem, Budget, Deal, Department, Counterparty
-          //    - ImportSession (удалит ImportedOperation каскадно)
-          //    - MappingRule, Subscription, etc.
-          await tx.company.delete({ where: { id: companyId } });
-        },
-        {
-          timeout: 300000, // 5 минут - достаточно для больших объемов данных
-          maxWait: 30000, // 30 секунд ожидания начала транзакции
-        }
-      );
-
-      logger.info('Demo user cleanup: Deleted user and company', {
-        userId: user.id,
-        email: user.email,
-        companyId,
-        attempt: attempt + 1,
-      });
-      return; // Успешно удалено
-    } catch (error: any) {
-      lastError = error;
-
-      // Если пользователь уже удален (P2025 = Record not found)
-      if (error.code === 'P2025') {
-        logger.warn(`User ${userId} or company ${companyId} already deleted`, {
-          userId,
-          companyId,
-        });
-        return;
-      }
-
-      // Если это последняя попытка, выбрасываем ошибку
-      if (attempt === maxRetries - 1) {
-        logger.error(
-          `Failed to delete user ${userId} after ${maxRetries} attempts`,
-          {
-            error,
-            userId,
-            companyId,
-            attempts: maxRetries,
-          }
-        );
-        throw error;
-      }
-
-      // Экспоненциальная задержка: 1s, 2s, 4s
-      const delay = 1000 * Math.pow(2, attempt);
-      logger.warn(
-        `Error deleting user ${userId} (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms`,
-        {
-          error: error.message,
-          errorCode: error.code,
-          userId,
-          companyId,
-        }
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
-    }
-  }
-
-  // Не должно сюда дойти, но на всякий случай
-  if (lastError) {
-    throw lastError;
+    return result as number;
+  } catch (error: any) {
+    logger.error('Failed to mark companies for deletion', {
+      error: error.message,
+      companyIdsCount: companyIds.length,
+    });
+    throw error;
   }
 }
 
@@ -107,15 +42,14 @@ async function deleteUser(
 let isCleanupRunning = false;
 
 /**
- * Очищает старых демо-пользователей
+ * Очищает старых демо-пользователей (soft delete)
+ * Помечает компании как удаленные вместо физического удаления
  * @param maxAgeHours Время жизни аккаунтов в часах
- * @param batchSize Размер батча для удаления (по умолчанию 10)
- * @param maxUsersPerRun Максимальное количество пользователей для удаления за один запуск (0 = без лимита)
+ * @param maxUsersPerRun Максимальное количество пользователей для обработки за один запуск (0 = без лимита)
  */
 export async function cleanupExpiredDemoUsers(
   maxAgeHours: number = 24,
-  batchSize: number = 10,
-  maxUsersPerRun: number = 0
+  maxUsersPerRun: number = 100
 ): Promise<number> {
   const jobName = 'cleanup_demo_users';
   const startTime = Date.now();
@@ -134,12 +68,21 @@ export async function cleanupExpiredDemoUsers(
     const threshold = new Date();
     threshold.setHours(threshold.getHours() - maxAgeHours);
 
+    // Находим истекших демо-пользователей и их компании
+    // Исключаем уже помеченные как удаленные компании
     const expiredUsers = await prisma.user.findMany({
       where: {
         email: { startsWith: 'demo_' },
         createdAt: { lt: threshold },
+        company: {
+          deletedAt: null, // Только компании, которые еще не помечены как удаленные
+        },
       },
-      select: { id: true, email: true },
+      select: {
+        id: true,
+        email: true,
+        companyId: true,
+      },
       take: maxUsersPerRun > 0 ? maxUsersPerRun : undefined,
     });
 
@@ -154,46 +97,16 @@ export async function cleanupExpiredDemoUsers(
 
     logger.info(`Found ${expiredUsers.length} expired demo users`, {
       total: expiredUsers.length,
-      batchSize,
       maxUsersPerRun,
     });
 
-    let deletedCount = 0;
-    let errorCount = 0;
+    // Собираем уникальные companyId (один пользователь = одна компания для демо)
+    const companyIds: string[] = Array.from(
+      new Set(expiredUsers.map((user: { companyId: string }) => user.companyId))
+    );
 
-    // Батчинг: удаляем пользователей батчами для оптимизации
-    for (let i = 0; i < expiredUsers.length; i += batchSize) {
-      const batch = expiredUsers.slice(i, i + batchSize);
-      logger.debug(`Processing batch ${Math.floor(i / batchSize) + 1}`, {
-        batchSize: batch.length,
-        totalBatches: Math.ceil(expiredUsers.length / batchSize),
-      });
-
-      // Удаляем пользователей в батче параллельно (но с ограничением)
-      const batchResults = await Promise.allSettled(
-        batch.map((user) => deleteUser(user.id))
-      );
-
-      // Подсчитываем результаты
-      for (let j = 0; j < batchResults.length; j++) {
-        const result = batchResults[j];
-        if (result.status === 'fulfilled') {
-          deletedCount++;
-        } else {
-          errorCount++;
-          logger.error(`Failed to delete expired demo user ${batch[j].id}`, {
-            error: result.reason,
-            userId: batch[j].id,
-            email: batch[j].email,
-          });
-        }
-      }
-
-      // Небольшая задержка между батчами, чтобы не перегружать БД
-      if (i + batchSize < expiredUsers.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
+    // Помечаем компании как удаленные (soft delete) - БЫСТРО, без блокировок
+    const markedCount = await markCompaniesForDeletion(companyIds);
 
     // Record metrics
     const duration = (Date.now() - startTime) / 1000;
@@ -201,14 +114,14 @@ export async function cleanupExpiredDemoUsers(
     jobCounter.inc({ job_name: jobName, status: 'success' });
     jobLastSuccess.set({ job_name: jobName }, Date.now() / 1000);
 
-    logger.info('Cleanup completed', {
-      deletedCount,
-      errorCount,
+    logger.info('Cleanup completed (soft delete)', {
+      markedCount,
       totalFound: expiredUsers.length,
+      companyIdsCount: companyIds.length,
       duration: `${duration.toFixed(2)}s`,
     });
 
-    return deletedCount;
+    return markedCount;
   } catch (error) {
     logger.error('Error in cleanupExpiredDemoUsers:', error);
 
@@ -221,5 +134,111 @@ export async function cleanupExpiredDemoUsers(
   } finally {
     // Сбрасываем флаг выполнения
     isCleanupRunning = false;
+  }
+}
+
+/**
+ * Физически удаляет компании, помеченные как удаленные (hard delete)
+ * Выполняется в фоновом режиме отдельным job
+ * @param minAgeHours Минимальный возраст пометки для удаления (по умолчанию 1 час)
+ * @param batchSize Размер батча для удаления (по умолчанию 5)
+ */
+export async function hardDeleteMarkedCompanies(
+  minAgeHours: number = 1,
+  batchSize: number = 5
+): Promise<number> {
+  const jobName = 'hard_delete_marked_companies';
+  const startTime = Date.now();
+
+  try {
+    // Находим компании, помеченные для удаления более minAgeHours назад
+    const threshold = new Date();
+    threshold.setHours(threshold.getHours() - minAgeHours);
+
+    const companiesToDelete = await prisma.company.findMany({
+      where: {
+        deletedAt: { not: null, lt: threshold },
+      },
+      select: { id: true },
+      take: batchSize,
+    });
+
+    if (companiesToDelete.length === 0) {
+      const duration = (Date.now() - startTime) / 1000;
+      jobDuration.observe({ job_name: jobName }, duration);
+      jobCounter.inc({ job_name: jobName, status: 'success' });
+      return 0;
+    }
+
+    const companyIds = companiesToDelete.map((c: { id: string }) => c.id);
+
+    logger.info(`Hard deleting ${companyIds.length} marked companies`, {
+      companyIdsCount: companyIds.length,
+      batchSize,
+    });
+
+    // Последовательное удаление для избежания блокировок
+    let deletedCount = 0;
+    let errorCount = 0;
+
+    for (const companyId of companyIds) {
+      try {
+        await prisma.$transaction(
+          async (tx: Prisma.TransactionClient) => {
+            // Используем raw SQL для быстрого удаления audit_logs
+            await (tx as any).$executeRawUnsafe(
+              `DELETE FROM audit_logs WHERE "companyId" = $1`,
+              companyId
+            );
+
+            // Удаляем компанию (каскадно удалит остальное через onDelete: Cascade)
+            await (tx as any).$executeRawUnsafe(
+              `DELETE FROM companies WHERE id = $1`,
+              companyId
+            );
+          },
+          {
+            timeout: 300000, // 5 минут
+            maxWait: 30000, // 30 секунд
+          }
+        );
+
+        deletedCount++;
+        logger.debug(`Hard deleted company ${companyId}`);
+
+        // Задержка между удалениями для снижения нагрузки
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      } catch (error: any) {
+        errorCount++;
+        logger.error(`Failed to hard delete company ${companyId}`, {
+          error: error.message,
+          errorCode: error.code,
+          companyId,
+        });
+      }
+    }
+
+    // Record metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'success' });
+
+    logger.info('Hard delete completed', {
+      deletedCount,
+      errorCount,
+      totalFound: companyIds.length,
+      duration: `${duration.toFixed(2)}s`,
+    });
+
+    return deletedCount;
+  } catch (error) {
+    logger.error('Error in hardDeleteMarkedCompanies:', error);
+
+    // Record error metrics
+    const duration = (Date.now() - startTime) / 1000;
+    jobDuration.observe({ job_name: jobName }, duration);
+    jobCounter.inc({ job_name: jobName, status: 'error' });
+
+    throw error;
   }
 }
