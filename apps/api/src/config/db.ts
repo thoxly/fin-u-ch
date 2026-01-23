@@ -1,16 +1,57 @@
 import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import logger from './logger';
 import { dbPoolSizeGauge } from './metrics';
 
 // Determine project root
-// Use process.cwd() which works in both CommonJS and ESM contexts
-// This assumes the process is started from the project root (apps/api)
-const projectRoot = process.cwd();
+// Try multiple paths to find .env file
+function findProjectRoot(): string {
+  // Try current working directory first
+  const currentPath = process.cwd();
+
+  // If we're in apps/api, go up to root
+  if (currentPath.endsWith('apps/api') || currentPath.endsWith('apps\\api')) {
+    return path.resolve(currentPath, '../..');
+  }
+
+  // If we're in apps/api/src, go up to root
+  if (
+    currentPath.endsWith('apps/api/src') ||
+    currentPath.endsWith('apps\\api\\src')
+  ) {
+    return path.resolve(currentPath, '../../..');
+  }
+
+  // Try to find .env in current directory or parent directories
+  let checkPath = currentPath;
+  for (let i = 0; i < 5; i++) {
+    const envPath = path.resolve(checkPath, '.env');
+    try {
+      if (fs.existsSync(envPath)) {
+        return checkPath;
+      }
+    } catch {
+      // Ignore errors
+    }
+    checkPath = path.resolve(checkPath, '..');
+  }
+
+  // Fallback to current directory
+  return currentPath;
+}
+
+const projectRoot = findProjectRoot();
+const envPath = path.resolve(projectRoot, '.env');
 
 // Load .env before initializing Prisma
-dotenv.config({ path: path.resolve(projectRoot, '.env') });
+const envResult = dotenv.config({ path: envPath });
+if (envResult.error && process.env.NODE_ENV !== 'test') {
+  logger.warn(
+    `Failed to load .env from ${envPath}: ${envResult.error.message}`
+  );
+}
 
 // Configure connection pooling parameters
 const databaseUrl = process.env.DATABASE_URL || '';

@@ -27,6 +27,25 @@ export const operationsApi = apiSlice.injectEndpoints({
               params,
             }
           : '/operations',
+      transformResponse: (
+        response: { data?: Operation[]; pagination?: unknown } | Operation[]
+      ) => {
+        // API может возвращать либо массив напрямую, либо объект с полем data
+        if (Array.isArray(response)) {
+          return response;
+        }
+        // Если это объект с полем data, извлекаем массив
+        if (
+          response &&
+          typeof response === 'object' &&
+          'data' in response &&
+          Array.isArray(response.data)
+        ) {
+          return response.data;
+        }
+        // Fallback: возвращаем пустой массив
+        return [];
+      },
       providesTags: (result, error, params) => {
         // For paginated queries, provide specific tags to prevent cache invalidation issues
         if (

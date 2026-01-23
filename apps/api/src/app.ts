@@ -8,6 +8,8 @@ import { requestIdMiddleware } from './middlewares/request-id';
 import { generalApiRateLimit } from './middlewares/rate-limit.middleware';
 import logger from './config/logger';
 import { swaggerSpec } from './config/swagger';
+import prisma from './config/db';
+import redis from './config/redis';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -68,9 +70,46 @@ app.use((req, res, next) => {
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check with service status
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    services: {
+      database: 'unknown',
+      redis: 'unknown',
+    },
+  };
+
+  // Check database connection
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    health.services.database = 'connected';
+  } catch (error) {
+    health.services.database = 'disconnected';
+    health.status = 'degraded';
+    logger.warn('Database health check failed:', error);
+  }
+
+  // Check Redis connection
+  try {
+    const result = await redis.ping();
+    if (result === 'PONG') {
+      health.services.redis = 'connected';
+    } else {
+      health.services.redis = 'disconnected';
+      health.status = 'degraded';
+    }
+  } catch (error) {
+    health.services.redis = 'disconnected';
+    health.status = 'degraded';
+    logger.warn('Redis health check failed:', error);
+  }
+
+  // Return appropriate status code
+  const statusCode = health.status === 'ok' ? 200 : 503;
+  res.status(statusCode).json(health);
 });
 
 // Routes

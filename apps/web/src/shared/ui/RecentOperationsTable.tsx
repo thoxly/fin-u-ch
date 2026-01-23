@@ -14,6 +14,9 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  // Ensure operations is always an array
+  const operationsArray = Array.isArray(operations) ? operations : [];
+
   const formatDate = (date: Date | string) => {
     const d = new Date(date);
     return d.toLocaleDateString('ru-RU', {
@@ -66,7 +69,7 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {operations.slice(0, 5).map((operation) => (
+            {operationsArray.slice(0, 5).map((operation) => (
               <tr
                 key={operation.id}
                 className="border-b border-gray-100 dark:border-gray-700 last:border-b-0"
@@ -94,13 +97,13 @@ export const RecentOperationsTable: React.FC<RecentOperationsTableProps> = ({
             ))}
           </tbody>
         </table>
-        {operations.length === 0 && (
+        {operationsArray.length === 0 && (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             Нет операций за выбранный период
           </div>
         )}
       </div>
-      {operations.length > 0 && (
+      {operationsArray.length > 0 && (
         <div className="mt-4 text-center">
           <button
             onClick={() => navigate('/operations')}
