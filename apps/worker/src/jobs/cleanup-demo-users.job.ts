@@ -268,14 +268,15 @@ async function deleteCompanyOptimized(companyId: string): Promise<void> {
 /**
  * Физически удаляет компании, помеченные как удаленные (hard delete)
  * ОПТИМИЗИРОВАННАЯ ВЕРСИЯ с использованием Raw SQL и правильного порядка удаления
+ * Оптимизировано для снижения нагрузки на БД при росте объема данных
  * @param minAgeHours Минимальный возраст пометки для удаления (по умолчанию 1 час)
- * @param batchSize Размер батча для удаления (по умолчанию 10, увеличено для оптимизации)
- * @param maxConcurrent Максимальное количество параллельных удалений (по умолчанию 2)
+ * @param batchSize Размер батча для удаления (по умолчанию 5, уменьшено для снижения нагрузки)
+ * @param maxConcurrent Максимальное количество параллельных удалений (по умолчанию 1, последовательное удаление)
  */
 export async function hardDeleteMarkedCompanies(
   minAgeHours: number = 1,
-  batchSize: number = 10, // Увеличено с 5 до 10
-  maxConcurrent: number = 2 // Параллельное удаление для ускорения
+  batchSize: number = 5, // Уменьшено с 10 до 5 для снижения нагрузки при росте данных
+  maxConcurrent: number = 1 // Последовательное удаление для минимизации блокировок и стабильности
 ): Promise<number> {
   const jobName = 'hard_delete_marked_companies';
   const startTime = Date.now();
@@ -362,9 +363,10 @@ export async function hardDeleteMarkedCompanies(
         }
       }
 
-      // Небольшая задержка между батчами для снижения нагрузки на БД
+      // Задержка между батчами для снижения нагрузки на БД
+      // Увеличена задержка при последовательном удалении для стабильности
       if (i + maxConcurrent < companyIds.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Уменьшено с 200ms до 100ms
+        await new Promise((resolve) => setTimeout(resolve, 200)); // 200ms для стабильности
       }
     }
 

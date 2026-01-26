@@ -75,13 +75,30 @@ const translateFieldName = (field: string | number): string => {
 export const formatZodErrors = (error: {
   errors: Array<{ path: (string | number)[]; message: string }>;
 }): string => {
+  // Проверка на пустой массив ошибок
+  if (!error.errors || error.errors.length === 0) {
+    return 'Некорректные данные';
+  }
+
   const errors = error.errors.map((err) => {
-    const path = err.path.map(translateFieldName).join('.');
-    const translatedMessage = translateZodError(err.message);
+    // Обработка пустого пути
+    const path =
+      err.path && err.path.length > 0
+        ? err.path.map(translateFieldName).join('.')
+        : 'Поле';
+
+    // Обработка пустого сообщения
+    const translatedMessage = err.message
+      ? translateZodError(err.message)
+      : 'Некорректное значение';
+
     return `${path}: ${translatedMessage}`;
   });
 
-  return errors.join(', ');
+  const result = errors.join(', ');
+
+  // Fallback на случай, если результат все еще пустой
+  return result || 'Ошибка валидации данных';
 };
 
 export const validateEmail = (email: string): void => {
