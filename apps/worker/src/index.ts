@@ -99,24 +99,29 @@ const cleanupDemoUsersTask = cron.schedule(
 
 /**
  * Задача физического удаления помеченных компаний (hard delete)
- * Запускается каждые 15 минут
+ * Запускается каждые 10 минут (увеличена частота для обработки большего количества)
  * Удаляет компании, помеченные как удаленные более 1 часа назад
+ * ОПТИМИЗИРОВАННАЯ ВЕРСИЯ: использует Raw SQL и параллельное удаление
  */
 const hardDeleteMarkedCompaniesTask = cron.schedule(
-  '*/15 * * * *', // Каждые 15 минут
+  '*/10 * * * *', // Каждые 10 минут (было 15)
   async () => {
     logger.info(
-      '🔄 Running scheduled hard delete task for marked companies...'
+      '🔄 Running scheduled hard delete task for marked companies (optimized)...'
     );
 
     try {
-      const deletedCount = await hardDeleteMarkedCompanies(1, 5); // Удаляем компании, помеченные более 1 часа назад, батч 5
+      // Увеличены параметры: batchSize=10, maxConcurrent=2 для ускорения
+      // Блокировка предотвращает параллельные запуски
+      const deletedCount = await hardDeleteMarkedCompanies(1, 10, 2);
       if (deletedCount > 0) {
         logger.info(
           `✅ Hard delete completed. Deleted ${deletedCount} companies.`
         );
       } else {
-        logger.debug('✅ Hard delete check completed. No companies to delete.');
+        logger.debug(
+          '✅ Hard delete check completed. No companies to delete or job already running.'
+        );
       }
     } catch (error) {
       logger.error('❌ Hard delete task failed:', error);
@@ -184,6 +189,7 @@ logger.info('✅ Worker started successfully');
 logger.info('📋 Active tasks:');
 logger.info('  - Recurring operations: Daily at 00:01');
 logger.info('  - Demo user cleanup: Hourly at :15');
+logger.info('  - Hard delete marked companies: Every 10 minutes (optimized)');
 
 // CLI support
 const args = process.argv.slice(2);

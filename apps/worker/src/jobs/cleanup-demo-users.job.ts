@@ -137,18 +137,158 @@ export async function cleanupExpiredDemoUsers(
   }
 }
 
+// Флаг для отслеживания выполнения hard delete job (защита от параллельных запусков)
+let isHardDeleteRunning = false;
+
+/**
+ * Оптимизированное удаление компании через Raw SQL
+ * Удаляет данные в правильном порядке для минимизации блокировок
+ * @param companyId ID компании для удаления
+ */
+async function deleteCompanyOptimized(companyId: string): Promise<void> {
+  // Используем raw SQL для быстрого удаления в правильном порядке
+  // Порядок важен: сначала удаляем дочерние таблицы с большим объемом данных
+
+  // 1. Удаляем таблицы с большим объемом данных (используем индексы для скорости)
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM imported_operations WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM operations WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM audit_logs WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 2. Удаляем связанные таблицы среднего размера
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM plan_items WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM import_sessions WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM mapping_rules WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 3. Удаляем справочники
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM accounts WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM articles WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM counterparties WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM budgets WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM deals WHERE "companyId" = $1`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM departments WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 4. Удаляем роли и разрешения (сначала дочерние)
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM role_permissions WHERE "roleId" IN (
+      SELECT id FROM roles WHERE "companyId" = $1
+    )`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM user_roles WHERE "roleId" IN (
+      SELECT id FROM roles WHERE "companyId" = $1
+    )`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM roles WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 5. Удаляем подписки
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM subscriptions WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 6. Удаляем пользователей и связанные данные
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM email_tokens WHERE "userId" IN (
+      SELECT id FROM users WHERE "companyId" = $1
+    )`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM user_roles WHERE "userId" IN (
+      SELECT id FROM users WHERE "companyId" = $1
+    )`,
+    companyId
+  );
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM users WHERE "companyId" = $1`,
+    companyId
+  );
+
+  // 7. Финально удаляем компанию
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM companies WHERE id = $1`,
+    companyId
+  );
+}
+
 /**
  * Физически удаляет компании, помеченные как удаленные (hard delete)
- * Выполняется в фоновом режиме отдельным job
+ * ОПТИМИЗИРОВАННАЯ ВЕРСИЯ с использованием Raw SQL и правильного порядка удаления
  * @param minAgeHours Минимальный возраст пометки для удаления (по умолчанию 1 час)
- * @param batchSize Размер батча для удаления (по умолчанию 5)
+ * @param batchSize Размер батча для удаления (по умолчанию 10, увеличено для оптимизации)
+ * @param maxConcurrent Максимальное количество параллельных удалений (по умолчанию 2)
  */
 export async function hardDeleteMarkedCompanies(
   minAgeHours: number = 1,
-  batchSize: number = 5
+  batchSize: number = 10, // Увеличено с 5 до 10
+  maxConcurrent: number = 2 // Параллельное удаление для ускорения
 ): Promise<number> {
   const jobName = 'hard_delete_marked_companies';
   const startTime = Date.now();
+
+  // БЛОКИРОВКА: Если предыдущий батч еще выполняется, пропускаем запуск
+  if (isHardDeleteRunning) {
+    logger.warn(
+      'Hard delete job is already running, skipping this execution to avoid overloading database'
+    );
+    return 0;
+  }
+
+  isHardDeleteRunning = true;
 
   try {
     // Находим компании, помеченные для удаления более minAgeHours назад
@@ -172,49 +312,59 @@ export async function hardDeleteMarkedCompanies(
 
     const companyIds = companiesToDelete.map((c: { id: string }) => c.id);
 
-    logger.info(`Hard deleting ${companyIds.length} marked companies`, {
-      companyIdsCount: companyIds.length,
-      batchSize,
-    });
+    logger.info(
+      `Hard deleting ${companyIds.length} marked companies (optimized)`,
+      {
+        companyIdsCount: companyIds.length,
+        batchSize,
+        maxConcurrent,
+      }
+    );
 
-    // Последовательное удаление для избежания блокировок
     let deletedCount = 0;
     let errorCount = 0;
 
-    for (const companyId of companyIds) {
-      try {
-        await prisma.$transaction(
-          async (tx: Prisma.TransactionClient) => {
-            // Используем raw SQL для быстрого удаления audit_logs
-            await (tx as any).$executeRawUnsafe(
-              `DELETE FROM audit_logs WHERE "companyId" = $1`,
-              companyId
+    // Удаляем компании батчами с ограничением параллелизма
+    for (let i = 0; i < companyIds.length; i += maxConcurrent) {
+      const batch = companyIds.slice(i, i + maxConcurrent);
+
+      const results = await Promise.allSettled(
+        batch.map(async (companyId: string) => {
+          try {
+            const deleteStartTime = Date.now();
+
+            // Используем оптимизированное удаление
+            await deleteCompanyOptimized(companyId);
+
+            const deleteDuration = (Date.now() - deleteStartTime) / 1000;
+            logger.debug(
+              `Hard deleted company ${companyId} in ${deleteDuration.toFixed(2)}s`
             );
 
-            // Удаляем компанию (каскадно удалит остальное через onDelete: Cascade)
-            await (tx as any).$executeRawUnsafe(
-              `DELETE FROM companies WHERE id = $1`,
-              companyId
-            );
-          },
-          {
-            timeout: 300000, // 5 минут
-            maxWait: 30000, // 30 секунд
+            return { companyId, success: true };
+          } catch (error: any) {
+            logger.error(`Failed to hard delete company ${companyId}`, {
+              error: error.message,
+              errorCode: error.code,
+              companyId,
+            });
+            throw error;
           }
-        );
+        })
+      );
 
-        deletedCount++;
-        logger.debug(`Hard deleted company ${companyId}`);
+      // Подсчитываем результаты
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          deletedCount++;
+        } else {
+          errorCount++;
+        }
+      }
 
-        // Задержка между удалениями для снижения нагрузки
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      } catch (error: any) {
-        errorCount++;
-        logger.error(`Failed to hard delete company ${companyId}`, {
-          error: error.message,
-          errorCode: error.code,
-          companyId,
-        });
+      // Небольшая задержка между батчами для снижения нагрузки на БД
+      if (i + maxConcurrent < companyIds.length) {
+        await new Promise((resolve) => setTimeout(resolve, 100)); // Уменьшено с 200ms до 100ms
       }
     }
 
@@ -223,11 +373,12 @@ export async function hardDeleteMarkedCompanies(
     jobDuration.observe({ job_name: jobName }, duration);
     jobCounter.inc({ job_name: jobName, status: 'success' });
 
-    logger.info('Hard delete completed', {
+    logger.info('Hard delete completed (optimized)', {
       deletedCount,
       errorCount,
       totalFound: companyIds.length,
       duration: `${duration.toFixed(2)}s`,
+      avgTimePerCompany: `${(duration / companyIds.length).toFixed(2)}s`,
     });
 
     return deletedCount;
@@ -240,5 +391,8 @@ export async function hardDeleteMarkedCompanies(
     jobCounter.inc({ job_name: jobName, status: 'error' });
 
     throw error;
+  } finally {
+    // Сбрасываем флаг выполнения - важно для разблокировки следующего запуска
+    isHardDeleteRunning = false;
   }
 }
