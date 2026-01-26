@@ -7,10 +7,63 @@ import logger from '../../config/logger';
 export class DemoDataGeneratorService {
   /**
    * Создает моковые данные для демо-компании
+   * С retry логикой на случай, если каталоги еще не созданы
    */
-  async createSampleData(companyId: string): Promise<void> {
-    await this.generateSampleOperations(companyId);
-    await this.createSamplePlans(companyId);
+  async createSampleData(
+    companyId: string,
+    maxRetries: number = 2
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        // Проверяем наличие счетов перед генерацией данных
+        const accounts = await prisma.account.findMany({
+          where: { companyId },
+        });
+        const mainAccount = accounts.find(
+          (a) => a.name === 'Расчетный счет в банке'
+        );
+
+        if (!mainAccount && attempt < maxRetries - 1) {
+          // Если счет не найден и есть еще попытки, ждем и повторяем
+          const delay = 500 * (attempt + 1); // 500ms, 1000ms
+          logger.warn(
+            `Main account not found for company ${companyId}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+
+        await this.generateSampleOperations(companyId);
+        await this.createSamplePlans(companyId);
+
+        logger.info('Demo sample data created successfully', { companyId });
+        return;
+      } catch (error: any) {
+        lastError = error;
+
+        if (attempt === maxRetries - 1) {
+          logger.error('Failed to create demo sample data after all retries', {
+            error: error.message || error,
+            companyId,
+            attempts: maxRetries,
+          });
+          // Не выбрасываем ошибку, так как это фоновый процесс
+          return;
+        }
+
+        const delay = 500 * (attempt + 1);
+        logger.warn(
+          `Error creating demo sample data (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms`,
+          {
+            error: error.message || error,
+            companyId,
+          }
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
   }
 
   /**
