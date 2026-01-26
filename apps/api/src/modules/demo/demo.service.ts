@@ -425,8 +425,133 @@ export class DemoUserService {
   }
 
   /**
+   * Оптимизированное удаление компании через Raw SQL
+   * Удаляет данные в правильном порядке для минимизации блокировок
+   * @param companyId ID компании для удаления
+   */
+  private async deleteCompanyOptimized(companyId: string): Promise<void> {
+    // Используем raw SQL для быстрого удаления в правильном порядке
+    // Порядок важен: сначала удаляем дочерние таблицы с большим объемом данных
+
+    // 1. Удаляем таблицы с большим объемом данных (используем индексы для скорости)
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM imported_operations WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM operations WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM audit_logs WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 2. Удаляем связанные таблицы среднего размера
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM plan_items WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM import_sessions WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM mapping_rules WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 3. Удаляем справочники
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM accounts WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM articles WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM counterparties WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM budgets WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM deals WHERE "companyId" = $1`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM departments WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 4. Удаляем роли и разрешения (сначала дочерние)
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM role_permissions WHERE "roleId" IN (
+        SELECT id FROM roles WHERE "companyId" = $1
+      )`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM user_roles WHERE "roleId" IN (
+        SELECT id FROM roles WHERE "companyId" = $1
+      )`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM roles WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 5. Удаляем подписки
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM subscriptions WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 6. Удаляем пользователей и связанные данные
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM email_tokens WHERE "userId" IN (
+        SELECT id FROM users WHERE "companyId" = $1
+      )`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM user_roles WHERE "userId" IN (
+        SELECT id FROM users WHERE "companyId" = $1
+      )`,
+      companyId
+    );
+
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM users WHERE "companyId" = $1`,
+      companyId
+    );
+
+    // 7. Финально удаляем компанию
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM companies WHERE id = $1`,
+      companyId
+    );
+  }
+
+  /**
    * Удаляет пользователя по ID (вместе с компанией)
-   * Использует каскадное удаление для оптимизации производительности
+   * ОПТИМИЗИРОВАННАЯ ВЕРСИЯ: использует Raw SQL вместо каскадного удаления
    * @param userId ID пользователя для удаления
    * @param maxRetries Максимальное количество попыток при ошибках
    */
@@ -450,31 +575,19 @@ export class DemoUserService {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        await prisma.$transaction(
-          async (tx) => {
-            // 1. Удаляем AuditLog вручную (ссылается на User БЕЗ onDelete: Cascade)
-            // Это нужно сделать перед удалением User, чтобы избежать foreign key constraint ошибки
-            await tx.auditLog.deleteMany({ where: { companyId } });
+        const deleteStartTime = Date.now();
 
-            // 2. Удаляем Company - это автоматически удалит каскадно:
-            //    - User (удалит EmailToken, UserRole каскадно)
-            //    - Role (удалит RolePermission каскадно)
-            //    - Account, Article, Operation, PlanItem, Budget, Deal, Department, Counterparty
-            //    - ImportSession (удалит ImportedOperation каскадно)
-            //    - MappingRule, Subscription, etc.
-            await tx.company.delete({ where: { id: companyId } });
-          },
-          {
-            timeout: 300000, // 5 минут - достаточно для больших объемов данных
-            maxWait: 30000, // 30 секунд ожидания начала транзакции
-          }
-        );
+        // Используем оптимизированное удаление через Raw SQL
+        await this.deleteCompanyOptimized(companyId);
 
-        logger.info('Demo user deleted', {
+        const deleteDuration = (Date.now() - deleteStartTime) / 1000;
+
+        logger.info('Demo user deleted (optimized)', {
           userId: user.id,
           email: user.email,
           companyId,
           attempt: attempt + 1,
+          duration: `${deleteDuration.toFixed(2)}s`,
         });
         return; // Успешно удалено
       } catch (error: any) {
