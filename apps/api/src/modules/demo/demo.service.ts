@@ -417,17 +417,22 @@ export class DemoUserService {
 
         // Создаем данные асинхронно (не блокируем ответ)
         // Пользователь получит токены сразу, данные создадутся в фоне
-        Promise.all([
-          demoCatalogsService.createInitialCatalogs(result.company.id),
-          demoDataGeneratorService.createSampleData(result.company.id),
-        ]).catch((error) => {
-          logger.error('Failed to create demo catalogs/data in background', {
-            error,
-            companyId: result.company.id,
-            userId: result.user.id,
+        // ВАЖНО: сначала создаем каталоги, затем данные (данные зависят от каталогов)
+        demoCatalogsService
+          .createInitialCatalogs(result.company.id)
+          .then(() => {
+            // После создания каталогов запускаем генерацию данных
+            return demoDataGeneratorService.createSampleData(result.company.id);
+          })
+          .catch((error) => {
+            logger.error('Failed to create demo catalogs/data in background', {
+              error: error.message || error,
+              errorCode: error.code,
+              companyId: result.company.id,
+              userId: result.user.id,
+            });
+            // Не выбрасываем ошибку, так как пользователь уже получил токены
           });
-          // Не выбрасываем ошибку, так как пользователь уже получил токены
-        });
 
         // Генерируем токены
         const accessToken = generateAccessToken({
