@@ -111,9 +111,9 @@ const hardDeleteMarkedCompaniesTask = cron.schedule(
     );
 
     try {
-      // Увеличены параметры: batchSize=10, maxConcurrent=2 для ускорения
+      // Оптимизированы параметры: batchSize=5, maxConcurrent=1 для снижения нагрузки
       // Блокировка предотвращает параллельные запуски
-      const deletedCount = await hardDeleteMarkedCompanies(1, 10, 2);
+      const deletedCount = await hardDeleteMarkedCompanies(1, 5, 1);
       if (deletedCount > 0) {
         logger.info(
           `✅ Hard delete completed. Deleted ${deletedCount} companies.`
