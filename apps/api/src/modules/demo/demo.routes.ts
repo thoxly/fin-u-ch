@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
+import { demoSessionRateLimit } from '../../middlewares/rate-limit.middleware';
 import demoController from './demo.controller';
 
 const router: Router = Router();
 
 // Публичный маршрут для получения учетных данных
 router.get('/credentials', demoController.getCredentials);
-router.post('/start-session', demoController.startSession);
+router.post(
+  '/start-session',
+  demoSessionRateLimit,
+  demoController.startSession
+);
 
 // Защищенные маршруты
 router.get('/info', authenticate, demoController.getInfo);

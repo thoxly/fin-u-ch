@@ -262,166 +262,258 @@ export class DemoUserService {
 
   /**
    * Создает динамического демо-пользователя с изолированным окружением
+   * С retry логикой для обработки временных ошибок БД
+   * @param maxRetries Максимальное количество попыток при ошибках (по умолчанию 3)
    */
-  async createDynamicUser(): Promise<TokensResponse> {
-    const uuid = crypto.randomUUID();
-    const email = `demo_${uuid}@example.com`;
-    const password = `demo_${uuid}`; // Пароль не так важен для авто-входа, но нужен для записи
+  async createDynamicUser(maxRetries: number = 3): Promise<TokensResponse> {
+    const startTime = Date.now();
+    let lastError: Error | null = null;
 
-    // Создаем все в одной транзакции
-    const result = await prisma.$transaction(async (tx) => {
-      // Создаем компанию
-      const company = await tx.company.create({
-        data: {
-          name: 'Демо-компания (Временная)',
-          currencyBase: 'RUB',
-        },
-      });
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const uuid = crypto.randomUUID();
+        const email = `demo_${uuid}@example.com`;
+        const password = `demo_${uuid}`; // Пароль не так важен для авто-входа, но нужен для записи
 
-      // Создаем пользователя
-      const passwordHash = await bcrypt.hash(password, 10);
-      const user = await tx.user.create({
-        data: {
-          email,
-          passwordHash,
-          companyId: company.id,
-          isActive: true,
-          isSuperAdmin: true,
-          isEmailVerified: true,
-        },
-      });
+        // Создаем все в одной транзакции с увеличенным таймаутом
+        const result = await prisma.$transaction(
+          async (tx) => {
+            // Создаем компанию
+            const company = await tx.company.create({
+              data: {
+                name: 'Демо-компания (Временная)',
+                currencyBase: 'RUB',
+              },
+            });
 
-      // Создаем роль администратора
-      const adminRole = await tx.role.create({
-        data: {
-          companyId: company.id,
-          name: 'Администратор',
-          description: 'Полный доступ ко всем разделам системы',
-          category: 'admin',
-          isSystem: true,
-          isActive: true,
-        },
-      });
+            // Создаем пользователя
+            const passwordHash = await bcrypt.hash(password, 10);
+            const user = await tx.user.create({
+              data: {
+                email,
+                passwordHash,
+                companyId: company.id,
+                isActive: true,
+                isSuperAdmin: true,
+                isEmailVerified: true,
+              },
+            });
 
-      // Добавляем разрешения (те же 46 штук)
-      // ВАЖНО: Дублируем логику разрешений, так как она хардкодилась внутри метода create()
-      // Лучше было бы вынести в private метод, но для минимизации изменений скопируем массив прав.
-      const permissions = [
-        // Operations
-        { entity: 'operations', action: 'create' },
-        { entity: 'operations', action: 'read' },
-        { entity: 'operations', action: 'update' },
-        { entity: 'operations', action: 'delete' },
-        { entity: 'operations', action: 'confirm' },
-        // Articles
-        { entity: 'articles', action: 'create' },
-        { entity: 'articles', action: 'read' },
-        { entity: 'articles', action: 'update' },
-        { entity: 'articles', action: 'delete' },
-        // Accounts
-        { entity: 'accounts', action: 'create' },
-        { entity: 'accounts', action: 'read' },
-        { entity: 'accounts', action: 'update' },
-        { entity: 'accounts', action: 'delete' },
-        // Counterparties
-        { entity: 'counterparties', action: 'create' },
-        { entity: 'counterparties', action: 'read' },
-        { entity: 'counterparties', action: 'update' },
-        { entity: 'counterparties', action: 'delete' },
-        // Budgets
-        { entity: 'budgets', action: 'create' },
-        { entity: 'budgets', action: 'read' },
-        { entity: 'budgets', action: 'update' },
-        { entity: 'budgets', action: 'delete' },
-        // Deals
-        { entity: 'deals', action: 'create' },
-        { entity: 'deals', action: 'read' },
-        { entity: 'deals', action: 'update' },
-        { entity: 'deals', action: 'delete' },
-        // Departments
-        { entity: 'departments', action: 'create' },
-        { entity: 'departments', action: 'read' },
-        { entity: 'departments', action: 'update' },
-        { entity: 'departments', action: 'delete' },
-        // Roles
-        { entity: 'roles', action: 'create' },
-        { entity: 'roles', action: 'read' },
-        { entity: 'roles', action: 'update' },
-        { entity: 'roles', action: 'delete' },
-        // Users
-        { entity: 'users', action: 'create' },
-        { entity: 'users', action: 'read' },
-        { entity: 'users', action: 'update' },
-        { entity: 'users', action: 'delete' },
-        // Import
-        { entity: 'import', action: 'create' },
-        { entity: 'import', action: 'read' },
-        { entity: 'import', action: 'confirm' },
-        // Settings
-        { entity: 'settings', action: 'read' },
-        { entity: 'settings', action: 'update' },
-      ];
+            // Создаем роль администратора
+            const adminRole = await tx.role.create({
+              data: {
+                companyId: company.id,
+                name: 'Администратор',
+                description: 'Полный доступ ко всем разделам системы',
+                category: 'admin',
+                isSystem: true,
+                isActive: true,
+              },
+            });
 
-      await tx.rolePermission.createMany({
-        data: permissions.map((perm) => ({
-          roleId: adminRole.id,
-          entity: perm.entity,
-          action: perm.action,
-          allowed: true,
-        })),
-      });
+            // Добавляем разрешения (те же 46 штук)
+            // ВАЖНО: Дублируем логику разрешений, так как она хардкодилась внутри метода create()
+            // Лучше было бы вынести в private метод, но для минимизации изменений скопируем массив прав.
+            const permissions = [
+              // Operations
+              { entity: 'operations', action: 'create' },
+              { entity: 'operations', action: 'read' },
+              { entity: 'operations', action: 'update' },
+              { entity: 'operations', action: 'delete' },
+              { entity: 'operations', action: 'confirm' },
+              // Articles
+              { entity: 'articles', action: 'create' },
+              { entity: 'articles', action: 'read' },
+              { entity: 'articles', action: 'update' },
+              { entity: 'articles', action: 'delete' },
+              // Accounts
+              { entity: 'accounts', action: 'create' },
+              { entity: 'accounts', action: 'read' },
+              { entity: 'accounts', action: 'update' },
+              { entity: 'accounts', action: 'delete' },
+              // Counterparties
+              { entity: 'counterparties', action: 'create' },
+              { entity: 'counterparties', action: 'read' },
+              { entity: 'counterparties', action: 'update' },
+              { entity: 'counterparties', action: 'delete' },
+              // Budgets
+              { entity: 'budgets', action: 'create' },
+              { entity: 'budgets', action: 'read' },
+              { entity: 'budgets', action: 'update' },
+              { entity: 'budgets', action: 'delete' },
+              // Deals
+              { entity: 'deals', action: 'create' },
+              { entity: 'deals', action: 'read' },
+              { entity: 'deals', action: 'update' },
+              { entity: 'deals', action: 'delete' },
+              // Departments
+              { entity: 'departments', action: 'create' },
+              { entity: 'departments', action: 'read' },
+              { entity: 'departments', action: 'update' },
+              { entity: 'departments', action: 'delete' },
+              // Roles
+              { entity: 'roles', action: 'create' },
+              { entity: 'roles', action: 'read' },
+              { entity: 'roles', action: 'update' },
+              { entity: 'roles', action: 'delete' },
+              // Users
+              { entity: 'users', action: 'create' },
+              { entity: 'users', action: 'read' },
+              { entity: 'users', action: 'update' },
+              { entity: 'users', action: 'delete' },
+              // Import
+              { entity: 'import', action: 'create' },
+              { entity: 'import', action: 'read' },
+              { entity: 'import', action: 'confirm' },
+              // Settings
+              { entity: 'settings', action: 'read' },
+              { entity: 'settings', action: 'update' },
+            ];
 
-      // Назначаем роль
-      await tx.userRole.create({
-        data: {
-          userId: user.id,
-          roleId: adminRole.id,
-        },
-      });
+            await tx.rolePermission.createMany({
+              data: permissions.map((perm) => ({
+                roleId: adminRole.id,
+                entity: perm.entity,
+                action: perm.action,
+                allowed: true,
+              })),
+            });
 
-      // Создаем подписку TEAM
-      await tx.subscription.create({
-        data: {
-          companyId: company.id,
-          plan: 'TEAM',
-          status: 'ACTIVE',
-          startDate: new Date(),
-        },
-      });
+            // Назначаем роль
+            await tx.userRole.create({
+              data: {
+                userId: user.id,
+                roleId: adminRole.id,
+              },
+            });
 
-      return { company, user };
-    });
+            // Создаем подписку TEAM
+            await tx.subscription.create({
+              data: {
+                companyId: company.id,
+                plan: 'TEAM',
+                status: 'ACTIVE',
+                startDate: new Date(),
+              },
+            });
 
-    logger.info('Dynamic demo user created', {
-      companyId: result.company.id,
-      userId: result.user.id,
-      email: result.user.email,
-    });
+            return { company, user };
+          },
+          {
+            timeout: 30000, // 30 секунд вместо дефолтных 5
+            maxWait: 15000, // 15 секунд ожидания начала транзакции
+          }
+        );
 
-    // Создаем данные
-    await demoCatalogsService.createInitialCatalogs(result.company.id);
-    await demoDataGeneratorService.createSampleData(result.company.id);
+        const transactionDuration = (Date.now() - startTime) / 1000;
 
-    // Генерируем токены
-    const accessToken = generateAccessToken({
-      userId: result.user.id,
-      email: result.user.email,
-    });
+        logger.info('Dynamic demo user created (transaction completed)', {
+          companyId: result.company.id,
+          userId: result.user.id,
+          email: result.user.email,
+          attempt: attempt + 1,
+          transactionDuration: `${transactionDuration.toFixed(2)}s`,
+        });
 
-    const refreshToken = generateRefreshToken({
-      userId: result.user.id,
-      email: result.user.email,
-    });
+        // Создаем данные асинхронно (не блокируем ответ)
+        // Пользователь получит токены сразу, данные создадутся в фоне
+        Promise.all([
+          demoCatalogsService.createInitialCatalogs(result.company.id),
+          demoDataGeneratorService.createSampleData(result.company.id),
+        ]).catch((error) => {
+          logger.error('Failed to create demo catalogs/data in background', {
+            error,
+            companyId: result.company.id,
+            userId: result.user.id,
+          });
+          // Не выбрасываем ошибку, так как пользователь уже получил токены
+        });
 
-    return {
-      accessToken,
-      refreshToken,
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        companyId: result.user.companyId,
-      },
-    };
+        // Генерируем токены
+        const accessToken = generateAccessToken({
+          userId: result.user.id,
+          email: result.user.email,
+        });
+
+        const refreshToken = generateRefreshToken({
+          userId: result.user.id,
+          email: result.user.email,
+        });
+
+        const totalDuration = (Date.now() - startTime) / 1000;
+
+        logger.info('Dynamic demo user created successfully', {
+          companyId: result.company.id,
+          userId: result.user.id,
+          email: result.user.email,
+          attempt: attempt + 1,
+          totalDuration: `${totalDuration.toFixed(2)}s`,
+          transactionDuration: `${transactionDuration.toFixed(2)}s`,
+        });
+
+        return {
+          accessToken,
+          refreshToken,
+          user: {
+            id: result.user.id,
+            email: result.user.email,
+            companyId: result.user.companyId,
+          },
+        };
+      } catch (error: any) {
+        lastError = error;
+
+        // Если это последняя попытка, логируем и выбрасываем
+        if (attempt === maxRetries - 1) {
+          const totalDuration = (Date.now() - startTime) / 1000;
+          logger.error('Failed to create dynamic demo user after all retries', {
+            error: error.message,
+            errorCode: error.code,
+            attempts: maxRetries,
+            totalDuration: `${totalDuration.toFixed(2)}s`,
+          });
+          throw error;
+        }
+
+        // Проверяем, стоит ли повторять
+        const isRetryableError =
+          error.code === 'P2028' || // Transaction timeout
+          error.message?.includes('Transaction') ||
+          error.message?.includes('timeout') ||
+          error.message?.includes('Unable to start a transaction');
+
+        if (!isRetryableError) {
+          // Не повторяем для не-транзакционных ошибок
+          const totalDuration = (Date.now() - startTime) / 1000;
+          logger.error('Non-retryable error in createDynamicUser', {
+            error: error.message,
+            errorCode: error.code,
+            attempt: attempt + 1,
+            totalDuration: `${totalDuration.toFixed(2)}s`,
+          });
+          throw error;
+        }
+
+        // Экспоненциальная задержка: 500ms, 1000ms, 2000ms
+        const delay = 500 * Math.pow(2, attempt);
+        logger.warn(
+          `Error creating dynamic demo user (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms`,
+          {
+            error: error.message,
+            errorCode: error.code,
+            delay: `${delay}ms`,
+          }
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    // Не должно сюда дойти, но на всякий случай
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error('Unexpected error: createDynamicUser failed without error');
   }
 
   /**

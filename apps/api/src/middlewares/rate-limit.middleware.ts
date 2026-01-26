@@ -159,3 +159,14 @@ export const generalApiRateLimit = createRateLimiter({
   keyGenerator: (req) => `rate-limit:api:${req.ip}`,
   message: 'Too many API requests. Please try again in a minute.',
 });
+
+/**
+ * Rate limiter для создания демо-сессий
+ * 10 запросов в минуту на IP (защита от перегрузки БД)
+ */
+export const demoSessionRateLimit = createRateLimiter({
+  windowMs: 60 * 1000, // 1 минута
+  maxRequests: 10, // 10 запросов в минуту
+  keyGenerator: (req) => `rate-limit:demo-session:${req.ip}`,
+  message: 'Too many demo session requests. Please try again in a minute.',
+});
