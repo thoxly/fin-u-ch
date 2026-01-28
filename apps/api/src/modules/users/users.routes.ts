@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../../middlewares/auth';
 import { extractTenant } from '../../middlewares/tenant';
 import { requirePermission } from '../../middlewares/permissions';
+import { checkUserLimit } from '../../middlewares/user-limit.guard';
 import usersController from './users.controller';
 
 const router: Router = Router();
@@ -254,6 +255,7 @@ router.get('/', requirePermission('users', 'read'), usersController.getAll);
 router.post(
   '/invite',
   requirePermission('users', 'create'),
+  checkUserLimit,
   usersController.inviteUser
 );
 
