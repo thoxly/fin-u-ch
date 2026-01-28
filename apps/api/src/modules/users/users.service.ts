@@ -414,59 +414,119 @@ export class UsersService {
     }
 
     // Выполняем полное удаление компании и всех связанных данных в транзакции
-    await prisma.$transaction(async (tx) => {
-      logger.debug('[UsersService.deleteMyAccount] Удаление данных компании', {
-        companyId,
-      });
+    // Используем raw SQL для оптимизации производительности (в 10-100 раз быстрее чем Prisma ORM)
+    // Увеличиваем таймаут до 30 секунд для больших объемов данных
+    await prisma.$transaction(
+      async (tx) => {
+        logger.debug(
+          '[UsersService.deleteMyAccount] Удаление данных компании',
+          {
+            companyId,
+          }
+        );
 
-      // 1. Сначала удаляем записи из таблиц, которые ссылаются на другие таблицы (чтобы избежать FK ошибок)
-      // ImportedOperation ссылается на многое, удаляем первой
-      await tx.importedOperation.deleteMany({ where: { companyId } });
+        // 1. Удаляем таблицы с большим объемом данных (используем индексы для скорости)
+        // Raw SQL выполняется намного быстрее, чем Prisma deleteMany
+        // Используем Prisma.sql для безопасных параметризованных запросов
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM imported_operations WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем сессии импорта
-      await tx.importSession.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM operations WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем правила маппинга
-      await tx.mappingRule.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM audit_logs WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем логи аудита (ссылаются на User и Company)
-      await tx.auditLog.deleteMany({ where: { companyId } });
+        // 2. Удаляем связанные таблицы среднего размера
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM plan_items WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем операции
-      await tx.operation.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM import_sessions WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем элементы плана
-      await tx.planItem.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM mapping_rules WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем зарплаты - DEPRECATED
+        // 3. Удаляем справочники
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM accounts WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем интеграции - DEPRECATED (Integration model removed)
-      // await tx.integration.deleteMany({ where: { companyId } });
+        // Article может ссылаться на себя (parentId), но DELETE CASCADE справится
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM articles WHERE "companyId" = ${companyId}`
+        );
 
-      // 2. Удаляем основные сущности
-      await tx.budget.deleteMany({ where: { companyId } });
-      await tx.deal.deleteMany({ where: { companyId } });
-      await tx.article.deleteMany({ where: { companyId } }); // Article может ссылаться на себя (parentId), но deleteMany обычно справляется
-      await tx.account.deleteMany({ where: { companyId } });
-      await tx.counterparty.deleteMany({ where: { companyId } });
-      await tx.department.deleteMany({ where: { companyId } });
-      await tx.subscription.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM counterparties WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем роли (и связанные RolePermission удалятся каскадно)
-      await tx.role.deleteMany({ where: { companyId } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM budgets WHERE "companyId" = ${companyId}`
+        );
 
-      // 3. Удаляем всех пользователей компании
-      // Сначала удаляем токены email, хотя они удалятся каскадно, но на всякий случай
-      // await tx.emailToken.deleteMany({ where: { user: { companyId } } });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM deals WHERE "companyId" = ${companyId}`
+        );
 
-      // Удаляем пользователей
-      await tx.user.deleteMany({
-        where: { companyId },
-      });
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM departments WHERE "companyId" = ${companyId}`
+        );
 
-      // 4. Удаляем саму компанию
-      await tx.company.delete({ where: { id: companyId } });
-    });
+        // 4. Удаляем роли и разрешения (сначала дочерние)
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM role_permissions WHERE "roleId" IN (
+            SELECT id FROM roles WHERE "companyId" = ${companyId}
+          )`
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM user_roles WHERE "roleId" IN (
+            SELECT id FROM roles WHERE "companyId" = ${companyId}
+          )`
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM roles WHERE "companyId" = ${companyId}`
+        );
+
+        // 5. Удаляем подписки
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM subscriptions WHERE "companyId" = ${companyId}`
+        );
+
+        // 6. Удаляем пользователей и связанные данные
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM email_tokens WHERE "userId" IN (
+            SELECT id FROM users WHERE "companyId" = ${companyId}
+          )`
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM user_roles WHERE "userId" IN (
+            SELECT id FROM users WHERE "companyId" = ${companyId}
+          )`
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM users WHERE "companyId" = ${companyId}`
+        );
+
+        // 7. Финально удаляем компанию
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM companies WHERE id = ${companyId}`
+        );
+      },
+      {
+        timeout: 30000, // 30 секунд - достаточно для удаления большого объема данных
+      }
+    );
 
     logger.warn(
       '[UsersService.deleteMyAccount] Аккаунт и компания полностью удалены',
