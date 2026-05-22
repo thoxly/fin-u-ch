@@ -1,10 +1,6 @@
 global:
   resolve_timeout: 5m
-  # Telegram configuration
-  # Note: Values will be substituted via envsubst in docker-compose
   telegram_api_url: 'https://api.telegram.org'
-  telegram_bot_token: '${TELEGRAM_BOT_TOKEN}'
-  telegram_chat_id: '${TELEGRAM_CHAT_ID}'
 
 # Templates for notifications
 templates:

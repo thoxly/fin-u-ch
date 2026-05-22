@@ -20,7 +20,7 @@ ingester:
 
 compactor:
   compaction:
-    block_retention: ${TEMPO_RETENTION:-168h} # 7 days default
+    block_retention: 168h
 
 storage:
   trace:
