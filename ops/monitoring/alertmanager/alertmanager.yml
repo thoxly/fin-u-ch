@@ -27,7 +27,7 @@ receivers:
   - name: 'telegram'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           <b>Alert:</b> {{ .GroupLabels.alertname }}
@@ -38,7 +38,7 @@ receivers:
   - name: 'telegram-critical'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           🚨 <b>CRITICAL ALERT</b> 🚨
@@ -50,7 +50,7 @@ receivers:
   - name: 'telegram-warning'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           ⚠️ <b>WARNING</b> ⚠️
