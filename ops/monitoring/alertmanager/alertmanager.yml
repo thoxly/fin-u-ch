@@ -1,10 +1,6 @@
 global:
   resolve_timeout: 5m
-  # Telegram configuration
-  # Note: Values will be substituted via envsubst in docker-compose
   telegram_api_url: 'https://api.telegram.org'
-  telegram_bot_token: '${TELEGRAM_BOT_TOKEN}'
-  telegram_chat_id: '${TELEGRAM_CHAT_ID}'
 
 # Templates for notifications
 templates:
@@ -31,7 +27,7 @@ receivers:
   - name: 'telegram'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           <b>Alert:</b> {{ .GroupLabels.alertname }}
@@ -42,7 +38,7 @@ receivers:
   - name: 'telegram-critical'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           🚨 <b>CRITICAL ALERT</b> 🚨
@@ -54,7 +50,7 @@ receivers:
   - name: 'telegram-warning'
     telegram_configs:
       - bot_token: '${TELEGRAM_BOT_TOKEN}'
-        chat_id: '${TELEGRAM_CHAT_ID}'
+        chat_id: ${TELEGRAM_CHAT_ID}
         parse_mode: 'HTML'
         message: |
           ⚠️ <b>WARNING</b> ⚠️

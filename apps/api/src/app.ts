@@ -57,20 +57,8 @@ app.use(express.urlencoded({ extended: true }));
 // Request ID middleware (must be before request logging)
 app.use(requestIdMiddleware);
 
-// General API rate limiting (applied to all API routes)
-app.use('/api', generalApiRateLimit);
-
-// Request logging
-app.use((req, res, next) => {
-  const requestId = (req as any).requestId || 'unknown';
-  logger.info(`${req.method} ${req.path}`, { requestId });
-  next();
-});
-
-// Swagger documentation
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Health check with service status
+// Health check must be before rate limiter — Docker healthcheck calls this
+// endpoint every 30s from 127.0.0.1, which would exhaust the per-IP limit
 app.get('/api/health', async (req, res) => {
   const health = {
     status: 'ok',
@@ -111,6 +99,19 @@ app.get('/api/health', async (req, res) => {
   const statusCode = health.status === 'ok' ? 200 : 503;
   res.status(statusCode).json(health);
 });
+
+// General API rate limiting (applied to all API routes except /api/health above)
+app.use('/api', generalApiRateLimit);
+
+// Request logging
+app.use((req, res, next) => {
+  const requestId = (req as any).requestId || 'unknown';
+  logger.info(`${req.method} ${req.path}`, { requestId });
+  next();
+});
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Routes
 app.use('/api/auth', authRoutes);

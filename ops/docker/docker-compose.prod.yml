@@ -134,11 +134,7 @@ services:
       - fin-u-ch-network
     restart: unless-stopped
     healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'wget --quiet --tries=1 --spider http://localhost/health || exit 1',
-        ]
+      test: ['CMD-SHELL', 'nc -z -w2 127.0.0.1 80 || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -207,7 +203,9 @@ services:
       - /bin/sh
       - -c
       - |
-        envsubst '$$TELEGRAM_BOT_TOKEN $$TELEGRAM_CHAT_ID' < /etc/alertmanager/alertmanager.yml.template > /etc/alertmanager/alertmanager.yml
+        sed -e "s|\$${TELEGRAM_BOT_TOKEN}|$$TELEGRAM_BOT_TOKEN|g" \
+            -e "s|\$${TELEGRAM_CHAT_ID}|$$TELEGRAM_CHAT_ID|g" \
+            /etc/alertmanager/alertmanager.yml.template > /etc/alertmanager/alertmanager.yml
         exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --storage.path=/alertmanager
     command: []
     volumes:
